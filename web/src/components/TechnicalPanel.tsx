@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { cropUrl, debugUrl, getDebugTrace, imageUrl } from "../api";
 import { IMPACT_LABELS, SEVERITY_LABELS, TYPE_LABELS } from "../lib/labels";
-import type { ConditionResult, Damage, DebugTrace } from "../types";
+import { CONFIDENCE_LABELS, DEDUCTION_SOURCE_LABELS, formatSek, variantLabel } from "../lib/price";
+import type { ConditionResult, Damage, DebugTrace, PriceEstimate } from "../types";
 
 /**
  * Deliberately NOT part of the seller-facing report above it: confidence, verification state and
@@ -53,6 +54,8 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
               <Row k="Dedup" v={`${trace.dedupBefore} fynd → ${trace.dedupAfter} skador`} />
             </dl>
           </TechSection>
+
+          {result.price && <PriceSection price={result.price} />}
 
           <TechSection title={`Gemini-anrop (${trace.geminiCalls.length})`}>
             <table className="tech-table">
@@ -151,6 +154,63 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * What the price engine did with our findings. It values, it never detects — so every row here is its
+ * own verdict on a damage WE reported, and `source` says how firm that verdict is: a measured table
+ * row, an estimated repair cost, or an explicit refusal to value it.
+ */
+function PriceSection({ price }: { price: PriceEstimate }) {
+  if (price.status !== "ok") {
+    return (
+      <TechSection title="Prissättning">
+        <dl className="tech-kv">
+          <Row k="Status" v={<span className="tech-flag">{price.status}</span>} />
+          <Row k="Orsak" v={price.unavailableReason ?? "—"} />
+          <Row k="Svarstid" v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
+        </dl>
+      </TechSection>
+    );
+  }
+  const valued = price.damageLines.filter((l) => l.deduction > 0);
+  return (
+    <TechSection title="Prissättning">
+      <dl className="tech-kv">
+        <Row k="Intervall" v={`${formatSek(price.low)} — ${formatSek(price.default)} — ${formatSek(price.high)}`} />
+        <Row k="Underlag" v={`${price.matchCount} annonser`} />
+        <Row k="Möbeltyp" v={`${price.variant?.map(variantLabel).join(", ") || "—"}${price.variantMethod ? ` (${price.variantMethod})` : ""}`} />
+        <Row k="Säkerhet" v={(price.confidence && CONFIDENCE_LABELS[price.confidence]) ?? price.confidence ?? "—"} />
+        <Row
+          k="Skadeavdrag"
+          v={
+            price.damageDeduction
+              ? `${(price.damageDeduction * 100).toFixed(0)} % över ${valued.length} värderad(e) post(er)`
+              : "inget"
+          }
+        />
+        <Row k="Svarstid" v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
+      </dl>
+      {price.damageLines.length > 0 && (
+        <table className="tech-table">
+          <thead>
+            <tr><th>Kategori</th><th>Grad</th><th>Avdrag</th><th>Värdering</th></tr>
+          </thead>
+          <tbody>
+            {price.damageLines.map((line, i) => (
+              <tr key={i} className={line.deduction === 0 ? "tech-part-clean" : undefined}>
+                <td>{line.category ?? "omappad"}{line.count && line.count > 1 ? ` ×${line.count}` : ""}</td>
+                <td>{line.grade ?? "—"}</td>
+                <td>{line.deduction ? `${(line.deduction * 100).toFixed(0)} %` : "—"}</td>
+                <td>{(line.source && DEDUCTION_SOURCE_LABELS[line.source]) ?? line.source ?? "—"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      {price.note && <p className="muted tech-note">{price.note}</p>}
+    </TechSection>
   );
 }
 

@@ -5,6 +5,7 @@ import GradeBadge from "../components/GradeBadge";
 import DamageCard from "../components/DamageCard";
 import EvidenceViewer from "../components/EvidenceViewer";
 import TechnicalPanel from "../components/TechnicalPanel";
+import PricePanel from "../components/PricePanel";
 import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
@@ -114,13 +115,20 @@ export default function ResultScreen({
 
   return (
     <div className="screen screen-light">
-      {result.grade && (
-        <section className="grade-hero">
-          <GradeBadge grade={result.grade.grade} size={72} />
-          <div className="grade-hero-label">{result.grade.label}</div>
-          <p className="grade-hero-rationale">{result.grade.rationale}</p>
-        </section>
+      {result.identity && (
+        <h2 className="result-identity">{[result.identity.brand, result.identity.model].filter(Boolean).join(" ")}</h2>
       )}
+
+      <div className="report-hero">
+        {result.grade && (
+          <section className="grade-hero">
+            <GradeBadge grade={result.grade.grade} size={72} />
+            <div className="grade-hero-label">{result.grade.label}</div>
+            <p className="grade-hero-rationale">{result.grade.rationale}</p>
+          </section>
+        )}
+        {result.price && <PricePanel price={result.price} />}
+      </div>
 
       <h3 className="damage-summary-line">
         {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}

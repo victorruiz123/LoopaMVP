@@ -1,4 +1,4 @@
-import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace } from "./types";
+import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -15,12 +15,21 @@ export interface CapturedShot {
   source: "video" | "manual";
 }
 
-export async function createJob(images: CapturedShot[]): Promise<{ jobId: string; imageCount: number }> {
+export async function createJob(
+  images: CapturedShot[],
+  identity: FurnitureIdentity | null,
+): Promise<{ jobId: string; imageCount: number }> {
   const res = await fetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ images }),
+    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null }),
   });
+  return json(res);
+}
+
+/** Kör om pipelinen på de bildrutor jobbet redan har — ingen ny filmning, ingen ny uppladdning. */
+export async function retryJob(jobId: string): Promise<{ jobId: string; imageCount: number }> {
+  const res = await fetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
   return json(res);
 }
 

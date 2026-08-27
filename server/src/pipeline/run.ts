@@ -1,6 +1,9 @@
+import path from "node:path";
 import { GEMINI_MODEL } from "../gemini.js";
 import { jobDir, updateProgress, completeJob, failJob, saveDebugTrace } from "../jobStore.js";
-import type { CallMeta, CapturedImage, ConditionResult, Damage, DebugTrace } from "../types.js";
+import { loadImageAsBase64 } from "../imageUtils.js";
+import { estimatePrice } from "../pricing.js";
+import type { CallMeta, CapturedImage, ConditionResult, Damage, DebugTrace, FurnitureIdentity } from "../types.js";
 import { DAMAGE_TYPES, inspectFurniture } from "./inspect.js";
 import { needsVerification, verifyFindings } from "./verify.js";
 import { dedupeDamages } from "./dedup.js";
@@ -12,7 +15,12 @@ import { gradeCondition } from "./grade.js";
  * per-tile, or per-defect calls, and no multi-minute retry chains — this is what keeps the whole run
  * inside the ~30s SLA.
  */
-export async function runConditionGrading(jobId: string, images: CapturedImage[], productContext: string | null): Promise<void> {
+export async function runConditionGrading(
+  jobId: string,
+  images: CapturedImage[],
+  productContext: string | null,
+  identity: FurnitureIdentity | null = null,
+): Promise<void> {
   const dir = jobDir(jobId);
   const startedAt = Date.now();
   const calls: CallMeta[] = [];
@@ -69,10 +77,21 @@ export async function runConditionGrading(jobId: string, images: CapturedImage[]
     const damages = dedupeDamages(verified);
     const grade = gradeCondition(damages, inspection.overallCondition);
 
+    // The price is a SECOND opinion on the same findings, computed by a separate engine that never
+    // looks for damage itself. It runs last because it needs both halves of the grading: the confirmed
+    // damage list to deduct from, and the canonical condition string to search on.
+    let price = null;
+    if (identity) {
+      await updateProgress(jobId, { stage: "pricing", message: "Hämtar prisförslag…" });
+      price = await estimatePrice(identity, damages, grade.canonicalCondition, await coverImage(dir, images));
+    }
+
     const latencyMs = Date.now() - startedAt;
     const result: ConditionResult = {
       jobId,
       createdAt: new Date().toISOString(),
+      identity,
+      price,
       coverage: inspection.coverage,
       coverageNote: inspection.coverageNote,
       grade,
@@ -107,6 +126,21 @@ export async function runConditionGrading(jobId: string, images: CapturedImage[]
     await saveDebugTrace(jobId, trace);
   } catch (err) {
     await failJob(jobId, err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * One frame for the price engine to read the furniture TYPE out of — "Landskrona" alone spans sofa,
+ * corner sofa, armchair and footstool. Best-effort: a missing file must not cost the whole price step.
+ */
+async function coverImage(dir: string, images: CapturedImage[]): Promise<string | null> {
+  const first = images[0];
+  if (!first) return null;
+  try {
+    const part = await loadImageAsBase64(path.join(dir, "originals", first.path));
+    return part.base64;
+  } catch {
+    return null;
   }
 }
 

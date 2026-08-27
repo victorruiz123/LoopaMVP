@@ -114,7 +114,7 @@ export interface PartInspection {
   defectsFound: number;
 }
 
-export type AnalysisStage = "queued" | "preparing" | "inspecting" | "verifying" | "grading" | "done" | "error";
+export type AnalysisStage = "queued" | "preparing" | "inspecting" | "verifying" | "grading" | "pricing" | "done" | "error";
 
 export interface JobProgress {
   stage: AnalysisStage;
@@ -135,9 +135,56 @@ export interface GradeExplanation {
   reasons: string[];
 }
 
+/** What the seller typed before filming. The price engine needs a name to search the corpus for. */
+export interface FurnitureIdentity {
+  brand: string | null;
+  model: string;
+}
+
+/** One damage as the price engine valued it — its category, not ours, and what it cost. */
+export interface PriceDamageLine {
+  category: string | null;
+  grade: number | null;
+  /** share of the undamaged base price, 0-1 */
+  deduction: number;
+  /** "table" | "estimated_repair" | "below_materiality" | "no_valuation" — how it was valued, or why it was not */
+  source: string | null;
+  description: string | null;
+  location: string | null;
+  count?: number;
+}
+
+/**
+ * The price half of the report. Always present once an identity was given, even when there is no
+ * number: `status` says which of the three cases this is, and the seller-facing text explains it.
+ */
+export interface PriceEstimate {
+  /** ok = a range; no_data = engine ran but found nothing comparable; unavailable = engine not reached */
+  status: "ok" | "no_data" | "unavailable";
+  low: number | null;
+  default: number | null;
+  high: number | null;
+  currency: "SEK";
+  confidence: string | null;
+  note: string | null;
+  matchCount: number;
+  variant: string[] | null;
+  variantMethod: string | null;
+  /** total deduction actually applied for the findings, as a share of the undamaged base */
+  damageDeduction: number | null;
+  damageLines: PriceDamageLine[];
+  unavailableReason: string | null;
+  requestedAt: string;
+  latencyMs: number;
+}
+
 export interface ConditionResult {
   jobId: string;
   createdAt: string;
+  /** brand + model as the seller typed them; null when the scan was started without them */
+  identity: FurnitureIdentity | null;
+  /** null only when no identity was given — otherwise always set, possibly to a status that has no number */
+  price: PriceEstimate | null;
   coverage: CoverageState;
   coverageNote: string | null;
   grade: GradeExplanation | null;
@@ -159,6 +206,16 @@ export interface ConditionJob {
   error: string | null;
   /** optional free-text product context (name/category) the caller may supply; grading must work without it */
   productContext: string | null;
+  /** what the seller typed on the start screen — carried so a re-price after a correction has it */
+  identity: FurnitureIdentity | null;
+  /**
+   * The curated frames, stored at CREATION time rather than only in the finished result.
+   *
+   * A run that dies upstream — Gemini 503/504 — used to take the walkaround with it: the files stayed
+   * on disk but nothing recorded which they were, so the only way forward was to film again. They are
+   * what a retry replays.
+   */
+  images?: CapturedImage[];
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

@@ -13,12 +13,13 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
+import { repriceResult } from "./pricing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
 import { mapRawDefect } from "./pipeline/inspect.js";
 import { loadImageAsBase64 } from "./imageUtils.js";
 import { getImageDimensions } from "./imageUtils.js";
 import { MAX_IMAGES_PER_JOB } from "./config.js";
-import type { CapturedImage, Damage, DamageType, Impact, Severity } from "./types.js";
+import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
 const MAX_BODY_BYTES = 60 * 1024 * 1024; // up to ~10 camera-resolution JPEGs as base64
@@ -52,8 +53,42 @@ async function readJsonBody<T>(req: IncomingMessage): Promise<T> {
 
 interface CreateJobBody {
   productContext?: string | null;
+  /** Brand + model as the seller typed them. Optional: grading works without them, pricing does not. */
+  brand?: string | null;
+  model?: string | null;
   /** Already curated by the client: selected video frames + any manual photos. No server-side selection. */
   images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual" }>;
+}
+
+/** A model name is what the price engine searches on; without one there is nothing to price. */
+function readIdentity(body: CreateJobBody): FurnitureIdentity | null {
+  const model = body.model?.trim();
+  if (!model) return null;
+  return { brand: body.brand?.trim() || null, model };
+}
+
+/**
+ * The one place a finished report is recomputed after the seller changes the findings. Grade and price
+ * are refreshed together, from the same damage list, so the two halves of the report cannot drift
+ * apart — the failure mode where a rejected damage disappears from the grade but is still deducted
+ * from the price.
+ */
+async function regradeAndReprice(job: ConditionJob): Promise<void> {
+  if (!job.result) return;
+  job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
+  await repriceResult(job.result, await coverImageBase64(job));
+  await persist(job);
+}
+
+async function coverImageBase64(job: ConditionJob): Promise<string | null> {
+  const first = job.result?.images[0];
+  if (!first) return null;
+  try {
+    const part = await loadImageAsBase64(path.join(jobDir(job.id), "originals", first.path));
+    return part.base64;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -64,7 +99,8 @@ async function createConditionJob(body: CreateJobBody): Promise<{ jobId: string;
   if (!Array.isArray(body.images) || body.images.length === 0) {
     return { error: "At least one image is required" };
   }
-  const job = await createJob(body.productContext ?? null);
+  const identity = readIdentity(body);
+  const job = await createJob(body.productContext ?? null, identity);
   const dir = jobDir(job.id);
   const originalsDir = path.join(dir, "originals");
   await mkdir(originalsDir, { recursive: true });
@@ -94,8 +130,11 @@ async function createConditionJob(body: CreateJobBody): Promise<{ jobId: string;
 
   if (images.length === 0) return { error: "No valid images were decoded" };
 
+  job.images = images;
+  await persist(job);
+
   // Fire and forget: the caller polls for progress.
-  void runConditionGrading(job.id, images, body.productContext ?? null);
+  void runConditionGrading(job.id, images, body.productContext ?? null, identity);
   return { jobId: job.id, imageCount: images.length };
 }
 
@@ -109,6 +148,32 @@ async function handleGetJob(id: string, res: ServerResponse) {
   const job = await getJob(id);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
   sendJson(res, 200, job);
+}
+
+/**
+ * Runs the pipeline again on the frames the job already has.
+ *
+ * The failures this exists for are upstream and transient — a Gemini 503 or 504 — and the walkaround
+ * that triggered them is still perfectly good. Re-uploading it would mean filming again for a fault
+ * that was never the seller's; the identical images also hit the Gemini disk cache for whatever part
+ * of the run did succeed, so a retry is cheaper than the first attempt, not dearer.
+ */
+async function handleRetry(id: string, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  const images = job.images ?? job.result?.images;
+  if (!images?.length) {
+    return sendJson(res, 409, { error: "Jobbet har inga sparade bildrutor att köra om." });
+  }
+  if (job.progress.stage !== "error" && job.progress.stage !== "done") {
+    return sendJson(res, 409, { error: "Analysen pågår redan." });
+  }
+
+  job.error = null;
+  job.progress = { stage: "queued", message: "I kö…" };
+  await persist(job);
+  void runConditionGrading(job.id, images, job.productContext ?? null, job.identity ?? null);
+  sendJson(res, 202, { jobId: job.id, imageCount: images.length });
 }
 
 async function handleGetDebug(id: string, res: ServerResponse) {
@@ -152,6 +217,8 @@ async function handleListJobs(res: ServerResponse) {
       createdAt: j.createdAt,
       progress: j.progress,
       grade: j.result?.grade ?? null,
+      identity: j.identity ?? null,
+      price: j.result?.price ?? null,
       thumbnailImageId: j.result?.images[0]?.id ?? null,
       error: j.error,
     })),
@@ -214,8 +281,7 @@ async function handleDamageAction(jobId: string, damageId: string, req: Incoming
     if (body.patch) Object.assign(damage, body.patch);
   }
 
-  job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
-  await persist(job);
+  await regradeAndReprice(job);
   sendJson(res, 200, job.result);
 }
 
@@ -264,8 +330,7 @@ async function handleDispute(jobId: string, damageId: string, req: IncomingMessa
   }
   damage.verificationReason = outcome.reason;
 
-  job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
-  await persist(job);
+  await regradeAndReprice(job);
   sendJson(res, 200, { verdict: outcome.verdict, reason: outcome.reason, result: job.result });
 }
 
@@ -318,8 +383,7 @@ async function handleAddFromPhoto(jobId: string, req: IncomingMessage, res: Serv
   damage.sellerAdded = true;
   job.result.damages.push(damage);
 
-  job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
-  await persist(job);
+  await regradeAndReprice(job);
   sendJson(res, 200, { added: true, reason: outcome.reason, damage, result: job.result });
 }
 
@@ -359,8 +423,7 @@ async function handleAddDamage(jobId: string, req: IncomingMessage, res: ServerR
   };
 
   job.result.damages.push(damage);
-  job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
-  await persist(job);
+  await regradeAndReprice(job);
   sendJson(res, 200, job.result);
 }
 
@@ -396,6 +459,9 @@ const server = http.createServer(async (req, res) => {
       if (segments.length === 3 && req.method === "GET") return await handleGetJob(segments[2], res);
       if (segments.length === 4 && segments[3] === "debug" && req.method === "GET") {
         return await handleGetDebug(segments[2], res);
+      }
+      if (segments.length === 4 && segments[3] === "retry" && req.method === "POST") {
+        return await handleRetry(segments[2], res);
       }
       if (segments.length === 5 && segments[3] === "images" && req.method === "GET") {
         return await handleGetImage(segments[2], segments[4], res);

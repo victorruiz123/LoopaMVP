@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { createJob, type CapturedShot } from "../api";
+import type { FurnitureIdentity } from "../types";
 import { extractBestFrames } from "../lib/videoFrames";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 
@@ -27,7 +28,15 @@ type Mode = "choose" | "photo" | "video" | "processing" | "review" | "creating";
 
 let shotCounter = 0;
 
-export default function CaptureScreen({ onBack, onCaptured }: { onBack: () => void; onCaptured: (jobId: string, previewShots: CapturedShot[]) => void }) {
+export default function CaptureScreen({
+  identity,
+  onBack,
+  onCaptured,
+}: {
+  identity: FurnitureIdentity;
+  onBack: () => void;
+  onCaptured: (jobId: string, previewShots: CapturedShot[]) => void;
+}) {
   const [mode, setMode] = useState<Mode>("choose");
   const [shots, setShots] = useState<Shot[]>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
@@ -238,7 +247,7 @@ export default function CaptureScreen({ onBack, onCaptured }: { onBack: () => vo
     const payload: CapturedShot[] =
       payloadOverride ?? shots.map((s) => ({ dataUrl: s.dataUrl, viewLabel: s.viewLabel, source: s.source }));
     try {
-      const { jobId } = await createJob(payload);
+      const { jobId } = await createJob(payload, identity);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       onCaptured(jobId, payload);
     } catch (err) {
@@ -255,6 +264,7 @@ export default function CaptureScreen({ onBack, onCaptured }: { onBack: () => vo
           ← Tillbaka
         </button>
         <h2 className="choose-title">Hur vill du visa möbeln?</h2>
+        <p className="capture-identity">{[identity.brand, identity.model].filter(Boolean).join(" ")}</p>
         <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("video")}>
           <span className="choose-icon">🎥</span>
           <div>

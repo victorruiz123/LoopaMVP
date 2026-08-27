@@ -1,7 +1,7 @@
 import path from "node:path";
 import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import type { ConditionJob, DebugTrace, JobProgress } from "./types.js";
+import type { ConditionJob, DebugTrace, FurnitureIdentity, JobProgress } from "./types.js";
 
 export const DATA_DIR = path.resolve(import.meta.dirname, "..", "data");
 export const JOBS_DIR = path.join(DATA_DIR, "jobs");
@@ -12,7 +12,10 @@ export function jobDir(id: string): string {
   return path.join(JOBS_DIR, id);
 }
 
-export async function createJob(productContext: string | null): Promise<ConditionJob> {
+export async function createJob(
+  productContext: string | null,
+  identity: FurnitureIdentity | null = null,
+): Promise<ConditionJob> {
   const id = randomUUID();
   const job: ConditionJob = {
     id,
@@ -21,6 +24,7 @@ export async function createJob(productContext: string | null): Promise<Conditio
     result: null,
     error: null,
     productContext,
+    identity,
   };
   jobs.set(id, job);
   await mkdir(path.join(jobDir(id), "originals"), { recursive: true });

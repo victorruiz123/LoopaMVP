@@ -135,9 +135,41 @@ function describeWorst(confirmed: Damage[]): string {
   return `Allvarligaste bekräftade fyndet: ${worst.type} på ${worst.part} (${worst.severity}).`;
 }
 
-const TYPE_LABELS_SV: Partial<Record<Damage["type"], string>> = {
-  scratch: "repor", scuff: "skrapmärken", stain: "fläckar", discoloration: "missfärgningar",
-  crack: "sprickor", dent: "bucklor", worn_material: "slitage", general_wear: "slitage",
+/**
+ * Skadetyp -> svensk pluralform för rapportens ENDA säljarmening.
+ *
+ * Fullständig `Record`, inte `Partial`, med flit: kartan täckte tidigare 8 av 26 typer, och de övriga
+ * föll tillbaka på ordet "skador" — vilket gav meningen "tydligt använd med 5 synliga skador, bland
+ * annat skador" högst upp i rapporten. Med en fullständig Record vägrar tsc kompilera den dagen någon
+ * lägger till en skadetyp utan att ge den ett ord här.
+ */
+const TYPE_LABELS_SV: Record<Damage["type"], string> = {
+  scratch: "repor",
+  scuff: "skrapmärken",
+  abrasion: "nötta ytor",
+  chip: "nagg",
+  dent: "bucklor",
+  crack: "sprickor",
+  tear: "revor",
+  hole: "hål",
+  stain: "fläckar",
+  discoloration: "missfärgningar",
+  fading: "blekta ytor",
+  rust: "rost",
+  corrosion: "korrosion",
+  pilling: "noppor",
+  worn_material: "slitage",
+  fraying: "fransade kanter",
+  compressed_upholstery: "nedtryckt stoppning",
+  peeling_flaking: "flagnande ytor",
+  deformation: "deformationer",
+  loose_component: "lösa delar",
+  broken_component: "trasiga delar",
+  missing_part: "delar som saknas",
+  sagging: "nedsjunkna partier",
+  structural_damage: "strukturella skador",
+  general_wear: "slitage",
+  other: "övriga skador",
 };
 
 /** ONE short seller-facing sentence — the primary thing the report shows, not a bullet list. */
@@ -157,7 +189,7 @@ function buildRationale(grade: ConditionGrade, confirmed: Damage[], oc: OverallC
 
   if (n > 0) {
     const worstType = [...confirmed].sort((a, b) => SEVERITY_RANK[b.severity] - SEVERITY_RANK[a.severity])[0].type;
-    const label = TYPE_LABELS_SV[worstType] ?? "skador";
+    const label = TYPE_LABELS_SV[worstType];
     const wearClause = wearDominates && oc ? ` Möbeln uppvisar även ${oc.affectedExtent === "widespread" ? "utbrett" : "märkbart"} allmänt slitage.` : "";
     return `Möbeln är tydligt använd med ${n} synlig${n === 1 ? "" : "a"} skad${n === 1 ? "a" : "or"}, bland annat ${label}.${wearClause}${impactClause}`;
   }

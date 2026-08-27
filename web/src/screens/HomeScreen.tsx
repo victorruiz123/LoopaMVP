@@ -1,20 +1,28 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { imageUrl, listJobs } from "../api";
-import type { JobSummary } from "../types";
+import type { FurnitureIdentity, JobSummary } from "../types";
 import GradeBadge from "../components/GradeBadge";
+import BrandSheet from "../components/BrandSheet";
+import BrandAvatar from "../components/BrandAvatar";
+import { ChevronRight } from "../components/icons";
+import { formatPriceRange } from "../lib/price";
 
 export default function HomeScreen({
   onStartScan,
   onOpenJob,
 }: {
-  onStartScan: () => void;
+  onStartScan: (identity: FurnitureIdentity) => void;
   onOpenJob: (jobId: string) => void;
 }) {
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState("");
   // Collapsed by default: the saved list used to render ABOVE the scan card, so once a few furniture
   // pieces had piled up the primary action was several screens down. History is something you look up
   // occasionally; starting a scan is why you opened the page.
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const modelRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listJobs()
@@ -23,35 +31,104 @@ export default function HomeScreen({
   }, []);
 
   const finished = jobs?.filter((j) => j.progress.stage === "done") ?? [];
+  // The model name is what the price engine searches the ad corpus on; without it there is nothing to
+  // price. The brand narrows that search but is not required — not every piece carries one.
+  const canStart = model.trim().length > 0;
+
+  function start() {
+    if (!canStart) return;
+    onStartScan({ brand: brand.trim() || null, model: model.trim() });
+  }
 
   return (
-    <div className="screen screen-light">
-      <header className="brand-header">
+    <div className="screen screen-light home">
+      <header className="home-header">
         <span className="brand-pill">
-          <span className="brand-dot" /> CONDITION GRADING
+          <span className="brand-dot" /> SKICK &amp; PRIS
         </span>
-        <h1>
-          Fotografera möbeln
+        <h1 className="home-title">
+          Vilken möbel
           <br />
-          <span className="accent">från alla håll</span>
+          <span className="accent">säljer du?</span>
         </h1>
+        <p className="home-lede">
+          Märke och modell först — sedan filmar du ett varv runt möbeln. Du får tillbaka skick, skador och
+          prisförslag i ett svar.
+        </p>
       </header>
 
-      <section className="scan-card">
-        <button className="scan-icon-btn">📷</button>
-        <h2>Redo att skanna?</h2>
-        <p className="muted">Filma, fotografera eller ladda upp en färdig video.</p>
-        <button className="btn btn-primary" onClick={onStartScan}>
-          Starta skanning
+      {/* Grupperad lista i stället för två inramade fält. Två rader som delar en yta och skiljs av
+          ett hårstreck läser som ETT formulär; två boxar med var sin kant läser som två beslut. */}
+      <div className="form-group">
+        <button
+          type="button"
+          className="form-row form-row-tappable"
+          onClick={() => setSheetOpen(true)}
+        >
+          <span className="form-row-label">Märke</span>
+          <span className="form-row-value">
+            {brand ? (
+              <>
+                <BrandAvatar name={brand} size={26} />
+                <span className="form-row-text">{brand}</span>
+              </>
+            ) : (
+              <span className="form-row-placeholder">Välj märke</span>
+            )}
+          </span>
+          <span className="form-row-chevron">
+            <ChevronRight size={17} />
+          </span>
         </button>
-      </section>
+
+        <div className="form-row">
+          <label className="form-row-label" htmlFor="model-input">
+            Modell
+          </label>
+          <input
+            id="model-input"
+            ref={modelRef}
+            className="form-row-input"
+            value={model}
+            onChange={(e) => setModel(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && start()}
+            placeholder="t.ex. Landskrona 3-sits"
+            autoComplete="off"
+            enterKeyHint="go"
+          />
+        </div>
+      </div>
+
+      <div className="home-cta">
+        <button className="btn btn-primary" disabled={!canStart} onClick={start}>
+          Fortsätt till filmning
+        </button>
+        <p className="form-hint">
+          {canStart
+            ? "Prisförslaget bygger på liknande annonser för just den här modellen."
+            : "Modellnamnet behövs för prisförslaget. Märket är valfritt men smalnar av underlaget."}
+        </p>
+      </div>
+
+      <BrandSheet
+        open={sheetOpen}
+        selected={brand || null}
+        onSelect={(picked) => {
+          setBrand(picked);
+          setSheetOpen(false);
+        }}
+        onClose={() => setSheetOpen(false)}
+      />
 
       {finished.length > 0 && (
         <section className="collapsible-card">
           <button className="collapsible-header" onClick={() => setHistoryOpen((v) => !v)}>
-            <span>🗂️ Sparade möbler</span>
-            <span className="muted">
-              {finished.length} st {historyOpen ? "⌄" : "›"}
+            <span className="collapsible-title">Sparade möbler</span>
+            <span className="collapsible-meta">
+              {finished.length} st
+              <span className={`collapsible-chevron ${historyOpen ? "collapsible-chevron-open" : ""}`}>
+                <ChevronRight size={16} />
+              </span>
             </span>
           </button>
           {historyOpen && (
@@ -64,10 +141,13 @@ export default function HomeScreen({
                     alt=""
                   />
                   <div className="saved-item-body">
-                    <div>Möbel · {new Date(j.createdAt).toLocaleDateString("sv-SE")}</div>
-                    <div className="muted">Analyserad · betyg {j.grade?.grade ?? "?"}</div>
+                    <div className="saved-item-title">{describe(j)}</div>
+                    <div className="muted small">
+                      Betyg {j.grade?.grade ?? "?"}
+                      {j.price?.status === "ok" ? ` · ${formatPriceRange(j.price)}` : ""}
+                    </div>
                   </div>
-                  {j.grade && <GradeBadge grade={j.grade.grade} size={36} />}
+                  {j.grade && <GradeBadge grade={j.grade.grade} size={34} />}
                 </button>
               ))}
             </div>
@@ -76,4 +156,9 @@ export default function HomeScreen({
       )}
     </div>
   );
+}
+
+function describe(job: JobSummary): string {
+  const name = [job.identity?.brand, job.identity?.model].filter(Boolean).join(" ");
+  return name || "Möbel";
 }

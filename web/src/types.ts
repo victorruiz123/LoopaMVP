@@ -77,9 +77,48 @@ export interface GradeExplanation {
   reasons: string[];
 }
 
+/** What the seller typed before filming — the price engine searches the corpus on this. */
+export interface FurnitureIdentity {
+  brand: string | null;
+  model: string;
+}
+
+/** One damage as the price engine valued it — its category, not ours, and what it cost. */
+export interface PriceDamageLine {
+  category: string | null;
+  grade: number | null;
+  /** share of the undamaged base price, 0-1 */
+  deduction: number;
+  /** "table" | "estimated_repair" | "below_materiality" | "no_valuation" */
+  source: string | null;
+  description: string | null;
+  location: string | null;
+  count?: number;
+}
+
+export interface PriceEstimate {
+  status: "ok" | "no_data" | "unavailable";
+  low: number | null;
+  default: number | null;
+  high: number | null;
+  currency: "SEK";
+  confidence: string | null;
+  note: string | null;
+  matchCount: number;
+  variant: string[] | null;
+  variantMethod: string | null;
+  damageDeduction: number | null;
+  damageLines: PriceDamageLine[];
+  unavailableReason: string | null;
+  requestedAt: string;
+  latencyMs: number;
+}
+
 export interface ConditionResult {
   jobId: string;
   createdAt: string;
+  identity: FurnitureIdentity | null;
+  price: PriceEstimate | null;
   coverage: CoverageState;
   coverageNote: string | null;
   grade: GradeExplanation | null;
@@ -93,7 +132,7 @@ export interface ConditionResult {
   latencyMs: number;
 }
 
-export type AnalysisStage = "queued" | "preparing" | "inspecting" | "verifying" | "grading" | "done" | "error";
+export type AnalysisStage = "queued" | "preparing" | "inspecting" | "verifying" | "grading" | "pricing" | "done" | "error";
 
 export interface JobProgress {
   stage: AnalysisStage;
@@ -107,6 +146,9 @@ export interface ConditionJob {
   result: ConditionResult | null;
   error: string | null;
   productContext: string | null;
+  identity: FurnitureIdentity | null;
+  /** bildrutorna jobbet skapades med — det ett omtag spelar upp igen */
+  images?: CapturedImage[];
 }
 
 export interface JobSummary {
@@ -114,6 +156,8 @@ export interface JobSummary {
   createdAt: string;
   progress: JobProgress;
   grade: GradeExplanation | null;
+  identity: FurnitureIdentity | null;
+  price: PriceEstimate | null;
   thumbnailImageId: string | null;
   error: string | null;
 }

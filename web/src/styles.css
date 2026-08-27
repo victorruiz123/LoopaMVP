@@ -64,9 +64,6 @@ body {
 .saved-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #eee; }
 .saved-item-body { flex: 1; font-size: 14px; }
 
-.scan-card { background: #fff; border-radius: 20px; padding: 28px 16px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-.scan-icon-btn { width: 56px; height: 56px; border-radius: 999px; background: #fed7aa; border: none; font-size: 24px; margin-bottom: 12px; cursor: pointer; }
-.scan-card h2 { margin: 4px 0; }
 
 /* ---- capture: mode choice ---- */
 .choose-title { text-align: center; margin: 4px 0 8px; }
@@ -155,9 +152,13 @@ body {
 
 /* ---- result ---- */
 .grade-hero {
-  background: #1c1712; color: #fff; border-radius: 20px; padding: 28px 20px; text-align: center;
+  background: #1c1712; color: #fff; border-radius: 24px; padding: 26px 20px; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
+/* Betyget sitter överst och priset under: när de är staplade sluts hörnen mot varandra
+   så paret läses som ett svar med två delar, inte som två fristående kort. */
+.report-hero .grade-hero { border-radius: 24px 24px 10px 10px; }
+.report-hero .price-panel { border-radius: 10px 10px 24px 24px; }
 .grade-hero-label { font-size: 22px; font-weight: 800; }
 .grade-hero-rationale { margin: 0; color: #d6d3d1; font-size: 15px; line-height: 1.5; max-width: 340px; }
 
@@ -302,3 +303,318 @@ body {
   text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
 .add-damage-actions { display: flex; flex-direction: column; gap: 2px; }
 .lap-ring-fill-fast { stroke: #f59e0b; }
+
+/* ---- identitet: märke + modell före skanningen ---- */
+.capture-identity { text-align: center; margin: -4px 0 4px; font-weight: 700; color: #57534e; }
+.analysis-identity { font-size: 15px; font-weight: 700; margin-bottom: 12px; text-align: center; }
+.result-identity { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
+
+/* ---- skick + pris sida vid sida ---- */
+.report-hero { display: flex; flex-direction: column; gap: 8px; }
+
+.price-panel {
+  background: #fff; border-radius: 24px; padding: 20px; text-align: center;
+  box-shadow: var(--brand-lift); display: flex; flex-direction: column; gap: 8px;
+}
+.price-panel-head {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--brand-muted-soft);
+}
+.price-main {
+  font-size: 36px; font-weight: 800; line-height: 1.05; letter-spacing: -0.03em;
+  color: var(--brand-ink-strong);
+}
+.price-range { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.price-range-end { display: flex; flex-direction: column; gap: 1px; min-width: 84px; }
+.price-range-end em { font-style: normal; font-weight: 700; font-size: 15px; }
+.price-range-end-high { align-items: flex-end; }
+.price-range-end:first-of-type { align-items: flex-start; }
+.price-range-bar {
+  flex: 1; height: 6px; border-radius: 999px;
+  background: linear-gradient(90deg, #7BB661, #E8C55B 55%, var(--brand-accent));
+  /* Ändpunkterna markeras med en ljus ring i vardera änden, så stapeln läser som en
+     skala med två avläsningspunkter och inte som en förloppsindikator. */
+  box-shadow: inset 3px 0 0 rgba(255,255,255,0.55), inset -3px 0 0 rgba(255,255,255,0.55);
+}
+.price-deduction {
+  margin: 6px 0 0; font-size: 14px; font-weight: 600; color: #9A4E12;
+  background: #FBEFE2; border-radius: 12px; padding: 9px 12px;
+}
+.price-basis { margin: 0; }
+.price-panel-empty { text-align: left; }
+.price-empty-title { margin: 0; font-weight: 700; }
+
+/* ==========================================================================
+   Märke & pris — typografi, grupperade fält och bottensheet
+   ==========================================================================
+   Tokens som variabler i stället för inklistrade hex-värden, eftersom de kom från
+   designen och inte från den här filen: appen runt omkring kör på närliggande men
+   inte identiska toner (#f4efe9 mot #F3EAE0, #ea580c mot #F2801F). Samlade så här
+   går de att jämka ihop på ett ställe den dagen paletterna ska bli en enda.       */
+:root {
+  --brand-surface: #FFFFFF;
+  --brand-field-bg: #FBF6EF;
+  --brand-border: #E9DCC9;
+  --brand-accent: #F2801F;
+  --brand-ink: #1B1613;
+  --brand-ink-strong: #2A1B12;
+  --brand-muted: #8D8680;
+  --brand-muted-soft: #9C948B;
+  --brand-label: #4A3F37;
+  --brand-cta: #F0A489;
+
+  /* Hårstreck, inte kanter. En separator ska avgränsa två rader utan att rita en
+     ram runt någon av dem — 1 px i full styrka gör det senare. */
+  --hairline: rgba(42, 27, 18, 0.09);
+  /* Två skuggor: en tät nära kanten som ger formen avgränsning, en vid och svag som
+     lyfter den. En ensam stor skugga blir grumlig i stället för upphöjd. */
+  --lift: 0 1px 2px rgba(42, 27, 18, 0.05), 0 10px 30px rgba(42, 27, 18, 0.06);
+  --focus: 0 0 0 3.5px rgba(242, 128, 31, 0.2);
+  /* iOS bottensheet-kurva: snabb start, lång mjuk inbromsning. En ren ease-out
+     stannar för tvärt och får arket att kännas lätt i stället för fysiskt. */
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+
+/* Siffror som inte hoppar i bredd när de uppdateras. */
+.price-main, .price-range-end em, .saved-item .small { font-variant-numeric: tabular-nums; }
+
+/* ---- startsidan ---- */
+.home { gap: 0; }
+.home-header { margin-bottom: 26px; }
+.home-title {
+  font-size: 34px; font-weight: 800; line-height: 1.08; margin: 0;
+  /* Stor text behöver dras ihop. Utan negativ spärr ser en 34-punkters rubrik gles
+     och luddig ut — det är den enskilt tydligaste skillnaden mot systemtypografi. */
+  letter-spacing: -0.033em; color: var(--brand-ink);
+}
+.home-lede {
+  margin: 12px 0 0; font-size: 15px; line-height: 1.5; color: var(--brand-muted);
+  max-width: 33ch;
+}
+
+/* grupperad lista, iOS-stil */
+.form-group {
+  background: var(--brand-surface); border-radius: 16px; overflow: hidden;
+  box-shadow: var(--lift);
+}
+.form-row {
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 56px; padding: 0 16px; background: none; border: none;
+  font-family: inherit; font-size: 17px; text-align: left;
+}
+/* Strecket dras från etikettens vänsterkant, inte från kortets. En separator som går
+   ut i kanten delar kortet i två kort; en indragen håller ihop dem som en lista.
+   Ritas som ett absolut placerat pseudoelement PÅ raden — den tidigare varianten
+   maskerade en genomgående inner-shadow med en vit ruta, och eftersom raden saknade
+   `position: relative` hamnade rutan mot sidan i stället för mot kortet och stack ut
+   som ett vitt streck till vänster om formuläret. */
+.form-row { position: relative; }
+.form-row + .form-row::before {
+  content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline);
+}
+.form-row-tappable { cursor: pointer; transition: background 140ms var(--ease-ui); }
+.form-row-tappable:active { background: var(--brand-field-bg); }
+.form-row-tappable:focus-visible { outline: none; box-shadow: var(--focus); }
+.form-row-label {
+  flex-shrink: 0; font-size: 17px; font-weight: 500; color: var(--brand-ink);
+  letter-spacing: -0.01em;
+}
+.form-row-value {
+  flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+  min-width: 0; overflow: hidden;
+}
+.form-row-text {
+  font-size: 17px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.form-row-placeholder { font-size: 17px; color: var(--brand-muted-soft); }
+.form-row-chevron { display: flex; color: #C6BDB2; flex-shrink: 0; margin-right: -3px; }
+.form-row-input {
+  flex: 1; min-width: 0; border: none; background: none; padding: 0;
+  font-family: inherit; font-size: 17px; color: var(--brand-ink-strong); font-weight: 600;
+  text-align: right; letter-spacing: -0.01em;
+}
+.form-row-input::placeholder { color: var(--brand-muted-soft); font-weight: 400; }
+.form-row-input:focus { outline: none; }
+
+.home-cta { margin-top: 22px; margin-bottom: 28px; }
+.home-cta .btn-primary {
+  min-height: 52px; border-radius: 15px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
+  transition: filter 140ms var(--ease-ui), transform 120ms var(--ease-ui);
+}
+.home-cta .btn-primary:not(:disabled):active { transform: scale(0.985); filter: brightness(0.95); }
+.form-hint {
+  margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted); text-align: center;
+}
+/* Ett inaktivt CTA måste SE inaktivt ut. Med enbart .btn-primary bakom sig renderades
+   knappen i en dämpad orange som läser som fullt klickbar, och enda återkopplingen på
+   ett tryck var att ingenting hände. */
+.btn:disabled { background: #E8DDCE; color: #9A8E80; cursor: default; box-shadow: none; }
+.btn-text:disabled { background: none; }
+
+/* ---- monogram ---- */
+.brand-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border-radius: 999px; font-weight: 700; letter-spacing: 0.01em;
+  /* Inre ring i stället för yttre kant: håller cirkelns diameter exakt och ger tonen
+     en kontur även mot en yta i nästan samma färg. */
+  box-shadow: inset 0 0 0 1px rgba(42, 27, 18, 0.05);
+}
+
+/* ---- bottensheet ---- */
+.sheet-root { position: fixed; inset: 0; z-index: 60; }
+.sheet-overlay {
+  position: absolute; inset: 0; background: rgba(24, 18, 14, 0.42);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity 320ms var(--ease-ui);
+}
+.sheet-overlay-shown { opacity: 1; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 78vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--brand-surface); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -0.5px 0 rgba(42, 27, 18, 0.08), 0 -20px 60px rgba(24, 18, 14, 0.26);
+  transform: translateY(100%); transition: transform 420ms var(--ease-sheet);
+  max-width: 480px; margin: 0 auto; will-change: transform;
+}
+.sheet-shown { transform: translateY(0); }
+/* Under dragningen får inget tweenas — arket ska sitta fast i fingret. */
+.sheet-dragging { transition: none; }
+
+.sheet-grip { flex-shrink: 0; touch-action: none; cursor: grab; }
+.sheet-grip:active { cursor: grabbing; }
+.sheet-handle {
+  width: 36px; height: 5px; border-radius: 999px; background: #DCD2C4;
+  margin: 8px auto 0;
+}
+.sheet-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px 12px;
+}
+.sheet-header h2 {
+  margin: 0; font-size: 22px; font-weight: 800; color: var(--brand-ink); letter-spacing: -0.025em;
+}
+.sheet-close {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border: none; background: rgba(42, 27, 18, 0.06); color: #7C736B;
+  width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
+  transition: background 140ms var(--ease-ui), color 140ms var(--ease-ui);
+}
+.sheet-close:hover { background: rgba(42, 27, 18, 0.11); color: var(--brand-ink); }
+.sheet-close:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.sheet-search { position: relative; padding: 0 16px 10px; flex-shrink: 0; }
+.sheet-search-icon {
+  position: absolute; left: 27px; top: 50%; transform: translateY(-55%);
+  display: flex; color: #A79D93; pointer-events: none;
+}
+.sheet-search input {
+  width: 100%; border: none; border-radius: 11px; height: 40px;
+  padding: 0 34px 0 34px; font-size: 16px; font-family: inherit;
+  background: rgba(42, 27, 18, 0.055); color: var(--brand-ink);
+  transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+}
+.sheet-search input::placeholder { color: #A79D93; }
+.sheet-search input:focus { outline: none; background: #fff; box-shadow: var(--focus); }
+.sheet-search-clear {
+  position: absolute; right: 25px; top: 50%; transform: translateY(-55%);
+  display: flex; align-items: center; justify-content: center;
+  width: 19px; height: 19px; border-radius: 999px; border: none; cursor: pointer;
+  background: #BDB3A8; color: #fff; padding: 0;
+}
+
+.sheet-body {
+  flex: 1; overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.sheet-section-title {
+  position: sticky; top: 0; z-index: 1;
+  font-size: 13px; font-weight: 600; color: var(--brand-muted-soft); letter-spacing: -0.005em;
+  padding: 8px 4px 8px; background: var(--brand-surface);
+}
+
+.sheet-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 62%; padding: 24px 16px; text-align: center;
+}
+.sheet-empty-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 54px; height: 54px; border-radius: 999px;
+  background: rgba(42, 27, 18, 0.055); color: #A79D93; margin-bottom: 15px;
+}
+.sheet-empty-title {
+  margin: 0 0 5px; font-size: 17px; font-weight: 700; color: var(--brand-ink-strong);
+  letter-spacing: -0.015em;
+}
+.sheet-empty-hint { margin: 0 0 20px; font-size: 14px; line-height: 1.45; color: var(--brand-muted); max-width: 28ch; }
+.brand-use-typed {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
+  border: none; border-radius: 14px; background: var(--brand-cta); color: #fff;
+  padding: 13px 20px; font-family: inherit; font-size: 16px; font-weight: 700;
+  letter-spacing: -0.01em; cursor: pointer;
+  transition: filter 140ms var(--ease-ui), transform 120ms var(--ease-ui);
+}
+.brand-use-typed:active { transform: scale(0.98); filter: brightness(0.95); }
+.brand-use-typed:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.brand-rows { list-style: none; margin: 0; padding: 0; }
+.brand-row {
+  position: relative; display: flex; align-items: center; gap: 12px; width: 100%;
+  border: none; background: none; padding: 9px 4px; min-height: 52px;
+  font-family: inherit; font-size: 17px; text-align: left; cursor: pointer;
+  transition: background 120ms var(--ease-ui);
+  border-radius: 10px;
+}
+/* Hårstrecket börjar där texten börjar, inte där raden gör. Fullbredds-streck läser som
+   en tabell; indragna läser som en lista av namn. */
+.brand-rows li + li .brand-row::before {
+  content: ""; position: absolute; top: 0; left: 50px; right: 0; height: 1px; background: var(--hairline);
+}
+.brand-row:active { background: rgba(42, 27, 18, 0.05); }
+.brand-row:active::before, .brand-row-selected::before { opacity: 0; }
+.brand-row:focus-visible { outline: none; box-shadow: var(--focus); }
+.brand-row-selected { background: rgba(242, 128, 31, 0.075); }
+.brand-row-name {
+  flex: 1; font-weight: 500; color: var(--brand-ink-strong); letter-spacing: -0.015em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-row-check { display: flex; color: var(--brand-accent); flex-shrink: 0; }
+
+/* ---- sparade möbler ---- */
+.collapsible-card { border-radius: 16px; box-shadow: var(--lift); }
+.collapsible-title { font-size: 16px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
+.collapsible-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-muted); font-size: 15px; }
+.collapsible-chevron { display: flex; color: #C6BDB2; transition: transform 220ms var(--ease-ui); }
+.collapsible-chevron-open { transform: rotate(90deg); }
+.saved-item-title { font-size: 15px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em; }
+
+/* Respektera systemets rörelseinställning. Arket ska fortfarande dyka upp, bara utan resa. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet-overlay, .collapsible-chevron, .btn-primary, .brand-use-typed { transition-duration: 1ms; }
+}
+
+/* ---- misslyckad analys ---- */
+.failure-card {
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+  max-width: 340px; width: 100%; text-align: center;
+}
+.failure-mark {
+  display: flex; align-items: center; justify-content: center;
+  width: 52px; height: 52px; border-radius: 999px;
+  background: rgba(242, 128, 31, 0.16); color: var(--brand-accent);
+  font-size: 26px; font-weight: 800; margin-bottom: 2px;
+}
+.failure-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.025em; }
+.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: #C3BBB2; }
+.failure-card .btn-primary { min-height: 50px; border-radius: 15px; font-size: 17px; }
+.failure-secondary { color: #C3BBB2; }
+.failure-details { margin-top: 8px; width: 100%; }
+.failure-details summary { font-size: 12px; color: #8A837C; cursor: pointer; }
+.failure-details code {
+  display: block; margin-top: 8px; padding: 10px; border-radius: 10px;
+  background: rgba(255,255,255,0.05); color: #A8A29E; font-size: 11px;
+  text-align: left; word-break: break-word;
+}

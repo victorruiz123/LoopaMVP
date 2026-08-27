@@ -1,12 +1,18 @@
 import type { ConditionGrade } from "../types";
 
+/**
+ * En skala grönt -> ockra -> rött, i appens egen värme. Färgerna var tidigare hämtade rakt ur en
+ * generisk Tailwind-palett, och C låg på en klarblå (#3b82f6) — mitt i en varm beige app blev betyget
+ * det enda kalla på skärmen, och blått läser dessutom som information snarare än som ett omdöme på en
+ * skala där grannarna är grönt och orange.
+ */
 const GRADE_COLORS: Record<ConditionGrade, string> = {
-  A: "#16a34a",
-  B: "#22c55e",
-  C: "#3b82f6",
-  D: "#f97316",
-  E: "#ef4444",
-  F: "#b91c1c",
+  A: "#2F7A50",
+  B: "#62A15C",
+  C: "#C9922E",
+  D: "#E07B2C",
+  E: "#C4442E",
+  F: "#96271C",
 };
 
 export default function GradeBadge({ grade, size = 56 }: { grade: ConditionGrade; size?: number }) {
