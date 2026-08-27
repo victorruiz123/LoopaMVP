@@ -1,0 +1,133 @@
+{
+  "id": "03-tre-sma-repor-spritt",
+  "description": "Tre spridda S1-skador: tippar över cMultiCountThreshold (>=3 st S1) och ger C.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "d1",
+        "type": "scratch",
+        "part": "sitsens ovansida",
+        "semanticLocation": "främre kanten",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 88,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_0",
+            "mark": {
+              "kind": "box",
+              "x": 0.2,
+              "y": 0.3,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d2",
+        "type": "scuff",
+        "part": "vänster framben",
+        "semanticLocation": "nedre delen",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 82,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_1",
+            "mark": {
+              "kind": "box",
+              "x": 0.15,
+              "y": 0.7,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d3",
+        "type": "stain",
+        "part": "ryggstödets framsida",
+        "semanticLocation": "mitten",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 75,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_2",
+            "mark": {
+              "kind": "box",
+              "x": 0.45,
+              "y": 0.4,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 3,
+    "types": [
+      "scratch",
+      "scuff",
+      "stain"
+    ],
+    "severityHistogram": {
+      "S1": 3
+    },
+    "impactHistogram": {
+      "cosmetic": 3
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 3
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 3,
+    "dedupAfter": 3
+  },
+  "intended": null
+}

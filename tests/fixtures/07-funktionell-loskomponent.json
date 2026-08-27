@@ -1,0 +1,77 @@
+{
+  "id": "07-funktionell-loskomponent",
+  "description": "Funktionell S2: defektspåret ger bara C, men functionalityAffected i helhetsläsningen lyfter till D.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "d1",
+        "type": "loose_component",
+        "part": "höger armstöd",
+        "semanticLocation": "fästet mot ryggstödet",
+        "severity": "S2",
+        "impact": "functional",
+        "description": "",
+        "confidence": 80,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_1",
+            "mark": {
+              "kind": "box",
+              "x": 0.6,
+              "y": 0.35,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": true,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "D",
+    "canonicalCondition": "Okej skick",
+    "damageCount": 1,
+    "types": [
+      "loose_component"
+    ],
+    "severityHistogram": {
+      "S2": 1
+    },
+    "impactHistogram": {
+      "functional": 1
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 1
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": true,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 1,
+    "dedupAfter": 1
+  },
+  "intended": null
+}

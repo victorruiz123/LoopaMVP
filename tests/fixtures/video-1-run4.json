@@ -1,0 +1,110 @@
+{
+  "id": "video-1-run4",
+  "description": "Inspelad körning av video-1 (körning 4), jobb a8ce1a8c-36ac-4f33-abb8-8898de3ec5b3.",
+  "source": "recorded",
+  "furniture": "video-1",
+  "runIndex": 4,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "bb5204ebd36d2c37",
+  "recordedAt": "2026-08-26T16:55:29.731Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_iavqly",
+        "type": "compressed_upholstery",
+        "part": "sitsens ovansida",
+        "semanticLocation": "mitten och främre delen",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Veckbildning och skrynklor i tyget samt lätt nedsutten stoppning på sitsens sittyta.",
+        "confidence": 80,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "64a2f64b-8ad3-4312-bd1b-691853eb256a",
+            "mark": {
+              "kind": "box",
+              "x": 0.15,
+              "y": 0.47,
+              "w": 0.8,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "8f3c7fdd-f8d2-444e-97db-69072f389e4c",
+            "mark": {
+              "kind": "box",
+              "x": 0.43,
+              "y": 0.45,
+              "w": 0.55,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "76604bf5-0413-490f-a530-d2005325adfb",
+            "mark": {
+              "kind": "box",
+              "x": 0.35,
+              "y": 0.32,
+              "w": 0.6,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "a82db74e-d372-4124-9135-95eb333f2a4f",
+            "mark": {
+              "kind": "box",
+              "x": 0.2,
+              "y": 0.45,
+              "w": 0.75,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "lätta veck på sitsytan",
+        "välvårdad helhetsform"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "B",
+    "canonicalCondition": "Mycket bra skick",
+    "damageCount": 1,
+    "types": [
+      "compressed_upholstery"
+    ],
+    "severityHistogram": {
+      "S1": 1
+    },
+    "impactHistogram": {
+      "cosmetic": 1
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 1
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 1,
+    "dedupAfter": 1
+  },
+  "intended": null
+}

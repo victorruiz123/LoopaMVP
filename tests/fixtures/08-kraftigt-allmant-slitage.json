@@ -1,0 +1,41 @@
+{
+  "id": "08-kraftigt-allmant-slitage",
+  "description": "Noll enskilda defekter men kraftigt utbrett slitage: holistiska spåret ensamt driver betyget via max().",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [],
+    "overallCondition": {
+      "overallWearLevel": "heavy",
+      "affectedExtent": "widespread",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "D",
+    "canonicalCondition": "Okej skick",
+    "damageCount": 0,
+    "types": [],
+    "severityHistogram": {},
+    "impactHistogram": {},
+    "verificationHistogram": {},
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "heavy",
+    "affectedExtent": "widespread",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 0,
+    "dedupAfter": 0
+  },
+  "intended": null
+}

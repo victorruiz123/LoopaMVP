@@ -1,0 +1,77 @@
+{
+  "id": "06-strukturell-spricka",
+  "description": "KLIPPAN: en enda S1 märkt structural golvar möbeln till E via E-grenens hasStructural.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "d1",
+        "type": "crack",
+        "part": "vänster bakben",
+        "semanticLocation": "vid fästet mot sargen",
+        "severity": "S1",
+        "impact": "structural",
+        "description": "",
+        "confidence": 72,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_3",
+            "mark": {
+              "kind": "box",
+              "x": 0.22,
+              "y": 0.75,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "E",
+    "canonicalCondition": "Okej skick",
+    "damageCount": 1,
+    "types": [
+      "crack"
+    ],
+    "severityHistogram": {
+      "S1": 1
+    },
+    "impactHistogram": {
+      "structural": 1
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 1
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 1,
+    "dedupAfter": 1
+  },
+  "intended": null
+}

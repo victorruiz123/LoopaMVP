@@ -1,0 +1,41 @@
+{
+  "id": "09-otillracklig-tackning",
+  "description": "Halva möbeln syntes aldrig men inga defekter hittades — får rakt A idag. Målet för fas 4.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "NOT_SUFFICIENTLY_VISIBLE",
+    "damages": [],
+    "overallCondition": {
+      "overallWearLevel": "minimal",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": false,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "A",
+    "canonicalCondition": "Nyskick",
+    "damageCount": 0,
+    "types": [],
+    "severityHistogram": {},
+    "impactHistogram": {},
+    "verificationHistogram": {},
+    "coverage": "NOT_SUFFICIENTLY_VISIBLE",
+    "wearLevel": "minimal",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 0,
+    "dedupAfter": 0
+  },
+  "intended": null
+}

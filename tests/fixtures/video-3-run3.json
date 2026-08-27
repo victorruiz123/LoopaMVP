@@ -1,0 +1,234 @@
+{
+  "id": "video-3-run3",
+  "description": "Inspelad körning av video-3 (körning 3), jobb 842d49f5-a1b0-4e32-a3c2-6141ee944f87.",
+  "source": "recorded",
+  "furniture": "video-3",
+  "runIndex": 3,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "19d828fc19aea4de",
+  "recordedAt": "2026-08-26T16:47:47.393Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_9eyzw5",
+        "type": "scuff",
+        "part": "vänster framben",
+        "semanticLocation": "nederkant nära golvet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Grått skavmärke och avskavd färg nära benets nederkant.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "4fb0bc96-0536-46e5-92d6-43ee039505dd",
+            "mark": {
+              "kind": "box",
+              "x": 0.17,
+              "y": 0.71,
+              "w": 0.04,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "62d5ed31-7456-41dd-b20e-1bc2823acf7d",
+            "mark": {
+              "kind": "box",
+              "x": 0.19,
+              "y": 0.68,
+              "w": 0.04,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_kb9n6x",
+        "type": "chip",
+        "part": "sitsens sarg",
+        "semanticLocation": "främre högra hörnet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Mörkt skavmärke och litet färgsläpp i träkanten.",
+        "confidence": 80,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "995f68bf-92eb-40a1-b196-48f2fe0cdec9",
+            "mark": {
+              "kind": "box",
+              "x": 0.29,
+              "y": 0.71,
+              "w": 0.03,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "504d881e-70fd-41f4-9f0d-9c5bfc14da10",
+            "mark": {
+              "kind": "box",
+              "x": 0.55,
+              "y": 0.69,
+              "w": 0.03,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "62d5ed31-7456-41dd-b20e-1bc2823acf7d",
+            "mark": {
+              "kind": "box",
+              "x": 0.46,
+              "y": 0.67,
+              "w": 0.03,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_2_2xjnfm",
+        "type": "scuff",
+        "part": "ryggstöd",
+        "semanticLocation": "högra yttre stolpens utsida",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Mörkt skavmärke som bryter den vita målade ytan.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "4fb0bc96-0536-46e5-92d6-43ee039505dd",
+            "mark": {
+              "kind": "box",
+              "x": 0.82,
+              "y": 0.35,
+              "w": 0.04,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "995f68bf-92eb-40a1-b196-48f2fe0cdec9",
+            "mark": {
+              "kind": "box",
+              "x": 0.54,
+              "y": 0.31,
+              "w": 0.03,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "cd0b2d3a-a7b4-4854-bdd2-f0d730c4763e",
+            "mark": {
+              "kind": "box",
+              "x": 0.81,
+              "y": 0.42,
+              "w": 0.04,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "62d5ed31-7456-41dd-b20e-1bc2823acf7d",
+            "mark": {
+              "kind": "box",
+              "x": 0.78,
+              "y": 0.34,
+              "w": 0.04,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_3_ptlo2c",
+        "type": "discoloration",
+        "part": "ryggstöd",
+        "semanticLocation": "översta tvärslåns överkant",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Svag missfärgning/slitage på färgen längs överkanten.",
+        "confidence": 70,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "ab3b2d53-0344-4bea-8569-4ef3408daafc",
+            "mark": {
+              "kind": "box",
+              "x": 0.4,
+              "y": 0.31,
+              "w": 0.25,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "75c3d5ec-0b73-41d7-8919-50ad3536cea4",
+            "mark": {
+              "kind": "box",
+              "x": 0.54,
+              "y": 0.34,
+              "w": 0.25,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "små skavmärken på stolsben och ryggstöd",
+        "lätt ytslitage vid kanter"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 4,
+    "types": [
+      "chip",
+      "discoloration",
+      "scuff",
+      "scuff"
+    ],
+    "severityHistogram": {
+      "S1": 4
+    },
+    "impactHistogram": {
+      "cosmetic": 4
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 4
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 4,
+    "dedupAfter": 4
+  },
+  "intended": null
+}

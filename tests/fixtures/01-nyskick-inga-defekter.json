@@ -1,0 +1,41 @@
+{
+  "id": "01-nyskick-inga-defekter",
+  "description": "Nyskick: inga defekter, minimalt slitage. Rena A-vägen i båda spåren.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_CLEAR",
+    "damages": [],
+    "overallCondition": {
+      "overallWearLevel": "minimal",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": false,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "A",
+    "canonicalCondition": "Nyskick",
+    "damageCount": 0,
+    "types": [],
+    "severityHistogram": {},
+    "impactHistogram": {},
+    "verificationHistogram": {},
+    "coverage": "INSPECTED_CLEAR",
+    "wearLevel": "minimal",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 0,
+    "dedupAfter": 0
+  },
+  "intended": null
+}

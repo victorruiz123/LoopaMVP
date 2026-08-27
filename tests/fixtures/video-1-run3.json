@@ -1,0 +1,150 @@
+{
+  "id": "video-1-run3",
+  "description": "Inspelad körning av video-1 (körning 3), jobb 5a178a2f-7ef5-404b-8d94-254413a2dd74.",
+  "source": "recorded",
+  "furniture": "video-1",
+  "runIndex": 3,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "e9a8683b597cbe1b",
+  "recordedAt": "2026-08-26T16:21:49.804Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_da6711",
+        "type": "compressed_upholstery",
+        "part": "sitsens ovansida",
+        "semanticLocation": "mitten av sitsen",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Måttliga veck och lätt nedtryckt tyg på sitsytan efter användning.",
+        "confidence": 75,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "bd40bf9a-f7da-4f35-8eee-5e3120bcfd0c",
+            "mark": {
+              "kind": "box",
+              "x": 0.18,
+              "y": 0.48,
+              "w": 0.64,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "ce83127e-2038-4655-a8b0-100b26c0637b",
+            "mark": {
+              "kind": "box",
+              "x": 0.45,
+              "y": 0.48,
+              "w": 0.48,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "377ddb5d-8480-4403-9131-d185cddc6eaf",
+            "mark": {
+              "kind": "box",
+              "x": 0.32,
+              "y": 0.32,
+              "w": 0.52,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "846aa5ef-3035-486c-91a2-20ff2dbe0517",
+            "mark": {
+              "kind": "box",
+              "x": 0.22,
+              "y": 0.48,
+              "w": 0.52,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_bf9jrs",
+        "type": "worn_material",
+        "part": "höger armstöd",
+        "semanticLocation": "främre ytterkanten",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Svagt ytslitage och skiftning på armstödets främre hörn.",
+        "confidence": 92,
+        "verification": "REJECTED",
+        "verificationReason": "Utsnittet visar naturlig skuggning och ljusreflektion över armstödets rundade hörn.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "ce83127e-2038-4655-a8b0-100b26c0637b",
+            "mark": {
+              "kind": "box",
+              "x": 0.22,
+              "y": 0.65,
+              "w": 0.24,
+              "h": 0.1
+            },
+            "cropPath": "crops/def_1_bf9jrs.jpg"
+          },
+          {
+            "imageId": "c07eecd3-1867-4b73-ba86-fecc9e97d906",
+            "mark": {
+              "kind": "box",
+              "x": 0.25,
+              "y": 0.52,
+              "w": 0.28,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "lättare veckbildning på sitsens tyg",
+        "milt slitage på armstödets kanter"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "B",
+    "canonicalCondition": "Mycket bra skick",
+    "damageCount": 2,
+    "types": [
+      "compressed_upholstery",
+      "worn_material"
+    ],
+    "severityHistogram": {
+      "S1": 2
+    },
+    "impactHistogram": {
+      "cosmetic": 2
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 1,
+      "REJECTED": 1
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 2,
+    "dedupAfter": 2
+  },
+  "intended": null
+}

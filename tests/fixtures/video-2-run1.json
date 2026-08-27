@@ -1,0 +1,246 @@
+{
+  "id": "video-2-run1",
+  "description": "Inspelad körning av video-2 (körning 1), jobb 57e8b3cb-a280-4bb2-b219-88ec4e28981f.",
+  "source": "recorded",
+  "furniture": "video-2",
+  "runIndex": 1,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "b417e41da3322e31",
+  "recordedAt": "2026-08-26T16:10:42.525Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_3lvw4t",
+        "type": "worn_material",
+        "part": "ryggstöd",
+        "semanticLocation": "övre kanten",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "Färgslitage och skavmärken längs övre kanten av ryggstödet.",
+        "confidence": 90,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "95279593-f834-4d2e-a95c-4829d30ab3fa",
+            "mark": {
+              "kind": "box",
+              "x": 0.61,
+              "y": 0.19,
+              "w": 0.3,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "c6be047b-a203-4bd1-a8ee-4629beeb4e40",
+            "mark": {
+              "kind": "box",
+              "x": 0.28,
+              "y": 0.25,
+              "w": 0.54,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "0dba6728-b721-4d1d-aab4-195028c38518",
+            "mark": {
+              "kind": "box",
+              "x": 0.1,
+              "y": 0.25,
+              "w": 0.56,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "a004b085-62f9-445c-9a21-adb4329edd4b",
+            "mark": {
+              "kind": "box",
+              "x": 0.12,
+              "y": 0.06,
+              "w": 0.35,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "a15653b6-b2f0-4aee-af72-1991e49dfe5a",
+            "mark": {
+              "kind": "box",
+              "x": 0.51,
+              "y": 0.23,
+              "w": 0.43,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_7phg5h",
+        "type": "chip",
+        "part": "ryggstöd",
+        "semanticLocation": "övre vänstra stolphörnet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Små vita färgskav/nötningar vid den vänstra hörnknuten på ryggstödet.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "c6be047b-a203-4bd1-a8ee-4629beeb4e40",
+            "mark": {
+              "kind": "box",
+              "x": 0.26,
+              "y": 0.3,
+              "w": 0.07,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "a15653b6-b2f0-4aee-af72-1991e49dfe5a",
+            "mark": {
+              "kind": "box",
+              "x": 0.51,
+              "y": 0.29,
+              "w": 0.07,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_2_68pmgx",
+        "type": "scratch",
+        "part": "sits",
+        "semanticLocation": "ovansida",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "Fina repor och slitage i ytskiktet på sitsens ovansida.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "acd2dece-7c8e-44de-9406-5b3239be8abc",
+            "mark": {
+              "kind": "box",
+              "x": 0.26,
+              "y": 0.23,
+              "w": 0.56,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "b12c15e9-cac9-4fb0-98c5-b3e92fce2153",
+            "mark": {
+              "kind": "box",
+              "x": 0.22,
+              "y": 0.25,
+              "w": 0.61,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "ff053cec-b7b9-4a19-8637-1f58b6524bd5",
+            "mark": {
+              "kind": "box",
+              "x": 0.1,
+              "y": 0.26,
+              "w": 0.65,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_3_c1bv2l",
+        "type": "worn_material",
+        "part": "sits",
+        "semanticLocation": "främre och sidokanter",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Lätt kantslitage där den svarta färgen nötts bort utmed kanterna.",
+        "confidence": 80,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "a004b085-62f9-445c-9a21-adb4329edd4b",
+            "mark": {
+              "kind": "box",
+              "x": 0.25,
+              "y": 0.42,
+              "w": 0.62,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "acd2dece-7c8e-44de-9406-5b3239be8abc",
+            "mark": {
+              "kind": "box",
+              "x": 0.32,
+              "y": 0.5,
+              "w": 0.52,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "moderate",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "färgslitage på ryggstödets övre kant",
+        "ytliga repor på sitsen",
+        "lätt kantslitage på sits och ben"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 4,
+    "types": [
+      "chip",
+      "scratch",
+      "worn_material",
+      "worn_material"
+    ],
+    "severityHistogram": {
+      "S1": 2,
+      "S2": 2
+    },
+    "impactHistogram": {
+      "cosmetic": 4
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 4
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "moderate",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 4,
+    "dedupAfter": 4
+  },
+  "intended": null
+}

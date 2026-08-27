@@ -1,0 +1,138 @@
+{
+  "id": "video-4-run1",
+  "description": "Inspelad körning av video-4 (körning 1), jobb 6a830718-0b85-43a6-babd-de644138f87f.",
+  "source": "recorded",
+  "furniture": "video-4",
+  "runIndex": 1,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "e9a8683b597cbe1b",
+  "recordedAt": "2026-08-26T16:23:33.713Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_0060nm",
+        "type": "peeling_flaking",
+        "part": "sitsens ovansida",
+        "semanticLocation": "invid grepphålet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Små vita färgprickar och avskav i färgskiktet nära grepphålet.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "d7ceaba6-a63f-4ebc-bcb4-d4ec52bf903c",
+            "mark": {
+              "kind": "box",
+              "x": 0.61,
+              "y": 0.37,
+              "w": 0.05,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "29d6360b-aea2-4750-a26d-b3a5fdfb793b",
+            "mark": {
+              "kind": "box",
+              "x": 0.44,
+              "y": 0.48,
+              "w": 0.04,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "1ddd47e2-5b9a-4cf0-be11-5f7bf9cc07b9",
+            "mark": {
+              "kind": "box",
+              "x": 0.51,
+              "y": 0.59,
+              "w": 0.05,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_rifmuz",
+        "type": "scuff",
+        "part": "höger framben",
+        "semanticLocation": "ytterkanten av benet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Lätt skrapmärke och nötmärke på den vitmålade benkanten.",
+        "confidence": 75,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "d7ceaba6-a63f-4ebc-bcb4-d4ec52bf903c",
+            "mark": {
+              "kind": "box",
+              "x": 0.55,
+              "y": 0.56,
+              "w": 0.06,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "2a9a1d79-8dcc-4446-a84a-723b47830be2",
+            "mark": {
+              "kind": "box",
+              "x": 0.82,
+              "y": 0.61,
+              "w": 0.07,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "små färgavskav vid grepphålet",
+        "lätt ytslitage på underredets kanter"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "B",
+    "canonicalCondition": "Mycket bra skick",
+    "damageCount": 2,
+    "types": [
+      "peeling_flaking",
+      "scuff"
+    ],
+    "severityHistogram": {
+      "S1": 2
+    },
+    "impactHistogram": {
+      "cosmetic": 2
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 2
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 2,
+    "dedupAfter": 2
+  },
+  "intended": null
+}

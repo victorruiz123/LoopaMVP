@@ -1,0 +1,133 @@
+{
+  "id": "05-tre-mattliga-skador",
+  "description": "Tre S2-skador: tippar över dMultiCountThreshold och ger D trots att ingen är S3.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "d1",
+        "type": "dent",
+        "part": "bordsskivan",
+        "semanticLocation": "höger hörn",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 90,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_0",
+            "mark": {
+              "kind": "box",
+              "x": 0.7,
+              "y": 0.2,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d2",
+        "type": "scratch",
+        "part": "bordsskivan",
+        "semanticLocation": "mitten",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_0",
+            "mark": {
+              "kind": "box",
+              "x": 0.4,
+              "y": 0.45,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d3",
+        "type": "discoloration",
+        "part": "vänster bakben",
+        "semanticLocation": "nedre delen",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 70,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_2",
+            "mark": {
+              "kind": "box",
+              "x": 0.18,
+              "y": 0.8,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "moderate",
+      "affectedExtent": "moderate",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "D",
+    "canonicalCondition": "Okej skick",
+    "damageCount": 3,
+    "types": [
+      "dent",
+      "discoloration",
+      "scratch"
+    ],
+    "severityHistogram": {
+      "S2": 3
+    },
+    "impactHistogram": {
+      "cosmetic": 3
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 3
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "moderate",
+    "affectedExtent": "moderate",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 3,
+    "dedupAfter": 3
+  },
+  "intended": null
+}

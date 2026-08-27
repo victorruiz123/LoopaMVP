@@ -1,0 +1,22 @@
+{
+  "name": "loopa-condition",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Condition grading: ConditionInput -> ConditionResult. Fristående besiktningsmotor för begagnade möbler.",
+  "scripts": {
+    "test": "tsx --test tests/*.test.ts",
+    "baseline": "tsx tests/baseline.ts",
+    "record": "tsx tests/record.ts",
+    "server:dev": "npm --prefix server run dev",
+    "server:check": "npm --prefix server run check",
+    "web:dev": "npm --prefix web run dev",
+    "web:build": "npm --prefix web run build",
+    "install:all": "npm install && npm --prefix server install && npm --prefix web install"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "tsx": "^4.22.4",
+    "typescript": "^5.8.3"
+  }
+}

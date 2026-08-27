@@ -1,0 +1,169 @@
+{
+  "id": "video-5-run1",
+  "description": "Inspelad körning av video-5 (körning 1), jobb ab53c5be-cbc2-4358-bb56-4276da51e0c4.",
+  "source": "recorded",
+  "furniture": "video-5",
+  "runIndex": 1,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "bb5204ebd36d2c37",
+  "recordedAt": "2026-08-26T17:02:44.960Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_rfqwnl",
+        "type": "fraying",
+        "part": "ryggstödets sidokant",
+        "semanticLocation": "höger kant",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "Fransade trådar och slitage längs ryggstödets kantsöm.",
+        "confidence": 90,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "abfa98d2-43a7-4be4-bf15-bdd0997b765c",
+            "mark": {
+              "kind": "box",
+              "x": 0.38,
+              "y": 0.15,
+              "w": 0.08,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "383f9a7c-0f5d-4051-9796-9386053bba90",
+            "mark": {
+              "kind": "box",
+              "x": 0.12,
+              "y": 0.22,
+              "w": 0.08,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "7146bc90-ffc2-4c1e-8fe8-186721641f51",
+            "mark": {
+              "kind": "box",
+              "x": 0.72,
+              "y": 0.45,
+              "w": 0.08,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "3bc2df3c-213f-453d-88f5-fc8b165c80d1",
+            "mark": {
+              "kind": "box",
+              "x": 0.88,
+              "y": 0.28,
+              "w": 0.08,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "ba3f88b8-89c0-4a0a-9d0e-b625095d2386",
+            "mark": {
+              "kind": "box",
+              "x": 0.84,
+              "y": 0.4,
+              "w": 0.08,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "decea65b-8791-4745-adec-c7730ce26d65",
+            "mark": {
+              "kind": "box",
+              "x": 0.75,
+              "y": 0.32,
+              "w": 0.06,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_741i0h",
+        "type": "discoloration",
+        "part": "sitsens ovansida",
+        "semanticLocation": "mitten av sitsen",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Lätt mörkare parti från användning mitt på sitsen.",
+        "confidence": 75,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "ba3f88b8-89c0-4a0a-9d0e-b625095d2386",
+            "mark": {
+              "kind": "box",
+              "x": 0.25,
+              "y": 0.45,
+              "w": 0.4,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "decea65b-8791-4745-adec-c7730ce26d65",
+            "mark": {
+              "kind": "box",
+              "x": 0.2,
+              "y": 0.42,
+              "w": 0.45,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "fransning längs ryggstödets kantsöm",
+        "svag missfärgning på sitsen"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 2,
+    "types": [
+      "discoloration",
+      "fraying"
+    ],
+    "severityHistogram": {
+      "S1": 1,
+      "S2": 1
+    },
+    "impactHistogram": {
+      "cosmetic": 2
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 2
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 2,
+    "dedupAfter": 2
+  },
+  "intended": null
+}

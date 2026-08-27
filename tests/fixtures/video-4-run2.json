@@ -1,0 +1,156 @@
+{
+  "id": "video-4-run2",
+  "description": "Inspelad körning av video-4 (körning 2), jobb 8d9917e3-8ee5-4755-b793-b909b53dfd3a.",
+  "source": "recorded",
+  "furniture": "video-4",
+  "runIndex": 2,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "bb5204ebd36d2c37",
+  "recordedAt": "2026-08-26T16:56:39.158Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "def_0_gwl4qj",
+        "type": "chip",
+        "part": "sitsens ovansida",
+        "semanticLocation": "nära handtagshålet",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Små vita färgprickar och färgsläpp på den gråmålade sitsytan bredvid handtagshålet.",
+        "confidence": 85,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "75c706a7-453a-45b9-9d46-45d6f8555b3c",
+            "mark": {
+              "kind": "box",
+              "x": 0.61,
+              "y": 0.37,
+              "w": 0.05,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "1da80edf-3948-48e2-8ffb-126fa6fbb2b9",
+            "mark": {
+              "kind": "box",
+              "x": 0.51,
+              "y": 0.61,
+              "w": 0.05,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_1_95ckd5",
+        "type": "scuff",
+        "part": "främre högra benet",
+        "semanticLocation": "ytterkanten vid mellersta fogstrukturen",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Skavmärke och avslagen vit färg längs benets ytterkant.",
+        "confidence": 80,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "75c706a7-453a-45b9-9d46-45d6f8555b3c",
+            "mark": {
+              "kind": "box",
+              "x": 0.57,
+              "y": 0.58,
+              "w": 0.05,
+              "h": 0.1
+            }
+          },
+          {
+            "imageId": "1da80edf-3948-48e2-8ffb-126fa6fbb2b9",
+            "mark": {
+              "kind": "box",
+              "x": 0.5,
+              "y": 0.74,
+              "w": 0.05,
+              "h": 0.1
+            }
+          }
+        ]
+      },
+      {
+        "id": "def_2_5wyowr",
+        "type": "peeling_flaking",
+        "part": "underrede och ben",
+        "semanticLocation": "hörn och skruvinfästningar",
+        "severity": "S1",
+        "impact": "cosmetic",
+        "description": "Lätt färgsläpp och ojämnt täckande färg vid kanter och skruvskallar på benen.",
+        "confidence": 75,
+        "verification": "CONFIRMED",
+        "verificationReason": "Tydligt fynd, hög säkerhet — accepterat direkt.",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "f48aa69b-52f3-48cd-bf17-060d20ec66e3",
+            "mark": {
+              "kind": "box",
+              "x": 0.82,
+              "y": 0.6,
+              "w": 0.1,
+              "h": 0.1
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "moderate",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": [
+        "målad yta med synliga mindre skavmärken",
+        "lätta färgskav på benkanter och vid handtagshål"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 3,
+    "types": [
+      "chip",
+      "peeling_flaking",
+      "scuff"
+    ],
+    "severityHistogram": {
+      "S1": 3
+    },
+    "impactHistogram": {
+      "cosmetic": 3
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 3
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "moderate",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 3,
+    "dedupAfter": 3
+  },
+  "intended": null
+}

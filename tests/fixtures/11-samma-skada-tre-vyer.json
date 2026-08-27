@@ -1,0 +1,134 @@
+{
+  "id": "11-samma-skada-tre-vyer",
+  "description": "Modellen missade att konsolidera: samma repa, samma del OCH plats, i tre bilder. Dedup ska slå ihop till en — även efter 2b.",
+  "source": "synthetic",
+  "furniture": null,
+  "runIndex": null,
+  "modelUsed": null,
+  "promptHash": null,
+  "recordedAt": null,
+  "lockPartLocations": true,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_DAMAGE",
+    "damages": [
+      {
+        "id": "d1",
+        "type": "scratch",
+        "part": "sitsens ovansida",
+        "semanticLocation": "främre vänstra kanten",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 84,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_0",
+            "mark": {
+              "kind": "box",
+              "x": 0.25,
+              "y": 0.3,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d2",
+        "type": "scratch",
+        "part": "sitsens ovansida",
+        "semanticLocation": "främre vänstra kanten",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 78,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_1",
+            "mark": {
+              "kind": "box",
+              "x": 0.55,
+              "y": 0.28,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      },
+      {
+        "id": "d3",
+        "type": "scratch",
+        "part": "sitsens ovansida",
+        "semanticLocation": "främre vänstra kanten",
+        "severity": "S2",
+        "impact": "cosmetic",
+        "description": "",
+        "confidence": 66,
+        "verification": "CONFIRMED",
+        "verificationReason": "",
+        "recaptureRequested": false,
+        "sellerAction": null,
+        "sellerAdded": false,
+        "evidence": [
+          {
+            "imageId": "img_2",
+            "mark": {
+              "kind": "box",
+              "x": 0.4,
+              "y": 0.35,
+              "w": 0.12,
+              "h": 0.12
+            }
+          }
+        ]
+      }
+    ],
+    "overallCondition": {
+      "overallWearLevel": "light",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": true,
+      "observations": []
+    }
+  },
+  "expected": {
+    "grade": "C",
+    "canonicalCondition": "Bra skick",
+    "damageCount": 1,
+    "types": [
+      "scratch"
+    ],
+    "severityHistogram": {
+      "S2": 1
+    },
+    "impactHistogram": {
+      "cosmetic": 1
+    },
+    "verificationHistogram": {
+      "CONFIRMED": 1
+    },
+    "coverage": "INSPECTED_DAMAGE",
+    "wearLevel": "light",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 3,
+    "dedupAfter": 1,
+    "partLocations": [
+      "sitsens ovansida::främre vänstra kanten"
+    ]
+  },
+  "intended": null
+}

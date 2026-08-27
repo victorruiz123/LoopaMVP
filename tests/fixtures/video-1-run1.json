@@ -1,0 +1,44 @@
+{
+  "id": "video-1-run1",
+  "description": "Inspelad körning av video-1 (körning 1), jobb d344af72-78b4-4c4f-8b64-39c1c32a445d.",
+  "source": "recorded",
+  "furniture": "video-1",
+  "runIndex": 1,
+  "modelUsed": "gemini-3.6-flash",
+  "promptHash": "14e3cbae5a60c67a",
+  "recordedAt": "2026-08-26T12:38:31.787Z",
+  "lockPartLocations": false,
+  "expectedToChangeIn": null,
+  "input": {
+    "coverage": "INSPECTED_CLEAR",
+    "damages": [],
+    "overallCondition": {
+      "overallWearLevel": "minimal",
+      "affectedExtent": "isolated",
+      "functionalityAffected": false,
+      "structuralIntegrityOk": true,
+      "clearlyUsedAppearance": false,
+      "observations": [
+        "välhållen tygklädsel",
+        "inga synliga skador eller fläckar"
+      ]
+    }
+  },
+  "expected": {
+    "grade": "A",
+    "canonicalCondition": "Nyskick",
+    "damageCount": 0,
+    "types": [],
+    "severityHistogram": {},
+    "impactHistogram": {},
+    "verificationHistogram": {},
+    "coverage": "INSPECTED_CLEAR",
+    "wearLevel": "minimal",
+    "affectedExtent": "isolated",
+    "functionalityAffected": false,
+    "structuralIntegrityOk": true,
+    "dedupBefore": 0,
+    "dedupAfter": 0
+  },
+  "intended": null
+}
