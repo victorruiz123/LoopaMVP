@@ -1,0 +1,3 @@
+[submodule "Price_engine/vips-soffadirekt-preview"]
+	path = Price_engine/vips-soffadirekt-preview
+	url = https://github.com/victorruiz123/vips-soffadirekt-preview.git

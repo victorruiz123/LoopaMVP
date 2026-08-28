@@ -4,8 +4,7 @@ dist/
 .env
 .DS_Store
 
-# Prismotorn och dess korpus ligger utanför versionshanteringen: 36 GB, med enskilda
-# filer på upp till 9,9 GB. GitHub avvisar allt över 100 MB per fil, och Git LFS löser
-# det inte — kvoten är 1 GB. Mappen innehåller dessutom två egna .git-repon och en
-# .venv. Se README för hur den ska pekas ut lokalt.
-Price_engine/
+# ML-korpusen ligger utanför versionshanteringen: 33 GB, med enskilda filer på upp
+# till 9,9 GB. GitHub avvisar allt över 100 MB per fil, och Git LFS löser det inte —
+# kvoten är 1 GB. Se README för hur den ska pekas ut lokalt.
+Price_engine/vips-ml-data/
