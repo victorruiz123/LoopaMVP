@@ -1,0 +1,259 @@
+bench,nr,möbel,kant,pris,orsak,rubrik
+11,1,IKEA Ektorp,dyrast,8000.0,bunt,Ikea Ektorp hörnsoffa 4 sits och Ektorp fotölj med fotpall
+11,1,IKEA Ektorp,dyrast,5999.0,bunt,"Soffa och fåtölj, Ikea Ektorp"
+11,1,IKEA Ektorp,dyrast,5500.0,sektion,Helt ny IKEA Ektorp 3-sits med schäslong
+11,1,IKEA Ektorp,dyrast,5200.0,bunt,"Soffa Kivik och fotpall Ektorp, grön"
+11,1,IKEA Ektorp,dyrast,5000.0,bunt,Hörnsoffa/Bäddsoffa Ektorp Ikea
+11,1,IKEA Ektorp,billigast,100.0,tillbehör,Ektorp fåtölj klädsel
+11,1,IKEA Ektorp,billigast,150.0,tillbehör,Ikea Ektorp Fåtölj med avtagbar klädsel.
+11,1,IKEA Ektorp,billigast,150.0,tillbehör,IKEA Ektorp fåtölj vit klädsel
+11,1,IKEA Ektorp,billigast,150.0,sektion,schäslong Ikea Ektorp
+11,1,IKEA Ektorp,billigast,150.0,sektion,Schäslong Ektorp Ikea
+11,2,IKEA Söderhamn bäddsoffa,dyrast,14500.0,typmotsägelse,"Söderhamn soffa, Finnsta vit från Ikea"
+11,2,IKEA Söderhamn bäddsoffa,dyrast,14000.0,typmotsägelse,IKEA Söderhamn soffa
+11,2,IKEA Söderhamn bäddsoffa,dyrast,14000.0,typmotsägelse,U soffa Stor Ikea Dubai Söderhamn
+11,2,IKEA Söderhamn bäddsoffa,dyrast,13000.0,typmotsägelse,Ikea Söderhamn soffa
+11,2,IKEA Söderhamn bäddsoffa,dyrast,12500.0,typmotsägelse,Söderhamn Soffa Ikea
+11,2,IKEA Söderhamn bäddsoffa,billigast,50.0,sektion,Divan/schäslong Ikea Söderhamn
+11,2,IKEA Söderhamn bäddsoffa,billigast,50.0,tillbehör,Ikea Söderhamn kuddar
+11,2,IKEA Söderhamn bäddsoffa,billigast,62.0,tillbehör,IKEA soffben (Söderhamn mm)
+11,2,IKEA Söderhamn bäddsoffa,billigast,100.0,typmotsägelse,Armstöd till soffa IKEA Söderhamn
+11,2,IKEA Söderhamn bäddsoffa,billigast,100.0,sektion,Armstöd Ikea Söderhamn
+11,3,IKEA Vimle,dyrast,15000.0,bunt,IKEA VIMLE Hörnsoffa + BESTÅ TV-bänk | Mycket fint skick | Paketpris 15 000
+11,3,IKEA Vimle,dyrast,15000.0,bunt,IKEA Vimle Soffa + Fåtölj i skinn - Grann/Bomstad Svart
+11,3,IKEA Vimle,dyrast,12000.0,bunt,Soffa Vimle Ikea + pall med förvaring
+11,3,IKEA Vimle,dyrast,11000.0,bunt,"IKEA vimle soffa 4-sits, bäddsoffa + förvaring"
+11,3,IKEA Vimle,dyrast,11000.0,bunt,"IKEA vimle soffa 4-sits, bäddsoffa + förvaring"
+11,3,IKEA Vimle,billigast,100.0,sektion,"VIMLE IKEA -soffa, moduler -hörnmodul + en-sits"
+11,3,IKEA Vimle,billigast,300.0,sektion,IKEA Vimle schäslong
+11,3,IKEA Vimle,billigast,300.0,sektion,"Ikea Vimle, 2-sists sektion"
+11,3,IKEA Vimle,billigast,350.0,sektion,Ikea VIMLE armstöd x2
+11,3,IKEA Vimle,billigast,395.0,tillbehör,Vimle fotpall IKEA klädsel
+11,4,Mio Cordelia,dyrast,9000.0,bunt,Fåtölj Cordelia med pall
+11,4,Mio Cordelia,dyrast,7700.0,bunt,Mio Cordelia Fåtöljer och fotpallar
+11,4,Mio Cordelia,dyrast,4500.0,bunt,Cordelia fåtölj och fotpall från Mio
+11,4,Mio Cordelia,dyrast,3999.0,bunt,Cordelia fåtölj med fotpall
+11,4,Mio Cordelia,dyrast,2900.0,bunt,Fåtölj &quot;Cordelia&quot; med fotpall (Mio)
+11,4,Mio Cordelia,billigast,1750.0,bunt,Mio Cordelia Fåtölj med fotpall (2st)
+11,4,Mio Cordelia,billigast,2900.0,bunt,Fåtölj &quot;Cordelia&quot; med fotpall (Mio)
+11,4,Mio Cordelia,billigast,3999.0,bunt,Cordelia fåtölj med fotpall
+11,4,Mio Cordelia,billigast,4500.0,bunt,Cordelia fåtölj och fotpall från Mio
+11,4,Mio Cordelia,billigast,7700.0,bunt,Mio Cordelia Fåtöljer och fotpallar
+11,5,IKEA Jennylund,dyrast,1000.0,tillbehör,Ikea fåtölj Jennylund klädsel Bemz
+11,5,IKEA Jennylund,dyrast,800.0,bunt,Ikea ”Jennylund” fåtölj med fotpall
+11,5,IKEA Jennylund,dyrast,500.0,tillbehör,Fåtölj Jennylund från IKEA med extra klädsel
+11,5,IKEA Jennylund,dyrast,500.0,tillbehör,Ikea Jennylund fåtölj med extra klädsel
+11,5,IKEA Jennylund,dyrast,250.0,typmotsägelse,Fotpall IKEA Jennylund
+11,5,IKEA Jennylund,billigast,50.0,bunt,Fåtölj Jennylund Ikea sängbord
+11,5,IKEA Jennylund,billigast,200.0,tillbehör,IKEA Jennylund fåtölj -utan klädsel
+11,5,IKEA Jennylund,billigast,250.0,typmotsägelse,Fotpall IKEA Jennylund
+11,5,IKEA Jennylund,billigast,500.0,tillbehör,Fåtölj Jennylund från IKEA med extra klädsel
+11,5,IKEA Jennylund,billigast,500.0,tillbehör,Ikea Jennylund fåtölj med extra klädsel
+11,6,IKEA Strandmon,dyrast,7500.0,typmotsägelse,IKEA Strandmon soffgrupp
+11,6,IKEA Strandmon,dyrast,5000.0,bunt,IKEA STRANDMON MED FOTPALL
+11,6,IKEA Strandmon,dyrast,5000.0,typmotsägelse,Strandmon soffa Ikea
+11,6,IKEA Strandmon,dyrast,4500.0,typmotsägelse,Soffgrupp IKEA Strandmon
+11,6,IKEA Strandmon,dyrast,4000.0,bunt,Ikea STRANDMON fåtöljer+fotpallar
+11,6,IKEA Strandmon,billigast,100.0,typmotsägelse,"Grå pall billigt, i fint skick - STRANDMON från IKEA"
+11,6,IKEA Strandmon,billigast,125.0,bunt,"Strandmon fåtölj 2 st, Ikea + 1 st Strandmon fotpall"
+11,6,IKEA Strandmon,billigast,150.0,bunt,Ikea Strandmon fåtölj och pall
+11,6,IKEA Strandmon,billigast,150.0,typmotsägelse,Fotpall Strandmon Ikea
+11,6,IKEA Strandmon,billigast,200.0,bunt,Fåtölj Strandmon med fotpall
+11,8,Sweef Valen 224 Rak soffa,dyrast,18000.0,typmotsägelse,Sweef valen 224/med Fotpall Sand 402
+11,8,Sweef Valen 224 Rak soffa,dyrast,17000.0,bunt,Soffa med fotpallar Sweef Valen 224
+11,8,Sweef Valen 224 Rak soffa,dyrast,14000.0,typmotsägelse,Sweef valen 224 /med Fotpall -Sand 402
+11,8,Sweef Valen 224 Rak soffa,dyrast,12990.0,bunt,KAP Sweef Valen 224 soffa + Valen fotpall
+11,8,Sweef Valen 224 Rak soffa,dyrast,12499.0,typmotsägelse,Sweef Valen Sofa 224 + Fotpall
+11,8,Sweef Valen 224 Rak soffa,billigast,5500.0,bunt,Sweef Valen soffa 224 + Valen fotpall
+11,8,Sweef Valen 224 Rak soffa,billigast,7000.0,tillbehör,Sweef Valen 224 soffa - Lös klädsel
+11,8,Sweef Valen 224 Rak soffa,billigast,10000.0,typmotsägelse,Sweef Valen 224 + fotpall
+11,8,Sweef Valen 224 Rak soffa,billigast,11990.0,tillbehör,Sweef Valen 224 cm ink. kuddar.
+11,8,Sweef Valen 224 Rak soffa,billigast,12499.0,typmotsägelse,Sweef Valen Sofa 224 + Fotpall
+11,9,Mio Santos,dyrast,4500.0,bunt,"Matbord och stolar Mio, Santos"
+11,9,Mio Santos,dyrast,4490.0,bunt,Santos matbord & Tracy stolar
+11,9,Mio Santos,dyrast,1175.0,bunt,MIO Matgrupp santos med 4 stolar
+11,9,Mio Santos,dyrast,1075.0,bunt,Santos matgrupp från Mio - matbord + 4 stolar
+11,9,Mio Santos,dyrast,1000.0,bunt,Santos matgrupp med fyra stolar
+11,9,Mio Santos,billigast,225.0,bunt,Mio Santos runt matbord med 4 stolar
+11,9,Mio Santos,billigast,625.0,bunt,Santos matbord och 4 stolar från Mio
+11,9,Mio Santos,billigast,667.0,bunt,Santos Matbord med 6 Tracy stolar (MIO)
+11,9,Mio Santos,billigast,875.0,bunt,Mio Santos Matbord med 4 st matstolar
+11,9,Mio Santos,billigast,917.0,bunt,Matgrupp med 6 stolar Santos
+11,10,IKEA PINNTORP,dyrast,500.0,bunt,"Bjursta och pinntorp, matbord och stolar"
+11,10,IKEA PINNTORP,dyrast,200.0,bunt,Matbord och stolar från IKEA PINNTORP-serien
+11,10,IKEA PINNTORP,billigast,200.0,bunt,Matbord och stolar från IKEA PINNTORP-serien
+11,10,IKEA PINNTORP,billigast,500.0,bunt,"Bjursta och pinntorp, matbord och stolar"
+b1,1,Mio Town,dyrast,14000.0,bunt,MIO TOWN 3-sits med divan &amp; fotpall
+b1,1,Mio Town,dyrast,11995.0,bunt,Town från Mio - Divansoffa med schäslong (u-soffa)
+b1,1,Mio Town,dyrast,9000.0,bunt,Beige hörnsoffa ”Town” från Mio med divan
+b1,1,Mio Town,dyrast,8500.0,bunt,hörnsoffa U- soffa town från mio
+b1,1,Mio Town,dyrast,7999.0,bunt,Mio Town hörnsoffa med divan
+b1,1,Mio Town,billigast,200.0,tillbehör,Kuddar till MIO soffa Town
+b1,1,Mio Town,billigast,250.0,bunt,Lampa taklampa från MIO mässing guld Cape Town
+b1,1,Mio Town,billigast,500.0,bunt,Mio sittpuff/fotpall Town
+b1,1,Mio Town,billigast,1500.0,bunt,MIO Uptown hallmöbel med spegel &amp; förvaring (nypris 3700 k
+b1,1,Mio Town,billigast,1500.0,bunt,fotpall sittpuff Town från Mio
+b1,2,Mio Saturday,dyrast,17500.0,sektion,"MIO, Saturday med schäslong XL vänster"
+b1,2,Mio Saturday,dyrast,17000.0,bunt,"MIO, Saturday Hörnsoffa med schäslong XL Höger"
+b1,2,Mio Saturday,dyrast,13897.0,bunt,"Saturday Hörnsoffa + Nackkudde, MIO"
+b1,2,Mio Saturday,dyrast,11900.0,bunt,Mio Saturday hörnsoffa med divan brun
+b1,2,Mio Saturday,dyrast,10000.0,bunt,Mio Hörnsoffa Saturday med divan
+b1,2,Mio Saturday,billigast,4500.0,bunt,Hörnsoffa med pall (Mio Saturday) säljes.
+b1,2,Mio Saturday,billigast,5000.0,bunt,Soffa från mio Saturday och soffbord från mio
+b1,2,Mio Saturday,billigast,6000.0,bunt,Saturday Hörnsoffa med schäslong XL höger från Mio
+b1,2,Mio Saturday,billigast,7000.0,sektion,Mio Saturday Schäslong 3-sits + divan
+b1,2,Mio Saturday,billigast,7900.0,bunt,Mio Saturday hörnsoffa med divan – mycket fint skick
+b1,3,Mio Bridge,dyrast,16000.0,bunt,Mio Hörnsoffa Bridge 3+3 Tyg Kall grey Ekben
+b1,3,Mio Bridge,dyrast,10995.0,sektion,MIO BRIDGE 4 SITS + SCHÄSLONG (FRI LEVERANS)
+b1,3,Mio Bridge,dyrast,9990.0,sektion,HELT NY &quot;MIO BRIDGE 4 SITS + SCHÄSLONG&quot; (FRI LEVERANS)
+b1,3,Mio Bridge,dyrast,9000.0,bunt,"3-sitssoffa, 2 st fåtöljer, fotpall - MIOs Bridge. nyskick"
+b1,3,Mio Bridge,dyrast,8990.0,bunt,MIO Bridge 3 sitt Soffa + Fåtölj Nyskick Nypris 15495 kr
+b1,3,Mio Bridge,billigast,2500.0,bunt,3-sits soffa + fotpall Mio Bridge
+b1,3,Mio Bridge,billigast,3000.0,bunt,Soffa Mio Bridge med fotpall
+b1,3,Mio Bridge,billigast,3000.0,bunt,Mio Bridge 3-sits soffa &amp; fotpall
+b1,3,Mio Bridge,billigast,4000.0,bunt,3-sits soffa + fotpall Mio Bridge
+b1,3,Mio Bridge,billigast,4000.0,bunt,Soffa 2-sits Mio bridge med sittpuff
+b1,5,Bellus soffa,dyrast,25000.0,typmotsägelse,Stor maffig hörnsoffa från Bellus
+b1,5,Bellus soffa,dyrast,22500.0,bunt,Bellus Soffa - Andango divansoffa tyg mörkgrön
+b1,5,Bellus soffa,dyrast,22000.0,bunt,Helt nytt - Bellus Soffa - Andango divansoffa tyg mörkgrön
+b1,5,Bellus soffa,dyrast,22000.0,bunt,Bellus Soffa - Andango divansoffa tyg mörkgrön
+b1,5,Bellus soffa,dyrast,18999.0,bunt,Bellus furniture moby soffa och fotpall
+b1,5,Bellus soffa,billigast,200.0,typmotsägelse,Bäddsoffa Bellus
+b1,5,Bellus soffa,billigast,500.0,typmotsägelse,BELLUS hörnsoffa med 2 divaner.
+b1,5,Bellus soffa,billigast,500.0,typmotsägelse,Divansoffa Magnum by Bellus
+b1,5,Bellus soffa,billigast,500.0,typmotsägelse,Bellus divansoffa 4-sits
+b1,5,Bellus soffa,billigast,850.0,typmotsägelse,"Nevada U-soffa, County, Mio Bellus bäddsoffa, Fri hemkörni"
+b1,6,IKEA stocksund,dyrast,6000.0,bunt,"Soffa, fåtölj och fotpall - IKEA Stocksund"
+b1,6,IKEA stocksund,dyrast,4000.0,tillbehör,Oanvänd IKEA-Stocksund soffa med Bemz överdrag
+b1,6,IKEA stocksund,dyrast,3800.0,tillbehör,Stocksund 2-sits soffa Ikea Bemz överdrag
+b1,6,IKEA stocksund,dyrast,3500.0,bunt,Ikea soffa &amp; fåtölj Stocksund m fotpall
+b1,6,IKEA stocksund,dyrast,3500.0,bunt,Ikea Stocksund Soffa med tillhörande pall
+b1,6,IKEA stocksund,billigast,99.0,bunt,"Ikea Stocksund 3,5 sits soffa, sittbänk o bord"
+b1,6,IKEA stocksund,billigast,200.0,bunt,"Ikea stocksund soffa, fåtölj, fotpall, tv-bänk, soffbord"
+b1,6,IKEA stocksund,billigast,200.0,bunt,"Ikea Stocksund soffgrupp, soffbord och tavlor"
+b1,6,IKEA stocksund,billigast,200.0,bunt,soffa och sittpuff Stocksund IKEA
+b1,6,IKEA stocksund,billigast,200.0,bunt,Två fåtöljer - Ikea Stocksund
+b1,8,Kartell Victoria Ghost,dyrast,4809.0,bunt,"stolar och karmstol, 6+1, ""Louis Ghost"" samt ""Victoria Ghost"", Kartell, plast. philippe starck"
+b1,8,Kartell Victoria Ghost,dyrast,1000.0,bunt,6 st. Kartell Victoria Ghost barstol
+b1,8,Kartell Victoria Ghost,dyrast,800.0,bunt,"Karmstolar, ""Victoria Ghost"", 2 st, för Kartell. philippe starck"
+b1,8,Kartell Victoria Ghost,billigast,800.0,bunt,"Karmstolar, ""Victoria Ghost"", 2 st, för Kartell. philippe starck"
+b1,8,Kartell Victoria Ghost,billigast,1000.0,bunt,6 st. Kartell Victoria Ghost barstol
+b1,8,Kartell Victoria Ghost,billigast,4809.0,bunt,"stolar och karmstol, 6+1, ""Louis Ghost"" samt ""Victoria Ghost"", Kartell, plast. philippe starck"
+b1,9,Matgrupp 5 stolar,dyrast,230000.0,bunt,Mio matgrupp med vitrinskåp
+b1,9,Matgrupp 5 stolar,dyrast,67000.0,tillbehör,"FÖR KNOLL INTERNATIONAL, MATGRUPP, ""TULIP"" 6 DELAR. eero saarinen"
+b1,9,Matgrupp 5 stolar,dyrast,65000.0,bunt,komplett heminredning soffa säng matgrupp
+b1,9,Matgrupp 5 stolar,dyrast,55000.0,bunt,Miss Holly bord stolar Stolab matgrupp
+b1,9,Matgrupp 5 stolar,dyrast,49000.0,bunt,soffgrupp/ Matgrupp
+b1,9,Matgrupp 5 stolar,billigast,10.0,bunt,"3-4 sitts Soffa med Twist, Matgrupp 6 stolar"
+b1,9,Matgrupp 5 stolar,billigast,10.0,bunt,"Matgrupp med bord och två vitrinskåp i trä, vit/ek från Xxxlutz"
+b1,9,Matgrupp 5 stolar,billigast,50.0,bunt,"MATGRUPP, MASSIV ASK, SPECIALBESTÄLLD TILLVERKNING, 1900-TAL, BORD SAMT 4 STOLAR."
+b1,9,Matgrupp 5 stolar,billigast,50.0,bunt,"MATGRUPP, BORD MED 4 STOLAR, 1900-TAL."
+b1,9,Matgrupp 5 stolar,billigast,50.0,bunt,"MATGRUPP ""AXET"" BORD MED 4 STOLAR, 2 ILÄGGSKIVOR, 1900-TAL."
+b1,10,Ekbord med stolar,dyrast,90000.0,bunt,Runt matbord i mörkt trä med stolar
+b1,10,Ekbord med stolar,dyrast,75000.0,bunt,Soffgrupp soffor matbord bord
+b1,10,Ekbord med stolar,dyrast,57000.0,tillbehör,"MATBORD, Georg III, England 1800-talets första hälft, fanerat och massiv mahogny, beslag i mässing."
+b1,10,Ekbord med stolar,dyrast,57000.0,bunt,"Matbord och taklampa, bordet i koppar med travertinskiva, taklampan i koppar med perforerad dekor. erik glemme"
+b1,10,Ekbord med stolar,dyrast,54000.0,bunt,"Gubi matbord valnöt, Charlie pommier Otto matstolar"
+b1,10,Ekbord med stolar,billigast,10.0,bunt,Stort matbord Bortskänkes (4 stolar)
+b1,10,Ekbord med stolar,billigast,50.0,bunt,"MATBORD med 6 stolar, Engelsk stil."
+b1,10,Ekbord med stolar,billigast,50.0,bunt,MATBORD med iläggsskivor samt 6 stolar.
+b1,10,Ekbord med stolar,billigast,50.0,bunt,"MATBORD MED 6 STOLAR, bambu, 1900-talets senare del."
+b1,10,Ekbord med stolar,billigast,50.0,bunt,"MATBORD med 6 STOLAR, rokokostil."
+b2,1,ikea norsborg,dyrast,5800.0,bunt,Soffa IKEA Norsborg och två soffbord
+b2,1,ikea norsborg,dyrast,2500.0,sektion,3-sitssoffa med schäslong - IKEA Norsborg
+b2,1,ikea norsborg,dyrast,2500.0,tillbehör,IKEA Norsborg 3-sits soffa – Vit klädsel
+b2,1,ikea norsborg,dyrast,2000.0,sektion,Blå IKEA-soffa Norsborg med schäslong
+b2,1,ikea norsborg,dyrast,1500.0,bunt,Soffa IKEA Norsborg 4-sits hörnsoffa
+b2,1,ikea norsborg,billigast,500.0,tillbehör,Soffa med divan (IKEA Norsborg) sliten klädsel
+b2,1,ikea norsborg,billigast,600.0,bunt,Ikea Norsborg Soffa inkl fotpall
+b2,1,ikea norsborg,billigast,800.0,bunt,Soffa IKEA Norsborg 4-sits hörnsoffa
+b2,1,ikea norsborg,billigast,900.0,tillbehör,Soffa IKEA Norsborg med Bemz klädsel
+b2,1,ikea norsborg,billigast,1200.0,tillbehör,Tresitsig tygsoffa Ikeas Norsborg grå klädsel.
+b2,2,Bolia soffa med puff,dyrast,50000.0,tillbehör,Helt ny Bolia Sepia 3-sits soffa med puff &amp; kuddar
+b2,2,Bolia soffa med puff,dyrast,40000.0,tillbehör,Helt ny Bolia Sepia 3-sits soffa med puff och kuddar
+b2,2,Bolia soffa med puff,dyrast,4000.0,tillbehör,Soffa Bolia med puff och kuddar
+b2,2,Bolia soffa med puff,billigast,4000.0,tillbehör,Soffa Bolia med puff och kuddar
+b2,2,Bolia soffa med puff,billigast,40000.0,tillbehör,Helt ny Bolia Sepia 3-sits soffa med puff och kuddar
+b2,2,Bolia soffa med puff,billigast,50000.0,tillbehör,Helt ny Bolia Sepia 3-sits soffa med puff &amp; kuddar
+b2,3,Mio Harper soffa,dyrast,22000.0,bunt,"Mio Harper, 1st soffa + 2st fåtöljer"
+b2,3,Mio Harper soffa,dyrast,20000.0,bunt,"Harper MIO soffa, fåtölj &amp; fotpall"
+b2,3,Mio Harper soffa,dyrast,19000.0,typmotsägelse,Mio soffgrupp Harper
+b2,3,Mio Harper soffa,dyrast,18000.0,bunt,Soffa & Fåtölj ”Harper” från Mio
+b2,3,Mio Harper soffa,dyrast,17500.0,bunt,Harper 4sits soffa med fåtölj från Mio
+b2,3,Mio Harper soffa,billigast,60.0,tillbehör,Harper Mio soffben
+b2,3,Mio Harper soffa,billigast,200.0,tillbehör,Mio soffben Harper svart metall
+b2,3,Mio Harper soffa,billigast,300.0,typmotsägelse,Mio Harper fotpall
+b2,3,Mio Harper soffa,billigast,500.0,typmotsägelse,Harper Fotpall Mios
+b2,3,Mio Harper soffa,billigast,550.0,typmotsägelse,"FOTPALL, ""Harper"", Mio."
+b2,4,Jysk Egedal,dyrast,1300.0,bunt,egedal soffa &amp; fåtölj från jysk
+b2,4,Jysk Egedal,billigast,1300.0,bunt,egedal soffa &amp; fåtölj från jysk
+b2,6,Jysk fåtölj,dyrast,5500.0,bunt,Soffa 3 sits Ilva +fåtölj i samma färg( Jysk)
+b2,6,Jysk fåtölj,dyrast,5000.0,bunt,Soffa 3 sits Ilva +fåtölj i samma färg( Jysk)
+b2,6,Jysk fåtölj,dyrast,4800.0,bunt,Jysk grå soffa med fåtölj och vit tv-bänk
+b2,6,Jysk fåtölj,dyrast,4500.0,typmotsägelse,Sammetsfåtöljer Jysk EGEDAL
+b2,6,Jysk fåtölj,dyrast,4000.0,bunt,Ikea Soffa Hylltarp 2 Jysk fåtöljer
+b2,6,Jysk fåtölj,billigast,200.0,bunt,Fåtölj med fotpall från Jysk
+b2,6,Jysk fåtölj,billigast,200.0,bunt,Stol/fåtölj (2st)
+b2,6,Jysk fåtölj,billigast,222.0,bunt,2st fåtöljer - Liknar Jysk Acapulco - Stol - Utemöbler - Loungestol
+b2,6,Jysk fåtölj,billigast,300.0,bunt,2 st fåtöljer Jysk Tankedal med fotpall
+b2,6,Jysk fåtölj,billigast,400.0,bunt,fåtölj fotpall jysk
+b2,7,Swedese Lamino,dyrast,26000.0,bunt,"YNGVE EKSTRÖM, ""Lamino"", 1-par, fåtöljer med fotpall, för Swedese, samtida, vitpigmenterad ek och fårskinn."
+b2,7,Swedese Lamino,dyrast,24000.0,bunt,Lamino Swedese fåtöljer och bord
+b2,7,Swedese Lamino,dyrast,20000.0,tillbehör,"Fåtöljer, fotpallar och bord, 5 delar, ""Lamino"", ek och svart fårskinn, Yngve Ekström för Swedese."
+b2,7,Swedese Lamino,dyrast,20000.0,bunt,Två Lamino fåtöljer med en pall
+b2,7,Swedese Lamino,dyrast,20000.0,bunt,Swedese Lamino Fåtölj &amp; Fotpall - Black Edition
+b2,7,Swedese Lamino,billigast,393.0,tillbehör,"Delar till fåtölj & pall, 7 st, Lamino, Swedese. yngve ekström"
+b2,7,Swedese Lamino,billigast,819.0,bunt,"Pall, ""Lamino"", Swedese, stomme i svartfärgad bok och svartfärgat fårskinn, brännmärkt, samtida. yngve ekström"
+b2,7,Swedese Lamino,billigast,850.0,bunt,"PALL med fårskinn, ""Lamino"", Yngve Ekström, Swedese."
+b2,7,Swedese Lamino,billigast,950.0,bunt,"Fotpall, teak och bok, Lamino, Swedese. yngve ekström"
+b2,7,Swedese Lamino,billigast,1000.0,bunt,Swedese lamino fåtölj och fotpall
+b2,8,DUX Bruno Mathsson Eva,dyrast,11000.0,bunt,"karmstolar, 1 par, ""Eva"", Dux, skinn, brännmärkta. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,dyrast,9800.0,tillbehör,"""Eva"" fåtöljer, 1 par, för DUX, stomme av skiktlimmad bok, klädsel i flätat läder, brännmärkta. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,dyrast,7250.0,bunt,"Karmstolar, ett par, ""Eva"", brännmärkta, för Dux. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,dyrast,7250.0,bunt,"1 par, ""Eva"", karmstolar, Dux, bok, flätad sadelgjord i skinn, brännmärkta. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,dyrast,7000.0,tillbehör,"Fåtölj, ""Eva låg"", Dux, stomme i bok med klädsel i grått fårskinn. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,billigast,1250.0,bunt,"KARMSTOL, ett par, ""Eva"", Bruno Mathsson för Dux, 1900-talets andra hälft."
+b2,8,DUX Bruno Mathsson Eva,billigast,2008.0,bunt,"Stolar ""Eva"" ett par, bok, sadelgjord, Dux. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,billigast,2750.0,bunt,"Fåtölj ""Eva hög"" med fotpall, ""Pernilla"", Dux. bruno mathsson"
+b2,8,DUX Bruno Mathsson Eva,billigast,2750.0,tillbehör,"Stommar i bok med klädsel i sadelgjord. ""Eva"", Dux, märkta på baksidan. bruno mathsson. fåtöljer, ett par"
+b2,8,DUX Bruno Mathsson Eva,billigast,2800.0,tillbehör,"fåtölj, ""Eva"", Dux, stomma av bok, klädsel i läder. bruno mathsson"
+b2,9,Matbord trä,dyrast,90000.0,bunt,Runt matbord i mörkt trä med stolar
+b2,9,Matbord trä,dyrast,75000.0,bunt,Soffgrupp soffor matbord bord
+b2,9,Matbord trä,dyrast,57000.0,tillbehör,"MATBORD, Georg III, England 1800-talets första hälft, fanerat och massiv mahogny, beslag i mässing."
+b2,9,Matbord trä,dyrast,57000.0,bunt,"Matbord och taklampa, bordet i koppar med travertinskiva, taklampan i koppar med perforerad dekor. erik glemme"
+b2,9,Matbord trä,dyrast,54000.0,bunt,"Gubi matbord valnöt, Charlie pommier Otto matstolar"
+b2,9,Matbord trä,billigast,10.0,bunt,Stort matbord Bortskänkes (4 stolar)
+b2,9,Matbord trä,billigast,50.0,bunt,"MATBORD med 6 stolar, Engelsk stil."
+b2,9,Matbord trä,billigast,50.0,bunt,MATBORD med iläggsskivor samt 6 stolar.
+b2,9,Matbord trä,billigast,50.0,bunt,"MATBORD MED 6 STOLAR, bambu, 1900-talets senare del."
+b2,9,Matbord trä,billigast,50.0,bunt,"MATBORD med 6 STOLAR, rokokostil."
+b2,10,Mio matgrupp,dyrast,230000.0,bunt,Mio matgrupp med vitrinskåp
+b2,10,Mio matgrupp,dyrast,23000.0,bunt,Mio matgrupp med vitrinskåp
+b2,10,Mio matgrupp,dyrast,23000.0,bunt,Mio matgrupp med vitrinskåp
+b2,10,Mio matgrupp,dyrast,22000.0,bunt,Matgrupp Mio &amp; Skänk
+b2,10,Mio matgrupp,dyrast,20000.0,bunt,Matbord stolar matgrupp
+b2,10,Mio matgrupp,billigast,50.0,bunt,Nätt matgrupp/köksbord Ikea PS 2012 + 4 vita stolar Mio
+b2,10,Mio matgrupp,billigast,58.0,bunt,Matgrupp ifrån Mio 6 stolar
+b2,10,Mio matgrupp,billigast,62.0,bunt,Moa Matgrupp Med 4 Stolar Köksbord Klaffbord Från MIO
+b2,10,Mio matgrupp,billigast,67.0,bunt,Mio Matgrupp Bord och 6 stolar
+b2,10,Mio matgrupp,billigast,83.0,bunt,Matgrupp i Ek - 6 stolar
+b2,11,Matgrupp byCrea,dyrast,230000.0,bunt,Mio matgrupp med vitrinskåp
+b2,11,Matgrupp byCrea,dyrast,67000.0,tillbehör,"FÖR KNOLL INTERNATIONAL, MATGRUPP, ""TULIP"" 6 DELAR. eero saarinen"
+b2,11,Matgrupp byCrea,dyrast,65000.0,bunt,komplett heminredning soffa säng matgrupp
+b2,11,Matgrupp byCrea,dyrast,55000.0,bunt,Miss Holly bord stolar Stolab matgrupp
+b2,11,Matgrupp byCrea,dyrast,49000.0,bunt,soffgrupp/ Matgrupp
+b2,11,Matgrupp byCrea,billigast,10.0,bunt,"3-4 sitts Soffa med Twist, Matgrupp 6 stolar"
+b2,11,Matgrupp byCrea,billigast,10.0,bunt,"Matgrupp med bord och två vitrinskåp i trä, vit/ek från Xxxlutz"
+b2,11,Matgrupp byCrea,billigast,50.0,bunt,"MATGRUPP, MASSIV ASK, SPECIALBESTÄLLD TILLVERKNING, 1900-TAL, BORD SAMT 4 STOLAR."
+b2,11,Matgrupp byCrea,billigast,50.0,bunt,"MATGRUPP, BORD MED 4 STOLAR, 1900-TAL."
+b2,11,Matgrupp byCrea,billigast,50.0,bunt,"MATGRUPP ""AXET"" BORD MED 4 STOLAR, 2 ILÄGGSKIVOR, 1900-TAL."
+b2,13,Ikea skotterud,dyrast,9500.0,bunt,"160 cm säng med förvaring, IKEA Skotterud med madrass &amp; ra"
+b2,13,Ikea skotterud,dyrast,6490.0,bunt,IKEA säng Skotterud med tillhörande madrass Tustna 120 cm
+b2,13,Ikea skotterud,dyrast,6000.0,bunt,Rustik sängstomme + två IKEA Skotterud 90x200 madrasser
+b2,13,Ikea skotterud,dyrast,6000.0,bunt,Rustik sängstomme + två IKEA Skotterud 90x200 madrasser
+b2,13,Ikea skotterud,dyrast,6000.0,bunt,Ikea Skotterud säng med Tussöy bäddmadrass
+b2,13,Ikea skotterud,billigast,350.0,bunt,"SÄNG, IKEA, stomme Brimnes samt madrass Skotterud."
+b2,13,Ikea skotterud,billigast,450.0,bunt,90x200 ikea skotterud med sänggavel
+b2,13,Ikea skotterud,billigast,500.0,bunt,Säng 90X200 - IKEA SKOTTERUD resårbotten med TUSSÖY bäddmadrass
+b2,13,Ikea skotterud,billigast,500.0,tillbehör,IKEA SKOTTERUD resårbotten 90x200 cm + ben
+b2,13,Ikea skotterud,billigast,700.0,tillbehör,IKEA SKOTTERUD Resårbotten med ben

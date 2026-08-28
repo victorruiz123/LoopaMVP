@@ -1,0 +1,9 @@
+{
+  "model": "google/gemini-2.5-flash",
+  "n": 18,
+  "answered": 17,
+  "failures": 0,
+  "accuracy_inga": 0.0,
+  "accuracy_ingar": 1.0,
+  "false_positive_rate": 1.0
+}

@@ -1,0 +1,1119 @@
+{
+  "built_at": "2026-08-05T13:07:21+00:00",
+  "matching_level": "engine",
+  "random_seed": 20260805,
+  "thresholds": {
+    "min_asking": 20,
+    "bid": [
+      5,
+      4,
+      3
+    ],
+    "min_sales_per_group": 50,
+    "time_window_months": 3
+  },
+  "funnel": [
+    {
+      "steg": "slutpriser i datan",
+      "tradera": 7831,
+      "auctionet": 461564,
+      "totalt": 469395
+    },
+    {
+      "steg": "auktionskanal (ej fastpris)",
+      "tradera": 7714,
+      "auctionet": 461564,
+      "totalt": 469278
+    },
+    {
+      "steg": "är en möbel (ej okänd/del)",
+      "tradera": 4420,
+      "auctionet": 386760,
+      "totalt": 391180
+    },
+    {
+      "steg": "har datum och budantal",
+      "tradera": 4420,
+      "auctionet": 386760,
+      "totalt": 391180
+    },
+    {
+      "steg": "med igenkänt märke",
+      "tradera": 897,
+      "auctionet": 69102,
+      "totalt": 69999
+    },
+    {
+      "steg": "med igenkänt märke OCH modellnamn",
+      "tradera": 224,
+      "auctionet": 19585,
+      "totalt": 19809
+    },
+    {
+      "steg": "modellsökning gav >= 20 annonser",
+      "tradera": 196,
+      "auctionet": 4507,
+      "totalt": 4703
+    }
+  ],
+  "channel_gaps": {
+    "low": {
+      "gap": -0.2109,
+      "groups": 2,
+      "n_tradera": 72,
+      "per_variant": {
+        "byrå": -0.2109,
+        "hylla": -0.5523
+      }
+    },
+    "mid": {
+      "gap": -0.1334,
+      "groups": 1,
+      "n_tradera": 36,
+      "per_variant": {
+        "hylla": -0.1334
+      }
+    },
+    "high": {
+      "gap": null,
+      "groups": 0,
+      "n_tradera": 0
+    }
+  },
+  "low_end_gap_status": "gap_measured",
+  "groups": {},
+  "segments": {
+    "high": {
+      "sell_percentile": 0.3503,
+      "p25": 0.1808,
+      "p75": 0.5948,
+      "ci_low": 0.337,
+      "ci_high": 0.3642,
+      "n": 3220,
+      "sell_percentile_raw": 0.3503,
+      "bid_threshold": 5,
+      "dimension": "märkesklass",
+      "n_tradera": 3,
+      "median_n_asking": 74,
+      "no_image_share": 0.8929,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.25,
+          "p25": 0.125,
+          "p75": 0.4615,
+          "ci_low": 0.2273,
+          "ci_high": 0.2667,
+          "n": 1093,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3696,
+          "p25": 0.2065,
+          "p75": 0.5882,
+          "ci_low": 0.3485,
+          "ci_high": 0.3956,
+          "n": 1129,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.4594,
+          "p25": 0.2565,
+          "p75": 0.7021,
+          "ci_low": 0.4405,
+          "ci_high": 0.4898,
+          "n": 998,
+          "median_bids": 27.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "low": {
+      "sell_percentile": 0.4104,
+      "p25": 0.1283,
+      "p75": 0.5953,
+      "ci_low": 0.3598,
+      "ci_high": 0.4455,
+      "n": 486,
+      "sell_percentile_raw": 0.5796,
+      "bid_threshold": 5,
+      "dimension": "märkesklass",
+      "n_tradera": 62,
+      "median_n_asking": 316,
+      "no_image_share": 0.8004,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4181,
+          "p25": 0.1752,
+          "p75": 0.6515,
+          "ci_low": 0.2936,
+          "ci_high": 0.4929,
+          "n": 182,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6194,
+          "p25": 0.3526,
+          "p75": 0.795,
+          "ci_low": 0.5321,
+          "ci_high": 0.6915,
+          "n": 142,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.7626,
+          "p25": 0.4717,
+          "p75": 0.8805,
+          "ci_low": 0.6851,
+          "ci_high": 0.7979,
+          "n": 162,
+          "median_bids": 24.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "mid": {
+      "sell_percentile": 0.3863,
+      "p25": 0.1523,
+      "p75": 0.6389,
+      "ci_low": 0.3147,
+      "ci_high": 0.4593,
+      "n": 387,
+      "sell_percentile_raw": 0.5188,
+      "bid_threshold": 5,
+      "dimension": "märkesklass",
+      "n_tradera": 24,
+      "median_n_asking": 1359,
+      "no_image_share": 0.9742,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2768,
+          "p25": 0.2184,
+          "p75": 0.3312,
+          "ci_low": 0.2493,
+          "ci_high": 0.2883,
+          "n": 132,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5239,
+          "p25": 0.3554,
+          "p75": 0.8119,
+          "ci_low": 0.4481,
+          "ci_high": 0.6295,
+          "n": 133,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.7244,
+          "p25": 0.569,
+          "p75": 0.8899,
+          "ci_low": 0.6811,
+          "ci_high": 0.7679,
+          "n": 122,
+          "median_bids": 21.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "high · hög": {
+      "sell_percentile": 0.2785,
+      "p25": 0.1389,
+      "p75": 0.5049,
+      "ci_low": 0.2647,
+      "ci_high": 0.3052,
+      "n": 1208,
+      "sell_percentile_raw": 0.2785,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 3,
+      "median_n_asking": 48,
+      "no_image_share": 0.9189,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2005,
+          "p25": 0.0906,
+          "p75": 0.3641,
+          "ci_low": 0.18,
+          "ci_high": 0.225,
+          "n": 410,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3029,
+          "p25": 0.1519,
+          "p75": 0.5024,
+          "ci_low": 0.2591,
+          "ci_high": 0.3229,
+          "n": 404,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.375,
+          "p25": 0.1967,
+          "p75": 0.6176,
+          "ci_low": 0.3378,
+          "ci_high": 0.4147,
+          "n": 394,
+          "median_bids": 27.5
+        }
+      },
+      "matching_level": "engine"
+    },
+    "high · låg": {
+      "sell_percentile": 0.4314,
+      "p25": 0.2564,
+      "p75": 0.6538,
+      "ci_low": 0.4103,
+      "ci_high": 0.4565,
+      "n": 845,
+      "sell_percentile_raw": 0.4314,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 0,
+      "median_n_asking": 80,
+      "no_image_share": 0.8556,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3351,
+          "p25": 0.1872,
+          "p75": 0.5589,
+          "ci_low": 0.2994,
+          "ci_high": 0.3695,
+          "n": 288,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.425,
+          "p25": 0.275,
+          "p75": 0.6229,
+          "ci_low": 0.3871,
+          "ci_high": 0.4625,
+          "n": 291,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.5615,
+          "p25": 0.375,
+          "p75": 0.7436,
+          "ci_low": 0.4938,
+          "ci_high": 0.6087,
+          "n": 266,
+          "median_bids": 26.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "high · mellan": {
+      "sell_percentile": 0.3589,
+      "p25": 0.1778,
+      "p75": 0.6183,
+      "ci_low": 0.3333,
+      "ci_high": 0.378,
+      "n": 1167,
+      "sell_percentile_raw": 0.3589,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 0,
+      "median_n_asking": 136,
+      "no_image_share": 0.8929,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2429,
+          "p25": 0.1323,
+          "p75": 0.4687,
+          "ci_low": 0.2143,
+          "ci_high": 0.2807,
+          "n": 395,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3768,
+          "p25": 0.1931,
+          "p75": 0.6176,
+          "ci_low": 0.3463,
+          "ci_high": 0.4437,
+          "n": 400,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.508,
+          "p25": 0.2525,
+          "p75": 0.7284,
+          "ci_low": 0.4469,
+          "ci_high": 0.5429,
+          "n": 372,
+          "median_bids": 27.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "low · hög": {
+      "sell_percentile": 0.5324,
+      "p25": 0.286,
+      "p75": 0.6584,
+      "ci_low": 0.4489,
+      "ci_high": 0.5834,
+      "n": 149,
+      "sell_percentile_raw": 0.7375,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 3,
+      "median_n_asking": 1009,
+      "no_image_share": 0.7718,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6234,
+          "p25": 0.4161,
+          "p75": 0.7956,
+          "ci_low": 0.4877,
+          "ci_high": 0.6704,
+          "n": 57,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7848,
+          "p25": 0.5671,
+          "p75": 0.8805,
+          "ci_low": 0.7217,
+          "ci_high": 0.8112,
+          "n": 46,
+          "median_bids": 16.5
+        },
+        "hög": {
+          "sell_percentile": 0.8287,
+          "p25": 0.512,
+          "p75": 0.9097,
+          "ci_low": 0.6598,
+          "ci_high": 0.8793,
+          "n": 46,
+          "median_bids": 25.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "low · låg": {
+      "sell_percentile": 0.2858,
+      "p25": 0.0756,
+      "p75": 0.5679,
+      "ci_low": 0.2066,
+      "ci_high": 0.3644,
+      "n": 215,
+      "sell_percentile_raw": 0.4475,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 51,
+      "median_n_asking": 294,
+      "no_image_share": 0.8372,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2865,
+          "p25": 0.1297,
+          "p75": 0.5655,
+          "ci_low": 0.1821,
+          "ci_high": 0.4271,
+          "n": 73,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4048,
+          "p25": 0.2185,
+          "p75": 0.7111,
+          "ci_low": 0.3214,
+          "ci_high": 0.5592,
+          "n": 70,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.6685,
+          "p25": 0.3953,
+          "p75": 0.8718,
+          "ci_low": 0.5513,
+          "ci_high": 0.754,
+          "n": 72,
+          "median_bids": 24.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "low · mellan": {
+      "sell_percentile": 0.4164,
+      "p25": 0.0903,
+      "p75": 0.5833,
+      "ci_low": 0.3088,
+      "ci_high": 0.4584,
+      "n": 122,
+      "sell_percentile_raw": 0.6221,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 8,
+      "median_n_asking": 316,
+      "no_image_share": 0.7705,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3593,
+          "p25": 0.1681,
+          "p75": 0.6648,
+          "ci_low": 0.2057,
+          "ci_high": 0.5693,
+          "n": 45,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6208,
+          "p25": 0.3388,
+          "p75": 0.7278,
+          "ci_low": 0.4685,
+          "ci_high": 0.6614,
+          "n": 37,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.7921,
+          "p25": 0.5383,
+          "p75": 0.8315,
+          "ci_low": 0.675,
+          "ci_high": 0.8047,
+          "n": 40,
+          "median_bids": 25.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "mid · låg": {
+      "sell_percentile": 0.3508,
+      "p25": 0.1585,
+      "p75": 0.6335,
+      "ci_low": 0.2772,
+      "ci_high": 0.4877,
+      "n": 130,
+      "sell_percentile_raw": 0.4842,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 7,
+      "median_n_asking": 1359,
+      "no_image_share": 0.9615,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2631,
+          "p25": 0.1989,
+          "p75": 0.3243,
+          "ci_low": 0.2424,
+          "ci_high": 0.2958,
+          "n": 43,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4799,
+          "p25": 0.36,
+          "p75": 0.7344,
+          "ci_low": 0.4343,
+          "ci_high": 0.6294,
+          "n": 46,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.7653,
+          "p25": 0.5758,
+          "p75": 0.8966,
+          "ci_low": 0.6733,
+          "ci_high": 0.8572,
+          "n": 41,
+          "median_bids": 20.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "mid · mellan": {
+      "sell_percentile": 0.4201,
+      "p25": 0.1629,
+      "p75": 0.6662,
+      "ci_low": 0.345,
+      "ci_high": 0.5105,
+      "n": 213,
+      "sell_percentile_raw": 0.5459,
+      "bid_threshold": 5,
+      "dimension": "märkesklass × prisnivå",
+      "n_tradera": 17,
+      "median_n_asking": 458,
+      "no_image_share": 0.9906,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.285,
+          "p25": 0.2208,
+          "p75": 0.3792,
+          "ci_low": 0.2622,
+          "ci_high": 0.2997,
+          "n": 77,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6443,
+          "p25": 0.3764,
+          "p75": 0.8597,
+          "ci_low": 0.4794,
+          "ci_high": 0.7433,
+          "n": 68,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.6921,
+          "p25": 0.543,
+          "p75": 0.8559,
+          "ci_low": 0.6241,
+          "ci_high": 0.7454,
+          "n": 68,
+          "median_bids": 21.5
+        }
+      },
+      "matching_level": "engine"
+    },
+    "bord · high": {
+      "sell_percentile": 0.2935,
+      "p25": 0.0952,
+      "p75": 0.6154,
+      "ci_low": 0.1956,
+      "ci_high": 0.375,
+      "n": 213,
+      "sell_percentile_raw": 0.2935,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 92,
+      "no_image_share": 0.9061,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.1277,
+          "p25": 0.0211,
+          "p75": 0.4316,
+          "ci_low": 0.0532,
+          "ci_high": 0.209,
+          "n": 72,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3365,
+          "p25": 0.1214,
+          "p75": 0.6154,
+          "ci_low": 0.2065,
+          "ci_high": 0.4767,
+          "n": 77,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.4892,
+          "p25": 0.1905,
+          "p75": 0.7195,
+          "ci_low": 0.3388,
+          "ci_high": 0.5683,
+          "n": 64,
+          "median_bids": 27.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "bord · low": {
+      "sell_percentile": 0.281,
+      "p25": 0.0457,
+      "p75": 0.5165,
+      "ci_low": 0.1625,
+      "ci_high": 0.381,
+      "n": 102,
+      "sell_percentile_raw": 0.4919,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 6,
+      "median_n_asking": 316,
+      "no_image_share": 0.7745,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2278,
+          "p25": 0.1358,
+          "p75": 0.4643,
+          "ci_low": 0.1626,
+          "ci_high": 0.3489,
+          "n": 34,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4656,
+          "p25": 0.2265,
+          "p75": 0.6573,
+          "ci_low": 0.3,
+          "ci_high": 0.6234,
+          "n": 36,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.7401,
+          "p25": 0.5598,
+          "p75": 0.8036,
+          "ci_low": 0.6229,
+          "ci_high": 0.7949,
+          "n": 32,
+          "median_bids": 23.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "byrå · low": {
+      "sell_percentile": 0.435,
+      "p25": 0.2508,
+      "p75": 0.581,
+      "ci_low": 0.3928,
+      "ci_high": 0.4786,
+      "n": 154,
+      "sell_percentile_raw": 0.6194,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 21,
+      "median_n_asking": 346,
+      "no_image_share": 0.7273,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5335,
+          "p25": 0.2659,
+          "p75": 0.6506,
+          "ci_low": 0.425,
+          "ci_high": 0.6092,
+          "n": 59,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6947,
+          "p25": 0.5086,
+          "p75": 0.7948,
+          "ci_low": 0.5898,
+          "ci_high": 0.7733,
+          "n": 46,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.6969,
+          "p25": 0.4604,
+          "p75": 0.8073,
+          "ci_low": 0.5601,
+          "ci_high": 0.7736,
+          "n": 49,
+          "median_bids": 25.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "fotpall · high": {
+      "sell_percentile": 0.4382,
+      "p25": 0.2029,
+      "p75": 0.6779,
+      "ci_low": 0.375,
+      "ci_high": 0.4822,
+      "n": 550,
+      "sell_percentile_raw": 0.4382,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 70,
+      "no_image_share": 0.9018,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3056,
+          "p25": 0.1425,
+          "p75": 0.5582,
+          "ci_low": 0.25,
+          "ci_high": 0.3478,
+          "n": 186,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4625,
+          "p25": 0.2353,
+          "p75": 0.6943,
+          "ci_low": 0.3818,
+          "ci_high": 0.5357,
+          "n": 193,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.5588,
+          "p25": 0.2795,
+          "p75": 0.7228,
+          "ci_low": 0.5,
+          "ci_high": 0.6176,
+          "n": 171,
+          "median_bids": 29.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "fåtölj · high": {
+      "sell_percentile": 0.2778,
+      "p25": 0.1397,
+      "p75": 0.4844,
+      "ci_low": 0.2591,
+      "ci_high": 0.2932,
+      "n": 1197,
+      "sell_percentile_raw": 0.2778,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 68,
+      "no_image_share": 0.9064,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2053,
+          "p25": 0.1111,
+          "p75": 0.3612,
+          "ci_low": 0.1805,
+          "ci_high": 0.2336,
+          "n": 454,
+          "median_bids": 11.0
+        },
+        "mellan": {
+          "sell_percentile": 0.308,
+          "p25": 0.1705,
+          "p75": 0.5,
+          "ci_low": 0.2778,
+          "ci_high": 0.3356,
+          "n": 350,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.3613,
+          "p25": 0.1838,
+          "p75": 0.6064,
+          "ci_low": 0.3191,
+          "ci_high": 0.3875,
+          "n": 393,
+          "median_bids": 27.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "fåtölj · low": {
+      "sell_percentile": 0.1243,
+      "p25": 0.0,
+      "p75": 0.2981,
+      "ci_low": 0.0348,
+      "ci_high": 0.2099,
+      "n": 52,
+      "sell_percentile_raw": 0.2926,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 3,
+      "median_n_asking": 305,
+      "no_image_share": 0.7885,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.1338,
+          "p25": 0.0786,
+          "p75": 0.3692,
+          "ci_low": 0.0875,
+          "ci_high": 0.2865,
+          "n": 19,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.2589,
+          "p25": 0.165,
+          "p75": 0.4834,
+          "ci_low": 0.1752,
+          "ci_high": 0.4863,
+          "n": 16,
+          "median_bids": 13.5
+        },
+        "hög": {
+          "sell_percentile": 0.4175,
+          "p25": 0.3032,
+          "p75": 0.6736,
+          "ci_low": 0.3032,
+          "ci_high": 0.6736,
+          "n": 17,
+          "median_bids": 19.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "hylla · high": {
+      "sell_percentile": 0.4197,
+      "p25": 0.2744,
+      "p75": 0.6724,
+      "ci_low": 0.3238,
+      "ci_high": 0.4897,
+      "n": 53,
+      "sell_percentile_raw": 0.4197,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 193,
+      "no_image_share": 0.9434,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2935,
+          "p25": 0.2065,
+          "p75": 0.6607,
+          "ci_low": 0.2128,
+          "ci_high": 0.5946,
+          "n": 25,
+          "median_bids": 13.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4022,
+          "p25": 0.3194,
+          "p75": 0.4627,
+          "ci_low": 0.3149,
+          "ci_high": 0.4688,
+          "n": 11,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.6518,
+          "p25": 0.3824,
+          "p75": 0.7641,
+          "ci_low": 0.3824,
+          "ci_high": 0.6795,
+          "n": 17,
+          "median_bids": 23.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "hylla · low": {
+      "sell_percentile": 0.6181,
+      "p25": 0.4032,
+      "p75": 0.716,
+      "ci_low": 0.5837,
+      "ci_high": 0.6578,
+      "n": 100,
+      "sell_percentile_raw": 0.8181,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 12,
+      "median_n_asking": 316,
+      "no_image_share": 0.84,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6427,
+          "p25": 0.4039,
+          "p75": 0.8125,
+          "ci_low": 0.4373,
+          "ci_high": 0.7956,
+          "n": 34,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8357,
+          "p25": 0.6593,
+          "p75": 0.9397,
+          "ci_low": 0.7531,
+          "ci_high": 0.8981,
+          "n": 36,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9048,
+          "p25": 0.8028,
+          "p75": 0.9848,
+          "ci_low": 0.8415,
+          "ci_high": 0.9643,
+          "n": 30,
+          "median_bids": 25.5
+        }
+      },
+      "matching_level": "engine"
+    },
+    "hylla · mid": {
+      "sell_percentile": 0.4119,
+      "p25": 0.1629,
+      "p75": 0.6705,
+      "ci_low": 0.345,
+      "ci_high": 0.4961,
+      "n": 329,
+      "sell_percentile_raw": 0.5289,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 16,
+      "median_n_asking": 1359,
+      "no_image_share": 0.9878,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2796,
+          "p25": 0.2318,
+          "p75": 0.3716,
+          "ci_low": 0.2631,
+          "ci_high": 0.298,
+          "n": 124,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5744,
+          "p25": 0.381,
+          "p75": 0.8532,
+          "ci_low": 0.4803,
+          "ci_high": 0.69,
+          "n": 101,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.7381,
+          "p25": 0.5913,
+          "p75": 0.8962,
+          "ci_low": 0.6963,
+          "ci_high": 0.7838,
+          "n": 104,
+          "median_bids": 21.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "matgrupp · high": {
+      "sell_percentile": 0.4524,
+      "p25": 0.1522,
+      "p75": 0.7228,
+      "ci_low": 0.3408,
+      "ci_high": 0.5217,
+      "n": 93,
+      "sell_percentile_raw": 0.4524,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 46,
+      "no_image_share": 0.9892,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2316,
+          "p25": 0.1336,
+          "p75": 0.5133,
+          "ci_low": 0.1429,
+          "ci_high": 0.3452,
+          "n": 35,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4286,
+          "p25": 0.3095,
+          "p75": 0.7007,
+          "ci_low": 0.3423,
+          "ci_high": 0.5721,
+          "n": 29,
+          "median_bids": 16.0
+        },
+        "hög": {
+          "sell_percentile": 0.7065,
+          "p25": 0.4524,
+          "p75": 0.8755,
+          "ci_low": 0.5,
+          "ci_high": 0.7826,
+          "n": 29,
+          "median_bids": 29.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "soffa · high": {
+      "sell_percentile": 0.4756,
+      "p25": 0.2143,
+      "p75": 0.7042,
+      "ci_low": 0.3832,
+      "ci_high": 0.5652,
+      "n": 156,
+      "sell_percentile_raw": 0.4756,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 0,
+      "median_n_asking": 51,
+      "no_image_share": 0.6538,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3611,
+          "p25": 0.21,
+          "p75": 0.6389,
+          "ci_low": 0.2353,
+          "ci_high": 0.5071,
+          "n": 57,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4447,
+          "p25": 0.1922,
+          "p75": 0.6436,
+          "ci_low": 0.2222,
+          "ci_high": 0.5646,
+          "n": 48,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.6389,
+          "p25": 0.404,
+          "p75": 0.8212,
+          "ci_low": 0.5268,
+          "ci_high": 0.7571,
+          "n": 51,
+          "median_bids": 24.0
+        }
+      },
+      "matching_level": "engine"
+    },
+    "stol · high": {
+      "sell_percentile": 0.4084,
+      "p25": 0.2381,
+      "p75": 0.6154,
+      "ci_low": 0.3788,
+      "ci_high": 0.4241,
+      "n": 943,
+      "sell_percentile_raw": 0.4084,
+      "bid_threshold": 5,
+      "dimension": "möbeltyp × märkesklass",
+      "n_tradera": 2,
+      "median_n_asking": 92,
+      "no_image_share": 0.8993,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3011,
+          "p25": 0.1719,
+          "p75": 0.4766,
+          "ci_low": 0.2711,
+          "ci_high": 0.3274,
+          "n": 315,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4137,
+          "p25": 0.2575,
+          "p75": 0.6171,
+          "ci_low": 0.3779,
+          "ci_high": 0.452,
+          "n": 334,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.497,
+          "p25": 0.3403,
+          "p75": 0.6878,
+          "ci_low": 0.4547,
+          "ci_high": 0.5348,
+          "n": 294,
+          "median_bids": 27.0
+        }
+      },
+      "matching_level": "engine"
+    }
+  },
+  "overall": {
+    "sell_percentile": 0.3404,
+    "sell_percentile_raw": 0.3656,
+    "n": 4369,
+    "median_n_asking": 98
+  },
+  "image_effect": {
+    "n_with_image": 533,
+    "share_with_image": 0.1133,
+    "methods": {
+      "none": 4170,
+      "too_few_vectors": 459,
+      "filtered": 46,
+      "reverted": 27,
+      "loosened": 1
+    },
+    "median_overlap": 1.0,
+    "median_rank_shift": 0.0,
+    "changed_materially": 0.1351
+  }
+}

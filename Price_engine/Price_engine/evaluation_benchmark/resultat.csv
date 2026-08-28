@@ -1,0 +1,21 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse
+1,Mio Town,kärnnamn,7000,12000,4000.0,6000.0,7900.0,34,none,,none,high,True,False,-0.14285714285714285
+1,Mio Town,kärnnamn + bild,7000,12000,3448.0,6163.0,9083.0,22,none,,filtered,low,True,False,-0.11957142857142856
+2,Mio Saturday,kärnnamn,3000,6000,3349.0,5742.0,9289.0,15,none,,none,low,True,True,0.0
+2,Mio Saturday,kärnnamn + bild,3000,6000,4104.0,6022.0,14620.0,12,none,,filtered,low,True,False,0.0036666666666666666
+3,Mio Bridge,kärnnamn,3500,7000,2000.0,3776.0,5665.0,24,none,,none,low,True,True,0.0
+3,Mio Bridge,kärnnamn + bild,3500,7000,884.0,3752.0,5260.0,21,none,,filtered,low,True,True,0.0
+4,IKEA Karlstrand,kärnnamn,500,2000,,,,0,none,,none,none,False,False,
+4,IKEA Karlstrand,kärnnamn + bild,500,2000,,,,0,none,,none,none,False,False,
+5,Bellus soffa,kärnnamn,2000,6000,2000.0,4000.0,10000.0,29,none,,none,high,True,True,0.0
+5,Bellus soffa,kärnnamn + bild,2000,6000,1300.0,4000.0,10000.0,24,none,,filtered,high,True,True,0.0
+6,IKEA Stocksund,kärnnamn,800,2000,500.0,750.0,1000.0,38,none,,none,high,True,False,-0.0625
+6,IKEA Stocksund,kärnnamn + bild,800,2000,553.0,801.0,1355.0,29,none,,filtered,low,True,True,0.0
+7,Stalands Happy,kärnnamn,3000,6000,1854.0,3658.0,5931.0,2,none,,none,low,True,True,0.0
+7,Stalands Happy,kärnnamn + bild,3000,6000,1854.0,3658.0,5931.0,2,none,,none,low,True,True,0.0
+8,Kartell Victoria Ghost,kärnnamn,1000,2000,326.0,585.0,1016.0,15,none,,none,low,True,False,-0.415
+8,Kartell Victoria Ghost,kärnnamn + bild,1000,2000,326.0,585.0,1016.0,15,none,,none,low,True,False,-0.415
+9,None Matgrupp 5 stolar,kärnnamn,1500,2500,148.0,586.0,2381.0,16,none,,none,low,True,False,-0.6093333333333333
+9,None Matgrupp 5 stolar,kärnnamn + bild,1500,2500,148.0,586.0,2381.0,16,none,,none,low,True,False,-0.6093333333333333
+10,None Ekbord med stolar,kärnnamn,2000,5000,212.0,300.0,833.0,35,none,,none,high,False,False,-0.85
+10,None Ekbord med stolar,kärnnamn + bild,2000,5000,117.0,371.0,1250.0,22,none,,filtered,low,False,False,-0.8145

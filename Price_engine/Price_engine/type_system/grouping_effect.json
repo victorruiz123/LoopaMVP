@@ -1,0 +1,181 @@
+{
+  "before": {
+    "label": "FÖRE",
+    "cells": 71043,
+    "cells_big": 5555,
+    "share_in_big": 0.8236,
+    "median_width": 0.6071,
+    "mean_width": 0.6212
+  },
+  "after": {
+    "label": "EFTER",
+    "cells": 21501,
+    "cells_big": 1459,
+    "share_in_big": 0.9441,
+    "median_width": 0.4731,
+    "mean_width": 0.5015
+  },
+  "moved_over_20pct": 580,
+  "top_moves": [
+    {
+      "cell": "norrgavel|soffa|nirvan richter",
+      "old_cell": "|soffa|trasoffa",
+      "n": 40,
+      "before": 911.0,
+      "after": 17060.0,
+      "shift": 17.727
+    },
+    {
+      "cell": "hay|soffa|low mags",
+      "old_cell": "|okand|hay",
+      "n": 31,
+      "before": 1200.0,
+      "after": 18000.0,
+      "shift": 14.0
+    },
+    {
+      "cell": "|bank|krobo mellemstrands trevareindustri",
+      "old_cell": "|okand|bank",
+      "n": 41,
+      "before": 750.0,
+      "after": 9007.0,
+      "shift": 11.009
+    },
+    {
+      "cell": "vitra|kontorsstol|charles eames ray",
+      "old_cell": "|skrivbord|skrivbordsstol",
+      "n": 78,
+      "before": 450.0,
+      "after": 5000.0,
+      "shift": 10.111
+    },
+    {
+      "cell": "|fatolj|moonlight",
+      "old_cell": "|fatolj|swedish",
+      "n": 59,
+      "before": 1706.0,
+      "after": 18000.0,
+      "shift": 9.551
+    },
+    {
+      "cell": "|skap|lindmans nordens planscher tapetserat",
+      "old_cell": "|forvaring|forsta",
+      "n": 33,
+      "before": 837.5,
+      "after": 8805.0,
+      "shift": 9.513
+    },
+    {
+      "cell": "|skap|nordens tapetserat",
+      "old_cell": "|forvaring|50-tal",
+      "n": 33,
+      "before": 1200.0,
+      "after": 12500.0,
+      "shift": 9.417
+    },
+    {
+      "cell": "norrgavel|garderob|",
+      "old_cell": "|forvaring|kladskap",
+      "n": 32,
+      "before": 1600.0,
+      "after": 15000.0,
+      "shift": 8.375
+    },
+    {
+      "cell": "|bank|krobo",
+      "old_cell": "|okand|bank",
+      "n": 37,
+      "before": 750.0,
+      "after": 7000.0,
+      "shift": 8.333
+    },
+    {
+      "cell": "|kontorsstol|sjuan",
+      "old_cell": "|stol|sjuan",
+      "n": 35,
+      "before": 1250.0,
+      "after": 11500.0,
+      "shift": 8.2
+    },
+    {
+      "cell": "|bordslampa|orrefors",
+      "old_cell": "|bord|bordslampa",
+      "n": 33,
+      "before": 459.0,
+      "after": 3390.0,
+      "shift": 6.386
+    },
+    {
+      "cell": "|okand|conform",
+      "old_cell": "|fatolj|snurrfatolj",
+      "n": 38,
+      "before": 550.0,
+      "after": 3850.0,
+      "shift": 6.0
+    },
+    {
+      "cell": "|taburett|sengustavianska",
+      "old_cell": "|okand|taburetter",
+      "n": 50,
+      "before": 672.5,
+      "after": 4625.5,
+      "shift": 5.878
+    },
+    {
+      "cell": "|byra|nordens",
+      "old_cell": "|byra|mitt",
+      "n": 53,
+      "before": 650.0,
+      "after": 4454.0,
+      "shift": 5.852
+    },
+    {
+      "cell": "|fatolj|ope",
+      "old_cell": "|fatolj|ope",
+      "n": 91,
+      "before": 1300.0,
+      "after": 8501.0,
+      "shift": 5.539
+    },
+    {
+      "cell": "norrgavel|fatolj|",
+      "old_cell": "|sanggavel|norrgavel",
+      "n": 37,
+      "before": 2637.5,
+      "after": 17000.0,
+      "shift": 5.445
+    },
+    {
+      "cell": "norrgavel|soffa|",
+      "old_cell": "|sanggavel|norrgavel",
+      "n": 101,
+      "before": 2637.5,
+      "after": 17000.0,
+      "shift": 5.445
+    },
+    {
+      "cell": "|taburett|gustavianska",
+      "old_cell": "|okand|taburetter",
+      "n": 90,
+      "before": 672.5,
+      "after": 4100.0,
+      "shift": 5.097
+    },
+    {
+      "cell": "artek|okand|aalto alvar",
+      "old_cell": "|okand|serveringsvagn",
+      "n": 103,
+      "before": 657.0,
+      "after": 3722.0,
+      "shift": 4.665
+    },
+    {
+      "cell": "|fotpall|conform",
+      "old_cell": "|fatolj|snurrfatolj",
+      "n": 31,
+      "before": 550.0,
+      "after": 3000.0,
+      "shift": 4.455
+    }
+  ]
+}

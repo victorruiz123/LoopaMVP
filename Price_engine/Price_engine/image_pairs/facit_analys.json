@@ -1,0 +1,295 @@
+{
+  "pairs": 9779,
+  "screenshots_found": 38,
+  "screenshot_pairs_removed": 221,
+  "per_variant": {
+    "bord": {
+      "status": "ok",
+      "n_pos": 497,
+      "n_neg": 492,
+      "auc": 0.612,
+      "median_pos": 0.347,
+      "median_neg": 0.273,
+      "p10_p90_pos": [
+        0.115,
+        0.671
+      ],
+      "p10_p90_neg": [
+        0.07,
+        0.553
+      ],
+      "threshold": 0.44,
+      "j": 0.177,
+      "sensitivity": 0.374,
+      "specificity": 0.803,
+      "false_positives": 97,
+      "false_negatives": 311,
+      "false_positives_at_045": 90,
+      "positives_below_045": 320
+    },
+    "byrå": {
+      "status": "ok",
+      "n_pos": 500,
+      "n_neg": 500,
+      "auc": 0.691,
+      "median_pos": 0.498,
+      "median_neg": 0.313,
+      "p10_p90_pos": [
+        0.125,
+        0.793
+      ],
+      "p10_p90_neg": [
+        0.07,
+        0.597
+      ],
+      "threshold": 0.44,
+      "j": 0.32,
+      "sensitivity": 0.594,
+      "specificity": 0.726,
+      "false_positives": 137,
+      "false_negatives": 203,
+      "false_positives_at_045": 131,
+      "positives_below_045": 210
+    },
+    "bäddsoffa": {
+      "status": "ok",
+      "n_pos": 488,
+      "n_neg": 485,
+      "auc": 0.592,
+      "median_pos": 0.661,
+      "median_neg": 0.608,
+      "p10_p90_pos": [
+        0.417,
+        0.822
+      ],
+      "p10_p90_neg": [
+        0.228,
+        0.802
+      ],
+      "threshold": 0.39,
+      "j": 0.157,
+      "sensitivity": 0.926,
+      "specificity": 0.231,
+      "false_positives": 373,
+      "false_negatives": 36,
+      "false_positives_at_045": 351,
+      "positives_below_045": 63,
+      "samma_modell_samma_variant": {
+        "n": 12,
+        "median": 0.694
+      },
+      "samma_modell_annan_variant": {
+        "n": 21,
+        "median": 0.692
+      }
+    },
+    "fotpall": {
+      "status": "ok",
+      "n_pos": 500,
+      "n_neg": 500,
+      "auc": 0.876,
+      "median_pos": 0.651,
+      "median_neg": 0.312,
+      "p10_p90_pos": [
+        0.433,
+        0.88
+      ],
+      "p10_p90_neg": [
+        0.115,
+        0.613
+      ],
+      "threshold": 0.52,
+      "j": 0.582,
+      "sensitivity": 0.786,
+      "specificity": 0.796,
+      "false_positives": 102,
+      "false_negatives": 107,
+      "false_positives_at_045": 154,
+      "positives_below_045": 61
+    },
+    "fåtölj": {
+      "status": "ok",
+      "n_pos": 492,
+      "n_neg": 494,
+      "auc": 0.887,
+      "median_pos": 0.736,
+      "median_neg": 0.407,
+      "p10_p90_pos": [
+        0.482,
+        0.887
+      ],
+      "p10_p90_neg": [
+        0.154,
+        0.653
+      ],
+      "threshold": 0.61,
+      "j": 0.653,
+      "sensitivity": 0.793,
+      "specificity": 0.86,
+      "false_positives": 69,
+      "false_negatives": 102,
+      "false_positives_at_045": 201,
+      "positives_below_045": 39
+    },
+    "hylla": {
+      "status": "ok",
+      "n_pos": 476,
+      "n_neg": 485,
+      "auc": 0.577,
+      "median_pos": 0.274,
+      "median_neg": 0.225,
+      "p10_p90_pos": [
+        0.046,
+        0.669
+      ],
+      "p10_p90_neg": [
+        0.029,
+        0.519
+      ],
+      "threshold": 0.2,
+      "j": 0.111,
+      "sensitivity": 0.639,
+      "specificity": 0.472,
+      "false_positives": 256,
+      "false_negatives": 172,
+      "false_positives_at_045": 72,
+      "positives_below_045": 355
+    },
+    "hörnsoffa": {
+      "status": "ok",
+      "n_pos": 480,
+      "n_neg": 478,
+      "auc": 0.513,
+      "median_pos": 0.523,
+      "median_neg": 0.541,
+      "p10_p90_pos": [
+        0.334,
+        0.735
+      ],
+      "p10_p90_neg": [
+        0.306,
+        0.74
+      ],
+      "threshold": 0.38,
+      "j": 0.068,
+      "sensitivity": 0.846,
+      "specificity": 0.222,
+      "false_positives": 372,
+      "false_negatives": 74,
+      "false_positives_at_045": 307,
+      "positives_below_045": 155,
+      "samma_modell_samma_variant": {
+        "n": 159,
+        "median": 0.491
+      },
+      "samma_modell_annan_variant": {
+        "n": 180,
+        "median": 0.507
+      }
+    },
+    "soffa": {
+      "status": "ok",
+      "n_pos": 484,
+      "n_neg": 482,
+      "auc": 0.662,
+      "median_pos": 0.632,
+      "median_neg": 0.519,
+      "p10_p90_pos": [
+        0.375,
+        0.799
+      ],
+      "p10_p90_neg": [
+        0.243,
+        0.722
+      ],
+      "threshold": 0.53,
+      "j": 0.236,
+      "sensitivity": 0.709,
+      "specificity": 0.527,
+      "false_positives": 228,
+      "false_negatives": 141,
+      "false_positives_at_045": 313,
+      "positives_below_045": 76,
+      "samma_modell_samma_variant": {
+        "n": 58,
+        "median": 0.656
+      },
+      "samma_modell_annan_variant": {
+        "n": 44,
+        "median": 0.682
+      }
+    },
+    "stol": {
+      "status": "ok",
+      "n_pos": 500,
+      "n_neg": 494,
+      "auc": 0.957,
+      "median_pos": 0.811,
+      "median_neg": 0.358,
+      "p10_p90_pos": [
+        0.622,
+        0.898
+      ],
+      "p10_p90_neg": [
+        0.168,
+        0.577
+      ],
+      "threshold": 0.63,
+      "j": 0.858,
+      "sensitivity": 0.898,
+      "specificity": 0.96,
+      "false_positives": 20,
+      "false_negatives": 51,
+      "false_positives_at_045": 144,
+      "positives_below_045": 27
+    },
+    "säng": {
+      "status": "ok",
+      "n_pos": 481,
+      "n_neg": 471,
+      "auc": 0.522,
+      "median_pos": 0.314,
+      "median_neg": 0.298,
+      "p10_p90_pos": [
+        0.087,
+        0.617
+      ],
+      "p10_p90_neg": [
+        0.099,
+        0.588
+      ],
+      "threshold": 0.45,
+      "j": 0.072,
+      "sensitivity": 0.306,
+      "specificity": 0.766,
+      "false_positives": 110,
+      "false_negatives": 334,
+      "false_positives_at_045": 110,
+      "positives_below_045": 334
+    }
+  },
+  "overall": {
+    "status": "ok",
+    "n_pos": 4898,
+    "n_neg": 4881,
+    "auc": 0.688,
+    "median_pos": 0.586,
+    "median_neg": 0.379,
+    "p10_p90_pos": [
+      0.171,
+      0.838
+    ],
+    "p10_p90_neg": [
+      0.11,
+      0.676
+    ],
+    "threshold": 0.58,
+    "j": 0.297,
+    "sensitivity": 0.506,
+    "specificity": 0.792,
+    "false_positives": 1017,
+    "false_negatives": 2421,
+    "false_positives_at_045": 1873,
+    "positives_below_045": 1640
+  }
+}

@@ -1,0 +1,19 @@
+truth,raw,count,predicted,confidence,evidence,method,error,name,price
+inga,4,4.0,ingar,hog,Fyra stolar syns runt bordet i bilden.,svar,,"Matbord stolar ingår ej, separat annons",300.0
+inga,6,6.0,ingar,hog,Jag kan se sex stolar tydligt placerade runt bordet. Två på varje långsida och en på varje kortsida.,svar,,1960s-tal teak matbord (stolar ingår inte),4000.0
+inga,4,4.0,ingar,hog,Fyra stolar med svarta säten och kromade ben syns tydligt runt bordet.,svar,,Matbord utan stolar,400.0
+inga,2,2.0,ingar,hog,Det syns tydligt två stolar vid bordet. En med vit klädsel och en mörkare med synlig rygg och sits under bordet.,svar,,Matbord med träskiva och vita ben (stolar ingår ej),5200.0
+inga,4,4.0,ingar,hog,"Fyra stolar syns runt bordet, två på vardera långsida.",svar,,Matbord (utan stolar) - sänkt pris,600.0
+inga,4,4.0,ingar,hog,Fyra stolar syns tydligt runt bordet. Två på varje långsida.,svar,,Matbord utan stolar,500.0
+inga,4,4.0,ingar,hog,"Tre stolar syns tydligt på bilden, en vid kortsidan och två vid långsidan. Dessutom antyder annonstexten 'utan utan', vilket kan tolkas som att det finns stolar som inte är inkluderade i priset, men b",svar,,Matbord utan stolar,500.0
+inga,gar_inte_se,,,lag,"Flera stolar syns runt bordet, men inte alla stolar syns i sin helhet. Det går därför inte att räkna alla.",svar,,matbord utan stolar,1500.0
+ingar,1,1.0,ingar,hog,"En stol syns framför bordet, och två stolar verkar vara infällda under bordet.",svar,,IKEA fällbart matbord med 4 stolar vit/grå,250.0
+ingar,3,3.0,ingar,hog,"Tre stolar syns vid bordet, två på långsidan närmast i bild och en bakom bordet. Det finns även en bänk på ena långsidan",svar,,WoodenforgeMatgrupp med 3 stolar och 1 bänk antikbrun,4667.0
+ingar,8,8.0,ingar,hog,"Det är en stol vid vardera kortsidan av bordet och tre stolar vid vardera långsidan av bordet, totalt 8 stolar.",svar,,Rustik matgrupp i äkta trä Lyon Vintaged,3000.0
+ingar,4,4.0,ingar,hog,Fyra stolar syns runt bordet på bilden.,svar,,"MATGRUPP, 5 delar, 1950/60-tal.",2750.0
+ingar,5,5.0,ingar,hog,"Det syns 4 stolar runt bordet och en stol är placerad framför bordet, vilket totalt blir 5 stolar.",svar,,Matbord med 6 stolar – Klassisk och elegant matgrupp,1667.0
+ingar,4,4.0,ingar,hog,Det syns tydligt fyra stolar runt bordet i bilden.,svar,,Matgrupp,3100.0
+ingar,8,8.0,ingar,hog,"Jag kan se 8 stolar runt bordet. 4 på ena sidan, 3 på den andra och en vid ena kortsidan.",svar,,Matsalsgrupp,1500.0
+ingar,4,4.0,ingar,hog,Fyra stolar syns runt bordet. Alla är tydligt synliga.,svar,,"Marmorbord och sammetsstolar från Mio, Tiffany/Sharon",5000.0
+ingar,4,4.0,ingar,hog,Fyra stolar är synliga runt bordet.,svar,,Matbord med stolar vit/natur,1000.0
+ingar,6,6.0,ingar,hog,"Jag ser sex stolar på bilden, fyra placerade runt bordet och två ställda ovanpå bordet.",svar,,"MATBORD med 6 stolar och 4 iläggsskivor, gustaviansk stil. Bodafors.",752.0

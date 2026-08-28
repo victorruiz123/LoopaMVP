@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Prismotor — begagnade möbler</title>
+<style>
+  :root {
+    --bg: #faf9f7; --panel: #fff; --ink: #1c1a17; --muted: #6b6560;
+    --line: #e4e0da; --accent: #b4552d; --accent-soft: #f3e6df;
+    --ok: #2f6b45; --warn: #9a6a12; --off: #8b8680;
+    --shadow: 0 1px 2px rgba(0,0,0,.04), 0 8px 24px rgba(0,0,0,.06);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17161a; --panel: #201f24; --ink: #ece9e4; --muted: #9d968e;
+      --line: #33313a; --accent: #e08a5f; --accent-soft: #35281f;
+      --ok: #6fbf8c; --warn: #d9ab52; --off: #7c7770;
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 8px 24px rgba(0,0,0,.35);
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 15px/1.55 ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 940px; margin: 0 auto; padding: 32px 20px 64px; }
+  header { margin-bottom: 28px; }
+  h1 { font-size: 24px; margin: 0 0 4px; letter-spacing: -.01em; }
+  header p { margin: 0; color: var(--muted); font-size: 14px; }
+  .grid { display: grid; grid-template-columns: 320px 1fr; gap: 20px; align-items: start; }
+  @media (max-width: 780px) { .grid { grid-template-columns: 1fr; } }
+  .card {
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px; box-shadow: var(--shadow);
+  }
+  label { display: block; font-size: 12px; font-weight: 600; letter-spacing: .02em;
+          text-transform: uppercase; color: var(--muted); margin: 0 0 5px; }
+  .field { margin-bottom: 15px; }
+  input[type=text], select {
+    width: 100%; padding: 9px 11px; border: 1px solid var(--line); border-radius: 8px;
+    background: var(--bg); color: var(--ink); font: inherit; font-size: 14px;
+  }
+  input[type=text]:focus, select:focus { outline: 2px solid var(--accent); outline-offset: -1px; }
+  .drop {
+    border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px;
+    text-align: center; color: var(--muted); font-size: 13px; cursor: pointer;
+  }
+  .drop:hover { border-color: var(--accent); color: var(--ink); }
+  .drop img { max-height: 96px; border-radius: 6px; display: block; margin: 0 auto 8px; }
+  button {
+    width: 100%; padding: 11px; border: 0; border-radius: 8px; cursor: pointer;
+    background: var(--accent); color: #fff; font: inherit; font-weight: 600; font-size: 15px;
+  }
+  button:disabled { opacity: .55; cursor: default; }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+
+  /* --- resultat --- */
+  #out { min-height: 260px; }
+  .placeholder { color: var(--muted); text-align: center; padding: 72px 20px; font-size: 14px; }
+  .price { font-size: 42px; font-weight: 650; letter-spacing: -.02em; margin: 2px 0 0; }
+  .price small { font-size: 18px; font-weight: 500; color: var(--muted); }
+  .sub { color: var(--muted); font-size: 13px; }
+  .slider { margin: 26px 0 6px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  .ends { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); }
+  .ends b { display: block; color: var(--ink); font-size: 14px; font-weight: 600; }
+  .ends .r { text-align: right; }
+  .badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 20px 0 12px; }
+  .b {
+    font-size: 12px; padding: 3px 9px; border-radius: 999px;
+    border: 1px solid var(--line); color: var(--muted); background: var(--bg);
+  }
+  .b.on { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+  .b.ok { border-color: var(--ok); color: var(--ok); background: transparent; }
+  .b.warn { border-color: var(--warn); color: var(--warn); background: transparent; }
+  .note { font-size: 13px; color: var(--muted); border-left: 2px solid var(--line);
+          padding-left: 12px; margin: 14px 0 0; }
+  details { margin-top: 18px; }
+  summary { cursor: pointer; font-size: 13px; color: var(--muted); }
+  pre { background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+        padding: 12px; overflow-x: auto; font-size: 12px; margin: 10px 0 0; }
+  .err { color: var(--accent); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Prismotor</h1>
+    <p>Prisförslag för begagnade möbler, baserat på <span id="n">…</span> annonser.</p>
+  </header>
+
+  <div class="grid">
+    <form class="card" id="f">
+      <div class="field">
+        <label for="name">Modellnamn</label>
+        <input type="text" id="name" value="Landskrona" placeholder="t.ex. Landskrona 3 sits" required>
+      </div>
+      <div class="field">
+        <label for="brand">Märke</label>
+        <input type="text" id="brand" value="IKEA" placeholder="t.ex. IKEA">
+      </div>
+      <div class="field">
+        <label for="condition">Skick</label>
+        <select id="condition">
+          <option value="">— inget angivet —</option>
+          <option>Nyskick</option>
+          <option>Mycket bra skick</option>
+          <option>Bra skick</option>
+          <option>Okej skick</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="variant">Möbeltyp</label>
+        <select id="variant"><option value="">— läs ur bild, annars ingen —</option></select>
+      </div>
+      <div class="field">
+        <label>Foto (valfritt)</label>
+        <div class="drop" id="drop">
+          <div id="dropTxt">Klicka för att välja bild</div>
+        </div>
+        <input type="file" id="file" accept="image/*" hidden>
+        <div class="hint">Bilden används till två saker: möbeltyp (kräver OPENAI_API_KEY)
+          och visuell likhet mot annonsernas bilder (lokalt, DINOv2).</div>
+      </div>
+      <div class="field">
+        <label for="kind">Prisbas</label>
+        <select id="kind">
+          <option value="auto">auto — realized när auktion dominerar</option>
+          <option value="asking">asking — utropspriser</option>
+          <option value="realized">realized — faktiskt betalt</option>
+        </select>
+      </div>
+      <button type="submit" id="go">Beräkna pris</button>
+    </form>
+
+    <div class="card" id="out">
+      <div class="placeholder">Fyll i formuläret och tryck <b>Beräkna pris</b>.</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+let imageB64 = null, imageType = "image/jpeg";
+
+// Möbeltyper hämtas från API:et så att listan alltid matchar taxonomin.
+fetch("/variants").then(r => r.json()).then(d => {
+  const sel = $("#variant");
+  (d.labels || []).filter(l => l !== "okänd").forEach(l => {
+    const o = document.createElement("option"); o.value = o.textContent = l; sel.append(o);
+  });
+});
+fetch("/health").then(r => r.json()).then(d => {
+  $("#n").textContent = (d.listings || 0).toLocaleString("sv-SE");
+});
+
+$("#drop").onclick = () => $("#file").click();
+// Bilden kodas ALLTID om till jpeg innan den skickas. Skälet: rutan tillåter
+// "image/*", och en iPhone lämnar HEIC som bild-LLM:en svarar 400 på. Felet
+// syntes bara i serverloggen, så priset kom tillbaka utan formord och såg rätt
+// ut. Ritas bilden på en canvas blir formatet jpeg oavsett vad som kom in —
+// och stora foton krymper samtidigt, vilket gör anropet snabbare.
+const MAX_KANT = 1600;
+$("#file").onchange = e => {
+  const f = e.target.files[0];
+  if (!f) return;
+  const fr = new FileReader();
+  fr.onload = () => {
+    const img = new Image();
+    img.onload = () => {
+      const skala = Math.min(1, MAX_KANT / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * skala);
+      c.height = Math.round(img.height * skala);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      const jpeg = c.toDataURL("image/jpeg", 0.9);
+      imageB64 = jpeg.split(",")[1];
+      imageType = "image/jpeg";
+      $("#drop").innerHTML = `<img src="${jpeg}" alt=""><div>${f.name} — klicka för att byta</div>`;
+    };
+    // Kan webbläsaren inte rita bilden går den inte att rädda här. Säg det
+    // rakt ut i stället för att skicka något modellen ändå avvisar.
+    img.onerror = () => {
+      imageB64 = null;
+      $("#drop").innerHTML = `<div>Kunde inte läsa ${f.name}. Spara om den som JPEG eller PNG.</div>`;
+    };
+    img.src = fr.result;
+  };
+  fr.readAsDataURL(f);
+};
+
+const kr = n => n == null ? "–" : n.toLocaleString("sv-SE") + " kr";
+
+$("#f").onsubmit = async e => {
+  e.preventDefault();
+  const btn = $("#go");
+  // En bildfråga tar 20-40 s: två modellanrop, varav ett till en långsam
+  // bildmodell. Utan räknare ser sidan död ut och man laddar om — vilket
+  // lägger ännu en förfrågan i kön hos en enkeltrådad server och gör allt
+  // långsammare. Klockan visar att något faktiskt händer.
+  btn.disabled = true;
+  const t0 = Date.now();
+  btn.textContent = "Beräknar… 0 s";
+  const tick = setInterval(() => {
+    btn.textContent = `Beräknar… ${Math.round((Date.now() - t0) / 1000)} s`;
+  }, 1000);
+  const body = {
+    name: $("#name").value,
+    brand: $("#brand").value || null,
+    condition: $("#condition").value || null,
+    price_kind: $("#kind").value,
+    variant: $("#variant").value ? [$("#variant").value] : null,
+  };
+  // Bilden skickas ÄVEN när en variant är vald. Varianten är möbelTYPEN;
+  // bilden ger dessutom FORMEN ("u-soffa") och tillbehören ("+ fotpall"),
+  // vilket är en annan uppgift. Förut ströps bilden här helt.
+  if (imageB64) { body.image_base64 = imageB64; body.image_media_type = imageType; }
+  try {
+    // Hellre ett tydligt fel än en sida som snurrar för alltid. Servern är
+    // enkeltrådad, så en kö av omladdningar gör svarstiden obegränsad.
+    const avbryt = new AbortController();
+    const larm = setTimeout(() => avbryt.abort(), 180000);
+    // Kräver servern en API-nyckel (PRICE_ENGINE_API_KEY) skickas den härifrån.
+    // Sätt den en gång i webbläsarkonsolen:
+    //   localStorage.setItem("prismotor_api_nyckel", "<nyckeln>")
+    // Utan nyckel i servern behövs ingenting — headern ignoreras då.
+    const huvuden = {"Content-Type": "application/json"};
+    try {
+      const nyckel = localStorage.getItem("prismotor_api_nyckel");
+      if (nyckel) huvuden["x-api-key"] = nyckel;
+    } catch (e) { /* privat läge kan blockera localStorage */ }
+    const res = await fetch("/price", {
+      method: "POST", headers: huvuden,
+      body: JSON.stringify(body), signal: avbryt.signal,
+    }).finally(() => clearTimeout(larm));
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    render(await res.json());
+  } catch (err) {
+    const text = err.name === "AbortError"
+      ? "Tog över 3 minuter och avbröts. Ligger flera förfrågningar i kö? Vänta tills servern är klar och försök igen."
+      : `Fel: ${err.message}`;
+    $("#out").innerHTML = `<div class="placeholder err">${text}</div>`;
+  } finally {
+    clearInterval(tick);
+    btn.disabled = false; btn.textContent = "Beräkna pris";
+  }
+};
+
+function render(d) {
+  if (!d.matchCount) {
+    $("#out").innerHTML = `<div class="placeholder">Hittade inga liknande annonser.<br>
+      <span style="font-size:13px">Prova ett kortare modellnamn eller ta bort möbeltypen.</span></div>`;
+    return;
+  }
+  const conf = d.confidence === "high"
+    ? '<span class="b ok">säker</span>' : '<span class="b warn">osäker</span>';
+  const badge = (k, v) => v && v !== "none"
+    ? `<span class="b on">${k}: ${v}</span>` : `<span class="b">${k}: –</span>`;
+
+  $("#out").innerHTML = `
+    <div class="sub">Förslag</div>
+    <div class="price" id="cur">${kr(d.default)}</div>
+    <div class="slider">
+      <input type="range" id="rng" min="${d.low}" max="${d.high}" value="${d.default}" step="1">
+      <div class="ends">
+        <div>säljs snabbt<b>${kr(d.low)}</b></div>
+        <div class="r">säljs långsamt<b>${kr(d.high)}</b></div>
+      </div>
+    </div>
+    <div class="badges">
+      <span class="b on">${d.matchCount.toLocaleString("sv-SE")} annonser</span>
+      ${conf}
+      ${badge("prisbas", d.priceBasis)}
+      ${badge("färskhet", d.recencyMethod)}
+      ${badge("möbeltyp", d.variantMethod)}
+      ${badge("skick", d.conditionMethod)}
+      ${badge("bild", d.imageFiltered)}
+      ${d.similarityRange ? `<span class="b on">likhet ${d.similarityRange[0]}–${d.similarityRange[1]}</span>` : ""}
+    </div>
+    <p class="note">${d.note}</p>
+    ${d.variantCandidates ? `<p class="note">Möjliga möbeltyper för modellen:
+       ${d.variantCandidates.join(", ")}.</p>` : ""}
+    <details><summary>Rådata</summary><pre>${JSON.stringify(d, null, 2)}</pre></details>`;
+
+  const rng = $("#rng"), cur = $("#cur");
+  rng.oninput = () => cur.textContent = kr(+rng.value);
+}
+</script>
+</body>
+</html>

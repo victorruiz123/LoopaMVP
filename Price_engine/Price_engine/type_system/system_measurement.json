@@ -1,0 +1,415 @@
+{
+  "n": 3200,
+  "abstain_threshold": 0.7,
+  "configs": {
+    "blind text": {
+      "coverage": 0.001,
+      "accuracy_base": 1.0,
+      "accuracy_type": 1.0,
+      "krona_median_when_wrong": null,
+      "krona_p90_when_wrong": null,
+      "krona_expected": 0.0,
+      "n_measurable": 4,
+      "n_wrong": 0
+    },
+    "text+prior": {
+      "coverage": 0.233,
+      "accuracy_base": 0.639,
+      "accuracy_type": 0.466,
+      "krona_median_when_wrong": 612.5,
+      "krona_p90_when_wrong": 3000.0,
+      "krona_expected": 652.3,
+      "n_measurable": 654,
+      "n_wrong": 306
+    },
+    "bild (familj)": {
+      "coverage": 0.754,
+      "accuracy_base": 0.843,
+      "accuracy_type": 0.609,
+      "krona_median_when_wrong": 550.0,
+      "krona_p90_when_wrong": 2500.0,
+      "krona_expected": 359.3,
+      "n_measurable": 2142,
+      "n_wrong": 673
+    },
+    "text+prior+bild": {
+      "coverage": 0.807,
+      "accuracy_base": 0.786,
+      "accuracy_type": 0.565,
+      "krona_median_when_wrong": 600.0,
+      "krona_p90_when_wrong": 2650.0,
+      "krona_expected": 465.9,
+      "n_measurable": 2277,
+      "n_wrong": 816
+    },
+    "gammal platt klassificerare": {
+      "coverage": 0.989,
+      "accuracy_base": 0.782,
+      "accuracy_type": 0.35,
+      "krona_median_when_wrong": 500.0,
+      "krona_p90_when_wrong": 2330.9,
+      "krona_expected": 349.1,
+      "n_measurable": 1640,
+      "n_wrong": 532
+    }
+  },
+  "per_base": {
+    "bord": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.065,
+        "accuracy_base": 0.158,
+        "krona_expected": 444.8
+      },
+      "bild (familj)": {
+        "accuracy": 0.263,
+        "accuracy_base": 0.748,
+        "krona_expected": 486.5
+      },
+      "text+prior+bild": {
+        "accuracy": 0.273,
+        "accuracy_base": 0.752,
+        "krona_expected": 484.9
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.307,
+        "accuracy_base": 0.733,
+        "krona_expected": 476.5
+      }
+    },
+    "forvaring": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.117,
+        "accuracy_base": 0.245,
+        "krona_expected": 174.6
+      },
+      "bild (familj)": {
+        "accuracy": 0.27,
+        "accuracy_base": 0.777,
+        "krona_expected": 514.2
+      },
+      "text+prior+bild": {
+        "accuracy": 0.278,
+        "accuracy_base": 0.805,
+        "krona_expected": 481.9
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.237,
+        "accuracy_base": 0.552,
+        "krona_expected": 397.3
+      }
+    },
+    "fotpall": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.028,
+        "accuracy_base": 0.028,
+        "krona_expected": 1134.1
+      },
+      "bild (familj)": {
+        "accuracy": 0.38,
+        "accuracy_base": 0.38,
+        "krona_expected": 570.2
+      },
+      "text+prior+bild": {
+        "accuracy": 0.367,
+        "accuracy_base": 0.367,
+        "krona_expected": 721.1
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.54,
+        "accuracy_base": 0.54,
+        "krona_expected": 477.0
+      }
+    },
+    "sang": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.362,
+        "accuracy_base": 0.362,
+        "krona_expected": 96.6
+      },
+      "bild (familj)": {
+        "accuracy": 0.77,
+        "accuracy_base": 0.77,
+        "krona_expected": 47.9
+      },
+      "text+prior+bild": {
+        "accuracy": 0.8,
+        "accuracy_base": 0.8,
+        "krona_expected": 89.1
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": 1255.1
+      }
+    },
+    "sanggavel": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": 2458.7
+      },
+      "bild (familj)": {
+        "accuracy": 0.407,
+        "accuracy_base": 0.407,
+        "krona_expected": 621.8
+      },
+      "text+prior+bild": {
+        "accuracy": 0.34,
+        "accuracy_base": 0.34,
+        "krona_expected": 1098.1
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": 1269.6
+      }
+    },
+    "soffa": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.01,
+        "accuracy_base": 0.01,
+        "krona_expected": 0.0
+      },
+      "text+prior": {
+        "accuracy": 0.117,
+        "accuracy_base": 0.16,
+        "krona_expected": 1188.0
+      },
+      "bild (familj)": {
+        "accuracy": 0.715,
+        "accuracy_base": 0.85,
+        "krona_expected": 141.4
+      },
+      "text+prior+bild": {
+        "accuracy": 0.718,
+        "accuracy_base": 0.85,
+        "krona_expected": 338.5
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.725,
+        "accuracy_base": 0.845,
+        "krona_expected": 125.2
+      }
+    },
+    "spegel": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.055,
+        "accuracy_base": 0.055,
+        "krona_expected": 531.4
+      },
+      "bild (familj)": {
+        "accuracy": 0.258,
+        "accuracy_base": 0.258,
+        "krona_expected": 444.6
+      },
+      "text+prior+bild": {
+        "accuracy": 0.26,
+        "accuracy_base": 0.26,
+        "krona_expected": 485.8
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.407,
+        "accuracy_base": 0.407,
+        "krona_expected": 277.0
+      }
+    },
+    "stol": {
+      "n": 400,
+      "blind text": {
+        "accuracy": 0.0,
+        "accuracy_base": 0.0,
+        "krona_expected": null
+      },
+      "text+prior": {
+        "accuracy": 0.125,
+        "accuracy_base": 0.185,
+        "krona_expected": 192.8
+      },
+      "bild (familj)": {
+        "accuracy": 0.61,
+        "accuracy_base": 0.897,
+        "krona_expected": 285.6
+      },
+      "text+prior+bild": {
+        "accuracy": 0.618,
+        "accuracy_base": 0.9,
+        "krona_expected": 282.1
+      },
+      "gammal platt klassificerare": {
+        "accuracy": 0.552,
+        "accuracy_base": 0.58,
+        "krona_expected": 197.1
+      }
+    }
+  },
+  "abstain_curve": [
+    {
+      "min_share": 0.3,
+      "coverage": 0.985,
+      "base_accuracy": 0.646,
+      "n": 3151
+    },
+    {
+      "min_share": 0.35,
+      "coverage": 0.975,
+      "base_accuracy": 0.652,
+      "n": 3121
+    },
+    {
+      "min_share": 0.4,
+      "coverage": 0.96,
+      "base_accuracy": 0.663,
+      "n": 3071
+    },
+    {
+      "min_share": 0.45,
+      "coverage": 0.935,
+      "base_accuracy": 0.68,
+      "n": 2992
+    },
+    {
+      "min_share": 0.5,
+      "coverage": 0.903,
+      "base_accuracy": 0.704,
+      "n": 2889
+    },
+    {
+      "min_share": 0.55,
+      "coverage": 0.868,
+      "base_accuracy": 0.733,
+      "n": 2778
+    },
+    {
+      "min_share": 0.6,
+      "coverage": 0.828,
+      "base_accuracy": 0.768,
+      "n": 2649
+    },
+    {
+      "min_share": 0.65,
+      "coverage": 0.791,
+      "base_accuracy": 0.804,
+      "n": 2532
+    },
+    {
+      "min_share": 0.7,
+      "coverage": 0.754,
+      "base_accuracy": 0.843,
+      "n": 2413
+    },
+    {
+      "min_share": 0.75,
+      "coverage": 0.712,
+      "base_accuracy": 0.854,
+      "n": 2279
+    },
+    {
+      "min_share": 0.8,
+      "coverage": 0.669,
+      "base_accuracy": 0.865,
+      "n": 2142
+    },
+    {
+      "min_share": 0.85,
+      "coverage": 0.604,
+      "base_accuracy": 0.886,
+      "n": 1933
+    },
+    {
+      "min_share": 0.9,
+      "coverage": 0.514,
+      "base_accuracy": 0.91,
+      "n": 1646
+    },
+    {
+      "min_share": 0.95,
+      "coverage": 0.384,
+      "base_accuracy": 0.933,
+      "n": 1230
+    }
+  ],
+  "common_subset": {
+    "blind text": {
+      "n": 251,
+      "accuracy_base": 0.016,
+      "accuracy_type": 0.016,
+      "krona_expected": 0.0,
+      "krona_median_when_wrong": NaN
+    },
+    "text+prior": {
+      "n": 251,
+      "accuracy_base": 0.797,
+      "accuracy_type": 0.53,
+      "krona_expected": 607.2,
+      "krona_median_when_wrong": 312.5
+    },
+    "bild (familj)": {
+      "n": 251,
+      "accuracy_base": 0.869,
+      "accuracy_type": 0.586,
+      "krona_expected": 252.9,
+      "krona_median_when_wrong": 253.8
+    },
+    "text+prior+bild": {
+      "n": 251,
+      "accuracy_base": 0.797,
+      "accuracy_type": 0.53,
+      "krona_expected": 607.2,
+      "krona_median_when_wrong": 312.5
+    },
+    "gammal platt klassificerare": {
+      "n": 251,
+      "accuracy_base": 0.861,
+      "accuracy_type": 0.582,
+      "krona_expected": 264.3,
+      "krona_median_when_wrong": 300.0
+    }
+  },
+  "prior_vs_image": {
+    "n_both_answer": 575,
+    "prior_base_accuracy": 0.699,
+    "image_base_accuracy": 0.838,
+    "n_disagree": 113,
+    "when_disagree": {
+      "prior_right": 0.071,
+      "image_right": 0.779
+    }
+  }
+}

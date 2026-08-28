@@ -1,0 +1,102 @@
+[
+ {
+  "nr": 1,
+  "label": "Mio Town",
+  "brand": "Mio",
+  "model": "Town",
+  "variant": null,
+  "category": null,
+  "facit_low": 7000,
+  "facit_high": 12000
+ },
+ {
+  "nr": 2,
+  "label": "Mio Saturday",
+  "brand": "Mio",
+  "model": "Saturday",
+  "variant": null,
+  "category": null,
+  "facit_low": 3000,
+  "facit_high": 6000
+ },
+ {
+  "nr": 3,
+  "label": "Mio Bridge",
+  "brand": "Mio",
+  "model": "Bridge",
+  "variant": null,
+  "category": null,
+  "facit_low": 3500,
+  "facit_high": 7000
+ },
+ {
+  "nr": 4,
+  "label": "IKEA karlstrand",
+  "brand": "IKEA",
+  "model": "karlstrand",
+  "variant": null,
+  "category": null,
+  "facit_low": 500,
+  "facit_high": 2000
+ },
+ {
+  "nr": 5,
+  "label": "Bellus soffa",
+  "brand": "Bellus",
+  "model": "soffa",
+  "variant": null,
+  "category": "soffa",
+  "facit_low": 2000,
+  "facit_high": 6000
+ },
+ {
+  "nr": 6,
+  "label": "IKEA stocksund",
+  "brand": "IKEA",
+  "model": "stocksund",
+  "variant": null,
+  "category": null,
+  "facit_low": 800,
+  "facit_high": 2000
+ },
+ {
+  "nr": 7,
+  "label": "Stalands happy",
+  "brand": "Stalands",
+  "model": "happy",
+  "variant": null,
+  "category": null,
+  "facit_low": 3000,
+  "facit_high": 6000
+ },
+ {
+  "nr": 8,
+  "label": "Kartell Victoria Ghost",
+  "brand": "Kartell",
+  "model": "Victoria Ghost",
+  "variant": null,
+  "category": null,
+  "facit_low": 1000,
+  "facit_high": 2000
+ },
+ {
+  "nr": 9,
+  "label": "Matgrupp 5 stolar",
+  "brand": null,
+  "model": null,
+  "variant": null,
+  "category": "matgrupp",
+  "facit_low": 1500,
+  "facit_high": 2500
+ },
+ {
+  "nr": 10,
+  "label": "Ekbord med stolar",
+  "brand": null,
+  "model": null,
+  "variant": null,
+  "category": "matbord",
+  "facit_low": 2000,
+  "facit_high": 5000
+ }
+]

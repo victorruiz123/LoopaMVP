@@ -1,0 +1,340 @@
+{
+  "soffa": {
+    "n_listings": 162349,
+    "n_model_tokens": 1483,
+    "bucket_counts": {
+      "rak soffa": 106439,
+      "baddsoffa": 22591,
+      "divan/schaslong": 20365,
+      "hornsoffa": 11243,
+      "horn+divan": 1711
+    },
+    "pairwise": {
+      "baddsoffa / divan/schaslong": {
+        "median_ratio": 0.857,
+        "diff_pct": 14.3,
+        "groups": 249,
+        "ci95": [
+          0.794,
+          0.938
+        ],
+        "merge": false
+      },
+      "baddsoffa / horn+divan": {
+        "median_ratio": 0.899,
+        "diff_pct": 10.1,
+        "groups": 48,
+        "ci95": [
+          0.771,
+          0.955
+        ],
+        "merge": false
+      },
+      "baddsoffa / hornsoffa": {
+        "median_ratio": 0.665,
+        "diff_pct": 33.5,
+        "groups": 220,
+        "ci95": [
+          0.619,
+          0.721
+        ],
+        "merge": false
+      },
+      "baddsoffa / rak soffa": {
+        "median_ratio": 0.8,
+        "diff_pct": 20.0,
+        "groups": 368,
+        "ci95": [
+          0.732,
+          0.836
+        ],
+        "merge": false
+      },
+      "divan/schaslong / horn+divan": {
+        "median_ratio": 1.0,
+        "diff_pct": 0.0,
+        "groups": 67,
+        "ci95": [
+          0.875,
+          1.006
+        ],
+        "merge": true
+      },
+      "divan/schaslong / rak soffa": {
+        "median_ratio": 0.941,
+        "diff_pct": 5.9,
+        "groups": 510,
+        "ci95": [
+          0.911,
+          1.0
+        ],
+        "merge": true
+      },
+      "horn+divan / rak soffa": {
+        "median_ratio": 0.992,
+        "diff_pct": 0.8,
+        "groups": 69,
+        "ci95": [
+          0.84,
+          1.053
+        ],
+        "merge": true
+      },
+      "hornsoffa / divan/schaslong": {
+        "median_ratio": 1.275,
+        "diff_pct": 27.5,
+        "groups": 290,
+        "ci95": [
+          1.2,
+          1.345
+        ],
+        "merge": false
+      },
+      "hornsoffa / horn+divan": {
+        "median_ratio": 1.167,
+        "diff_pct": 16.7,
+        "groups": 71,
+        "ci95": [
+          1.0,
+          1.4
+        ],
+        "merge": false
+      },
+      "hornsoffa / rak soffa": {
+        "median_ratio": 1.234,
+        "diff_pct": 23.4,
+        "groups": 438,
+        "ci95": [
+          1.163,
+          1.297
+        ],
+        "merge": false
+      }
+    }
+  },
+  "forvaring": {
+    "n_listings": 225562,
+    "n_model_tokens": 1883,
+    "bucket_counts": {
+      "hylla": 78669,
+      "byra": 77250,
+      "skank": 37992,
+      "vitrin": 31651
+    },
+    "pairwise": {
+      "byra / hylla": {
+        "median_ratio": 1.25,
+        "diff_pct": 25.0,
+        "groups": 1038,
+        "ci95": [
+          1.178,
+          1.309
+        ],
+        "merge": false
+      },
+      "byra / skank": {
+        "median_ratio": 0.701,
+        "diff_pct": 29.9,
+        "groups": 910,
+        "ci95": [
+          0.667,
+          0.733
+        ],
+        "merge": false
+      },
+      "byra / vitrin": {
+        "median_ratio": 0.635,
+        "diff_pct": 36.5,
+        "groups": 701,
+        "ci95": [
+          0.607,
+          0.675
+        ],
+        "merge": false
+      },
+      "hylla / skank": {
+        "median_ratio": 0.58,
+        "diff_pct": 42.0,
+        "groups": 950,
+        "ci95": [
+          0.55,
+          0.624
+        ],
+        "merge": false
+      },
+      "hylla / vitrin": {
+        "median_ratio": 0.588,
+        "diff_pct": 41.2,
+        "groups": 752,
+        "ci95": [
+          0.55,
+          0.625
+        ],
+        "merge": false
+      },
+      "skank / vitrin": {
+        "median_ratio": 0.906,
+        "diff_pct": 9.4,
+        "groups": 722,
+        "ci95": [
+          0.866,
+          0.954
+        ],
+        "merge": true
+      }
+    }
+  },
+  "bord": {
+    "n_listings": 363264,
+    "n_model_tokens": 3231,
+    "bucket_counts": {
+      "bord": 136008,
+      "soffbord": 60006,
+      "matgrupp": 48344,
+      "skrivbord": 48184,
+      "matbord": 45274,
+      "sidobord": 25448
+    },
+    "pairwise": {
+      "matbord / sidobord": {
+        "median_ratio": 3.0,
+        "diff_pct": 200.0,
+        "groups": 748,
+        "ci95": [
+          2.866,
+          3.138
+        ],
+        "merge": false
+      },
+      "matbord / skrivbord": {
+        "median_ratio": 1.316,
+        "diff_pct": 31.6,
+        "groups": 796,
+        "ci95": [
+          1.233,
+          1.419
+        ],
+        "merge": false
+      },
+      "matbord / soffbord": {
+        "median_ratio": 2.002,
+        "diff_pct": 100.2,
+        "groups": 1175,
+        "ci95": [
+          2.0,
+          2.111
+        ],
+        "merge": false
+      },
+      "matgrupp / matbord": {
+        "median_ratio": 0.521,
+        "diff_pct": 47.9,
+        "groups": 959,
+        "ci95": [
+          0.5,
+          0.556
+        ],
+        "merge": false
+      },
+      "matgrupp / sidobord": {
+        "median_ratio": 1.6,
+        "diff_pct": 60.0,
+        "groups": 551,
+        "ci95": [
+          1.5,
+          1.707
+        ],
+        "merge": false
+      },
+      "matgrupp / skrivbord": {
+        "median_ratio": 0.682,
+        "diff_pct": 31.8,
+        "groups": 616,
+        "ci95": [
+          0.648,
+          0.718
+        ],
+        "merge": false
+      },
+      "matgrupp / soffbord": {
+        "median_ratio": 1.028,
+        "diff_pct": 2.8,
+        "groups": 757,
+        "ci95": [
+          0.962,
+          1.106
+        ],
+        "merge": true
+      },
+      "sidobord / skrivbord": {
+        "median_ratio": 0.457,
+        "diff_pct": 54.3,
+        "groups": 664,
+        "ci95": [
+          0.431,
+          0.486
+        ],
+        "merge": false
+      },
+      "soffbord / sidobord": {
+        "median_ratio": 1.429,
+        "diff_pct": 42.9,
+        "groups": 1021,
+        "ci95": [
+          1.368,
+          1.474
+        ],
+        "merge": false
+      },
+      "soffbord / skrivbord": {
+        "median_ratio": 0.633,
+        "diff_pct": 36.7,
+        "groups": 851,
+        "ci95": [
+          0.596,
+          0.667
+        ],
+        "merge": false
+      }
+    }
+  },
+  "seats": {
+    "pairwise": {
+      "3-sits / 2-sits": {
+        "median_ratio": 1.333,
+        "diff_pct": 33.3,
+        "groups": 276,
+        "ci95": [
+          1.25,
+          1.379
+        ],
+        "merge": false
+      },
+      "4-sits / 2-sits": {
+        "median_ratio": 2.0,
+        "diff_pct": 100.0,
+        "groups": 77,
+        "ci95": [
+          1.841,
+          2.06
+        ],
+        "merge": false
+      },
+      "4-sits / 3-sits": {
+        "median_ratio": 1.487,
+        "diff_pct": 48.7,
+        "groups": 109,
+        "ci95": [
+          1.356,
+          1.583
+        ],
+        "merge": false
+      }
+    },
+    "bucket_counts": {
+      "3-sits": 18419,
+      "2-sits": 6145,
+      "4-sits": 2437
+    }
+  }
+}

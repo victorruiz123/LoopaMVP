@@ -1,0 +1,285 @@
+{
+  "built_at": "2026-08-04T21:27:29+00:00",
+  "horizon_months": 24,
+  "min_per_level": 10,
+  "min_groups": 3,
+  "pivot": "gott",
+  "tables": {
+    "budget": {
+      "scope": "budget",
+      "source": "data",
+      "multipliers": {
+        "nyskick": 1.625,
+        "mycket_gott": 1.3333,
+        "gott": 1.0,
+        "slitet": 0.625,
+        "renoveringsobjekt": 0.4688
+      },
+      "measured_levels": [
+        "nyskick",
+        "mycket_gott",
+        "gott",
+        "slitet"
+      ],
+      "spread": {
+        "nyskick": {
+          "p25": 1.0,
+          "p75": 2.0,
+          "groups": 31,
+          "uncertainty": 0.124,
+          "bridged": 0,
+          "listings": 1480
+        },
+        "mycket_gott": {
+          "p25": 1.192,
+          "p75": 1.462,
+          "groups": 36,
+          "uncertainty": 0.034,
+          "bridged": 0,
+          "listings": 9681
+        },
+        "gott": {
+          "p25": 1.0,
+          "p75": 1.0,
+          "groups": 36,
+          "uncertainty": 0.0,
+          "bridged": 0,
+          "listings": 12915
+        },
+        "slitet": {
+          "p25": 0.5,
+          "p75": 0.683,
+          "groups": 32,
+          "uncertainty": 0.055,
+          "bridged": 0,
+          "listings": 4174
+        }
+      },
+      "listings": {
+        "nyskick": 1480,
+        "mycket_gott": 9681,
+        "gott": 12915,
+        "slitet": 4174
+      },
+      "groups": 36,
+      "inherited_levels": [],
+      "fallback_levels": [
+        "renoveringsobjekt"
+      ],
+      "clamped_levels": []
+    },
+    "mellan": {
+      "scope": "mellan",
+      "source": "data",
+      "multipliers": {
+        "nyskick": 1.625,
+        "mycket_gott": 1.25,
+        "gott": 1.0,
+        "slitet": 0.6,
+        "renoveringsobjekt": 0.5625
+      },
+      "measured_levels": [
+        "mycket_gott",
+        "gott"
+      ],
+      "spread": {
+        "nyskick": {
+          "p25": 0.75,
+          "p75": 0.75,
+          "groups": 1,
+          "uncertainty": 0.0,
+          "bridged": 0,
+          "listings": 18,
+          "rejected": "1 grupper"
+        },
+        "mycket_gott": {
+          "p25": 0.962,
+          "p75": 1.54,
+          "groups": 19,
+          "uncertainty": 0.108,
+          "bridged": 0,
+          "listings": 556
+        },
+        "gott": {
+          "p25": 1.0,
+          "p75": 1.0,
+          "groups": 19,
+          "uncertainty": 0.0,
+          "bridged": 0,
+          "listings": 699
+        },
+        "slitet": {
+          "p25": 0.35,
+          "p75": 0.8,
+          "groups": 8,
+          "uncertainty": 0.292,
+          "bridged": 0,
+          "listings": 148,
+          "rejected": "osäkerhet 0.29"
+        }
+      },
+      "listings": {
+        "mycket_gott": 556,
+        "gott": 699
+      },
+      "groups": 19,
+      "inherited_levels": [
+        "nyskick",
+        "slitet"
+      ],
+      "fallback_levels": [
+        "renoveringsobjekt"
+      ],
+      "clamped_levels": []
+    },
+    "premium": {
+      "scope": "premium",
+      "source": "data",
+      "multipliers": {
+        "nyskick": 1.625,
+        "mycket_gott": 1.5,
+        "gott": 1.0,
+        "slitet": 0.6261,
+        "renoveringsobjekt": 0.4696
+      },
+      "measured_levels": [
+        "mycket_gott",
+        "gott",
+        "slitet"
+      ],
+      "spread": {
+        "nyskick": {
+          "p25": 1.839,
+          "p75": 3.25,
+          "groups": 3,
+          "uncertainty": 0.329,
+          "bridged": 0,
+          "listings": 48,
+          "rejected": "osäkerhet 0.33"
+        },
+        "mycket_gott": {
+          "p25": 1.42,
+          "p75": 2.125,
+          "groups": 14,
+          "uncertainty": 0.108,
+          "bridged": 0,
+          "listings": 478
+        },
+        "gott": {
+          "p25": 1.0,
+          "p75": 1.0,
+          "groups": 16,
+          "uncertainty": 0.0,
+          "bridged": 0,
+          "listings": 744
+        },
+        "slitet": {
+          "p25": 0.571,
+          "p75": 0.8,
+          "groups": 13,
+          "uncertainty": 0.093,
+          "bridged": 0,
+          "listings": 329
+        }
+      },
+      "listings": {
+        "mycket_gott": 478,
+        "gott": 744,
+        "slitet": 329
+      },
+      "groups": 16,
+      "inherited_levels": [
+        "nyskick"
+      ],
+      "fallback_levels": [
+        "renoveringsobjekt"
+      ],
+      "clamped_levels": []
+    },
+    "global": {
+      "scope": "global",
+      "source": "data",
+      "multipliers": {
+        "nyskick": 1.625,
+        "mycket_gott": 1.3333,
+        "gott": 1.0,
+        "slitet": 0.6,
+        "renoveringsobjekt": 0.45
+      },
+      "measured_levels": [
+        "nyskick",
+        "mycket_gott",
+        "gott",
+        "slitet"
+      ],
+      "spread": {
+        "nyskick": {
+          "p25": 1.0,
+          "p75": 2.0,
+          "groups": 31,
+          "uncertainty": 0.124,
+          "bridged": 0,
+          "listings": 1546
+        },
+        "mycket_gott": {
+          "p25": 1.18,
+          "p75": 1.543,
+          "groups": 36,
+          "uncertainty": 0.045,
+          "bridged": 0,
+          "listings": 10715
+        },
+        "gott": {
+          "p25": 1.0,
+          "p75": 1.0,
+          "groups": 36,
+          "uncertainty": 0.0,
+          "bridged": 0,
+          "listings": 14358
+        },
+        "slitet": {
+          "p25": 0.5,
+          "p75": 0.714,
+          "groups": 32,
+          "uncertainty": 0.063,
+          "bridged": 0,
+          "listings": 4651
+        }
+      },
+      "listings": {
+        "nyskick": 1546,
+        "mycket_gott": 10715,
+        "gott": 14358,
+        "slitet": 4651
+      },
+      "groups": 36,
+      "inherited_levels": [],
+      "fallback_levels": [
+        "renoveringsobjekt"
+      ],
+      "clamped_levels": []
+    }
+  },
+  "diagnostics": {
+    "listings_used": 80440,
+    "groups_with_ratios": 36,
+    "bridged_rows": 0,
+    "unmapped_condition_values": {},
+    "levels_without_data": [
+      "renoveringsobjekt"
+    ],
+    "previous_run": "2026-08-04T18:04:51+00:00",
+    "changed": {
+      "budget/nyskick": "1.500 -> 1.625",
+      "budget/mycket_gott": "1.300 -> 1.333",
+      "mellan/nyskick": "1.429 -> 1.625",
+      "mellan/mycket_gott": "1.380 -> 1.250",
+      "mellan/slitet": "0.625 -> 0.600",
+      "premium/nyskick": "1.500 -> 1.625",
+      "global/nyskick": "1.429 -> 1.625",
+      "global/mycket_gott": "1.300 -> 1.333",
+      "global/slitet": "0.625 -> 0.600",
+      "global/renoveringsobjekt": "0.469 -> 0.450"
+    }
+  }
+}

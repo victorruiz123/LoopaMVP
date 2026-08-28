@@ -1,0 +1,19 @@
+{
+  "n_listings": 246401,
+  "bucket_counts": {
+    "stol": 169653,
+    "fatolj": 76748
+  },
+  "pairwise": {
+    "fatolj / stol": {
+      "median_ratio": 2.6,
+      "diff_pct": 160.0,
+      "groups": 1973,
+      "ci95": [
+        2.5,
+        2.667
+      ],
+      "merge": false
+    }
+  }
+}

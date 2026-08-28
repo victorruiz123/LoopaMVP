@@ -1,0 +1,373 @@
+{
+  "pairs": 9779,
+  "crop_share_overall": 0.729,
+  "crop_share_per_variant": {
+    "bord": 0.537,
+    "byrå": 0.269,
+    "bäddsoffa": 0.936,
+    "fotpall": 0.917,
+    "fåtölj": 0.925,
+    "hylla": 0.18,
+    "hörnsoffa": 0.988,
+    "soffa": 0.952,
+    "stol": 0.958,
+    "säng": 0.632
+  },
+  "overall_by_crop_group": {
+    "blandade": {
+      "status": "ok",
+      "n_pos": 977,
+      "n_neg": 1211,
+      "auc": 0.601,
+      "median_pos": 0.317,
+      "median_neg": 0.248
+    },
+    "båda_beskurna": {
+      "status": "ok",
+      "n_pos": 3131,
+      "n_neg": 2908,
+      "auc": 0.735,
+      "median_pos": 0.656,
+      "median_neg": 0.453
+    },
+    "båda_obeskurna": {
+      "status": "ok",
+      "n_pos": 790,
+      "n_neg": 762,
+      "auc": 0.624,
+      "median_pos": 0.42,
+      "median_neg": 0.324
+    }
+  },
+  "per_variant": {
+    "bord": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 497,
+        "n_neg": 492,
+        "auc": 0.612,
+        "median_pos": 0.347,
+        "median_neg": 0.273
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 226,
+          "n_neg": 250,
+          "auc": 0.592,
+          "median_pos": 0.302,
+          "median_neg": 0.255
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 164,
+          "n_neg": 129,
+          "auc": 0.644,
+          "median_pos": 0.392,
+          "median_neg": 0.251
+        },
+        "båda_obeskurna": {
+          "status": "ok",
+          "n_pos": 107,
+          "n_neg": 113,
+          "auc": 0.604,
+          "median_pos": 0.378,
+          "median_neg": 0.326
+        }
+      }
+    },
+    "byrå": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 500,
+        "n_neg": 500,
+        "auc": 0.691,
+        "median_pos": 0.498,
+        "median_neg": 0.313
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 171,
+          "n_neg": 211,
+          "auc": 0.629,
+          "median_pos": 0.345,
+          "median_neg": 0.222
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 42,
+          "n_neg": 36,
+          "auc": 0.775,
+          "median_pos": 0.356,
+          "median_neg": 0.192
+        },
+        "båda_obeskurna": {
+          "status": "ok",
+          "n_pos": 287,
+          "n_neg": 253,
+          "auc": 0.716,
+          "median_pos": 0.578,
+          "median_neg": 0.402
+        }
+      }
+    },
+    "bäddsoffa": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 488,
+        "n_neg": 485,
+        "auc": 0.592,
+        "median_pos": 0.661,
+        "median_neg": 0.608
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 71,
+          "n_neg": 46,
+          "auc": 0.704,
+          "median_pos": 0.469,
+          "median_neg": 0.297
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 413,
+          "n_neg": 439,
+          "auc": 0.608,
+          "median_pos": 0.685,
+          "median_neg": 0.632
+        },
+        "båda_obeskurna": {
+          "status": "för litet underlag",
+          "n_pos": 4,
+          "n_neg": 0
+        }
+      }
+    },
+    "fotpall": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 500,
+        "n_neg": 500,
+        "auc": 0.876,
+        "median_pos": 0.651,
+        "median_neg": 0.312
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 32,
+          "n_neg": 116,
+          "auc": 0.97,
+          "median_pos": 0.618,
+          "median_neg": 0.197
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 465,
+          "n_neg": 378,
+          "auc": 0.853,
+          "median_pos": 0.656,
+          "median_neg": 0.357
+        },
+        "båda_obeskurna": {
+          "status": "för litet underlag",
+          "n_pos": 3,
+          "n_neg": 6
+        }
+      }
+    },
+    "fåtölj": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 492,
+        "n_neg": 494,
+        "auc": 0.887,
+        "median_pos": 0.736,
+        "median_neg": 0.407
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 60,
+          "n_neg": 71,
+          "auc": 0.829,
+          "median_pos": 0.691,
+          "median_neg": 0.395
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 428,
+          "n_neg": 419,
+          "auc": 0.9,
+          "median_pos": 0.757,
+          "median_neg": 0.408
+        },
+        "båda_obeskurna": {
+          "status": "för litet underlag",
+          "n_pos": 4,
+          "n_neg": 4
+        }
+      }
+    },
+    "hylla": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 476,
+        "n_neg": 485,
+        "auc": 0.577,
+        "median_pos": 0.274,
+        "median_neg": 0.225
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 135,
+          "n_neg": 143,
+          "auc": 0.494,
+          "median_pos": 0.117,
+          "median_neg": 0.131
+        },
+        "båda_beskurna": {
+          "status": "för litet underlag",
+          "n_pos": 15,
+          "n_neg": 19
+        },
+        "båda_obeskurna": {
+          "status": "ok",
+          "n_pos": 326,
+          "n_neg": 323,
+          "auc": 0.61,
+          "median_pos": 0.346,
+          "median_neg": 0.274
+        }
+      }
+    },
+    "hörnsoffa": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 480,
+        "n_neg": 478,
+        "auc": 0.513,
+        "median_pos": 0.523,
+        "median_neg": 0.541
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "för litet underlag",
+          "n_pos": 12,
+          "n_neg": 11
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 468,
+          "n_neg": 467,
+          "auc": 0.512,
+          "median_pos": 0.532,
+          "median_neg": 0.543
+        }
+      }
+    },
+    "soffa": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 484,
+        "n_neg": 482,
+        "auc": 0.662,
+        "median_pos": 0.632,
+        "median_neg": 0.519
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 43,
+          "n_neg": 46,
+          "auc": 0.701,
+          "median_pos": 0.588,
+          "median_neg": 0.343
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 439,
+          "n_neg": 436,
+          "auc": 0.652,
+          "median_pos": 0.633,
+          "median_neg": 0.529
+        },
+        "båda_obeskurna": {
+          "status": "för litet underlag",
+          "n_pos": 2,
+          "n_neg": 0
+        }
+      }
+    },
+    "stol": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 500,
+        "n_neg": 494,
+        "auc": 0.957,
+        "median_pos": 0.811,
+        "median_neg": 0.358
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "för litet underlag",
+          "n_pos": 13,
+          "n_neg": 68
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 487,
+          "n_neg": 425,
+          "auc": 0.96,
+          "median_pos": 0.814,
+          "median_neg": 0.366
+        },
+        "båda_obeskurna": {
+          "status": "för litet underlag",
+          "n_pos": 0,
+          "n_neg": 1
+        }
+      }
+    },
+    "säng": {
+      "alla": {
+        "status": "ok",
+        "n_pos": 481,
+        "n_neg": 471,
+        "auc": 0.522,
+        "median_pos": 0.314,
+        "median_neg": 0.298
+      },
+      "per_crop_group": {
+        "blandade": {
+          "status": "ok",
+          "n_pos": 214,
+          "n_neg": 249,
+          "auc": 0.516,
+          "median_pos": 0.266,
+          "median_neg": 0.258
+        },
+        "båda_beskurna": {
+          "status": "ok",
+          "n_pos": 210,
+          "n_neg": 160,
+          "auc": 0.535,
+          "median_pos": 0.446,
+          "median_neg": 0.407
+        },
+        "båda_obeskurna": {
+          "status": "ok",
+          "n_pos": 57,
+          "n_neg": 62,
+          "auc": 0.381,
+          "median_pos": 0.178,
+          "median_neg": 0.244
+        }
+      }
+    }
+  },
+  "caveat": "URVALSEFFEKT, INTE KONTROLLERAD: grupperna är inte slumpmässigt tilldelade. YOLO lyckas oftare på bilder där möbeln är stor, välbelyst och fristående mot enkel bakgrund — alltså bilder som är lättare för DINOv2 oavsett beskärning. Högre AUC i gruppen 'båda_beskurna' kan därför bero på bildernas kvalitet snarare än på beskärningen. Skillnaden går inte att separera med denna data; det skulle kräva att samma bilder embeddades både med och utan beskärning och jämfördes parvis."
+}

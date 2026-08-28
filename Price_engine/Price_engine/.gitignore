@@ -1,0 +1,15 @@
+.venv/
+.cache/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Datafiler hör inte hemma i git.
+data/
+*.parquet
+*.ndjson
+*.jsonl
+*.tar.zst
+
+# API-nycklar
+.env

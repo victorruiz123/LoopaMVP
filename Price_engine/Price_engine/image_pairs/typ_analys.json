@@ -1,0 +1,304 @@
+{
+  "n": 4200,
+  "k": 40,
+  "leakage_guard": {
+    "own_embedding_excluded": true,
+    "duplicate_group_excluded": true,
+    "median_rows_blocked": 1,
+    "max_rows_blocked": 97
+  },
+  "abstain_rate": 0.006,
+  "accuracy_when_answering": 0.545,
+  "per_variant": {
+    "bord": {
+      "n": 300,
+      "abstain_rate": 0.003,
+      "accuracy": 0.783,
+      "median_share": 0.697
+    },
+    "byrå": {
+      "n": 300,
+      "abstain_rate": 0.01,
+      "accuracy": 0.636,
+      "median_share": 0.702
+    },
+    "bäddsoffa": {
+      "n": 300,
+      "abstain_rate": 0.003,
+      "accuracy": 0.033,
+      "median_share": 0.62
+    },
+    "fotpall": {
+      "n": 300,
+      "abstain_rate": 0.007,
+      "accuracy": 0.393,
+      "median_share": 0.578
+    },
+    "fåtölj": {
+      "n": 300,
+      "abstain_rate": 0.0,
+      "accuracy": 0.773,
+      "median_share": 0.675
+    },
+    "hylla": {
+      "n": 300,
+      "abstain_rate": 0.007,
+      "accuracy": 0.732,
+      "median_share": 0.714
+    },
+    "hörnsoffa": {
+      "n": 300,
+      "abstain_rate": 0.0,
+      "accuracy": 0.187,
+      "median_share": 0.526
+    },
+    "matbord": {
+      "n": 300,
+      "abstain_rate": 0.013,
+      "accuracy": 0.257,
+      "median_share": 0.528
+    },
+    "matgrupp": {
+      "n": 300,
+      "abstain_rate": 0.0,
+      "accuracy": 0.643,
+      "median_share": 0.526
+    },
+    "soffa": {
+      "n": 300,
+      "abstain_rate": 0.0,
+      "accuracy": 0.747,
+      "median_share": 0.688
+    },
+    "spegel": {
+      "n": 300,
+      "abstain_rate": 0.037,
+      "accuracy": 0.426,
+      "median_share": 0.553
+    },
+    "stol": {
+      "n": 300,
+      "abstain_rate": 0.0,
+      "accuracy": 0.813,
+      "median_share": 0.753
+    },
+    "säng": {
+      "n": 300,
+      "abstain_rate": 0.007,
+      "accuracy": 0.681,
+      "median_share": 0.575
+    },
+    "sänggavel": {
+      "n": 300,
+      "abstain_rate": 0.003,
+      "accuracy": 0.518,
+      "median_share": 0.554
+    }
+  },
+  "confusion": {
+    "bord": {
+      "bord": 0.78,
+      "hylla": 0.027,
+      "matbord": 0.023,
+      "matgrupp": 0.037,
+      "okänd": 0.07,
+      "stol": 0.023
+    },
+    "byrå": {
+      "bord": 0.103,
+      "byrå": 0.63,
+      "hylla": 0.153,
+      "okänd": 0.067
+    },
+    "bäddsoffa": {
+      "bäddsoffa": 0.033,
+      "hörnsoffa": 0.033,
+      "okänd": 0.02,
+      "soffa": 0.87,
+      "säng": 0.027
+    },
+    "fotpall": {
+      "bord": 0.107,
+      "fotpall": 0.39,
+      "fåtölj": 0.23,
+      "okänd": 0.107,
+      "soffa": 0.027,
+      "stol": 0.103
+    },
+    "fåtölj": {
+      "bord": 0.023,
+      "fåtölj": 0.773,
+      "soffa": 0.03,
+      "stol": 0.133
+    },
+    "hylla": {
+      "bord": 0.067,
+      "byrå": 0.037,
+      "hylla": 0.727,
+      "okänd": 0.123
+    },
+    "hörnsoffa": {
+      "fåtölj": 0.037,
+      "hörnsoffa": 0.187,
+      "soffa": 0.713
+    },
+    "matbord": {
+      "bord": 0.34,
+      "matbord": 0.253,
+      "matgrupp": 0.27,
+      "okänd": 0.023,
+      "stol": 0.087
+    },
+    "matgrupp": {
+      "bord": 0.077,
+      "matbord": 0.127,
+      "matgrupp": 0.643,
+      "stol": 0.113
+    },
+    "soffa": {
+      "bord": 0.027,
+      "fåtölj": 0.063,
+      "hörnsoffa": 0.033,
+      "okänd": 0.037,
+      "soffa": 0.747,
+      "stol": 0.057
+    },
+    "spegel": {
+      "avstår": 0.037,
+      "bord": 0.133,
+      "byrå": 0.103,
+      "hylla": 0.137,
+      "okänd": 0.117,
+      "spegel": 0.41,
+      "stol": 0.023
+    },
+    "stol": {
+      "bord": 0.027,
+      "fåtölj": 0.073,
+      "matgrupp": 0.027,
+      "okänd": 0.02,
+      "stol": 0.813
+    },
+    "säng": {
+      "okänd": 0.243,
+      "säng": 0.677,
+      "sänggavel": 0.023
+    },
+    "sänggavel": {
+      "bord": 0.037,
+      "byrå": 0.037,
+      "hylla": 0.027,
+      "okänd": 0.137,
+      "soffa": 0.023,
+      "säng": 0.203,
+      "sänggavel": 0.517
+    }
+  },
+  "price_critical": {
+    "hörnsoffa ↔ soffa ↔ bäddsoffa": {
+      "hörnsoffa -> soffa": 0.713,
+      "hörnsoffa -> bäddsoffa": 0.007,
+      "soffa -> hörnsoffa": 0.033,
+      "bäddsoffa -> hörnsoffa": 0.033,
+      "bäddsoffa -> soffa": 0.87
+    },
+    "matgrupp ↔ matbord": {
+      "matgrupp -> matbord": 0.127,
+      "matbord -> matgrupp": 0.27
+    },
+    "stol ↔ fåtölj": {
+      "stol -> fåtölj": 0.073,
+      "fåtölj -> stol": 0.133
+    },
+    "byrå ↔ hylla": {
+      "byrå -> hylla": 0.153,
+      "hylla -> byrå": 0.037
+    }
+  },
+  "abstain_curve": [
+    {
+      "min_share": 0.3,
+      "coverage": 0.968,
+      "accuracy": 0.555,
+      "n": 4064
+    },
+    {
+      "min_share": 0.35,
+      "coverage": 0.933,
+      "accuracy": 0.566,
+      "n": 3920
+    },
+    {
+      "min_share": 0.4,
+      "coverage": 0.882,
+      "accuracy": 0.581,
+      "n": 3705
+    },
+    {
+      "min_share": 0.45,
+      "coverage": 0.8,
+      "accuracy": 0.603,
+      "n": 3362
+    },
+    {
+      "min_share": 0.5,
+      "coverage": 0.7,
+      "accuracy": 0.63,
+      "n": 2941
+    },
+    {
+      "min_share": 0.55,
+      "coverage": 0.598,
+      "accuracy": 0.662,
+      "n": 2512
+    },
+    {
+      "min_share": 0.6,
+      "coverage": 0.505,
+      "accuracy": 0.698,
+      "n": 2123
+    },
+    {
+      "min_share": 0.65,
+      "coverage": 0.418,
+      "accuracy": 0.73,
+      "n": 1755
+    },
+    {
+      "min_share": 0.7,
+      "coverage": 0.348,
+      "accuracy": 0.759,
+      "n": 1460
+    },
+    {
+      "min_share": 0.75,
+      "coverage": 0.274,
+      "accuracy": 0.802,
+      "n": 1150
+    },
+    {
+      "min_share": 0.8,
+      "coverage": 0.205,
+      "accuracy": 0.823,
+      "n": 863
+    },
+    {
+      "min_share": 0.85,
+      "coverage": 0.133,
+      "accuracy": 0.873,
+      "n": 559
+    },
+    {
+      "min_share": 0.9,
+      "coverage": 0.073,
+      "accuracy": 0.922,
+      "n": 307
+    },
+    {
+      "min_share": 0.95,
+      "coverage": 0.028,
+      "accuracy": 0.949,
+      "n": 117
+    }
+  ]
+}

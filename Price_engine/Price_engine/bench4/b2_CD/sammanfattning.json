@@ -1,0 +1,60 @@
+{
+  "totalt": {
+    "kärnnamn": {
+      "möbler": 13,
+      "svar_gavs": 13,
+      "accuracy_intervall_överlapp": 0.7692,
+      "accuracy_default_inom_facit": 0.2308,
+      "median_avvikelse_när_utanför": 0.4835,
+      "för_högt": 2,
+      "för_lågt": 8
+    },
+    "kärnnamn + bild": {
+      "möbler": 13,
+      "svar_gavs": 13,
+      "accuracy_intervall_överlapp": 0.6923,
+      "accuracy_default_inom_facit": 0.3077,
+      "median_avvikelse_när_utanför": 0.6751,
+      "för_högt": 2,
+      "för_lågt": 7
+    }
+  },
+  "per_felklass": {
+    "kärnnamn": {
+      "tunt": {
+        "fall": 7,
+        "överlapp": 0.8571,
+        "default_inom": 0.2857
+      },
+      "övrigt": {
+        "fall": 4,
+        "överlapp": 0.75,
+        "default_inom": 0.25
+      },
+      "anonym": {
+        "fall": 2,
+        "överlapp": 0.5,
+        "default_inom": 0.0
+      }
+    },
+    "kärnnamn + bild": {
+      "tunt": {
+        "fall": 7,
+        "överlapp": 0.8571,
+        "default_inom": 0.4286
+      },
+      "övrigt": {
+        "fall": 4,
+        "överlapp": 0.75,
+        "default_inom": 0.25
+      },
+      "anonym": {
+        "fall": 2,
+        "överlapp": 0.0,
+        "default_inom": 0.0
+      }
+    }
+  },
+  "spec_fingerprint": "28f56614f44a",
+  "price_cells_enabled": true
+}

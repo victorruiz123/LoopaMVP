@@ -1,0 +1,12 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,effectiveN,sizeMethod,sizeQuery,sizeWarning,filtersConverted,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse,felklass
+1,IKEA Ektorp,kärnnamn + bild,400,900,800,1000,1500,124,filtered,type_system:prior+union3,49.8,weighted,2-sits,,storlek,"['baddsoffa', 'hornsoffa', 'soffa']",none,high,True,False,0.1111111111111111,storlek
+2,IKEA Söderhamn bäddsoffa,kärnnamn + bild,2000,2500,2000,2495,2999,55,filtered,type_system:image+union3,55.0,filtered,3-sits,,,"['baddsoffa', 'hornsoffa', 'soffa']",none,high,True,True,0.0,storlek
+3,IKEA Vimle,kärnnamn + bild,1500,3000,2000,2500,4000,103,filtered,type_system:image+union3,43.8,weighted,3-sits,,storlek,"['baddsoffa', 'hornsoffa', 'soffa']",none,high,True,True,0.0,storlek
+4,Mio Cordelia,kärnnamn + bild,1500,3000,727,1288,3245,11,ignored,type_system:image+union2,11.0,none,,,,"['fatolj', 'stol']",none,low,True,False,-0.14133333333333334,tunt
+5,IKEA Jennylund,kärnnamn + bild,200,700,163,250,553,15,weighted,type_system:image+union2,12.8,none,,,variant,"['fatolj', 'stol']",none,low,True,True,0.0,tunt
+6,IKEA Strandmon,kärnnamn + bild,1000,2000,750,1000,1400,67,filtered,type_system:image+union2,67.0,none,,,,"['fatolj', 'stol']",none,high,True,True,0.0,övrigt
+7,Sofacompany Clara,kärnnamn + bild,7000,10000,2632,3290,4899,2,ignored,type_system:text+union3,2.0,none,,,,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,False,False,-0.53,tunt
+8,Sweef Valen 224,kärnnamn + bild,7000,12000,5695,8642,12052,15,weighted,type_system:image+union3,10.5,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,tunt
+9,Mio Santos,kärnnamn + bild,700,1000,191,767,1703,24,weighted,type_system:image+union6,21.8,none,,,variant,"['matbord', 'matgrupp', 'soffbord', 'sidobord', 'skrivbord', 'bord']",none,low,True,True,0.0,övrigt
+10,IKEA PINNTORP,kärnnamn + bild,600,800,117,469,833,15,weighted,type_system:image+union6,15.0,no_match,4 stolar,,variant,"['matbord', 'matgrupp', 'soffbord', 'sidobord', 'skrivbord', 'bord']",none,low,True,False,-0.21833333333333332,storlek
+11,Kinnarps Capella X,kärnnamn + bild,1300,1600,1000,1480,2240,3,ignored,type_system:image+union2,3.0,none,,,,"['fatolj', 'stol']",none,low,True,True,0.0,tunt

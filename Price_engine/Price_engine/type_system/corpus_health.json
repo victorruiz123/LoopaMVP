@@ -1,0 +1,299 @@
+{
+ "kord": "2026-08-17T16:32:12.867403+00:00",
+ "recency_months": 8,
+ "cutoff": "2025-12-17",
+ "rader": 1525135,
+ "farska_rader": 126388,
+ "andel_farska": 0.0829,
+ "per_kalla": [
+  {
+   "kalla": "archive",
+   "rader": 973009,
+   "senaste": "2025-12-15",
+   "inom_fonster": 0,
+   "andel_fardk": 0.0,
+   "utgangsdatum": "2026-08-15"
+  },
+  {
+   "kalla": "auctionet",
+   "rader": 461564,
+   "senaste": "2026-07-10",
+   "inom_fonster": 35837,
+   "andel_fardk": 0.0776,
+   "utgangsdatum": "2027-03-10"
+  },
+  {
+   "kalla": "blocket",
+   "rader": 82731,
+   "senaste": "2026-07-13",
+   "inom_fonster": 82731,
+   "andel_fardk": 1.0,
+   "utgangsdatum": "2027-03-13"
+  },
+  {
+   "kalla": "tradera",
+   "rader": 7831,
+   "senaste": "2026-07-11",
+   "inom_fonster": 7820,
+   "andel_fardk": 0.9986,
+   "utgangsdatum": "2027-03-11"
+  }
+ ],
+ "typer_under_golvet": 0,
+ "benchmark": {
+  "per_metod": {
+   "window": 17,
+   "extended": 16,
+   "none": 2
+  },
+  "andel_extended": 0.4571,
+  "niva": "GULT",
+  "per_mobel": [
+   {
+    "id": "11#1",
+    "mobel": "IKEA Ektorp",
+    "recency": "window",
+    "n": 90,
+    "confidence": "high"
+   },
+   {
+    "id": "11#2",
+    "mobel": "IKEA Söderhamn bäddsoffa",
+    "recency": "window",
+    "n": 57,
+    "confidence": "high"
+   },
+   {
+    "id": "11#3",
+    "mobel": "IKEA Vimle",
+    "recency": "window",
+    "n": 75,
+    "confidence": "low"
+   },
+   {
+    "id": "11#4",
+    "mobel": "Mio Cordelia",
+    "recency": "extended",
+    "n": 5,
+    "confidence": "low"
+   },
+   {
+    "id": "11#5",
+    "mobel": "IKEA Jennylund",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "high"
+   },
+   {
+    "id": "11#6",
+    "mobel": "IKEA Strandmon",
+    "recency": "window",
+    "n": 42,
+    "confidence": "high"
+   },
+   {
+    "id": "11#7",
+    "mobel": "Sofacompany Clara Rak bäddsoffa",
+    "recency": "extended",
+    "n": 2,
+    "confidence": "low"
+   },
+   {
+    "id": "11#8",
+    "mobel": "Sweef Valen 224 Rak soffa",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "11#9",
+    "mobel": "Mio Santos",
+    "recency": "window",
+    "n": 18,
+    "confidence": "low"
+   },
+   {
+    "id": "11#10",
+    "mobel": "IKEA PINNTORP",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "11#11",
+    "mobel": "Kinnarps Capella X / Capella Classic",
+    "recency": "extended",
+    "n": 3,
+    "confidence": "low"
+   },
+   {
+    "id": "11#12",
+    "mobel": "IKEA PINNTORP",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#1",
+    "mobel": "Mio Town",
+    "recency": "window",
+    "n": 23,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#2",
+    "mobel": "Mio Saturday",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#3",
+    "mobel": "Mio Bridge",
+    "recency": "window",
+    "n": 20,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#4",
+    "mobel": "IKEA karlstrand",
+    "recency": "none",
+    "n": 0,
+    "confidence": "none"
+   },
+   {
+    "id": "b1#5",
+    "mobel": "Bellus soffa",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "high"
+   },
+   {
+    "id": "b1#6",
+    "mobel": "IKEA stocksund",
+    "recency": "window",
+    "n": 27,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#7",
+    "mobel": "Stalands happy",
+    "recency": "extended",
+    "n": 2,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#8",
+    "mobel": "Kartell Victoria Ghost",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b1#9",
+    "mobel": "Matgrupp 5 stolar",
+    "recency": "window",
+    "n": 503,
+    "confidence": "high"
+   },
+   {
+    "id": "b1#10",
+    "mobel": "Ekbord med stolar",
+    "recency": "window",
+    "n": 2703,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#1",
+    "mobel": "ikea norsborg",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#2",
+    "mobel": "Bolia soffa med puff",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#3",
+    "mobel": "Mio Harper soffa",
+    "recency": "window",
+    "n": 24,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#4",
+    "mobel": "Jysk Egedal",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#5",
+    "mobel": "Jysk Allese",
+    "recency": "extended",
+    "n": 12,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#6",
+    "mobel": "Jysk fåtölj",
+    "recency": "window",
+    "n": 79,
+    "confidence": "high"
+   },
+   {
+    "id": "b2#7",
+    "mobel": "Swedese Lamino",
+    "recency": "window",
+    "n": 24,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#8",
+    "mobel": "DUX Bruno Mathsson Eva",
+    "recency": "extended",
+    "n": 15,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#9",
+    "mobel": "Matbord trä",
+    "recency": "window",
+    "n": 2703,
+    "confidence": "low"
+   },
+   {
+    "id": "b2#10",
+    "mobel": "Mio matgrupp",
+    "recency": "window",
+    "n": 108,
+    "confidence": "high"
+   },
+   {
+    "id": "b2#11",
+    "mobel": "Matgrupp byCrea",
+    "recency": "window",
+    "n": 503,
+    "confidence": "high"
+   },
+   {
+    "id": "b2#12",
+    "mobel": "DUX säng 303",
+    "recency": "none",
+    "n": 0,
+    "confidence": "none"
+   },
+   {
+    "id": "b2#13",
+    "mobel": "Ikea skotterud",
+    "recency": "window",
+    "n": 43,
+    "confidence": "high"
+   }
+  ]
+ }
+}

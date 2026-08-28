@@ -1,0 +1,21 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,effectiveN,sizeMethod,sizeQuery,sizeWarning,filtersConverted,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse,felklass
+1,Mio Town,kärnnamn,7000,12000,4000,6000,9900,34,none,none,34.0,none,,"divan,3-sits,u-soffa",,,none,low,True,False,-0.14285714285714285,övrigt
+1,Mio Town,kärnnamn + bild,7000,12000,4500,6000,9900,34,weighted,dinov2,31.0,none,,"divan,3-sits,u-soffa",variant,"['soffa', 'hörnsoffa']",none,low,True,False,-0.14285714285714285,övrigt
+2,Mio Saturday,kärnnamn,3000,6000,3349,5742,9289,15,none,none,15.0,none,,,,,none,low,True,True,0.0,tunt
+2,Mio Saturday,kärnnamn + bild,3000,6000,2983,5439,15317,15,weighted,dinov2,7.5,none,,,variant,['soffa'],none,low,True,True,0.0,tunt
+3,Mio Bridge,kärnnamn,3500,7000,2000,3776,5665,24,none,none,24.0,none,,,,,none,low,True,True,0.0,övrigt
+3,Mio Bridge,kärnnamn + bild,3500,7000,864,3394,6038,24,weighted,dinov2,18.0,none,,,variant,['soffa'],none,low,True,False,-0.030285714285714287,övrigt
+4,IKEA Karlstad,kärnnamn,500,2000,390,700,1200,44,none,none,44.0,none,,"2-sits,3-sits",,,none,low,True,True,0.0,övrigt
+4,IKEA Karlstad,kärnnamn + bild,500,2000,350,750,1200,44,weighted,dinov2,31.2,none,,"2-sits,3-sits",variant,['soffa'],none,low,True,True,0.0,övrigt
+5,Bellus soffa,kärnnamn,2000,6000,2000,4000,10000,29,none,none,29.0,none,,,,,none,high,True,True,0.0,övrigt
+5,Bellus soffa,kärnnamn + bild,2000,6000,600,4000,10900,29,weighted,dinov2,18.5,none,,,variant,['soffa'],none,high,True,True,0.0,övrigt
+6,IKEA Stocksund,kärnnamn,800,2000,500,750,1000,38,none,none,38.0,none,,"divan,3-sits",,,none,low,True,False,-0.0625,övrigt
+6,IKEA Stocksund,kärnnamn + bild,800,2000,500,800,1250,38,weighted,dinov2,29.8,none,,"divan,3-sits",variant,['soffa'],none,low,True,True,0.0,övrigt
+7,Stalands Happy,kärnnamn,3000,6000,1854,3658,5931,2,none,none,2.0,none,,,,,none,low,True,True,0.0,tunt
+7,Stalands Happy,kärnnamn + bild,3000,6000,1854,3658,5931,2,none,single_candidate,2.0,none,,,,,none,low,True,True,0.0,tunt
+8,Kartell Victoria Ghost,kärnnamn,1000,2000,456,811,1483,15,none,none,15.0,none,,,,,none,low,True,False,-0.189,tunt
+8,Kartell Victoria Ghost,kärnnamn + bild,1000,2000,456,811,1483,15,none,single_candidate,15.0,none,,,,,none,low,True,False,-0.189,tunt
+9,None Matgrupp 5 stolar,kärnnamn,1500,2500,281,585,1969,15,none,none,11.2,weighted,5 stolar,,storlek,,none,low,True,False,-0.61,tunt
+9,None Matgrupp 5 stolar,kärnnamn + bild,1500,2500,281,585,1969,15,none,single_candidate,11.2,weighted,5 stolar,,storlek,,none,low,True,False,-0.61,tunt
+10,None Ekbord med stolar,kärnnamn,2000,5000,212,300,833,35,none,none,35.0,none,,"8 stolar,6 stolar,4 stolar",,,none,low,False,False,-0.85,övrigt
+10,None Ekbord med stolar,kärnnamn + bild,2000,5000,143,672,1543,24,none,unresolved,19.5,none,,,,,none,low,False,False,-0.664,övrigt

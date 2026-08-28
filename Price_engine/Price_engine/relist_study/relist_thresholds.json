@@ -1,0 +1,344 @@
+{
+  "built_at": "2026-08-05T12:56:06+00:00",
+  "indicative_only": true,
+  "random_seed": 20260805,
+  "thresholds": {
+    "max_title_freq": 2,
+    "min_title_len": 40,
+    "image_sim": 0.85,
+    "min_days": 3,
+    "max_days": 270
+  },
+  "strictness_steps": [
+    {
+      "steg": "kandidatkedjor (samma titel, olika datum)",
+      "kedjor": 30944,
+      "sänkt_%": 44.6,
+      "höjt_%": 44.7,
+      "skattad_precision": 0.106
+    },
+    {
+      "steg": "titeln förekommer högst 2 gånger",
+      "kedjor": 10026,
+      "sänkt_%": 52.2,
+      "höjt_%": 33.3,
+      "skattad_precision": 0.335
+    },
+    {
+      "steg": "titeln minst 40 tecken",
+      "kedjor": 1057,
+      "sänkt_%": 53.6,
+      "höjt_%": 14.6,
+      "skattad_precision": 0.709
+    },
+    {
+      "steg": "prisändringen rimlig",
+      "kedjor": 1047,
+      "sänkt_%": 53.9,
+      "höjt_%": 14.0,
+      "skattad_precision": 0.719
+    },
+    {
+      "steg": "bilden motbevisar inte",
+      "kedjor": 993,
+      "sänkt_%": 54.6,
+      "höjt_%": 13.0,
+      "skattad_precision": 0.74
+    }
+  ],
+  "precision_all": {
+    "n_sampled": 100,
+    "precision_safe": 0.82,
+    "title_ok": 0.99,
+    "image_ok": 0.95,
+    "price_ok": 0.88,
+    "image_confirmed": 0,
+    "image_rejected": 5,
+    "no_image": 95
+  },
+  "precision_strict": {
+    "n_sampled": 100,
+    "precision_safe": 0.99,
+    "title_ok": 0.99,
+    "image_ok": 1.0,
+    "price_ok": 1.0,
+    "image_confirmed": 1,
+    "image_rejected": 0,
+    "no_image": 99
+  },
+  "n_chains": 993,
+  "gradient_by_variant": {
+    "global": {
+      "p0-10": {
+        "n": 66,
+        "share_lowered": 0.2576,
+        "share_raised": 0.1667,
+        "median_cut": -0.2326
+      },
+      "p10-20": {
+        "n": 61,
+        "share_lowered": 0.459,
+        "share_raised": 0.1639,
+        "median_cut": -0.3095
+      },
+      "p20-30": {
+        "n": 65,
+        "share_lowered": 0.4615,
+        "share_raised": 0.1385,
+        "median_cut": -0.2667
+      },
+      "p30-40": {
+        "n": 62,
+        "share_lowered": 0.3871,
+        "share_raised": 0.2258,
+        "median_cut": -0.2182
+      },
+      "p40-50": {
+        "n": 73,
+        "share_lowered": 0.5753,
+        "share_raised": 0.1781,
+        "median_cut": -0.2694
+      },
+      "p50-60": {
+        "n": 93,
+        "share_lowered": 0.5161,
+        "share_raised": 0.1613,
+        "median_cut": -0.2177
+      },
+      "p60-70": {
+        "n": 104,
+        "share_lowered": 0.6827,
+        "share_raised": 0.1442,
+        "median_cut": -0.2878
+      },
+      "p70-80": {
+        "n": 124,
+        "share_lowered": 0.6774,
+        "share_raised": 0.1048,
+        "median_cut": -0.2535
+      },
+      "p80-90": {
+        "n": 134,
+        "share_lowered": 0.5522,
+        "share_raised": 0.0597,
+        "median_cut": -0.2445
+      },
+      "p90-100": {
+        "n": 211,
+        "share_lowered": 0.5877,
+        "share_raised": 0.0995,
+        "median_cut": -0.25
+      }
+    },
+    "bord": {
+      "p70-80": {
+        "n": 23,
+        "share_lowered": 0.5217,
+        "share_raised": 0.2174,
+        "median_cut": -0.2364
+      },
+      "p80-90": {
+        "n": 24,
+        "share_lowered": 0.5,
+        "share_raised": 0.125,
+        "median_cut": -0.2809
+      },
+      "p90-100": {
+        "n": 31,
+        "share_lowered": 0.5161,
+        "share_raised": 0.0645,
+        "median_cut": -0.1878
+      }
+    }
+  },
+  "gradient_by_price_tier": {
+    "global": {
+      "p0-10": {
+        "n": 66,
+        "share_lowered": 0.2576,
+        "share_raised": 0.1667,
+        "median_cut": -0.2326
+      },
+      "p10-20": {
+        "n": 61,
+        "share_lowered": 0.459,
+        "share_raised": 0.1639,
+        "median_cut": -0.3095
+      },
+      "p20-30": {
+        "n": 65,
+        "share_lowered": 0.4615,
+        "share_raised": 0.1385,
+        "median_cut": -0.2667
+      },
+      "p30-40": {
+        "n": 62,
+        "share_lowered": 0.3871,
+        "share_raised": 0.2258,
+        "median_cut": -0.2182
+      },
+      "p40-50": {
+        "n": 73,
+        "share_lowered": 0.5753,
+        "share_raised": 0.1781,
+        "median_cut": -0.2694
+      },
+      "p50-60": {
+        "n": 93,
+        "share_lowered": 0.5161,
+        "share_raised": 0.1613,
+        "median_cut": -0.2177
+      },
+      "p60-70": {
+        "n": 104,
+        "share_lowered": 0.6827,
+        "share_raised": 0.1442,
+        "median_cut": -0.2878
+      },
+      "p70-80": {
+        "n": 124,
+        "share_lowered": 0.6774,
+        "share_raised": 0.1048,
+        "median_cut": -0.2535
+      },
+      "p80-90": {
+        "n": 134,
+        "share_lowered": 0.5522,
+        "share_raised": 0.0597,
+        "median_cut": -0.2445
+      },
+      "p90-100": {
+        "n": 211,
+        "share_lowered": 0.5877,
+        "share_raised": 0.0995,
+        "median_cut": -0.25
+      }
+    },
+    "hög": {
+      "p30-40": {
+        "n": 20,
+        "share_lowered": 0.45,
+        "share_raised": 0.25,
+        "median_cut": -0.25
+      },
+      "p40-50": {
+        "n": 25,
+        "share_lowered": 0.6,
+        "share_raised": 0.2,
+        "median_cut": -0.2143
+      },
+      "p60-70": {
+        "n": 24,
+        "share_lowered": 0.4583,
+        "share_raised": 0.25,
+        "median_cut": -0.2
+      },
+      "p70-80": {
+        "n": 28,
+        "share_lowered": 0.6786,
+        "share_raised": 0.1071,
+        "median_cut": -0.25
+      },
+      "p80-90": {
+        "n": 32,
+        "share_lowered": 0.625,
+        "share_raised": 0.0312,
+        "median_cut": -0.2445
+      },
+      "p90-100": {
+        "n": 68,
+        "share_lowered": 0.5882,
+        "share_raised": 0.1029,
+        "median_cut": -0.2883
+      }
+    },
+    "låg": {
+      "p50-60": {
+        "n": 25,
+        "share_lowered": 0.44,
+        "share_raised": 0.16,
+        "median_cut": -0.2353
+      },
+      "p70-80": {
+        "n": 30,
+        "share_lowered": 0.5333,
+        "share_raised": 0.1,
+        "median_cut": -0.3192
+      },
+      "p80-90": {
+        "n": 20,
+        "share_lowered": 0.5,
+        "share_raised": 0.0,
+        "median_cut": -0.3465
+      },
+      "p90-100": {
+        "n": 30,
+        "share_lowered": 0.5333,
+        "share_raised": 0.1,
+        "median_cut": -0.1667
+      }
+    },
+    "mellan": {
+      "p0-10": {
+        "n": 29,
+        "share_lowered": 0.3448,
+        "share_raised": 0.069,
+        "median_cut": -0.2142
+      },
+      "p10-20": {
+        "n": 33,
+        "share_lowered": 0.5152,
+        "share_raised": 0.1515,
+        "median_cut": -0.2857
+      },
+      "p20-30": {
+        "n": 28,
+        "share_lowered": 0.5357,
+        "share_raised": 0.0714,
+        "median_cut": -0.2986
+      },
+      "p30-40": {
+        "n": 23,
+        "share_lowered": 0.4348,
+        "share_raised": 0.2174,
+        "median_cut": -0.1945
+      },
+      "p40-50": {
+        "n": 34,
+        "share_lowered": 0.5294,
+        "share_raised": 0.2059,
+        "median_cut": -0.2442
+      },
+      "p50-60": {
+        "n": 40,
+        "share_lowered": 0.575,
+        "share_raised": 0.075,
+        "median_cut": -0.2
+      },
+      "p60-70": {
+        "n": 44,
+        "share_lowered": 0.7955,
+        "share_raised": 0.0682,
+        "median_cut": -0.2878
+      },
+      "p70-80": {
+        "n": 51,
+        "share_lowered": 0.7059,
+        "share_raised": 0.1176,
+        "median_cut": -0.2582
+      },
+      "p80-90": {
+        "n": 59,
+        "share_lowered": 0.4746,
+        "share_raised": 0.1017,
+        "median_cut": -0.2111
+      },
+      "p90-100": {
+        "n": 86,
+        "share_lowered": 0.6279,
+        "share_raised": 0.0814,
+        "median_cut": -0.2202
+      }
+    }
+  }
+}

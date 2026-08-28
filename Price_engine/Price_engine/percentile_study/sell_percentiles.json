@@ -1,0 +1,4670 @@
+{
+  "built_at": "2026-08-05T02:31:25+00:00",
+  "random_seed": 20260805,
+  "thresholds": {
+    "bid": [
+      5,
+      4,
+      3
+    ],
+    "min_sales_per_group": 50,
+    "min_asking_per_match": 30,
+    "min_tradera_sales": 30,
+    "time_window_months": 3
+  },
+  "channel_gaps": {
+    "low": {
+      "gap": -0.4211,
+      "groups": 6,
+      "n_tradera": 440,
+      "per_variant": {
+        "bord": -0.4211,
+        "byrå": -0.4806,
+        "fotpall": -0.0432,
+        "fåtölj": -0.4206,
+        "hylla": -0.5758,
+        "stol": -0.2593
+      }
+    },
+    "mid": {
+      "gap": -0.0788,
+      "groups": 2,
+      "n_tradera": 147,
+      "per_variant": {
+        "hylla": -0.1529,
+        "soffa": -0.0788
+      }
+    },
+    "high": {
+      "gap": -0.0918,
+      "groups": 2,
+      "n_tradera": 72,
+      "per_variant": {
+        "fotpall": -0.0918,
+        "fåtölj": -0.159
+      }
+    }
+  },
+  "channel_gaps_unbranded": {
+    "per_pair": {
+      "bord|låg": {
+        "gap": -0.3634,
+        "n_tradera": 861
+      },
+      "byrå|låg": {
+        "gap": -0.389,
+        "n_tradera": 352
+      },
+      "bäddsoffa|mellan": {
+        "gap": -0.068,
+        "n_tradera": 42
+      },
+      "fotpall|låg": {
+        "gap": -0.2308,
+        "n_tradera": 192
+      },
+      "fåtölj|låg": {
+        "gap": -0.1456,
+        "n_tradera": 180
+      },
+      "hylla|låg": {
+        "gap": -0.4383,
+        "n_tradera": 931
+      },
+      "hörnsoffa|hög": {
+        "gap": -0.0738,
+        "n_tradera": 54
+      },
+      "matgrupp|låg": {
+        "gap": -0.5097,
+        "n_tradera": 33
+      },
+      "matgrupp|mellan": {
+        "gap": -0.3922,
+        "n_tradera": 168
+      },
+      "soffa|låg": {
+        "gap": -0.1509,
+        "n_tradera": 161
+      },
+      "spegel|låg": {
+        "gap": -0.4564,
+        "n_tradera": 104
+      },
+      "stol|låg": {
+        "gap": -0.0823,
+        "n_tradera": 312
+      },
+      "säng|låg": {
+        "gap": -0.1411,
+        "n_tradera": 102
+      }
+    },
+    "per_tier": {
+      "hög": {
+        "gap": -0.218,
+        "n_tradera": 54
+      },
+      "låg": {
+        "gap": -0.3113,
+        "n_tradera": 3228
+      },
+      "mellan": {
+        "gap": -0.3314,
+        "n_tradera": 239
+      }
+    }
+  },
+  "low_end_gap_status": "gap_measured",
+  "global_sell_percentile": 0.6122,
+  "track_a_brand_tier": {
+    "bord|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 1064,
+      "n_total": 1295,
+      "median_bids": 13.0,
+      "low_bid_share": 0.0965,
+      "tier_source": "brand",
+      "sell_percentile": 0.5424,
+      "p25": 0.2978,
+      "p75": 0.9062,
+      "ci_low": 0.4947,
+      "ci_high": 0.5813,
+      "n": 1064,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 1064,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3673,
+          "p25": 0.1589,
+          "p75": 0.7101,
+          "ci_low": 0.3109,
+          "ci_high": 0.4211,
+          "n": 393,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6548,
+          "p25": 0.3516,
+          "p75": 0.8886,
+          "ci_low": 0.5781,
+          "ci_high": 0.7099,
+          "n": 349,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.8889,
+          "p25": 0.6269,
+          "p75": 0.9531,
+          "ci_low": 0.8266,
+          "ci_high": 0.9125,
+          "n": 322,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "bord|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 438,
+      "n_total": 524,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0897,
+      "tier_source": "brand",
+      "sell_percentile": 0.8242,
+      "p25": 0.7947,
+      "p75": 0.9727,
+      "ci_low": 0.8066,
+      "ci_high": 0.8394,
+      "n": 429,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 9,
+      "n_auctionet": 429,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8137,
+          "p25": 0.651,
+          "p75": 0.9321,
+          "ci_low": 0.7782,
+          "ci_high": 0.8369,
+          "n": 149,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9147,
+          "p25": 0.7947,
+          "p75": 0.9652,
+          "ci_low": 0.8699,
+          "ci_high": 0.9322,
+          "n": 152,
+          "median_bids": 16.0
+        },
+        "hög": {
+          "sell_percentile": 0.9712,
+          "p25": 0.9139,
+          "p75": 0.9946,
+          "ci_low": 0.9635,
+          "ci_high": 0.9784,
+          "n": 137,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "bord|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 278,
+      "n_total": 342,
+      "median_bids": 13.0,
+      "low_bid_share": 0.0994,
+      "tier_source": "brand",
+      "sell_percentile": 0.8048,
+      "p25": 0.7764,
+      "p75": 0.974,
+      "ci_low": 0.791,
+      "ci_high": 0.8245,
+      "n": 278,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 278,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7811,
+          "p25": 0.5743,
+          "p75": 0.8931,
+          "ci_low": 0.6756,
+          "ci_high": 0.831,
+          "n": 105,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.896,
+          "p25": 0.7906,
+          "p75": 0.9573,
+          "ci_low": 0.8682,
+          "ci_high": 0.918,
+          "n": 84,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.9699,
+          "p25": 0.9144,
+          "p75": 0.9931,
+          "ci_low": 0.9488,
+          "ci_high": 0.9842,
+          "n": 89,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "bord|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 13,
+      "n_total": 21,
+      "median_bids": 5.0,
+      "low_bid_share": 0.381,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bord|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 344,
+      "n_total": 606,
+      "median_bids": 6.0,
+      "low_bid_share": 0.3053,
+      "tier_source": "brand",
+      "sell_percentile": 0.3652,
+      "p25": 0.1977,
+      "p75": 0.6963,
+      "ci_low": 0.2365,
+      "ci_high": 0.6097,
+      "n": 38,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 38,
+      "n_auctionet": 306,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5857,
+          "p25": 0.4895,
+          "p75": 0.8389,
+          "ci_low": 0.5529,
+          "ci_high": 0.6411,
+          "n": 120,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8228,
+          "p25": 0.7029,
+          "p75": 0.9498,
+          "ci_low": 0.7828,
+          "ci_high": 0.8763,
+          "n": 112,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.9652,
+          "p25": 0.8762,
+          "p75": 0.9925,
+          "ci_low": 0.9432,
+          "ci_high": 0.978,
+          "n": 112,
+          "median_bids": 21.5
+        }
+      }
+    },
+    "bord|low|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 119,
+      "n_total": 185,
+      "median_bids": 7.0,
+      "low_bid_share": 0.2,
+      "tier_source": "brand",
+      "sell_percentile": 0.3584,
+      "p25": 0.5124,
+      "p75": 0.9641,
+      "ci_low": 0.2658,
+      "ci_high": 0.4292,
+      "n": 119,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 0,
+      "n_auctionet": 119,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4368,
+          "p25": 0.3903,
+          "p75": 0.7174,
+          "ci_low": 0.422,
+          "ci_high": 0.5534,
+          "n": 40,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7887,
+          "p25": 0.5683,
+          "p75": 0.952,
+          "ci_low": 0.6435,
+          "ci_high": 0.8735,
+          "n": 40,
+          "median_bids": 11.0
+        },
+        "hög": {
+          "sell_percentile": 0.9672,
+          "p25": 0.8364,
+          "p75": 0.9885,
+          "ci_low": 0.8979,
+          "ci_high": 0.9804,
+          "n": 39,
+          "median_bids": 21.0
+        }
+      }
+    },
+    "bord|mid|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 102,
+      "n_total": 158,
+      "median_bids": 7.5,
+      "low_bid_share": 0.2215,
+      "tier_source": "brand",
+      "sell_percentile": 0.4388,
+      "p25": 0.2872,
+      "p75": 0.7558,
+      "ci_low": 0.3347,
+      "ci_high": 0.5545,
+      "n": 101,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 1,
+      "n_auctionet": 101,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3052,
+          "p25": 0.1646,
+          "p75": 0.5465,
+          "ci_low": 0.243,
+          "ci_high": 0.4839,
+          "n": 41,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4274,
+          "p25": 0.289,
+          "p75": 0.7315,
+          "ci_low": 0.3315,
+          "ci_high": 0.7199,
+          "n": 29,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8036,
+          "p25": 0.6032,
+          "p75": 0.9056,
+          "ci_low": 0.6614,
+          "ci_high": 0.8861,
+          "n": 32,
+          "median_bids": 24.5
+        }
+      }
+    },
+    "bord|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 27,
+      "n_total": 32,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1562,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bord|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 21,
+      "n_total": 22,
+      "median_bids": 14.5,
+      "low_bid_share": 0.0455,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "byrå|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 241,
+      "n_total": 271,
+      "median_bids": 16.0,
+      "low_bid_share": 0.059,
+      "tier_source": "brand",
+      "sell_percentile": 0.7507,
+      "p25": 0.5447,
+      "p75": 0.9692,
+      "ci_low": 0.6355,
+      "ci_high": 0.8004,
+      "n": 241,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 241,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6071,
+          "p25": 0.2875,
+          "p75": 0.8598,
+          "ci_low": 0.4179,
+          "ci_high": 0.7075,
+          "n": 83,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8425,
+          "p25": 0.5815,
+          "p75": 0.9679,
+          "ci_low": 0.6744,
+          "ci_high": 0.9077,
+          "n": 77,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.9571,
+          "p25": 0.7791,
+          "p75": 0.9851,
+          "ci_low": 0.917,
+          "ci_high": 0.9744,
+          "n": 81,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "byrå|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 222,
+      "n_total": 249,
+      "median_bids": 17.0,
+      "low_bid_share": 0.0723,
+      "tier_source": "brand",
+      "sell_percentile": 0.8746,
+      "p25": 0.865,
+      "p75": 0.9871,
+      "ci_low": 0.8561,
+      "ci_high": 0.8824,
+      "n": 221,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 1,
+      "n_auctionet": 221,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.9335,
+          "p25": 0.7448,
+          "p75": 0.9752,
+          "ci_low": 0.8937,
+          "ci_high": 0.9636,
+          "n": 74,
+          "median_bids": 9.5
+        },
+        "mellan": {
+          "sell_percentile": 0.947,
+          "p25": 0.7702,
+          "p75": 0.9865,
+          "ci_low": 0.9028,
+          "ci_high": 0.9684,
+          "n": 79,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.9866,
+          "p25": 0.9664,
+          "p75": 0.9926,
+          "ci_low": 0.978,
+          "ci_high": 0.9886,
+          "n": 69,
+          "median_bids": 31.0
+        }
+      }
+    },
+    "byrå|high|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 53,
+      "n_total": 59,
+      "median_bids": 11.0,
+      "low_bid_share": 0.1017,
+      "tier_source": "brand",
+      "sell_percentile": 0.6448,
+      "p25": 0.5011,
+      "p75": 0.959,
+      "ci_low": 0.5412,
+      "ci_high": 0.8307,
+      "n": 53,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 53,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4812,
+          "p25": 0.3088,
+          "p75": 0.7031,
+          "ci_low": 0.3228,
+          "ci_high": 0.6912,
+          "n": 18,
+          "median_bids": 5.5
+        },
+        "mellan": {
+          "sell_percentile": 0.7994,
+          "p25": 0.6639,
+          "p75": 0.9738,
+          "ci_low": 0.717,
+          "ci_high": 0.9565,
+          "n": 20,
+          "median_bids": 12.5
+        },
+        "hög": {
+          "sell_percentile": 0.9502,
+          "p25": 0.7034,
+          "p75": 0.9763,
+          "ci_low": 0.6975,
+          "ci_high": 0.9634,
+          "n": 15,
+          "median_bids": 22.0
+        }
+      }
+    },
+    "byrå|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 3,
+      "median_bids": 19.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "byrå|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 310,
+      "n_total": 397,
+      "median_bids": 11.0,
+      "low_bid_share": 0.1511,
+      "tier_source": "brand",
+      "sell_percentile": 0.475,
+      "p25": 0.19,
+      "p75": 0.5849,
+      "ci_low": 0.3135,
+      "ci_high": 0.5814,
+      "n": 37,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 37,
+      "n_auctionet": 273,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7562,
+          "p25": 0.5285,
+          "p75": 0.9531,
+          "ci_low": 0.6156,
+          "ci_high": 0.8336,
+          "n": 117,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9167,
+          "p25": 0.7944,
+          "p75": 0.9823,
+          "ci_low": 0.8831,
+          "ci_high": 0.9532,
+          "n": 90,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9615,
+          "p25": 0.8276,
+          "p75": 0.9915,
+          "ci_low": 0.915,
+          "ci_high": 0.9756,
+          "n": 103,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "byrå|low|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 110,
+      "n_total": 135,
+      "median_bids": 12.0,
+      "low_bid_share": 0.1333,
+      "tier_source": "brand",
+      "sell_percentile": 0.4754,
+      "p25": 0.7685,
+      "p75": 0.9732,
+      "ci_low": 0.4464,
+      "ci_high": 0.513,
+      "n": 110,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 0,
+      "n_auctionet": 110,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7765,
+          "p25": 0.4076,
+          "p75": 0.9134,
+          "ci_low": 0.4899,
+          "ci_high": 0.8905,
+          "n": 37,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9155,
+          "p25": 0.8119,
+          "p75": 0.9753,
+          "ci_low": 0.8573,
+          "ci_high": 0.9537,
+          "n": 37,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9459,
+          "p25": 0.8717,
+          "p75": 0.9915,
+          "ci_low": 0.8909,
+          "ci_high": 0.9799,
+          "n": 36,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "byrå|mid|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 79,
+      "n_total": 90,
+      "median_bids": 14.5,
+      "low_bid_share": 0.0667,
+      "tier_source": "brand",
+      "sell_percentile": 0.3598,
+      "p25": 0.2487,
+      "p75": 0.6309,
+      "ci_low": 0.311,
+      "ci_high": 0.4104,
+      "n": 79,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 0,
+      "n_auctionet": 79,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2775,
+          "p25": 0.1792,
+          "p75": 0.453,
+          "ci_low": 0.2176,
+          "ci_high": 0.4123,
+          "n": 30,
+          "median_bids": 8.5
+        },
+        "mellan": {
+          "sell_percentile": 0.4785,
+          "p25": 0.3937,
+          "p75": 0.6327,
+          "ci_low": 0.4057,
+          "ci_high": 0.6262,
+          "n": 22,
+          "median_bids": 16.0
+        },
+        "hög": {
+          "sell_percentile": 0.552,
+          "p25": 0.3745,
+          "p75": 0.6797,
+          "ci_low": 0.431,
+          "ci_high": 0.664,
+          "n": 27,
+          "median_bids": 23.0
+        }
+      }
+    },
+    "byrå|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 40,
+      "n_total": 46,
+      "median_bids": 11.0,
+      "low_bid_share": 0.1304,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "byrå|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 3,
+      "median_bids": 8.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|high|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 5,
+      "median_bids": 23.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|high|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 4,
+      "n_total": 5,
+      "median_bids": 11.0,
+      "low_bid_share": 0.2,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 4,
+      "median_bids": 11.5,
+      "low_bid_share": 0.25,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|low|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 7,
+      "n_total": 12,
+      "median_bids": 3.5,
+      "low_bid_share": 0.4167,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 4,
+      "median_bids": 7.5,
+      "low_bid_share": 0.25,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 3,
+      "median_bids": 1.0,
+      "low_bid_share": 0.6667,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 0,
+      "n_total": 1,
+      "median_bids": 1.0,
+      "low_bid_share": 1.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fotpall|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 645,
+      "n_total": 702,
+      "median_bids": 17.0,
+      "low_bid_share": 0.0356,
+      "tier_source": "brand",
+      "sell_percentile": 0.4707,
+      "p25": 0.325,
+      "p75": 0.7972,
+      "ci_low": 0.4448,
+      "ci_high": 0.5135,
+      "n": 645,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 645,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4527,
+          "p25": 0.2558,
+          "p75": 0.6889,
+          "ci_low": 0.3921,
+          "ci_high": 0.5095,
+          "n": 229,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5951,
+          "p25": 0.3523,
+          "p75": 0.8028,
+          "ci_low": 0.537,
+          "ci_high": 0.675,
+          "n": 222,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.6774,
+          "p25": 0.4266,
+          "p75": 0.8652,
+          "ci_low": 0.6078,
+          "ci_high": 0.748,
+          "n": 194,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "fotpall|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 246,
+      "n_total": 289,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0761,
+      "tier_source": "brand",
+      "sell_percentile": 0.8359,
+      "p25": 0.8252,
+      "p75": 0.9633,
+      "ci_low": 0.8089,
+      "ci_high": 0.8504,
+      "n": 231,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 15,
+      "n_auctionet": 231,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8573,
+          "p25": 0.6673,
+          "p75": 0.9362,
+          "ci_low": 0.818,
+          "ci_high": 0.8951,
+          "n": 88,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9313,
+          "p25": 0.8213,
+          "p75": 0.9618,
+          "ci_low": 0.8996,
+          "ci_high": 0.9445,
+          "n": 84,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.9485,
+          "p25": 0.8684,
+          "p75": 0.9775,
+          "ci_low": 0.9348,
+          "ci_high": 0.9656,
+          "n": 74,
+          "median_bids": 29.5
+        }
+      }
+    },
+    "fotpall|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 237,
+      "n_total": 253,
+      "median_bids": 17.0,
+      "low_bid_share": 0.0237,
+      "tier_source": "brand",
+      "sell_percentile": 0.8125,
+      "p25": 0.7913,
+      "p75": 0.9527,
+      "ci_low": 0.7887,
+      "ci_high": 0.8317,
+      "n": 237,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 237,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8053,
+          "p25": 0.555,
+          "p75": 0.9335,
+          "ci_low": 0.7209,
+          "ci_high": 0.8608,
+          "n": 82,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9043,
+          "p25": 0.8183,
+          "p75": 0.9421,
+          "ci_low": 0.8732,
+          "ci_high": 0.924,
+          "n": 77,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.9376,
+          "p25": 0.8786,
+          "p75": 0.9782,
+          "ci_low": 0.9184,
+          "ci_high": 0.9563,
+          "n": 78,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "fotpall|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 3,
+      "median_bids": 12.0,
+      "low_bid_share": 0.3333,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fotpall|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 129,
+      "n_total": 235,
+      "median_bids": 5.0,
+      "low_bid_share": 0.3277,
+      "tier_source": "brand",
+      "sell_percentile": 0.252,
+      "p25": 0.4488,
+      "p75": 0.8716,
+      "ci_low": 0.1777,
+      "ci_high": 0.3376,
+      "n": 110,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 19,
+      "n_auctionet": 110,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5299,
+          "p25": 0.4168,
+          "p75": 0.6913,
+          "ci_low": 0.4639,
+          "ci_high": 0.5919,
+          "n": 48,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6577,
+          "p25": 0.4344,
+          "p75": 0.8221,
+          "ci_low": 0.4964,
+          "ci_high": 0.7201,
+          "n": 43,
+          "median_bids": 10.0
+        },
+        "hög": {
+          "sell_percentile": 0.884,
+          "p25": 0.6637,
+          "p75": 0.9656,
+          "ci_low": 0.7693,
+          "ci_high": 0.925,
+          "n": 38,
+          "median_bids": 21.0
+        }
+      }
+    },
+    "fotpall|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 18,
+      "n_total": 25,
+      "median_bids": 7.0,
+      "low_bid_share": 0.28,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fotpall|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 31,
+      "n_total": 35,
+      "median_bids": 13.0,
+      "low_bid_share": 0.1143,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fotpall|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 13,
+      "n_total": 14,
+      "median_bids": 7.0,
+      "low_bid_share": 0.0714,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fotpall|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 22,
+      "n_total": 25,
+      "median_bids": 8.0,
+      "low_bid_share": 0.12,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fåtölj|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 3068,
+      "n_total": 3449,
+      "median_bids": 15.0,
+      "low_bid_share": 0.0536,
+      "tier_source": "brand",
+      "sell_percentile": 0.3304,
+      "p25": 0.2214,
+      "p75": 0.6126,
+      "ci_low": 0.3088,
+      "ci_high": 0.3441,
+      "n": 3059,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 9,
+      "n_auctionet": 3059,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2983,
+          "p25": 0.1388,
+          "p75": 0.5,
+          "ci_low": 0.276,
+          "ci_high": 0.3142,
+          "n": 1136,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4359,
+          "p25": 0.2387,
+          "p75": 0.6203,
+          "ci_low": 0.3974,
+          "ci_high": 0.4594,
+          "n": 920,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.5169,
+          "p25": 0.3392,
+          "p75": 0.7152,
+          "ci_low": 0.5,
+          "ci_high": 0.5418,
+          "n": 1012,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "fåtölj|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 777,
+      "n_total": 920,
+      "median_bids": 13.0,
+      "low_bid_share": 0.0793,
+      "tier_source": "brand",
+      "sell_percentile": 0.7631,
+      "p25": 0.6734,
+      "p75": 0.962,
+      "ci_low": 0.7412,
+      "ci_high": 0.7737,
+      "n": 771,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 6,
+      "n_auctionet": 771,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7338,
+          "p25": 0.4863,
+          "p75": 0.8627,
+          "ci_low": 0.6812,
+          "ci_high": 0.7545,
+          "n": 287,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8653,
+          "p25": 0.7074,
+          "p75": 0.9623,
+          "ci_low": 0.8332,
+          "ci_high": 0.8969,
+          "n": 231,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9269,
+          "p25": 0.8337,
+          "p75": 0.979,
+          "ci_low": 0.9105,
+          "ci_high": 0.9453,
+          "n": 259,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "fåtölj|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 520,
+      "n_total": 597,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0687,
+      "tier_source": "brand",
+      "sell_percentile": 0.706,
+      "p25": 0.5706,
+      "p75": 0.926,
+      "ci_low": 0.691,
+      "ci_high": 0.7289,
+      "n": 520,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 520,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6546,
+          "p25": 0.4332,
+          "p75": 0.871,
+          "ci_low": 0.5954,
+          "ci_high": 0.7493,
+          "n": 193,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8091,
+          "p25": 0.6357,
+          "p75": 0.929,
+          "ci_low": 0.7773,
+          "ci_high": 0.8383,
+          "n": 169,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.8638,
+          "p25": 0.7288,
+          "p75": 0.9556,
+          "ci_low": 0.8265,
+          "ci_high": 0.889,
+          "n": 158,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "fåtölj|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 26,
+      "n_total": 32,
+      "median_bids": 10.0,
+      "low_bid_share": 0.1875,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fåtölj|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 570,
+      "n_total": 794,
+      "median_bids": 10.0,
+      "low_bid_share": 0.1814,
+      "tier_source": "brand",
+      "sell_percentile": 0.4197,
+      "p25": 0.6478,
+      "p75": 0.9519,
+      "ci_low": 0.3878,
+      "ci_high": 0.441,
+      "n": 560,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 10,
+      "n_auctionet": 560,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6639,
+          "p25": 0.4942,
+          "p75": 0.8132,
+          "ci_low": 0.615,
+          "ci_high": 0.702,
+          "n": 213,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8302,
+          "p25": 0.6679,
+          "p75": 0.9296,
+          "ci_low": 0.7824,
+          "ci_high": 0.8652,
+          "n": 167,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9535,
+          "p25": 0.8621,
+          "p75": 0.9873,
+          "ci_low": 0.9421,
+          "ci_high": 0.9636,
+          "n": 190,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "fåtölj|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 2,
+      "median_bids": 7.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fåtölj|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 31,
+      "n_total": 35,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1143,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fåtölj|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 49,
+      "n_total": 61,
+      "median_bids": 10.0,
+      "low_bid_share": 0.1967,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "fåtölj|mid|mellan": {
+      "bid_threshold": 4,
+      "n_qualified": 51,
+      "n_total": 55,
+      "median_bids": 15.0,
+      "low_bid_share": 0.0545,
+      "tier_source": "brand",
+      "sell_percentile": 0.3454,
+      "p25": 0.3113,
+      "p75": 0.5954,
+      "ci_low": 0.3038,
+      "ci_high": 0.4368,
+      "n": 51,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 0,
+      "n_auctionet": 51,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4045,
+          "p25": 0.3333,
+          "p75": 0.517,
+          "ci_low": 0.3394,
+          "ci_high": 0.4951,
+          "n": 18,
+          "median_bids": 7.5
+        },
+        "mellan": {
+          "sell_percentile": 0.4169,
+          "p25": 0.3118,
+          "p75": 0.5974,
+          "ci_low": 0.318,
+          "ci_high": 0.5954,
+          "n": 16,
+          "median_bids": 16.5
+        },
+        "hög": {
+          "sell_percentile": 0.5156,
+          "p25": 0.2913,
+          "p75": 0.6724,
+          "ci_low": 0.2913,
+          "ci_high": 0.6724,
+          "n": 17,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "hylla|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 463,
+      "n_total": 533,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0675,
+      "tier_source": "brand",
+      "sell_percentile": 0.5406,
+      "p25": 0.4007,
+      "p75": 0.835,
+      "ci_low": 0.5258,
+      "ci_high": 0.5853,
+      "n": 463,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 463,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4861,
+          "p25": 0.3179,
+          "p75": 0.7812,
+          "ci_low": 0.4375,
+          "ci_high": 0.5711,
+          "n": 159,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.625,
+          "p25": 0.4657,
+          "p75": 0.7717,
+          "ci_low": 0.5769,
+          "ci_high": 0.681,
+          "n": 166,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.7647,
+          "p25": 0.5208,
+          "p75": 0.9344,
+          "ci_low": 0.7159,
+          "ci_high": 0.835,
+          "n": 138,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "hylla|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 244,
+      "n_total": 282,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0674,
+      "tier_source": "brand",
+      "sell_percentile": 0.8218,
+      "p25": 0.8414,
+      "p75": 0.9556,
+      "ci_low": 0.8018,
+      "ci_high": 0.8321,
+      "n": 238,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 6,
+      "n_auctionet": 238,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8661,
+          "p25": 0.7458,
+          "p75": 0.9244,
+          "ci_low": 0.8283,
+          "ci_high": 0.8881,
+          "n": 82,
+          "median_bids": 9.5
+        },
+        "mellan": {
+          "sell_percentile": 0.8881,
+          "p25": 0.8413,
+          "p75": 0.9404,
+          "ci_low": 0.8579,
+          "ci_high": 0.9148,
+          "n": 80,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9439,
+          "p25": 0.9089,
+          "p75": 0.9818,
+          "ci_low": 0.9308,
+          "ci_high": 0.9512,
+          "n": 82,
+          "median_bids": 24.5
+        }
+      }
+    },
+    "hylla|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 229,
+      "n_total": 259,
+      "median_bids": 16.0,
+      "low_bid_share": 0.0463,
+      "tier_source": "brand",
+      "sell_percentile": 0.8203,
+      "p25": 0.8165,
+      "p75": 0.9728,
+      "ci_low": 0.7919,
+      "ci_high": 0.8352,
+      "n": 229,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 229,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.834,
+          "p25": 0.7197,
+          "p75": 0.9081,
+          "ci_low": 0.8165,
+          "ci_high": 0.8722,
+          "n": 81,
+          "median_bids": 10.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9143,
+          "p25": 0.8179,
+          "p75": 0.9605,
+          "ci_low": 0.8795,
+          "ci_high": 0.9355,
+          "n": 77,
+          "median_bids": 18.0
+        },
+        "hög": {
+          "sell_percentile": 0.9786,
+          "p25": 0.9213,
+          "p75": 0.9878,
+          "ci_low": 0.9602,
+          "ci_high": 0.9822,
+          "n": 71,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "hylla|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 6,
+      "n_total": 9,
+      "median_bids": 16.0,
+      "low_bid_share": 0.3333,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hylla|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 362,
+      "n_total": 560,
+      "median_bids": 9.0,
+      "low_bid_share": 0.25,
+      "tier_source": "brand",
+      "sell_percentile": 0.3853,
+      "p25": 0.2616,
+      "p75": 0.6923,
+      "ci_low": 0.3253,
+      "ci_high": 0.5985,
+      "n": 37,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 37,
+      "n_auctionet": 325,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7751,
+          "p25": 0.6002,
+          "p75": 0.9155,
+          "ci_low": 0.7119,
+          "ci_high": 0.8239,
+          "n": 126,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9241,
+          "p25": 0.7925,
+          "p75": 0.9642,
+          "ci_low": 0.9061,
+          "ci_high": 0.94,
+          "n": 117,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9442,
+          "p25": 0.8703,
+          "p75": 0.9824,
+          "ci_low": 0.9313,
+          "ci_high": 0.9575,
+          "n": 119,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "hylla|low|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 103,
+      "n_total": 136,
+      "median_bids": 12.0,
+      "low_bid_share": 0.1691,
+      "tier_source": "brand",
+      "sell_percentile": 0.4684,
+      "p25": 0.7859,
+      "p75": 0.9589,
+      "ci_low": 0.4388,
+      "ci_high": 0.504,
+      "n": 103,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 0,
+      "n_auctionet": 103,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8437,
+          "p25": 0.5845,
+          "p75": 0.9364,
+          "ci_low": 0.7877,
+          "ci_high": 0.9206,
+          "n": 34,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8723,
+          "p25": 0.7732,
+          "p75": 0.9391,
+          "ci_low": 0.8072,
+          "ci_high": 0.902,
+          "n": 35,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.9412,
+          "p25": 0.8331,
+          "p75": 0.9811,
+          "ci_low": 0.8745,
+          "ci_high": 0.9795,
+          "n": 34,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "hylla|mid|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 382,
+      "n_total": 514,
+      "median_bids": 10.0,
+      "low_bid_share": 0.1634,
+      "tier_source": "brand",
+      "sell_percentile": 0.4458,
+      "p25": 0.2907,
+      "p75": 0.7889,
+      "ci_low": 0.3843,
+      "ci_high": 0.5004,
+      "n": 366,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 16,
+      "n_auctionet": 366,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2802,
+          "p25": 0.2213,
+          "p75": 0.4923,
+          "ci_low": 0.2582,
+          "ci_high": 0.3013,
+          "n": 142,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.541,
+          "p25": 0.3734,
+          "p75": 0.8548,
+          "ci_low": 0.4685,
+          "ci_high": 0.6697,
+          "n": 120,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.6968,
+          "p25": 0.5046,
+          "p75": 0.8553,
+          "ci_low": 0.6613,
+          "ci_high": 0.7437,
+          "n": 120,
+          "median_bids": 22.0
+        }
+      }
+    },
+    "hylla|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 25,
+      "n_total": 30,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1667,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hylla|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 14,
+      "n_total": 15,
+      "median_bids": 17.0,
+      "low_bid_share": 0.0667,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|high|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 6,
+      "median_bids": 13.0,
+      "low_bid_share": 0.1667,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|high|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 3,
+      "median_bids": 10.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|high|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 3,
+      "n_total": 3,
+      "median_bids": 5.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 0,
+      "n_total": 8,
+      "median_bids": 1.0,
+      "low_bid_share": 1.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|low|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 13,
+      "n_total": 16,
+      "median_bids": 7.0,
+      "low_bid_share": 0.1875,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 1,
+      "median_bids": 16.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 9,
+      "n_total": 12,
+      "median_bids": 13.0,
+      "low_bid_share": 0.25,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 2,
+      "median_bids": 5.5,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 2,
+      "median_bids": 10.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "matgrupp|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 441,
+      "n_total": 479,
+      "median_bids": 16.0,
+      "low_bid_share": 0.0271,
+      "tier_source": "brand",
+      "sell_percentile": 0.5525,
+      "p25": 0.3853,
+      "p75": 0.7931,
+      "ci_low": 0.5174,
+      "ci_high": 0.5923,
+      "n": 441,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 441,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5172,
+          "p25": 0.2752,
+          "p75": 0.7189,
+          "ci_low": 0.4886,
+          "ci_high": 0.5733,
+          "n": 167,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6841,
+          "p25": 0.3864,
+          "p75": 0.7931,
+          "ci_low": 0.5946,
+          "ci_high": 0.7216,
+          "n": 133,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.7586,
+          "p25": 0.5676,
+          "p75": 0.9353,
+          "ci_low": 0.7317,
+          "ci_high": 0.799,
+          "n": 141,
+          "median_bids": 30.0
+        }
+      }
+    },
+    "matgrupp|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 234,
+      "n_total": 253,
+      "median_bids": 17.0,
+      "low_bid_share": 0.0356,
+      "tier_source": "brand",
+      "sell_percentile": 0.8157,
+      "p25": 0.752,
+      "p75": 0.9771,
+      "ci_low": 0.785,
+      "ci_high": 0.8443,
+      "n": 233,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 1,
+      "n_auctionet": 233,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7825,
+          "p25": 0.6041,
+          "p75": 0.9456,
+          "ci_low": 0.7364,
+          "ci_high": 0.8464,
+          "n": 81,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9219,
+          "p25": 0.8066,
+          "p75": 0.977,
+          "ci_low": 0.8791,
+          "ci_high": 0.9458,
+          "n": 75,
+          "median_bids": 19.0
+        },
+        "hög": {
+          "sell_percentile": 0.9683,
+          "p25": 0.8407,
+          "p75": 0.9922,
+          "ci_low": 0.9325,
+          "ci_high": 0.9788,
+          "n": 78,
+          "median_bids": 29.0
+        }
+      }
+    },
+    "matgrupp|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 183,
+      "n_total": 199,
+      "median_bids": 16.0,
+      "low_bid_share": 0.0302,
+      "tier_source": "brand",
+      "sell_percentile": 0.8074,
+      "p25": 0.7953,
+      "p75": 0.9563,
+      "ci_low": 0.7854,
+      "ci_high": 0.8287,
+      "n": 183,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 183,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.8567,
+          "p25": 0.6659,
+          "p75": 0.9276,
+          "ci_low": 0.7855,
+          "ci_high": 0.8919,
+          "n": 62,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.9057,
+          "p25": 0.8378,
+          "p75": 0.9519,
+          "ci_low": 0.8772,
+          "ci_high": 0.9351,
+          "n": 61,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.9216,
+          "p25": 0.826,
+          "p75": 0.9797,
+          "ci_low": 0.8833,
+          "ci_high": 0.9458,
+          "n": 60,
+          "median_bids": 31.0
+        }
+      }
+    },
+    "matgrupp|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 4,
+      "median_bids": 1.0,
+      "low_bid_share": 0.75,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "matgrupp|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 132,
+      "n_total": 186,
+      "median_bids": 12.0,
+      "low_bid_share": 0.1613,
+      "tier_source": "brand",
+      "sell_percentile": 0.4246,
+      "p25": 0.6204,
+      "p75": 0.9413,
+      "ci_low": 0.3658,
+      "ci_high": 0.4767,
+      "n": 129,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 3,
+      "n_auctionet": 129,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7044,
+          "p25": 0.5434,
+          "p75": 0.8016,
+          "ci_low": 0.6204,
+          "ci_high": 0.7617,
+          "n": 44,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.8721,
+          "p25": 0.5992,
+          "p75": 0.9365,
+          "ci_low": 0.6723,
+          "ci_high": 0.9201,
+          "n": 53,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.9499,
+          "p25": 0.8493,
+          "p75": 0.979,
+          "ci_low": 0.908,
+          "ci_high": 0.9745,
+          "n": 35,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "matgrupp|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 22,
+      "n_total": 28,
+      "median_bids": 11.5,
+      "low_bid_share": 0.2143,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "matgrupp|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 53,
+      "n_total": 60,
+      "median_bids": 11.5,
+      "low_bid_share": 0.1167,
+      "tier_source": "brand",
+      "sell_percentile": 0.3287,
+      "p25": 0.2326,
+      "p75": 0.5749,
+      "ci_low": 0.2329,
+      "ci_high": 0.4445,
+      "n": 53,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 0,
+      "n_auctionet": 53,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3117,
+          "p25": 0.2088,
+          "p75": 0.4505,
+          "ci_low": 0.2259,
+          "ci_high": 0.3778,
+          "n": 19,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4038,
+          "p25": 0.2831,
+          "p75": 0.5016,
+          "ci_low": 0.2877,
+          "ci_high": 0.4901,
+          "n": 16,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.5357,
+          "p25": 0.4511,
+          "p75": 0.7237,
+          "ci_low": 0.4604,
+          "ci_high": 0.719,
+          "n": 18,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "matgrupp|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 20,
+      "n_total": 21,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0476,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "matgrupp|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 13,
+      "n_total": 14,
+      "median_bids": 10.5,
+      "low_bid_share": 0.0714,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "soffa|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 530,
+      "n_total": 658,
+      "median_bids": 13.0,
+      "low_bid_share": 0.1079,
+      "tier_source": "brand",
+      "sell_percentile": 0.4278,
+      "p25": 0.3258,
+      "p75": 0.7773,
+      "ci_low": 0.4014,
+      "ci_high": 0.4702,
+      "n": 530,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 530,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3858,
+          "p25": 0.21,
+          "p75": 0.6244,
+          "ci_low": 0.3421,
+          "ci_high": 0.4324,
+          "n": 185,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5,
+          "p25": 0.2859,
+          "p75": 0.7432,
+          "ci_low": 0.4521,
+          "ci_high": 0.5596,
+          "n": 168,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.74,
+          "p25": 0.498,
+          "p75": 0.8773,
+          "ci_low": 0.6524,
+          "ci_high": 0.7703,
+          "n": 177,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "soffa|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 328,
+      "n_total": 412,
+      "median_bids": 11.0,
+      "low_bid_share": 0.1092,
+      "tier_source": "brand",
+      "sell_percentile": 0.6357,
+      "p25": 0.4956,
+      "p75": 0.9318,
+      "ci_low": 0.607,
+      "ci_high": 0.6881,
+      "n": 322,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 6,
+      "n_auctionet": 322,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6138,
+          "p25": 0.3147,
+          "p75": 0.8805,
+          "ci_low": 0.5358,
+          "ci_high": 0.6989,
+          "n": 128,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7063,
+          "p25": 0.547,
+          "p75": 0.9091,
+          "ci_low": 0.6545,
+          "ci_high": 0.7887,
+          "n": 96,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.8657,
+          "p25": 0.6548,
+          "p75": 0.9674,
+          "ci_low": 0.7675,
+          "ci_high": 0.9289,
+          "n": 104,
+          "median_bids": 26.5
+        }
+      }
+    },
+    "soffa|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 437,
+      "n_total": 502,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0717,
+      "tier_source": "brand",
+      "sell_percentile": 0.6013,
+      "p25": 0.3889,
+      "p75": 0.9154,
+      "ci_low": 0.5617,
+      "ci_high": 0.6747,
+      "n": 437,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 437,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4279,
+          "p25": 0.2292,
+          "p75": 0.8536,
+          "ci_low": 0.3627,
+          "ci_high": 0.5392,
+          "n": 154,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6784,
+          "p25": 0.472,
+          "p75": 0.9033,
+          "ci_low": 0.6417,
+          "ci_high": 0.766,
+          "n": 143,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.8507,
+          "p25": 0.643,
+          "p75": 0.9472,
+          "ci_low": 0.8068,
+          "ci_high": 0.8957,
+          "n": 140,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "soffa|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 18,
+      "n_total": 29,
+      "median_bids": 8.0,
+      "low_bid_share": 0.3793,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "soffa|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 115,
+      "n_total": 163,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1534,
+      "tier_source": "brand",
+      "sell_percentile": 0.3621,
+      "p25": 0.4484,
+      "p75": 0.9339,
+      "ci_low": 0.2363,
+      "ci_high": 0.4248,
+      "n": 111,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 4,
+      "n_auctionet": 111,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4701,
+          "p25": 0.1862,
+          "p75": 0.7752,
+          "ci_low": 0.236,
+          "ci_high": 0.6907,
+          "n": 39,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7299,
+          "p25": 0.4716,
+          "p75": 0.8911,
+          "ci_low": 0.5628,
+          "ci_high": 0.8181,
+          "n": 38,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.9435,
+          "p25": 0.7538,
+          "p75": 0.9852,
+          "ci_low": 0.8866,
+          "ci_high": 0.97,
+          "n": 38,
+          "median_bids": 23.5
+        }
+      }
+    },
+    "soffa|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 1,
+      "median_bids": 12.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "soffa|mid|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 87,
+      "n_total": 110,
+      "median_bids": 13.5,
+      "low_bid_share": 0.1636,
+      "tier_source": "brand",
+      "sell_percentile": 0.3487,
+      "p25": 0.197,
+      "p75": 0.6402,
+      "ci_low": 0.2107,
+      "ci_high": 0.3939,
+      "n": 81,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 6,
+      "n_auctionet": 81,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.241,
+          "p25": 0.1267,
+          "p75": 0.5,
+          "ci_low": 0.1567,
+          "ci_high": 0.4371,
+          "n": 29,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4345,
+          "p25": 0.2368,
+          "p75": 0.4929,
+          "ci_low": 0.2873,
+          "ci_high": 0.4713,
+          "n": 29,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.5865,
+          "p25": 0.3306,
+          "p75": 0.7263,
+          "ci_low": 0.4275,
+          "ci_high": 0.6842,
+          "n": 29,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "soffa|mid|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 715,
+      "n_total": 1095,
+      "median_bids": 8.0,
+      "low_bid_share": 0.2384,
+      "tier_source": "brand",
+      "sell_percentile": 0.1983,
+      "p25": 0.0578,
+      "p75": 0.2665,
+      "ci_low": 0.0901,
+      "ci_high": 0.2306,
+      "n": 42,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 42,
+      "n_auctionet": 673,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.1941,
+          "p25": 0.0955,
+          "p75": 0.4151,
+          "ci_low": 0.1545,
+          "ci_high": 0.2391,
+          "n": 251,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3786,
+          "p25": 0.218,
+          "p75": 0.6456,
+          "ci_low": 0.3382,
+          "ci_high": 0.4396,
+          "n": 238,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.6125,
+          "p25": 0.3567,
+          "p75": 0.8203,
+          "ci_low": 0.5489,
+          "ci_high": 0.6558,
+          "n": 226,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "soffa|mid|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 401,
+      "n_total": 624,
+      "median_bids": 8.0,
+      "low_bid_share": 0.2244,
+      "tier_source": "brand",
+      "sell_percentile": 0.2572,
+      "p25": 0.1676,
+      "p75": 0.5809,
+      "ci_low": 0.2392,
+      "ci_high": 0.3103,
+      "n": 400,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 1,
+      "n_auctionet": 400,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2093,
+          "p25": 0.1081,
+          "p75": 0.3891,
+          "ci_low": 0.1556,
+          "ci_high": 0.248,
+          "n": 147,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3232,
+          "p25": 0.1805,
+          "p75": 0.5597,
+          "ci_low": 0.2618,
+          "ci_high": 0.3615,
+          "n": 134,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.5649,
+          "p25": 0.387,
+          "p75": 0.7247,
+          "ci_low": 0.5032,
+          "ci_high": 0.6,
+          "n": 120,
+          "median_bids": 26.5
+        }
+      }
+    },
+    "spegel|high|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 8,
+      "n_total": 10,
+      "median_bids": 9.5,
+      "low_bid_share": 0.2,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|high|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 5,
+      "median_bids": 20.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|high|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 2,
+      "median_bids": 27.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 1,
+      "median_bids": 3.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|low|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 10,
+      "n_total": 22,
+      "median_bids": 1.5,
+      "low_bid_share": 0.5455,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 0,
+      "n_total": 1,
+      "median_bids": 1.0,
+      "low_bid_share": 1.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 1,
+      "n_total": 1,
+      "median_bids": 30.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "spegel|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 5,
+      "median_bids": 29.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "stol|high|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 1802,
+      "n_total": 2032,
+      "median_bids": 15.0,
+      "low_bid_share": 0.0522,
+      "tier_source": "brand",
+      "sell_percentile": 0.4143,
+      "p25": 0.2969,
+      "p75": 0.7653,
+      "ci_low": 0.3933,
+      "ci_high": 0.438,
+      "n": 1798,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 4,
+      "n_auctionet": 1798,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3808,
+          "p25": 0.1988,
+          "p75": 0.6585,
+          "ci_low": 0.3446,
+          "ci_high": 0.3982,
+          "n": 604,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5107,
+          "p25": 0.327,
+          "p75": 0.7581,
+          "ci_low": 0.4745,
+          "ci_high": 0.5435,
+          "n": 664,
+          "median_bids": 17.0
+        },
+        "hög": {
+          "sell_percentile": 0.6362,
+          "p25": 0.4108,
+          "p75": 0.8471,
+          "ci_low": 0.6038,
+          "ci_high": 0.68,
+          "n": 534,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "stol|high|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 649,
+      "n_total": 763,
+      "median_bids": 14.0,
+      "low_bid_share": 0.0931,
+      "tier_source": "brand",
+      "sell_percentile": 0.7404,
+      "p25": 0.6737,
+      "p75": 0.9236,
+      "ci_low": 0.7309,
+      "ci_high": 0.7695,
+      "n": 647,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 2,
+      "n_auctionet": 647,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.7505,
+          "p25": 0.5632,
+          "p75": 0.8902,
+          "ci_low": 0.7143,
+          "ci_high": 0.7854,
+          "n": 224,
+          "median_bids": 9.0
+        },
+        "mellan": {
+          "sell_percentile": 0.82,
+          "p25": 0.6821,
+          "p75": 0.904,
+          "ci_low": 0.7841,
+          "ci_high": 0.83,
+          "n": 212,
+          "median_bids": 16.0
+        },
+        "hög": {
+          "sell_percentile": 0.8942,
+          "p25": 0.8149,
+          "p75": 0.9512,
+          "ci_low": 0.8801,
+          "ci_high": 0.9064,
+          "n": 213,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "stol|high|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 164,
+      "n_total": 233,
+      "median_bids": 8.0,
+      "low_bid_share": 0.1631,
+      "tier_source": "brand",
+      "sell_percentile": 0.6151,
+      "p25": 0.5012,
+      "p75": 0.8639,
+      "ci_low": 0.5636,
+      "ci_high": 0.6586,
+      "n": 164,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0918,
+      "n_tradera": 0,
+      "n_auctionet": 164,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6093,
+          "p25": 0.3214,
+          "p75": 0.7818,
+          "ci_low": 0.5125,
+          "ci_high": 0.7028,
+          "n": 60,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7,
+          "p25": 0.5461,
+          "p75": 0.7999,
+          "ci_low": 0.6248,
+          "ci_high": 0.7217,
+          "n": 49,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8522,
+          "p25": 0.6675,
+          "p75": 0.9375,
+          "ci_low": 0.7598,
+          "ci_high": 0.9067,
+          "n": 55,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "stol|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 5,
+      "median_bids": 42.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "stol|low|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 249,
+      "n_total": 441,
+      "median_bids": 6.0,
+      "low_bid_share": 0.2993,
+      "tier_source": "brand",
+      "sell_percentile": 0.2919,
+      "p25": 0.4567,
+      "p75": 0.8798,
+      "ci_low": 0.259,
+      "ci_high": 0.35,
+      "n": 236,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 13,
+      "n_auctionet": 236,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4849,
+          "p25": 0.288,
+          "p75": 0.7257,
+          "ci_low": 0.417,
+          "ci_high": 0.6611,
+          "n": 88,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7118,
+          "p25": 0.3916,
+          "p75": 0.8903,
+          "ci_low": 0.5556,
+          "ci_high": 0.8025,
+          "n": 82,
+          "median_bids": 12.5
+        },
+        "hög": {
+          "sell_percentile": 0.8179,
+          "p25": 0.6591,
+          "p75": 0.9452,
+          "ci_low": 0.7773,
+          "ci_high": 0.8785,
+          "n": 79,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "stol|low|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 97,
+      "n_total": 160,
+      "median_bids": 6.0,
+      "low_bid_share": 0.2375,
+      "tier_source": "brand",
+      "sell_percentile": 0.2281,
+      "p25": 0.2904,
+      "p75": 0.8803,
+      "ci_low": 0.0798,
+      "ci_high": 0.3521,
+      "n": 97,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4211,
+      "n_tradera": 0,
+      "n_auctionet": 97,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2904,
+          "p25": 0.1419,
+          "p75": 0.7732,
+          "ci_low": 0.1932,
+          "ci_high": 0.5061,
+          "n": 37,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5336,
+          "p25": 0.2904,
+          "p75": 0.7617,
+          "ci_low": 0.3308,
+          "ci_high": 0.6989,
+          "n": 30,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.8869,
+          "p25": 0.7334,
+          "p75": 0.9491,
+          "ci_low": 0.8219,
+          "ci_high": 0.9121,
+          "n": 30,
+          "median_bids": 20.0
+        }
+      }
+    },
+    "stol|mid|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 108,
+      "n_total": 171,
+      "median_bids": 8.0,
+      "low_bid_share": 0.193,
+      "tier_source": "brand",
+      "sell_percentile": 0.2404,
+      "p25": 0.1849,
+      "p75": 0.5136,
+      "ci_low": 0.1991,
+      "ci_high": 0.3058,
+      "n": 107,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.0788,
+      "n_tradera": 1,
+      "n_auctionet": 107,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2655,
+          "p25": 0.1844,
+          "p75": 0.4239,
+          "ci_low": 0.2125,
+          "ci_high": 0.3538,
+          "n": 37,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3433,
+          "p25": 0.1436,
+          "p75": 0.4686,
+          "ci_low": 0.23,
+          "ci_high": 0.4312,
+          "n": 38,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.4359,
+          "p25": 0.2677,
+          "p75": 0.5791,
+          "ci_low": 0.3183,
+          "ci_high": 0.5405,
+          "n": 33,
+          "median_bids": 22.0
+        }
+      }
+    },
+    "stol|mid|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 19,
+      "n_total": 31,
+      "median_bids": 4.0,
+      "low_bid_share": 0.3871,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "stol|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 2,
+      "median_bids": 7.0,
+      "low_bid_share": 0.0,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|high|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 39,
+      "n_total": 43,
+      "median_bids": 11.0,
+      "low_bid_share": 0.093,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|high|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 18,
+      "n_total": 25,
+      "median_bids": 10.0,
+      "low_bid_share": 0.28,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|high|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 26,
+      "n_total": 36,
+      "median_bids": 12.0,
+      "low_bid_share": 0.2778,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|low|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 15,
+      "n_total": 21,
+      "median_bids": 16.0,
+      "low_bid_share": 0.2857,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|low|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 13,
+      "n_total": 26,
+      "median_bids": 2.5,
+      "low_bid_share": 0.5,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|low|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 6,
+      "n_total": 7,
+      "median_bids": 17.0,
+      "low_bid_share": 0.1429,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|mid|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 5,
+      "n_total": 6,
+      "median_bids": 18.5,
+      "low_bid_share": 0.1667,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    },
+    "säng|mid|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 2,
+      "n_total": 3,
+      "median_bids": 9.0,
+      "low_bid_share": 0.3333,
+      "tier_source": "brand",
+      "status": "insufficient_data"
+    }
+  },
+  "track_b_unbranded": {
+    "bord|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 3258,
+      "n_total": 5925,
+      "median_bids": 5.0,
+      "low_bid_share": 0.321,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3725,
+      "p25": 0.3921,
+      "p75": 0.7798,
+      "ci_low": 0.3483,
+      "ci_high": 0.3915,
+      "n": 3258,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 3258,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3656,
+          "p25": 0.2635,
+          "p75": 0.5905,
+          "ci_low": 0.3483,
+          "ci_high": 0.3921,
+          "n": 1215,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5383,
+          "p25": 0.4183,
+          "p75": 0.7336,
+          "ci_low": 0.5186,
+          "ci_high": 0.5585,
+          "n": 994,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.776,
+          "p25": 0.6406,
+          "p75": 0.8847,
+          "ci_low": 0.7679,
+          "ci_high": 0.7986,
+          "n": 1049,
+          "median_bids": 23.0
+        }
+      }
+    },
+    "bord|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 3007,
+      "n_total": 5375,
+      "median_bids": 6.0,
+      "low_bid_share": 0.3176,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.2714,
+      "p25": 0.1426,
+      "p75": 0.4918,
+      "ci_low": 0.2503,
+      "ci_high": 0.3249,
+      "n": 416,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 416,
+      "n_auctionet": 2591,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4962,
+          "p25": 0.398,
+          "p75": 0.6952,
+          "ci_low": 0.4962,
+          "ci_high": 0.515,
+          "n": 1028,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.709,
+          "p25": 0.566,
+          "p75": 0.8369,
+          "ci_low": 0.6952,
+          "ci_high": 0.7187,
+          "n": 1016,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8422,
+          "p25": 0.7259,
+          "p75": 0.9391,
+          "ci_low": 0.8362,
+          "ci_high": 0.8654,
+          "n": 963,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "bord|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 4164,
+      "n_total": 7189,
+      "median_bids": 6.0,
+      "low_bid_share": 0.2906,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3584,
+      "p25": 0.4789,
+      "p75": 0.8457,
+      "ci_low": 0.3442,
+      "ci_high": 0.3655,
+      "n": 4164,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 4164,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4617,
+          "p25": 0.3645,
+          "p75": 0.672,
+          "ci_low": 0.4485,
+          "ci_high": 0.473,
+          "n": 1533,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6672,
+          "p25": 0.5315,
+          "p75": 0.815,
+          "ci_low": 0.65,
+          "ci_high": 0.6806,
+          "n": 1297,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8361,
+          "p25": 0.7397,
+          "p75": 0.9197,
+          "ci_low": 0.828,
+          "ci_high": 0.8493,
+          "n": 1334,
+          "median_bids": 23.0
+        }
+      }
+    },
+    "byrå|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 3001,
+      "n_total": 4617,
+      "median_bids": 8.0,
+      "low_bid_share": 0.2283,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3951,
+      "p25": 0.3632,
+      "p75": 0.8354,
+      "ci_low": 0.3636,
+      "ci_high": 0.4023,
+      "n": 3001,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 3001,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3474,
+          "p25": 0.2235,
+          "p75": 0.6131,
+          "ci_low": 0.3306,
+          "ci_high": 0.3676,
+          "n": 1129,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5815,
+          "p25": 0.4331,
+          "p75": 0.7946,
+          "ci_low": 0.5554,
+          "ci_high": 0.6131,
+          "n": 962,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8224,
+          "p25": 0.6686,
+          "p75": 0.9178,
+          "ci_low": 0.7946,
+          "ci_high": 0.8354,
+          "n": 910,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "byrå|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 3674,
+      "n_total": 5326,
+      "median_bids": 9.0,
+      "low_bid_share": 0.2009,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4119,
+      "p25": 0.1939,
+      "p75": 0.6315,
+      "ci_low": 0.297,
+      "ci_high": 0.4557,
+      "n": 161,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 161,
+      "n_auctionet": 3513,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5151,
+          "p25": 0.4089,
+          "p75": 0.7466,
+          "ci_low": 0.4886,
+          "ci_high": 0.5363,
+          "n": 1301,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7361,
+          "p25": 0.59,
+          "p75": 0.8852,
+          "ci_low": 0.7067,
+          "ci_high": 0.7461,
+          "n": 1209,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8855,
+          "p25": 0.764,
+          "p75": 0.9547,
+          "ci_low": 0.877,
+          "ci_high": 0.9002,
+          "n": 1164,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "byrå|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 2530,
+      "n_total": 3676,
+      "median_bids": 9.0,
+      "low_bid_share": 0.2084,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.378,
+      "p25": 0.4931,
+      "p75": 0.8872,
+      "ci_low": 0.3679,
+      "ci_high": 0.389,
+      "n": 2530,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 2530,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4728,
+          "p25": 0.3536,
+          "p75": 0.6991,
+          "ci_low": 0.4428,
+          "ci_high": 0.4978,
+          "n": 907,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7048,
+          "p25": 0.5531,
+          "p75": 0.8807,
+          "ci_low": 0.6633,
+          "ci_high": 0.7204,
+          "n": 815,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8564,
+          "p25": 0.7376,
+          "p75": 0.9423,
+          "ci_low": 0.846,
+          "ci_high": 0.8842,
+          "n": 808,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "bäddsoffa|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 12,
+      "n_total": 16,
+      "median_bids": 7.5,
+      "low_bid_share": 0.25,
+      "tier_source": "unbranded",
+      "status": "insufficient_data"
+    },
+    "bäddsoffa|mellan": {
+      "bid_threshold": 3,
+      "n_qualified": 43,
+      "n_total": 74,
+      "median_bids": 3.5,
+      "low_bid_share": 0.4189,
+      "tier_source": "unbranded",
+      "status": "insufficient_data"
+    },
+    "fotpall|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 541,
+      "n_total": 1088,
+      "median_bids": 4.0,
+      "low_bid_share": 0.3594,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3771,
+      "p25": 0.3874,
+      "p75": 0.7972,
+      "ci_low": 0.3341,
+      "ci_high": 0.4086,
+      "n": 541,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 541,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3296,
+          "p25": 0.2644,
+          "p75": 0.5521,
+          "ci_low": 0.3228,
+          "ci_high": 0.3874,
+          "n": 192,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5762,
+          "p25": 0.4513,
+          "p75": 0.7572,
+          "ci_low": 0.5521,
+          "ci_high": 0.6111,
+          "n": 178,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.796,
+          "p25": 0.6811,
+          "p75": 0.892,
+          "ci_low": 0.7608,
+          "ci_high": 0.8284,
+          "n": 171,
+          "median_bids": 23.0
+        }
+      }
+    },
+    "fotpall|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 464,
+      "n_total": 912,
+      "median_bids": 5.0,
+      "low_bid_share": 0.3695,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4673,
+      "p25": 0.1755,
+      "p75": 0.6471,
+      "ci_low": 0.3504,
+      "ci_high": 0.5803,
+      "n": 70,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 70,
+      "n_auctionet": 394,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5042,
+          "p25": 0.3752,
+          "p75": 0.6503,
+          "ci_low": 0.4835,
+          "ci_high": 0.5076,
+          "n": 173,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6433,
+          "p25": 0.5367,
+          "p75": 0.7935,
+          "ci_low": 0.5959,
+          "ci_high": 0.6775,
+          "n": 144,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.7947,
+          "p25": 0.6755,
+          "p75": 0.8962,
+          "ci_low": 0.7529,
+          "ci_high": 0.8289,
+          "n": 147,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "fotpall|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 999,
+      "n_total": 1738,
+      "median_bids": 6.0,
+      "low_bid_share": 0.298,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3764,
+      "p25": 0.5087,
+      "p75": 0.8485,
+      "ci_low": 0.3413,
+      "ci_high": 0.402,
+      "n": 999,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 999,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.475,
+          "p25": 0.39,
+          "p75": 0.6666,
+          "ci_low": 0.4621,
+          "ci_high": 0.4878,
+          "n": 352,
+          "median_bids": 6.5
+        },
+        "mellan": {
+          "sell_percentile": 0.6705,
+          "p25": 0.5572,
+          "p75": 0.8207,
+          "ci_low": 0.6427,
+          "ci_high": 0.7094,
+          "n": 330,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8444,
+          "p25": 0.7478,
+          "p75": 0.9043,
+          "ci_low": 0.8261,
+          "ci_high": 0.861,
+          "n": 317,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "fåtölj|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 2394,
+      "n_total": 3830,
+      "median_bids": 7.0,
+      "low_bid_share": 0.2585,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3382,
+      "p25": 0.1203,
+      "p75": 0.5836,
+      "ci_low": 0.1875,
+      "ci_high": 0.3835,
+      "n": 77,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 77,
+      "n_auctionet": 2317,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4047,
+          "p25": 0.2532,
+          "p75": 0.639,
+          "ci_low": 0.3835,
+          "ci_high": 0.4277,
+          "n": 816,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5905,
+          "p25": 0.4414,
+          "p75": 0.7904,
+          "ci_low": 0.5676,
+          "ci_high": 0.6187,
+          "n": 837,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.8001,
+          "p25": 0.6278,
+          "p75": 0.9145,
+          "ci_low": 0.7741,
+          "ci_high": 0.8148,
+          "n": 741,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "fåtölj|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 3460,
+      "n_total": 5631,
+      "median_bids": 7.0,
+      "low_bid_share": 0.2682,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.2375,
+      "p25": 0.3484,
+      "p75": 0.7625,
+      "ci_low": 0.2097,
+      "ci_high": 0.2573,
+      "n": 3460,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 3460,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3459,
+          "p25": 0.2538,
+          "p75": 0.5706,
+          "ci_low": 0.3313,
+          "ci_high": 0.3657,
+          "n": 1288,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5706,
+          "p25": 0.4113,
+          "p75": 0.7592,
+          "ci_low": 0.5377,
+          "ci_high": 0.5984,
+          "n": 1078,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.7323,
+          "p25": 0.5954,
+          "p75": 0.8535,
+          "ci_low": 0.7216,
+          "ci_high": 0.7518,
+          "n": 1094,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "hylla|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 2779,
+      "n_total": 4096,
+      "median_bids": 9.0,
+      "low_bid_share": 0.2119,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4301,
+      "p25": 0.4557,
+      "p75": 0.8056,
+      "ci_low": 0.4156,
+      "ci_high": 0.443,
+      "n": 2779,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 2779,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4509,
+          "p25": 0.2971,
+          "p75": 0.6572,
+          "ci_low": 0.4106,
+          "ci_high": 0.4861,
+          "n": 1004,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6245,
+          "p25": 0.4861,
+          "p75": 0.7828,
+          "ci_low": 0.6003,
+          "ci_high": 0.6336,
+          "n": 892,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8013,
+          "p25": 0.6999,
+          "p75": 0.8884,
+          "ci_low": 0.7964,
+          "ci_high": 0.8056,
+          "n": 883,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "hylla|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 2743,
+      "n_total": 4304,
+      "median_bids": 7.0,
+      "low_bid_share": 0.26,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4493,
+      "p25": 0.2071,
+      "p75": 0.6282,
+      "ci_low": 0.4055,
+      "ci_high": 0.517,
+      "n": 374,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 374,
+      "n_auctionet": 2369,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6255,
+          "p25": 0.5142,
+          "p75": 0.7897,
+          "ci_low": 0.6086,
+          "ci_high": 0.6481,
+          "n": 1037,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7683,
+          "p25": 0.6513,
+          "p75": 0.8932,
+          "ci_low": 0.7451,
+          "ci_high": 0.7875,
+          "n": 839,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8943,
+          "p25": 0.7897,
+          "p75": 0.9577,
+          "ci_low": 0.8881,
+          "ci_high": 0.9002,
+          "n": 867,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "hylla|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 4244,
+      "n_total": 6027,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1923,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4196,
+      "p25": 0.5892,
+      "p75": 0.8785,
+      "ci_low": 0.4115,
+      "ci_high": 0.4294,
+      "n": 4244,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 4244,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5568,
+          "p25": 0.4277,
+          "p75": 0.7457,
+          "ci_low": 0.5379,
+          "ci_high": 0.5826,
+          "n": 1494,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7279,
+          "p25": 0.6239,
+          "p75": 0.8569,
+          "ci_low": 0.717,
+          "ci_high": 0.7409,
+          "n": 1385,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8755,
+          "p25": 0.7837,
+          "p75": 0.9397,
+          "ci_low": 0.8686,
+          "ci_high": 0.8798,
+          "n": 1365,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "hörnsoffa|hög": {
+      "bid_threshold": 3,
+      "n_qualified": 58,
+      "n_total": 102,
+      "median_bids": 3.0,
+      "low_bid_share": 0.4314,
+      "tier_source": "unbranded",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|låg": {
+      "bid_threshold": 3,
+      "n_qualified": 48,
+      "n_total": 58,
+      "median_bids": 9.0,
+      "low_bid_share": 0.1724,
+      "tier_source": "unbranded",
+      "status": "insufficient_data"
+    },
+    "hörnsoffa|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 61,
+      "n_total": 89,
+      "median_bids": 9.0,
+      "low_bid_share": 0.2022,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.0645,
+      "p25": 0.1703,
+      "p75": 0.6878,
+      "ci_low": 0,
+      "ci_high": 0.2222,
+      "n": 61,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 61,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.1642,
+          "p25": 0.1196,
+          "p75": 0.3524,
+          "ci_low": 0.125,
+          "ci_high": 0.2238,
+          "n": 23,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.294,
+          "p25": 0.2109,
+          "p75": 0.5536,
+          "ci_low": 0.2109,
+          "ci_high": 0.5536,
+          "n": 17,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.7731,
+          "p25": 0.5014,
+          "p75": 0.8858,
+          "ci_low": 0.5513,
+          "ci_high": 0.8558,
+          "n": 21,
+          "median_bids": 27.0
+        }
+      }
+    },
+    "matgrupp|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 1108,
+      "n_total": 1554,
+      "median_bids": 10.0,
+      "low_bid_share": 0.1866,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3301,
+      "p25": 0.3864,
+      "p75": 0.732,
+      "ci_low": 0.3186,
+      "ci_high": 0.3497,
+      "n": 1108,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 1108,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3864,
+          "p25": 0.2397,
+          "p75": 0.5621,
+          "ci_low": 0.3642,
+          "ci_high": 0.408,
+          "n": 380,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.52,
+          "p25": 0.3997,
+          "p75": 0.6753,
+          "ci_low": 0.4901,
+          "ci_high": 0.5481,
+          "n": 383,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.7324,
+          "p25": 0.5782,
+          "p75": 0.8497,
+          "ci_low": 0.704,
+          "ci_high": 0.7452,
+          "n": 345,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "matgrupp|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 1389,
+      "n_total": 1890,
+      "median_bids": 11.0,
+      "low_bid_share": 0.1799,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.1939,
+      "p25": 0.5273,
+      "p75": 0.8584,
+      "ci_low": 0.1808,
+      "ci_high": 0.2155,
+      "n": 1379,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.5097,
+      "n_tradera": 10,
+      "n_auctionet": 1379,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5216,
+          "p25": 0.3434,
+          "p75": 0.6877,
+          "ci_low": 0.4823,
+          "ci_high": 0.561,
+          "n": 463,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6964,
+          "p25": 0.5569,
+          "p75": 0.8264,
+          "ci_low": 0.6764,
+          "ci_high": 0.7271,
+          "n": 476,
+          "median_bids": 16.0
+        },
+        "hög": {
+          "sell_percentile": 0.8393,
+          "p25": 0.7255,
+          "p75": 0.9307,
+          "ci_low": 0.8115,
+          "ci_high": 0.8584,
+          "n": 450,
+          "median_bids": 28.0
+        }
+      }
+    },
+    "matgrupp|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 1219,
+      "n_total": 1820,
+      "median_bids": 9.0,
+      "low_bid_share": 0.2247,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.1475,
+      "p25": 0.0451,
+      "p75": 0.3494,
+      "ci_low": 0.0734,
+      "ci_high": 0.2661,
+      "n": 65,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 65,
+      "n_auctionet": 1154,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.502,
+          "p25": 0.3056,
+          "p75": 0.6628,
+          "ci_low": 0.4604,
+          "ci_high": 0.5397,
+          "n": 452,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6307,
+          "p25": 0.4696,
+          "p75": 0.7666,
+          "ci_low": 0.599,
+          "ci_high": 0.6513,
+          "n": 379,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.7818,
+          "p25": 0.6534,
+          "p75": 0.9017,
+          "ci_low": 0.7586,
+          "ci_high": 0.7985,
+          "n": 388,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "soffa|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 751,
+      "n_total": 1173,
+      "median_bids": 8.0,
+      "low_bid_share": 0.2387,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.1635,
+      "p25": 0.2107,
+      "p75": 0.6575,
+      "ci_low": 0.1504,
+      "ci_high": 0.2183,
+      "n": 751,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 751,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2151,
+          "p25": 0.1048,
+          "p75": 0.4302,
+          "ci_low": 0.1835,
+          "ci_high": 0.2625,
+          "n": 257,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3421,
+          "p25": 0.2151,
+          "p75": 0.6156,
+          "ci_low": 0.2917,
+          "ci_high": 0.3721,
+          "n": 258,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.6528,
+          "p25": 0.4711,
+          "p75": 0.8169,
+          "ci_low": 0.6244,
+          "ci_high": 0.6722,
+          "n": 236,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "soffa|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 739,
+      "n_total": 1193,
+      "median_bids": 7.0,
+      "low_bid_share": 0.264,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.2312,
+      "p25": 0.0992,
+      "p75": 0.4062,
+      "ci_low": 0.1784,
+      "ci_high": 0.3253,
+      "n": 57,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 57,
+      "n_auctionet": 682,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3295,
+          "p25": 0.173,
+          "p75": 0.5494,
+          "ci_low": 0.278,
+          "ci_high": 0.3976,
+          "n": 279,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4847,
+          "p25": 0.3092,
+          "p75": 0.6947,
+          "ci_low": 0.4047,
+          "ci_high": 0.5001,
+          "n": 230,
+          "median_bids": 15.0
+        },
+        "hög": {
+          "sell_percentile": 0.6761,
+          "p25": 0.4845,
+          "p75": 0.8548,
+          "ci_low": 0.6145,
+          "ci_high": 0.7018,
+          "n": 230,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "soffa|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 1183,
+      "n_total": 1799,
+      "median_bids": 8.0,
+      "low_bid_share": 0.2285,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.1475,
+      "p25": 0.2373,
+      "p75": 0.7257,
+      "ci_low": 0.1049,
+      "ci_high": 0.1859,
+      "n": 1183,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 1183,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2962,
+          "p25": 0.1334,
+          "p75": 0.5535,
+          "ci_low": 0.2494,
+          "ci_high": 0.3294,
+          "n": 438,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4096,
+          "p25": 0.2286,
+          "p75": 0.6579,
+          "ci_low": 0.3806,
+          "ci_high": 0.4724,
+          "n": 362,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.6644,
+          "p25": 0.4778,
+          "p75": 0.8375,
+          "ci_low": 0.6328,
+          "ci_high": 0.7147,
+          "n": 383,
+          "median_bids": 26.0
+        }
+      }
+    },
+    "spegel|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 159,
+      "n_total": 299,
+      "median_bids": 5.0,
+      "low_bid_share": 0.311,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.292,
+      "p25": 0.3236,
+      "p75": 0.7107,
+      "ci_low": 0.2442,
+      "ci_high": 0.361,
+      "n": 159,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 159,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2887,
+          "p25": 0.2452,
+          "p75": 0.51,
+          "ci_low": 0.2675,
+          "ci_high": 0.3699,
+          "n": 57,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.4622,
+          "p25": 0.3599,
+          "p75": 0.5995,
+          "ci_low": 0.4081,
+          "ci_high": 0.542,
+          "n": 49,
+          "median_bids": 11.0
+        },
+        "hög": {
+          "sell_percentile": 0.7107,
+          "p25": 0.6095,
+          "p75": 0.8387,
+          "ci_low": 0.6737,
+          "ci_high": 0.7749,
+          "n": 53,
+          "median_bids": 20.0
+        }
+      }
+    },
+    "spegel|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 138,
+      "n_total": 348,
+      "median_bids": 3.0,
+      "low_bid_share": 0.4885,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3544,
+      "p25": 0.6935,
+      "p75": 0.9269,
+      "ci_low": 0.3276,
+      "ci_high": 0.4033,
+      "n": 111,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.4564,
+      "n_tradera": 27,
+      "n_auctionet": 111,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.6079,
+          "p25": 0.4645,
+          "p75": 0.8325,
+          "ci_low": 0.4864,
+          "ci_high": 0.7434,
+          "n": 50,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.7398,
+          "p25": 0.6935,
+          "p75": 0.8803,
+          "ci_low": 0.6991,
+          "ci_high": 0.8058,
+          "n": 45,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.8785,
+          "p25": 0.7827,
+          "p75": 0.9428,
+          "ci_low": 0.8145,
+          "ci_high": 0.9178,
+          "n": 43,
+          "median_bids": 21.0
+        }
+      }
+    },
+    "spegel|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 85,
+      "n_total": 177,
+      "median_bids": 4.0,
+      "low_bid_share": 0.4124,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3788,
+      "p25": 0.586,
+      "p75": 0.8689,
+      "ci_low": 0.3174,
+      "ci_high": 0.449,
+      "n": 85,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 85,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.5423,
+          "p25": 0.4608,
+          "p75": 0.7102,
+          "ci_low": 0.4941,
+          "ci_high": 0.6479,
+          "n": 33,
+          "median_bids": 8.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6571,
+          "p25": 0.616,
+          "p75": 0.7992,
+          "ci_low": 0.6302,
+          "ci_high": 0.6912,
+          "n": 24,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.8913,
+          "p25": 0.7809,
+          "p75": 0.9562,
+          "ci_low": 0.8066,
+          "ci_high": 0.9403,
+          "n": 28,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "stol|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 1684,
+      "n_total": 3009,
+      "median_bids": 6.0,
+      "low_bid_share": 0.3151,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3118,
+      "p25": 0.3059,
+      "p75": 0.7456,
+      "ci_low": 0.2854,
+      "ci_high": 0.3401,
+      "n": 1684,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 1684,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.3916,
+          "p25": 0.1992,
+          "p75": 0.5581,
+          "ci_low": 0.3616,
+          "ci_high": 0.3916,
+          "n": 578,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5716,
+          "p25": 0.3233,
+          "p75": 0.7612,
+          "ci_low": 0.5298,
+          "ci_high": 0.5863,
+          "n": 599,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.6962,
+          "p25": 0.4805,
+          "p75": 0.8385,
+          "ci_low": 0.6694,
+          "ci_high": 0.7183,
+          "n": 507,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "stol|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 2297,
+      "n_total": 3995,
+      "median_bids": 6.0,
+      "low_bid_share": 0.3001,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.4485,
+      "p25": 0.2363,
+      "p75": 0.6016,
+      "ci_low": 0.3767,
+      "ci_high": 0.5381,
+      "n": 117,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 117,
+      "n_auctionet": 2180,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4452,
+          "p25": 0.2369,
+          "p75": 0.6148,
+          "ci_low": 0.4074,
+          "ci_high": 0.4875,
+          "n": 808,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.6321,
+          "p25": 0.4128,
+          "p75": 0.7773,
+          "ci_low": 0.6107,
+          "ci_high": 0.6494,
+          "n": 750,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.7472,
+          "p25": 0.5853,
+          "p75": 0.8837,
+          "ci_low": 0.7417,
+          "ci_high": 0.7723,
+          "n": 739,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "stol|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 1857,
+      "n_total": 3156,
+      "median_bids": 6.0,
+      "low_bid_share": 0.2959,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.2544,
+      "p25": 0.362,
+      "p75": 0.779,
+      "ci_low": 0.2307,
+      "ci_high": 0.2692,
+      "n": 1857,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 0,
+      "n_auctionet": 1857,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.4585,
+          "p25": 0.2381,
+          "p75": 0.59,
+          "ci_low": 0.4165,
+          "ci_high": 0.4658,
+          "n": 637,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5958,
+          "p25": 0.3782,
+          "p75": 0.7468,
+          "ci_low": 0.564,
+          "ci_high": 0.6138,
+          "n": 614,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.7488,
+          "p25": 0.5636,
+          "p75": 0.8915,
+          "ci_low": 0.7252,
+          "ci_high": 0.7763,
+          "n": 606,
+          "median_bids": 25.0
+        }
+      }
+    },
+    "säng|hög": {
+      "bid_threshold": 5,
+      "n_qualified": 83,
+      "n_total": 136,
+      "median_bids": 7.0,
+      "low_bid_share": 0.2721,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.1913,
+      "p25": 0.2165,
+      "p75": 0.6704,
+      "ci_low": 0.1251,
+      "ci_high": 0.2715,
+      "n": 83,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.218,
+      "n_tradera": 0,
+      "n_auctionet": 83,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2996,
+          "p25": 0.1476,
+          "p75": 0.3913,
+          "ci_low": 0.1811,
+          "ci_high": 0.3649,
+          "n": 28,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3431,
+          "p25": 0.1703,
+          "p75": 0.7061,
+          "ci_low": 0.194,
+          "ci_high": 0.4895,
+          "n": 29,
+          "median_bids": 14.0
+        },
+        "hög": {
+          "sell_percentile": 0.5998,
+          "p25": 0.49,
+          "p75": 0.803,
+          "ci_low": 0.5105,
+          "ci_high": 0.7436,
+          "n": 26,
+          "median_bids": 26.5
+        }
+      }
+    },
+    "säng|låg": {
+      "bid_threshold": 5,
+      "n_qualified": 70,
+      "n_total": 158,
+      "median_bids": 3.0,
+      "low_bid_share": 0.4177,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.3164,
+      "p25": 0.0642,
+      "p75": 0.5,
+      "ci_low": 0.1931,
+      "ci_high": 0.386,
+      "n": 40,
+      "status": "ok",
+      "source": "tradera",
+      "channel_gap_applied": 0.0,
+      "n_tradera": 40,
+      "n_auctionet": 30,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2963,
+          "p25": 0.073,
+          "p75": 0.4708,
+          "ci_low": 0.0822,
+          "ci_high": 0.4687,
+          "n": 23,
+          "median_bids": 7.0
+        },
+        "mellan": {
+          "sell_percentile": 0.3276,
+          "p25": 0.1013,
+          "p75": 0.4222,
+          "ci_low": 0.1207,
+          "ci_high": 0.3659,
+          "n": 23,
+          "median_bids": 12.0
+        },
+        "hög": {
+          "sell_percentile": 0.6767,
+          "p25": 0.4977,
+          "p75": 0.7883,
+          "ci_low": 0.5143,
+          "ci_high": 0.7751,
+          "n": 24,
+          "median_bids": 24.0
+        }
+      }
+    },
+    "säng|mellan": {
+      "bid_threshold": 5,
+      "n_qualified": 103,
+      "n_total": 178,
+      "median_bids": 5.0,
+      "low_bid_share": 0.2921,
+      "tier_source": "unbranded",
+      "sell_percentile": 0.2342,
+      "p25": 0.2957,
+      "p75": 0.7961,
+      "ci_low": 0.1495,
+      "ci_high": 0.298,
+      "n": 92,
+      "status": "ok",
+      "source": "auctionet_corrected",
+      "channel_gap_applied": -0.3314,
+      "n_tradera": 11,
+      "n_auctionet": 92,
+      "bid_terciles": {
+        "låg": {
+          "sell_percentile": 0.2877,
+          "p25": 0.1978,
+          "p75": 0.4637,
+          "ci_low": 0.2335,
+          "ci_high": 0.3769,
+          "n": 40,
+          "median_bids": 6.0
+        },
+        "mellan": {
+          "sell_percentile": 0.5743,
+          "p25": 0.2709,
+          "p75": 0.6476,
+          "ci_low": 0.3427,
+          "ci_high": 0.6122,
+          "n": 28,
+          "median_bids": 13.0
+        },
+        "hög": {
+          "sell_percentile": 0.7692,
+          "p25": 0.5677,
+          "p75": 0.9275,
+          "ci_low": 0.6188,
+          "ci_high": 0.8647,
+          "n": 35,
+          "median_bids": 25.0
+        }
+      }
+    }
+  },
+  "bid_sensitivity": [
+    {
+      "grupp": "fåtölj|high|hög",
+      ">=5": 0.4191,
+      "n>=5": 3068,
+      ">=4": 0.4107,
+      "n>=4": 3164,
+      ">=3": 0.3971,
+      "n>=3": 3264
+    },
+    {
+      "grupp": "stol|high|hög",
+      ">=5": 0.5058,
+      "n>=5": 1802,
+      ">=4": 0.5,
+      "n>=4": 1860,
+      ">=3": 0.4894,
+      "n>=3": 1926
+    },
+    {
+      "grupp": "bord|high|hög",
+      ">=5": 0.6342,
+      "n>=5": 1064,
+      ">=4": 0.6182,
+      "n>=4": 1114,
+      ">=3": 0.5751,
+      "n>=3": 1170
+    },
+    {
+      "grupp": "soffa|mid|låg",
+      ">=5": 0.383,
+      "n>=5": 715,
+      ">=4": 0.3545,
+      "n>=4": 762,
+      ">=3": 0.3368,
+      "n>=3": 834
+    },
+    {
+      "grupp": "fåtölj|high|låg",
+      ">=5": 0.8549,
+      "n>=5": 777,
+      ">=4": 0.8403,
+      "n>=4": 813,
+      ">=3": 0.8332,
+      "n>=3": 847
+    },
+    {
+      "grupp": "fåtölj|low|låg",
+      ">=5": 0.8359,
+      "n>=5": 570,
+      ">=4": 0.8132,
+      "n>=4": 615,
+      ">=3": 0.8039,
+      "n>=3": 650
+    },
+    {
+      "grupp": "stol|high|låg",
+      ">=5": 0.8313,
+      "n>=5": 649,
+      ">=4": 0.8291,
+      "n>=4": 670,
+      ">=3": 0.8257,
+      "n>=3": 692
+    },
+    {
+      "grupp": "fotpall|high|hög",
+      ">=5": 0.5625,
+      "n>=5": 645,
+      ">=4": 0.5625,
+      "n>=4": 655,
+      ">=3": 0.5521,
+      "n>=3": 677
+    }
+  ],
+  "recommended_percentiles": {
+    "n": 13125,
+    "per_segment": {
+      "high": {
+        "sell_percentile": 0.3479,
+        "sell_percentile_raw": 0.4395,
+        "p25": 0.142,
+        "p75": 0.5911,
+        "n": 7695,
+        "dimension": "märkesklass"
+      },
+      "low": {
+        "sell_percentile": 0.3822,
+        "sell_percentile_raw": 0.779,
+        "p25": 0.1259,
+        "p75": 0.5265,
+        "n": 3235,
+        "dimension": "märkesklass"
+      },
+      "mid": {
+        "sell_percentile": 0.2593,
+        "sell_percentile_raw": 0.3315,
+        "p25": 0.0768,
+        "p75": 0.5382,
+        "n": 2195,
+        "dimension": "märkesklass"
+      },
+      "high · hög": {
+        "sell_percentile": 0.3457,
+        "sell_percentile_raw": 0.4375,
+        "p25": 0.1404,
+        "p75": 0.588,
+        "n": 7402,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "high · låg": {
+        "sell_percentile": 0.3185,
+        "sell_percentile_raw": 0.4103,
+        "p25": 0.0604,
+        "p75": 0.628,
+        "n": 67,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "high · mellan": {
+        "sell_percentile": 0.4198,
+        "sell_percentile_raw": 0.5116,
+        "p25": 0.1982,
+        "p75": 0.6641,
+        "n": 226,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "low · hög": {
+        "sell_percentile": 0.0918,
+        "sell_percentile_raw": 0.3277,
+        "p25": 0.0,
+        "p75": 0.3057,
+        "n": 84,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "low · låg": {
+        "sell_percentile": 0.3915,
+        "sell_percentile_raw": 0.7898,
+        "p25": 0.1529,
+        "p75": 0.5306,
+        "n": 2614,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "low · mellan": {
+        "sell_percentile": 0.3554,
+        "sell_percentile_raw": 0.7765,
+        "p25": 0.0009,
+        "p75": 0.518,
+        "n": 537,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "mid · hög": {
+        "sell_percentile": 0.3026,
+        "sell_percentile_raw": 0.374,
+        "p25": 0.1281,
+        "p75": 0.5712,
+        "n": 897,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "mid · låg": {
+        "sell_percentile": 0.2513,
+        "sell_percentile_raw": 0.3282,
+        "p25": 0.0462,
+        "p75": 0.5281,
+        "n": 819,
+        "dimension": "märkesklass × prisnivå"
+      },
+      "mid · mellan": {
+        "sell_percentile": 0.1954,
+        "sell_percentile_raw": 0.2742,
+        "p25": 0.0346,
+        "p75": 0.4825,
+        "n": 479,
+        "dimension": "märkesklass × prisnivå"
+      }
+    },
+    "channel_gap_applied": {
+      "low": -0.4211,
+      "mid": -0.0788,
+      "high": -0.0918
+    },
+    "overall_raw": 0.4932,
+    "overall": 0.344
+  },
+  "validation": {
+    "n_train": 40146,
+    "n_test": 40146,
+    "global_sell_percentile": 0.6122,
+    "group_coverage": 0.2509,
+    "models": {
+      "gruppspecifik säljpercentil": {
+        "n": 40146,
+        "median_abs_log_error": 0.7394,
+        "median_abs_pct": 109.5,
+        "within_25pct": 0.1576,
+        "median_bias_pct": 4.5
+      },
+      "baslinje: global säljpercentil": {
+        "n": 40146,
+        "median_abs_log_error": 0.7706,
+        "median_abs_pct": 116.1,
+        "within_25pct": 0.1496,
+        "median_bias_pct": 2.7
+      },
+      "baslinje: alltid p50": {
+        "n": 40146,
+        "median_abs_log_error": 0.7802,
+        "median_abs_pct": 118.2,
+        "within_25pct": 0.1635,
+        "median_bias_pct": -27.8
+      },
+      "baslinje: aux_estimate": {
+        "n": 38986,
+        "median_abs_log_error": 0.4788,
+        "median_abs_pct": 61.4,
+        "within_25pct": 0.262,
+        "median_bias_pct": 33.3
+      }
+    },
+    "models_covered_only": {
+      "gruppspecifik säljpercentil": {
+        "n": 10071,
+        "median_abs_log_error": 0.7256,
+        "median_abs_pct": 106.6,
+        "within_25pct": 0.1751,
+        "median_bias_pct": 1.0
+      },
+      "baslinje: global säljpercentil": {
+        "n": 10071,
+        "median_abs_log_error": 0.8686,
+        "median_abs_pct": 138.4,
+        "within_25pct": 0.1429,
+        "median_bias_pct": -6.5
+      },
+      "baslinje: alltid p50": {
+        "n": 10071,
+        "median_abs_log_error": 0.8938,
+        "median_abs_pct": 144.4,
+        "within_25pct": 0.1498,
+        "median_bias_pct": -31.4
+      },
+      "baslinje: aux_estimate": {
+        "n": 9865,
+        "median_abs_log_error": 0.4176,
+        "median_abs_pct": 51.8,
+        "within_25pct": 0.3036,
+        "median_bias_pct": 25.0
+      }
+    },
+    "narrowness": {
+      "n": 15197,
+      "median_rank_narrow": 0.4301,
+      "median_rank_broad": 0.6659,
+      "median_abs_diff": 0.1488,
+      "p90_abs_diff": 0.4621,
+      "correlation": 0.7273,
+      "within_010": 0.3762
+    },
+    "narrow_recommendation": {
+      "n": 13125,
+      "per_segment": {
+        "high": {
+          "sell_percentile": 0.3479,
+          "sell_percentile_raw": 0.4395,
+          "p25": 0.142,
+          "p75": 0.5911,
+          "n": 7695,
+          "dimension": "märkesklass"
+        },
+        "low": {
+          "sell_percentile": 0.3822,
+          "sell_percentile_raw": 0.779,
+          "p25": 0.1259,
+          "p75": 0.5265,
+          "n": 3235,
+          "dimension": "märkesklass"
+        },
+        "mid": {
+          "sell_percentile": 0.2593,
+          "sell_percentile_raw": 0.3315,
+          "p25": 0.0768,
+          "p75": 0.5382,
+          "n": 2195,
+          "dimension": "märkesklass"
+        },
+        "high · hög": {
+          "sell_percentile": 0.3457,
+          "sell_percentile_raw": 0.4375,
+          "p25": 0.1404,
+          "p75": 0.588,
+          "n": 7402,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "high · låg": {
+          "sell_percentile": 0.3185,
+          "sell_percentile_raw": 0.4103,
+          "p25": 0.0604,
+          "p75": 0.628,
+          "n": 67,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "high · mellan": {
+          "sell_percentile": 0.4198,
+          "sell_percentile_raw": 0.5116,
+          "p25": 0.1982,
+          "p75": 0.6641,
+          "n": 226,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "low · hög": {
+          "sell_percentile": 0.0918,
+          "sell_percentile_raw": 0.3277,
+          "p25": 0.0,
+          "p75": 0.3057,
+          "n": 84,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "low · låg": {
+          "sell_percentile": 0.3915,
+          "sell_percentile_raw": 0.7898,
+          "p25": 0.1529,
+          "p75": 0.5306,
+          "n": 2614,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "low · mellan": {
+          "sell_percentile": 0.3554,
+          "sell_percentile_raw": 0.7765,
+          "p25": 0.0009,
+          "p75": 0.518,
+          "n": 537,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "mid · hög": {
+          "sell_percentile": 0.3026,
+          "sell_percentile_raw": 0.374,
+          "p25": 0.1281,
+          "p75": 0.5712,
+          "n": 897,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "mid · låg": {
+          "sell_percentile": 0.2513,
+          "sell_percentile_raw": 0.3282,
+          "p25": 0.0462,
+          "p75": 0.5281,
+          "n": 819,
+          "dimension": "märkesklass × prisnivå"
+        },
+        "mid · mellan": {
+          "sell_percentile": 0.1954,
+          "sell_percentile_raw": 0.2742,
+          "p25": 0.0346,
+          "p75": 0.4825,
+          "n": 479,
+          "dimension": "märkesklass × prisnivå"
+        }
+      },
+      "channel_gap_applied": {
+        "low": -0.4211,
+        "mid": -0.0788,
+        "high": -0.0918
+      },
+      "overall_raw": 0.4932,
+      "overall": 0.344
+    },
+    "stability_by_year": {
+      "2024": {
+        "sell_percentile": 0.5306,
+        "n": 22822
+      },
+      "2025": {
+        "sell_percentile": 0.6181,
+        "n": 32491
+      },
+      "2026": {
+        "sell_percentile": 0.6689,
+        "n": 24979
+      }
+    }
+  }
+}

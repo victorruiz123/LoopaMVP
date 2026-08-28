@@ -1,0 +1,50 @@
+[
+  {
+    "steg":"slutpriser i datan",
+    "tradera":7831,
+    "auctionet":461564,
+    "totalt":469395
+  },
+  {
+    "steg":"auktionskanal (ej fastpris)",
+    "tradera":7714,
+    "auctionet":461564,
+    "totalt":469278
+  },
+  {
+    "steg":"\u00e4r en m\u00f6bel (ej ok\u00e4nd\/del)",
+    "tradera":4420,
+    "auctionet":386760,
+    "totalt":391180
+  },
+  {
+    "steg":"har datum och budantal",
+    "tradera":4420,
+    "auctionet":386760,
+    "totalt":391180
+  },
+  {
+    "steg":"matchad mot >= 30 samtida utrop",
+    "tradera":4417,
+    "auctionet":99820,
+    "totalt":104237
+  },
+  {
+    "steg":"  ... och >= 5 bud",
+    "tradera":1814,
+    "auctionet":67178,
+    "totalt":68992
+  },
+  {
+    "steg":"  ... och >= 4 bud",
+    "tradera":1983,
+    "auctionet":71974,
+    "totalt":73957
+  },
+  {
+    "steg":"  ... och >= 3 bud",
+    "tradera":2251,
+    "auctionet":78041,
+    "totalt":80292
+  }
+]

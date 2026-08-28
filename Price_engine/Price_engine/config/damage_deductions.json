@@ -1,0 +1,544 @@
+{
+  "_meta": {
+    "version": "0.3-coldstart",
+    "created": "2026-08-19",
+    "supersedes": "0.2-coldstart",
+    "status": "KALLSTART — inga nivåer är uppmätta mot marknadsdata",
+    "change_log": "Samtliga nivåer sänkta efter granskning. Grad 1 (synlig) ligger nu på 4–15 % — en synlig men vanlig skada ska inte halvera värdet. Grad 2 sänkt 15–25 %. Lukt grad 2 sänkt 42 → 35 % enligt beslut. | 0.3: bojningsformer tillagda som synonymer for skinnflagning, nedsutten och saknad_del. De tva flack+skinn-raderna borttagna — furniture_type ar en mobeltyp, inte ett material, sa de kunde aldrig losa ut; skillnaden var tva procentenheter och laderspecifika skador tacks av repa_skinn och skinnflagning.",
+    "stacking": "INGEN. Totalt avdrag = max(d_i). Endast den värsta skadan påverkar priset.",
+    "grade_scale": {
+      "0": "knappt synlig / osynlig — syns bara vid närgranskning. ALLTID 0 %.",
+      "1": "synlig — syns på annonsbild eller på nära håll, men möbeln är fortfarande fin",
+      "2": "framträdande — det första man ser, definierar möbelns intryck"
+    },
+    "calibration_notes": [
+      "Grad 1 hålls under 15 % genomgående: en synlig men normal skada ska inte flytta möbeln ur köparens urval.",
+      "Grad 2 bär hela avdraget eftersom stapling är borttagen — den ska vara kännbar men inte förödande.",
+      "Funktionella och hygieniska skador ligger högre än kosmetiska vid samma grad: de ändrar vad möbeln kan, inte bara hur den ser ut.",
+      "Ankare från granskning: stor fläck på 20 000 kr-soffa → ca 15 000–16 000 kr. Tabellen ger 22 % → 15 600 kr."
+    ],
+    "repair_cost_note": "repair_cost_sek är DOKUMENTATION och rimlighetsunderlag. Den ingår aldrig i värderingen (låst med test). Endast omappade skador använder kostnad, via REPAIR_HASSLE_FACTOR."
+  },
+  "rules": {
+    "stacking": "none — total = max(deduction)",
+    "repair_hassle_factor": 2.0,
+    "max_unmapped_deduction": 0.25,
+    "max_total_deduction": 0.5,
+    "count_escalation_at": 3,
+    "grade_0_threshold": "grad 0 ger alltid 0 % — listas för transparens, prissätts inte",
+    "note": "Motorn läser dessa värden ur config, inte härifrån. Blocket hålls synkat med test."
+  },
+  "categories": {
+    "flack": {
+      "label": "Fläck",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "fläck",
+        "flackar",
+        "missfärgning av vätska",
+        "kaffefläck",
+        "spill",
+        "vinfläck",
+        "matfläck"
+      ]
+    },
+    "repa_hard": {
+      "label": "Repa i trä/lack/metall",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "repa",
+        "repor",
+        "skrapmärke",
+        "märke i lacken",
+        "bucklor i träet",
+        "nagg"
+      ]
+    },
+    "repa_skinn": {
+      "label": "Repa/skrapmärke i skinn",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "repa i skinn",
+        "kattklösmärken",
+        "skrapmärke i läder",
+        "klösmärken"
+      ]
+    },
+    "reva_hal": {
+      "label": "Reva eller hål i tyg",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "reva",
+        "hål",
+        "spräckt söm",
+        "uppsprucken söm",
+        "trasigt tyg"
+      ]
+    },
+    "nedsutten": {
+      "label": "Nedsutten / tappad form",
+      "kind": "funktionell",
+      "photo_visible": true,
+      "synonyms": [
+        "nedsutten",
+        "sviktar",
+        "platta dynor",
+        "tappat formen",
+        "sjunken sits",
+        "nedsuttna",
+        "nedsuttna dynor",
+        "sviktande"
+      ]
+    },
+    "missfargning": {
+      "label": "Missfärgning/solblekning",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "solblekt",
+        "blekt",
+        "urblekt",
+        "färgskillnad",
+        "gulnat"
+      ]
+    },
+    "skinnflagning": {
+      "label": "Sprucket/flagande skinn",
+      "kind": "kosmetisk",
+      "photo_visible": true,
+      "synonyms": [
+        "flagande skinn",
+        "sprucket läder",
+        "skinnet spricker",
+        "torrsprickor",
+        "skinnet flagnar",
+        "flagnat skinn",
+        "sprucken yta"
+      ]
+    },
+    "stomskada": {
+      "label": "Vinglig/skadad stomme",
+      "kind": "funktionell",
+      "photo_visible": "delvis",
+      "synonyms": [
+        "vinglig",
+        "glappar",
+        "lös fog",
+        "sprucken stomme",
+        "ostadig"
+      ]
+    },
+    "mekanikfel": {
+      "label": "Trasig mekanik",
+      "kind": "funktionell",
+      "photo_visible": false,
+      "synonyms": [
+        "trasig bäddfunktion",
+        "går inte att fälla ut",
+        "lådskena trasig",
+        "hissen fungerar inte",
+        "kärvar"
+      ]
+    },
+    "saknad_del": {
+      "label": "Saknad del",
+      "kind": "funktionell",
+      "photo_visible": "delvis",
+      "synonyms": [
+        "saknas hyllplan",
+        "saknad dyna",
+        "skruvar saknas",
+        "en del saknas",
+        "utan beslag",
+        "en skruv saknas",
+        "saknar dyna",
+        "delar saknas"
+      ]
+    },
+    "vattenskada": {
+      "label": "Vattenskada/svullnad",
+      "kind": "funktionell",
+      "photo_visible": true,
+      "synonyms": [
+        "vattenskada",
+        "svullet trä",
+        "fuktskada",
+        "bubblor i skivan"
+      ]
+    },
+    "lukt": {
+      "label": "Lukt (rök, husdjur, unket)",
+      "kind": "hygien",
+      "photo_visible": false,
+      "synonyms": [
+        "röklukt",
+        "luktar rök",
+        "djurlukt",
+        "hundlukt",
+        "kattlukt",
+        "unken lukt",
+        "källarlukt"
+      ]
+    },
+    "mogel": {
+      "label": "Mögel",
+      "kind": "hygien",
+      "photo_visible": true,
+      "synonyms": [
+        "mögel",
+        "mögelfläckar",
+        "mögellukt",
+        "svartmögel"
+      ]
+    }
+  },
+  "rows": [
+    {
+      "category": "flack",
+      "furniture_type": "*",
+      "grade": 0,
+      "deduction": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "source": "judgment",
+      "repair_cost_sek": 0,
+      "note": "under väsentlighetströskeln"
+    },
+    {
+      "category": "flack",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.08,
+      "ci_low": 0.04,
+      "ci_high": 0.14,
+      "source": "judgment",
+      "repair_cost_sek": 1200,
+      "note": "synlig men enstaka fläck; ofta tvättbar"
+    },
+    {
+      "category": "flack",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.22,
+      "ci_low": 0.15,
+      "ci_high": 0.3,
+      "source": "judgment",
+      "repair_cost_sek": 1200,
+      "note": "ankare: 20 000 kr-soffa → 15 600 kr"
+    },
+    {
+      "category": "repa_hard",
+      "furniture_type": "*",
+      "grade": 0,
+      "deduction": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "source": "judgment",
+      "repair_cost_sek": 0,
+      "note": "bruksslitage; på vintage närmast förväntat"
+    },
+    {
+      "category": "repa_hard",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.04,
+      "ci_low": 0.01,
+      "ci_high": 0.08,
+      "source": "judgment",
+      "repair_cost_sek": 1750,
+      "note": "repor i trä accepteras brett på begagnat"
+    },
+    {
+      "category": "repa_hard",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.12,
+      "ci_low": 0.07,
+      "ci_high": 0.2,
+      "source": "judgment",
+      "repair_cost_sek": 1750,
+      "note": ""
+    },
+    {
+      "category": "repa_skinn",
+      "furniture_type": "*",
+      "grade": 0,
+      "deduction": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "source": "judgment",
+      "repair_cost_sek": 0,
+      "note": ""
+    },
+    {
+      "category": "repa_skinn",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.08,
+      "ci_low": 0.04,
+      "ci_high": 0.14,
+      "source": "judgment",
+      "repair_cost_sek": 2000,
+      "note": "svårare att dölja än i trä"
+    },
+    {
+      "category": "repa_skinn",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.18,
+      "ci_low": 0.11,
+      "ci_high": 0.26,
+      "source": "judgment",
+      "repair_cost_sek": 2000,
+      "note": ""
+    },
+    {
+      "category": "reva_hal",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.14,
+      "ci_low": 0.08,
+      "ci_high": 0.22,
+      "source": "judgment",
+      "repair_cost_sek": 4000,
+      "note": "mindre reva, lagbar"
+    },
+    {
+      "category": "reva_hal",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.3,
+      "ci_low": 0.2,
+      "ci_high": 0.4,
+      "source": "judgment",
+      "repair_cost_sek": 4000,
+      "note": "stor reva: kräver omklädsel eller döljs inte"
+    },
+    {
+      "category": "nedsutten",
+      "furniture_type": "*",
+      "grade": 0,
+      "deduction": 0.0,
+      "ci_low": 0.0,
+      "ci_high": 0.0,
+      "source": "judgment",
+      "repair_cost_sek": 0,
+      "note": ""
+    },
+    {
+      "category": "nedsutten",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.1,
+      "ci_low": 0.05,
+      "ci_high": 0.16,
+      "source": "judgment",
+      "repair_cost_sek": 2500,
+      "note": "funktionell — påverkar sittkomfort"
+    },
+    {
+      "category": "nedsutten",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.22,
+      "ci_low": 0.14,
+      "ci_high": 0.32,
+      "source": "judgment",
+      "repair_cost_sek": 2500,
+      "note": "nytt stoppmaterial + arbete"
+    },
+    {
+      "category": "missfargning",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.07,
+      "ci_low": 0.03,
+      "ci_high": 0.12,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "irreversibel men jämn blekning stör lite"
+    },
+    {
+      "category": "missfargning",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.16,
+      "ci_low": 0.1,
+      "ci_high": 0.24,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "ojämn blekning ser sämre ut än jämn"
+    },
+    {
+      "category": "skinnflagning",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.12,
+      "ci_low": 0.06,
+      "ci_high": 0.19,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "förvärras över tid — köpare vet det"
+    },
+    {
+      "category": "skinnflagning",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.28,
+      "ci_low": 0.18,
+      "ci_high": 0.38,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": ""
+    },
+    {
+      "category": "stomskada",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.12,
+      "ci_low": 0.06,
+      "ci_high": 0.2,
+      "source": "judgment",
+      "repair_cost_sek": 1000,
+      "note": "lätt glapp, åtgärdbart"
+    },
+    {
+      "category": "stomskada",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.3,
+      "ci_low": 0.2,
+      "ci_high": 0.42,
+      "source": "judgment",
+      "repair_cost_sek": 5500,
+      "note": "instabil möbel — funktionen ifrågasatt"
+    },
+    {
+      "category": "mekanikfel",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.14,
+      "ci_low": 0.08,
+      "ci_high": 0.22,
+      "source": "judgment",
+      "repair_cost_sek": 1500,
+      "note": "kärvar men fungerar"
+    },
+    {
+      "category": "mekanikfel",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.3,
+      "ci_low": 0.2,
+      "ci_high": 0.42,
+      "source": "judgment",
+      "repair_cost_sek": 3000,
+      "note": "obrukbar funktion — bäddsoffa som inte bäddar är en soffa"
+    },
+    {
+      "category": "saknad_del",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.08,
+      "ci_low": 0.04,
+      "ci_high": 0.14,
+      "source": "judgment",
+      "repair_cost_sek": 500,
+      "note": "ersättningsbar del"
+    },
+    {
+      "category": "saknad_del",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.2,
+      "ci_low": 0.12,
+      "ci_high": 0.3,
+      "source": "judgment",
+      "repair_cost_sek": 1500,
+      "note": "svårersatt eller central del"
+    },
+    {
+      "category": "vattenskada",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.15,
+      "ci_low": 0.08,
+      "ci_high": 0.24,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "begränsad svällning"
+    },
+    {
+      "category": "vattenskada",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.35,
+      "ci_low": 0.24,
+      "ci_high": 0.46,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "spånskiva som svällt går inte att laga"
+    },
+    {
+      "category": "lukt",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.15,
+      "ci_low": 0.08,
+      "ci_high": 0.24,
+      "source": "judgment",
+      "repair_cost_sek": 1200,
+      "note": "svag lukt; syns EJ i bild — kräver deklaration"
+    },
+    {
+      "category": "lukt",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.35,
+      "ci_low": 0.25,
+      "ci_high": 0.45,
+      "source": "judgment",
+      "repair_cost_sek": 1200,
+      "note": "rök/husdjur är ofta deal-breaker; sänkt från 0,42 efter granskning"
+    },
+    {
+      "category": "mogel",
+      "furniture_type": "*",
+      "grade": 1,
+      "deduction": 0.25,
+      "ci_low": 0.15,
+      "ci_high": 0.38,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "begränsad angrepp"
+    },
+    {
+      "category": "mogel",
+      "furniture_type": "*",
+      "grade": 2,
+      "deduction": 0.45,
+      "ci_low": 0.35,
+      "ci_high": 0.5,
+      "source": "judgment",
+      "repair_cost_sek": null,
+      "note": "hälsorisk — bör prissättas som renoveringsobjekt"
+    }
+  ],
+  "_schema": {
+    "berakning": "ANDELAR, alltid. En kategori i tabellen ger avdrag = deduction x bas. Ingen min()-regel, ingen jamforelse mot kostnad, ingen omrakning.",
+    "repair_cost_sek": "DOKUMENTATION OCH RIMLIGHETSUNDERLAG — INGAR INTE I BERAKNINGEN. Aterinfor det ALDRIG i varderingen; tests/test_damage_pricing.py::test_table_repair_cost_never_enters_valuation failar om nagon gor det.",
+    "undantag": "Omappade skador (source=estimated_repair) saknar andel och maste utga fran kostnad. Dar galler REPAIR_HASSLE_FACTOR = 2,0 (ovaliderad) och taket MAX_UNMAPPED_DEDUCTION = 25 %.",
+    "rules_block": "Blocket 'rules' ar DOKUMENTATION. Motorn laser ALDRIG darifran — konstanterna bor i price_engine/config.py. Se tests/test_damage_table.py::test_rules_block_matches_config.",
+    "source": {
+      "measured": "uppmatt kvot flaggade/oflaggade inom modellgrupp",
+      "repair_anchor": "harledd ur reparationskostnad i relation till typiskt begagnatvarde",
+      "judgment": "bedomning av marknadsreaktion; ingen kostnad eller matning bakom",
+      "structure_only": "raden finns for att strukturen ska vara komplett; avdraget ar 0",
+      "insufficient_data": "under 30 grupper — ingen siffra ges"
+    }
+  }
+}

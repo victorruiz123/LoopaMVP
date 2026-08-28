@@ -1,0 +1,27 @@
+{
+  "n": 2458,
+  "punkt (basen som typ)": {
+    "n": 2386,
+    "expected": 371.1,
+    "median": 0.0,
+    "p90": 1050.0
+  },
+  "union (L5)": {
+    "n": 2458,
+    "expected": 301.5,
+    "median": 0.0,
+    "p90": 900.0
+  },
+  "gammal platt klassificerare": {
+    "n": 1441,
+    "expected": 343.9,
+    "median": 0.0,
+    "p90": 1000.0
+  },
+  "coverage_of_true_median": {
+    "all": 0.891,
+    "subtyped_only": 0.946,
+    "n_subtyped": 483
+  },
+  "median_spread_ratio": 1.0
+}

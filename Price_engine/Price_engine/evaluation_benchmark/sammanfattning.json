@@ -1,0 +1,20 @@
+{
+  "kärnnamn": {
+    "möbler": 10,
+    "svar_gavs": 9,
+    "accuracy_intervall_överlapp": 0.8,
+    "accuracy_default_inom_facit": 0.4,
+    "median_avvikelse_när_utanför": 0.415,
+    "för_högt": 0,
+    "för_lågt": 5
+  },
+  "kärnnamn + bild": {
+    "möbler": 10,
+    "svar_gavs": 9,
+    "accuracy_intervall_överlapp": 0.8,
+    "accuracy_default_inom_facit": 0.4,
+    "median_avvikelse_när_utanför": 0.415,
+    "för_högt": 1,
+    "för_lågt": 4
+  }
+}

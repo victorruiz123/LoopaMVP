@@ -1,0 +1,12 @@
+{
+  "sigma_alla": 0.8116,
+  "sigma_med_modellnamn": 0.6384,
+  "grupper_med_modellnamn": 7082,
+  "rader_med_modellnamn": 119588,
+  "grupper": 22865,
+  "rader": 517703,
+  "min_group": 5,
+  "spridning_p75_p25_median": 0.6937,
+  "spridning_p75_p25_medel": 0.8264,
+  "andel_inom_egen_p30_p60": 0.3704
+}

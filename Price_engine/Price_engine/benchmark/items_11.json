@@ -1,0 +1,115 @@
+[
+ {
+  "nr": 1,
+  "brand": "IKEA",
+  "model": "Ektorp",
+  "variant": "2-sits",
+  "category": "Soffor",
+  "facit_low": 400,
+  "facit_high": 900
+ },
+ {
+  "nr": 2,
+  "brand": "IKEA",
+  "model": "Söderhamn bäddsoffa",
+  "variant": "3-sits",
+  "category": "Soffor",
+  "facit_low": 2000,
+  "facit_high": 2500
+ },
+ {
+  "nr": 3,
+  "brand": "IKEA",
+  "model": "Vimle",
+  "variant": "3-sits",
+  "category": "Soffor",
+  "facit_low": 1500,
+  "facit_high": 3000
+ },
+ {
+  "nr": 4,
+  "brand": "Mio",
+  "model": "Cordelia",
+  "variant": "Om fåtölj: I vår fåtölj Cordelia kan man slappna av och njuta av lugnet. En fåtölj med fina detaljer och runda former. Finns att välja mellan flera olika tyger och färger. Dess höga ben underlättar vid städning och ger ett lyftigare intryck.",
+  "category": "fåtölj",
+  "facit_low": 1500,
+  "facit_high": 3000
+ },
+ {
+  "nr": 5,
+  "brand": "IKEA",
+  "model": "Jennylund",
+  "variant": null,
+  "category": "Fåtöljer",
+  "facit_low": 200,
+  "facit_high": 700
+ },
+ {
+  "nr": 6,
+  "brand": "IKEA",
+  "model": "Strandmon",
+  "variant": null,
+  "category": "Fåtöljer",
+  "facit_low": 1000,
+  "facit_high": 2000
+ },
+ {
+  "nr": 7,
+  "brand": "Sofacompany",
+  "model": "Clara Rak bäddsoffa",
+  "variant": null,
+  "category": "soffor",
+  "facit_low": 7000,
+  "facit_high": 10000
+ },
+ {
+  "nr": 8,
+  "brand": "Sweef",
+  "model": "Valen 224 Rak soffa",
+  "variant": null,
+  "category": "soffor",
+  "facit_low": 7000,
+  "facit_high": 12000
+ },
+ {
+  "nr": 9,
+  "brand": "Mio",
+  "model": "Santos",
+  "variant": "Matbord",
+  "category": "Matbord",
+  "facit_low": 700,
+  "facit_high": 1000
+ },
+ {
+  "nr": 10,
+  "brand": "IKEA",
+  "model": "PINNTORP",
+  "variant": "Matbord",
+  "category": "Matbord",
+  "facit_low": 300,
+  "facit_high": 800,
+  "facit_note": "satt for BORDET ensamt, utan stolar",
+  "images_from": 10
+ },
+ {
+  "nr": 11,
+  "brand": "Kinnarps",
+  "model": "Capella X / Capella Classic",
+  "variant": "Kontorsstol",
+  "category": "Sittmöbler",
+  "facit_low": 1300,
+  "facit_high": 1600
+ },
+ {
+  "nr": 12,
+  "brand": "IKEA",
+  "model": "PINNTORP",
+  "variant": "Bord och 4 stolar",
+  "category": "Matgrupp",
+  "facit_low": 1500,
+  "facit_high": 2500,
+  "disputed": true,
+  "facit_note": "hela matgruppen; disputed mot matgruppsrabatten 0,52x",
+  "images_from": 10
+ }
+]

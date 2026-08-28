@@ -1,0 +1,10 @@
+{
+  "n": 120,
+  "n_both_answered": 119,
+  "median_n_off": 90,
+  "median_n_on": 75,
+  "share_moved": 0.328,
+  "median_abs_shift": 0.1667,
+  "filtered_off": 15,
+  "filtered_on": 34
+}

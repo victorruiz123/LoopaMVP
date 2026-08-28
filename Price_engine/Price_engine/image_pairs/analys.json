@@ -1,0 +1,284 @@
+{
+  "pairs_selected": 128,
+  "pairs_labelled": 126,
+  "uncertain": 2,
+  "current_threshold": 0.45,
+  "overall": {
+    "distribution": {
+      "olika": {
+        "n": 112,
+        "median": 0.6,
+        "p25": 0.318,
+        "p75": 0.74
+      },
+      "samma_modell_annan_variant": {
+        "n": 11,
+        "median": 0.842,
+        "p25": 0.767,
+        "p75": 0.862
+      },
+      "samma_variant": {
+        "n": 3,
+        "median": 0.769,
+        "p25": 0.725,
+        "p75": 0.78
+      }
+    },
+    "strict": {
+      "threshold": 0.68,
+      "j": 0.65,
+      "sensitivity": 1.0,
+      "specificity": 0.65,
+      "false_positives": 43,
+      "false_negatives": 0,
+      "n_positive": 3,
+      "n_negative": 123,
+      "separation": 0.74
+    },
+    "broad": {
+      "threshold": 0.68,
+      "j": 0.714,
+      "sensitivity": 1.0,
+      "specificity": 0.714,
+      "false_positives": 32,
+      "false_negatives": 0,
+      "n_positive": 14,
+      "n_negative": 112,
+      "separation": 0.92
+    }
+  },
+  "per_variant": {
+    "bord": {
+      "n": 25,
+      "distribution": {
+        "olika": {
+          "n": 25,
+          "median": 0.492,
+          "p25": 0.342,
+          "p75": 0.67
+        }
+      },
+      "broad": {
+        "threshold": null,
+        "reason": "en klass saknas"
+      },
+      "false_positives_at_045": 15,
+      "positives_below_045": 0
+    },
+    "byrå": {
+      "n": 7,
+      "distribution": {
+        "olika": {
+          "n": 5,
+          "median": 0.78,
+          "p25": 0.652,
+          "p75": 0.781
+        },
+        "samma_modell_annan_variant": {
+          "n": 1,
+          "median": 0.876,
+          "p25": 0.876,
+          "p75": 0.876
+        },
+        "samma_variant": {
+          "n": 1,
+          "median": 0.79,
+          "p25": 0.79,
+          "p75": 0.79
+        }
+      },
+      "broad": {
+        "threshold": 0.79,
+        "j": 0.8,
+        "sensitivity": 1.0,
+        "specificity": 0.8,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "n_positive": 2,
+        "n_negative": 5,
+        "separation": 0.56
+      },
+      "false_positives_at_045": 5,
+      "positives_below_045": 0
+    },
+    "fåtölj": {
+      "n": 24,
+      "distribution": {
+        "olika": {
+          "n": 22,
+          "median": 0.506,
+          "p25": 0.323,
+          "p75": 0.612
+        },
+        "samma_modell_annan_variant": {
+          "n": 1,
+          "median": 0.885,
+          "p25": 0.885,
+          "p75": 0.885
+        },
+        "samma_variant": {
+          "n": 1,
+          "median": 0.769,
+          "p25": 0.769,
+          "p75": 0.769
+        }
+      },
+      "broad": {
+        "threshold": 0.65,
+        "j": 0.864,
+        "sensitivity": 1.0,
+        "specificity": 0.864,
+        "false_positives": 3,
+        "false_negatives": 0,
+        "n_positive": 2,
+        "n_negative": 22,
+        "separation": 1.74
+      },
+      "false_positives_at_045": 12,
+      "positives_below_045": 0
+    },
+    "hylla": {
+      "n": 7,
+      "distribution": {
+        "olika": {
+          "n": 6,
+          "median": 0.751,
+          "p25": 0.677,
+          "p75": 0.793
+        },
+        "samma_modell_annan_variant": {
+          "n": 1,
+          "median": 0.883,
+          "p25": 0.883,
+          "p75": 0.883
+        }
+      },
+      "broad": {
+        "threshold": 0.88,
+        "j": 1.0,
+        "sensitivity": 1.0,
+        "specificity": 1.0,
+        "false_positives": 0,
+        "false_negatives": 0,
+        "n_positive": 1,
+        "n_negative": 6,
+        "separation": 0.57
+      },
+      "false_positives_at_045": 5,
+      "positives_below_045": 0
+    },
+    "matgrupp": {
+      "n": 13,
+      "distribution": {
+        "olika": {
+          "n": 13,
+          "median": 0.637,
+          "p25": 0.601,
+          "p75": 0.784
+        }
+      },
+      "broad": {
+        "threshold": null,
+        "reason": "en klass saknas"
+      },
+      "false_positives_at_045": 10,
+      "positives_below_045": 0
+    },
+    "soffa": {
+      "n": 24,
+      "distribution": {
+        "olika": {
+          "n": 21,
+          "median": 0.493,
+          "p25": 0.315,
+          "p75": 0.642
+        },
+        "samma_modell_annan_variant": {
+          "n": 2,
+          "median": 0.808,
+          "p25": 0.789,
+          "p75": 0.828
+        },
+        "samma_variant": {
+          "n": 1,
+          "median": 0.681,
+          "p25": 0.681,
+          "p75": 0.681
+        }
+      },
+      "broad": {
+        "threshold": 0.68,
+        "j": 0.81,
+        "sensitivity": 1.0,
+        "specificity": 0.81,
+        "false_positives": 4,
+        "false_negatives": 0,
+        "n_positive": 3,
+        "n_negative": 21,
+        "separation": 1.48
+      },
+      "false_positives_at_045": 12,
+      "positives_below_045": 0
+    },
+    "stol": {
+      "n": 13,
+      "distribution": {
+        "olika": {
+          "n": 10,
+          "median": 0.635,
+          "p25": 0.522,
+          "p75": 0.675
+        },
+        "samma_modell_annan_variant": {
+          "n": 3,
+          "median": 0.756,
+          "p25": 0.754,
+          "p75": 0.799
+        }
+      },
+      "broad": {
+        "threshold": 0.69,
+        "j": 0.8,
+        "sensitivity": 1.0,
+        "specificity": 0.8,
+        "false_positives": 2,
+        "false_negatives": 0,
+        "n_positive": 3,
+        "n_negative": 10,
+        "separation": 0.61
+      },
+      "false_positives_at_045": 8,
+      "positives_below_045": 0
+    },
+    "säng": {
+      "n": 13,
+      "distribution": {
+        "olika": {
+          "n": 10,
+          "median": 0.455,
+          "p25": 0.276,
+          "p75": 0.719
+        },
+        "samma_modell_annan_variant": {
+          "n": 3,
+          "median": 0.789,
+          "p25": 0.776,
+          "p75": 0.818
+        }
+      },
+      "broad": {
+        "threshold": 0.76,
+        "j": 0.9,
+        "sensitivity": 1.0,
+        "specificity": 0.9,
+        "false_positives": 1,
+        "false_negatives": 0,
+        "n_positive": 3,
+        "n_negative": 10,
+        "separation": 1.4
+      },
+      "false_positives_at_045": 5,
+      "positives_below_045": 0
+    }
+  }
+}

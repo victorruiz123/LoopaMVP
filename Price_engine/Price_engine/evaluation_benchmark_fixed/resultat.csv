@@ -1,0 +1,21 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse
+1,Mio Town,kärnnamn,7000,12000,4000,6000,7900,34,none,none,,none,high,True,False,-0.14285714285714285
+1,Mio Town,kärnnamn + bild,7000,12000,3617,6163,9083,22,filtered,dinov2,"['soffa', 'hörnsoffa']",filtered,low,True,False,-0.11957142857142856
+2,Mio Saturday,kärnnamn,3000,6000,3349,5742,9289,15,none,none,,none,low,True,True,0.0
+2,Mio Saturday,kärnnamn + bild,3000,6000,3738,5325,7383,15,filtered,dinov2,['soffa'],none,low,True,True,0.0
+3,Mio Bridge,kärnnamn,3500,7000,2000,3776,5665,24,none,none,,none,low,True,True,0.0
+3,Mio Bridge,kärnnamn + bild,3500,7000,2000,3334,5787,13,filtered,dinov2,['soffa'],filtered,low,True,False,-0.04742857142857143
+4,IKEA Karlstad,kärnnamn,500,2000,480,700,1000,44,none,none,,none,high,True,True,0.0
+4,IKEA Karlstad,kärnnamn + bild,500,2000,193,1169,2338,14,filtered,dinov2,['soffa'],filtered,low,True,True,0.0
+5,Bellus soffa,kärnnamn,2000,6000,2000,4000,10000,29,none,none,,none,high,True,True,0.0
+5,Bellus soffa,kärnnamn + bild,2000,6000,600,4000,10900,13,filtered,dinov2,['soffa'],filtered,high,True,True,0.0
+6,IKEA Stocksund,kärnnamn,800,2000,500,750,1000,38,none,none,,none,high,True,False,-0.0625
+6,IKEA Stocksund,kärnnamn + bild,800,2000,519,938,1592,23,filtered,dinov2,['soffa'],filtered,low,True,True,0.0
+7,Stalands Happy,kärnnamn,3000,6000,1854,3658,5931,2,none,none,,none,low,True,True,0.0
+7,Stalands Happy,kärnnamn + bild,3000,6000,1854,3658,5931,2,none,single_candidate,,none,low,True,True,0.0
+8,Kartell Victoria Ghost,kärnnamn,1000,2000,326,585,1016,15,none,none,,none,low,True,False,-0.415
+8,Kartell Victoria Ghost,kärnnamn + bild,1000,2000,326,585,1016,15,none,single_candidate,,none,low,True,False,-0.415
+9,None Matgrupp 5 stolar,kärnnamn,1500,2500,148,586,2381,16,none,none,,none,low,True,False,-0.6093333333333333
+9,None Matgrupp 5 stolar,kärnnamn + bild,1500,2500,148,586,2381,16,none,single_candidate,,none,low,True,False,-0.6093333333333333
+10,None Ekbord med stolar,kärnnamn,2000,5000,212,300,833,35,none,none,,none,high,False,False,-0.85
+10,None Ekbord med stolar,kärnnamn + bild,2000,5000,117,371,1250,22,none,unresolved,,filtered,low,False,False,-0.8145

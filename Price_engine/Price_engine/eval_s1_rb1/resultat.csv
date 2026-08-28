@@ -1,0 +1,11 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,effectiveN,sizeMethod,sizeQuery,sizeWarning,filtersConverted,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse,felklass
+1,Mio Town,kärnnamn + bild,7000,12000,5000.0,6500.0,9900.0,34,weighted,type_system:image+union3,29.5,none,,"divan,3-sits,u-soffa",variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,False,-0.07142857142857142,övrigt
+2,Mio Saturday,kärnnamn + bild,3000,6000,2983.0,5495.0,9013.0,15,weighted,type_system:image+union3,14.2,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,tunt
+3,Mio Bridge,kärnnamn + bild,3500,7000,2000.0,3776.0,5665.0,24,weighted,type_system:image+union3,22.5,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,övrigt
+4,IKEA karlstrand,kärnnamn + bild,500,2000,,,,0,ignored,type_system:image+union3,0.0,none,,,,"['baddsoffa', 'hornsoffa', 'soffa']",none,none,False,False,,tunt
+5,Bellus soffa,kärnnamn + bild,2000,6000,2000.0,4000.0,10000.0,29,weighted,type_system:text+union3,28.2,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,high,True,True,0.0,övrigt
+6,IKEA stocksund,kärnnamn + bild,800,2000,500.0,800.0,1500.0,30,filtered,type_system:image+union3,30.0,none,,"divan,3-sits",,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,övrigt
+7,Stalands happy,kärnnamn + bild,3000,6000,1854.0,3658.0,5931.0,2,ignored,type_system:image+union3,2.0,none,,,,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,tunt
+8,Kartell Victoria Ghost,kärnnamn + bild,1000,2000,456.0,811.0,1483.0,15,none,unresolved,15.0,none,,,,,none,low,True,False,-0.189,tunt
+9, Matgrupp 5 stolar,kärnnamn + bild,1500,2500,281.0,585.0,1969.0,15,weighted,type_system:text,11.2,weighted,5 stolar,,"variant,storlek",['matgrupp'],none,low,True,False,-0.61,tunt
+10, Ekbord med stolar,kärnnamn + bild,2000,5000,92.0,438.0,3230.0,15,weighted,type_system:text,11.4,none,,,variant,['matgrupp'],none,low,True,False,-0.781,tunt

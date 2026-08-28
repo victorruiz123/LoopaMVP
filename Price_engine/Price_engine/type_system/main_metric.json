@@ -1,0 +1,38 @@
+[
+  {
+    "cfg": "text+prior",
+    "base_acc": 0.7298245614035088,
+    "type_acc": 0.4842105263157895,
+    "kr_med_wrong": 400.0,
+    "kr_p90_wrong": 2410.000000000001,
+    "expected": 613.8736842105263,
+    "p90_all": 1615.0999999999995
+  },
+  {
+    "cfg": "bild (familj)",
+    "base_acc": 0.7824561403508772,
+    "type_acc": 0.543859649122807,
+    "kr_med_wrong": 400.0,
+    "kr_p90_wrong": 1877.5,
+    "expected": 409.2438596491228,
+    "p90_all": 1200.6
+  },
+  {
+    "cfg": "text+prior+bild",
+    "base_acc": 0.7298245614035088,
+    "type_acc": 0.4842105263157895,
+    "kr_med_wrong": 400.0,
+    "kr_p90_wrong": 2410.000000000001,
+    "expected": 613.8736842105263,
+    "p90_all": 1615.0999999999995
+  },
+  {
+    "cfg": "gammal platt klassificerare",
+    "base_acc": 0.7894736842105263,
+    "type_acc": 0.5789473684210527,
+    "kr_med_wrong": 400.0,
+    "kr_p90_wrong": 1505.0000000000005,
+    "expected": 311.03508771929825,
+    "p90_all": 1000.0
+  }
+]

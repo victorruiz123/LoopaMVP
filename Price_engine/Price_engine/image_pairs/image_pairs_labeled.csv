@@ -1,0 +1,129 @@
+pair_id,a_row,b_row,similarity,variant,bucket,label,motivering,a_source,b_source,a_name,b_name
+1,35151,30839,0.2905,soffa,0.20-0.30,olika,vit skinnsoffa mot vit/furu hörnsoffa,blocket,blocket,Ikea Kivik 3 sits,Soffa Ikea Furudal furu 5 moduler design Gillis Lundgren IKEA 1983
+2,2492,25675,0.2172,soffa,0.20-0.30,olika,grå reclinerfåtölj mot gammal brun soffstomme,auctionet,blocket,"FÅTÖLJ, ""Seat up"", tillverkad av O.H. Sjögren, brickmärkt.",Rottinggrupp med klädsel
+3,88516,86675,0.245,soffa,0.20-0.30,olika,grå tvåsits mot rotting-/metallbänk utomhus,blocket,blocket,"Soffa Coffee 2,5 sits",Brun utesoffa med svart metallstomme
+4,11670,11642,0.293,soffa,0.20-0.30,olika,rosa tresits på hjul mot mörk träbänk,auctionet,auctionet,"SOFFA, "" Visingsö "". carl malmsten","PINNSOFFA, trä, 1900-talets andra hälft."
+5,29335,7453,0.2671,soffa,0.20-0.30,olika,blommig soffa mot bänk med rottingrygg,blocket,auctionet,Vacker soffa från 60-talet,"SOFFA, rokokostil, 1900-tal."
+6,7381,720,0.3145,soffa,0.30-0.45,olika,träbänk mot mörk läderpuff,auctionet,auctionet,"PINNSOFFA, möjligen Danmark, 1960-tal.","TABURETT, England, stoppad och skinnklädd sits, 1900-talets slit."
+7,23069,31285,0.4373,soffa,0.30-0.45,olika,beige soffa i rum mot vitmålad dagbädd,blocket,blocket,Jysk Egense beige 2-sits soffa,Kökssoffa/ Bänk/ Gammal möbel
+8,34782,35270,0.3237,soffa,0.30-0.45,olika,röd soffa i rum mot antik allmogesoffa,blocket,blocket,Röd soffa 3-sits med träben,Antik soffa
+9,30344,31291,0.387,soffa,0.30-0.45,olika,blommig rottinggrupp mot ljusgrå modern soffa,blocket,blocket,Rottinggrupp,Soffa - Dublin - från Slettvoll säljes
+10,35298,12377,0.3499,soffa,0.30-0.45,osäker,stor grå modulsoffa mot enstaka mörkgrå modul - kan vara samma system,blocket,blocket,Stor rymlig soffa grå,Sammets soffa / fåtölj
+11,30277,31034,0.5991,soffa,0.45-0.60,olika,ljus tvåsits mot ljusblå sliten soffa med rullade armstöd,blocket,blocket,IKEA Kivik 3-sitssoffa,Soffa
+12,30659,23977,0.5288,soffa,0.45-0.60,olika,ljusgrå högryggad mot mörk petroleumblå sammetssoffa,blocket,blocket,"2,5 sits soffa säljes!",Jysk soffa mörkgrön tyg
+13,91160,32407,0.46,soffa,0.45-0.60,olika,svart skinnsoffa mot skärmdump från ikea.se,blocket,blocket,Svart soffa i skinnimitation,Soffa Söderhamn Ikea
+14,26424,31010,0.5298,soffa,0.45-0.60,olika,marinblå modern soffa mot beige rumssoffa,blocket,blocket,HAY Silhouette 3-sits soffa – mörkblå,Oxford soffa svängd
+15,7757,84157,0.4929,soffa,0.45-0.60,olika,blommig soffa i studio mot blå utomhushörnsoffa,auctionet,blocket,"SOFFA, 1900-talets andra hälft, klädd i JP Bakers ""Hydrangea bird"", klotformade ben.",Utesoffa med svarta dynor
+16,25916,23611,0.6807,soffa,0.60-0.75,samma_variant,två mörkgrå boxiga soffor med låga armstöd - samma modellfamilj,blocket,blocket,Soffa och bord,soffa till salu
+17,88416,30081,0.6514,soffa,0.60-0.75,olika,skärmdump rosa tvåsits mot grå klippan-liknande med överdrag,blocket,blocket,Sweef soffa - katten,IKEA Klippan 2-sits soffa grå tyg
+18,29444,30481,0.6357,soffa,0.60-0.75,olika,brun/beige soffa utomhus mot två ljusgrå sittmöbler i rum,blocket,blocket,Mio Soffa Arizona,Soffa och fåtölj
+19,29822,31110,0.7324,soffa,0.60-0.75,olika,röd tvåsits mot ljusgrå tvåsits med träben,blocket,blocket,Två 3-sits soffor,ikea soffa Karlstad
+20,7910,33895,0.6416,soffa,0.60-0.75,olika,mönstrad antik hörnbänk mot brungrå tvåsits,auctionet,blocket,"SOFFA, hörnmodell, 1800/1900 tal, Norge.",Brun tygsoffa 3-sits med rundade armstöd
+21,30535,25838,0.769,soffa,0.75-0.92,samma_modell_annan_variant,ljusgrå tresits mot ljusgrå hörnsoffa - samma tyg och stil,blocket,blocket,Tresitsig soffa med avtagbar klädsel,Soffa
+22,25642,90904,0.751,soffa,0.75-0.92,olika,beige sektionssoffa med divan mot blommig traditionell soffa,blocket,blocket,Jättefin Eden Soffa med nackstöd o pall,Soffa med fåtöljer
+23,35028,27873,0.8477,soffa,0.75-0.92,samma_modell_annan_variant,två högryggade soffor av samma typ i olika tyg (gräddvit mot grå),blocket,blocket,Eilersen Zenith 3-sits soffa,Ikea Stocksund 3-sits soffa
+24,24773,23140,0.7686,soffa,0.75-0.92,olika,grå sammetssoffa med rullade armstöd mot kraftigare brungrå soffa,blocket,blocket,Lawrence howardsoffa 2-sits,Soffor
+25,34574,31380,0.7529,soffa,0.75-0.92,olika,vit låg soffa med tunna ben mot vit tresits med rullade armstöd,blocket,blocket,"Sören Lund SL 88, dansk designsoffa",Soffa och Fotölj säljes nu billigt pga flytt
+26,28237,37704,0.2764,fåtölj,0.20-0.30,olika,svart barockfåtölj mot svart modern högryggad på metallstativ,blocket,blocket,Nätt svart karmstol,Svart karmstol i sammet
+27,2054,23057,0.2305,fåtölj,0.20-0.30,olika,orange fluffig cocktailfåtölj mot blågrå recliner,auctionet,blocket,"ARNE DAHLÉN. Fåtölj, ""Eva"", Dalums Fåtöljindustri, 1960-tal.",Elektrisk recliner fåtölj med lift-upfunktion
+28,1980,82976,0.2947,fåtölj,0.20-0.30,olika,två gula 40-talsfåtöljer mot två ornamenterade antika fåtöljer,auctionet,blocket,"""Corall"", karmstolar, ett par, Nordiska Kompaniet, 1930-tal, stomme i betsad björk, klädse",2st läckra fåtöljer
+29,2298,2982,0.2229,fåtölj,0.20-0.30,olika,blåmålad träfåtölj mot butterfly-stol i kohud,auctionet,auctionet,"FÅTÖLJ ""Lövåsen"" Sportsugemöbel, bemålad furu, Åby Möbelfabrik, 1900-talets mitt.","FÅTÖLJ, fladdermusmodell, metallunderede, koskinn/canvas."
+30,4247,84760,0.2354,fåtölj,0.20-0.30,olika,två svarta läderfåtöljer mot grå rottingstol utomhus,auctionet,blocket,"KARMSTOLAR, ett par, modell 401, konstläder & nitdekor, Engen, Örkelljunga, 1900-talets mi",Rottingfåtölj
+31,28668,29808,0.449,fåtölj,0.30-0.45,olika,grå tvåsits soffa mot mörkbrun fåtölj med träarmstöd,blocket,blocket,Ikea VIMLE fåtölj,50-talsfåtölj
+32,47589,93947,0.3335,fåtölj,0.30-0.45,olika,röd antik fällstol mot gul 40-talsfåtölj,blocket,auctionet,"Karmstol ""dante"" med snidade detaljer","""Samsas"", fåtölj, stoppad textilbeklädd stomme, OH Sjögren Tranås, brickmärkt. carl malmst"
+33,4215,23282,0.3196,fåtölj,0.30-0.45,olika,två röda barockstolar mot rottingstolar,auctionet,blocket,"KARMSTOLAR/LÄNSSTOLAR, ett par, barockstil, 1900-tal.",Rottingfåtöljer i natur från Åhléns Home!
+34,1314,27856,0.4302,fåtölj,0.30-0.45,olika,två svarta läderfåtöljer i teak mot gräddvit högryggad på gräsmatta,auctionet,blocket,"""Senator"", fåtöljer, ett par, France & Son, Danmark, 1960-tal, teak. ole wanscher",Fåtölj
+35,84895,3037,0.3481,fåtölj,0.30-0.45,olika,två rottingstolar med blå dynor mot brun fårskinnsfåtölj,blocket,auctionet,Rottingfåtöljer med grå dynor,"Fåtölj ""Hemmakväll"", klädd i fårskinnspäls Espresso. carl malmsten"
+36,2106,27037,0.5781,fåtölj,0.45-0.60,olika,två gröna fåtöljer med träarmstöd mot beige öronlappsfåtölj,auctionet,blocket,"FÅTÖLJER, ett par, 1930/40-tal.",Fåtölj i mycket bra skick –600kr
+37,29716,2969,0.5234,fåtölj,0.45-0.60,olika,rottingfåtölj mot två cognacfärgade läderöronlappsfåtöljer,blocket,auctionet,Artwood design - rottingfåtölj med tjocka vita dynor,"FÅTÖLJER, 1 par, 1900-talets andra hälft, omklädd i brunt skinn, betsade ben."
+38,27271,22960,0.5,fåtölj,0.45-0.60,olika,grå recliner mot grå tuftad fåtölj på metallstativ,blocket,blocket,Fåtölj,Fåtölj i sammet
+39,23607,2969,0.5386,fåtölj,0.45-0.60,olika,vit bouclé-öronlappsfåtölj mot två cognac läderöronlappsfåtöljer,blocket,auctionet,Boucle Fåtölj Vit,"FÅTÖLJER, 1 par, 1900-talets andra hälft, omklädd i brunt skinn, betsade ben."
+40,35498,28201,0.5117,fåtölj,0.45-0.60,olika,röd sammetsfåtölj mot gräddvit 50-talsfåtölj med teakarmstöd,blocket,blocket,Emmafåtölj i röd sammet,Retro karmstol fåtölj
+41,25089,23289,0.6274,fåtölj,0.60-0.75,olika,brun fåtölj mot ljusgrå fåtölj - liknande silhuett men olika möbel,blocket,blocket,Howard fåtölj 2 st,Beige fåtölj
+42,23131,85821,0.6465,fåtölj,0.60-0.75,olika,röd läderrecliner mot grå rottingstol,blocket,blocket,Ekornes/ Stressless,2 st fåtöljer i konstrotting med dyna
+43,25998,29474,0.6987,fåtölj,0.60-0.75,osäker,två blommiga 50-talsfåtöljer mot två grå fåtöljer - liknande form; går inte att avgöra,blocket,blocket,Erik Mio fåtölj,Fåtöljer
+44,3393,2394,0.6084,fåtölj,0.60-0.75,olika,grönmönstrad 50-talsfåtölj mot blommig träbänk,auctionet,auctionet,"FÅTÖLJ, TILLSKRIVEN KURT ØSTERVIG.","Fåtölj, ""TeVe"", ur Studio-kollektionen 1953, Dux, Ljungs Industrier AB, Malmö. alf svensso"
+45,29891,29640,0.6138,fåtölj,0.60-0.75,olika,brunlila låg fåtölj med puff mot grå fåtölj,blocket,blocket,Cube fåtölj Karup Design,IKEA Mellby fåtölj i grått tyg
+46,29914,34239,0.7852,fåtölj,0.75-0.92,olika,två mörkbruna läderfåtöljer mot två svartblå läderkubfåtöljer,blocket,blocket,Världens skönaste fåtöljer,2 st svarta skinnfåtöljer från IKEA
+47,4374,32346,0.7695,fåtölj,0.75-0.92,samma_variant,två Mathsson-liknande högryggade fårskinnsfåtöljer med bokträstativ,auctionet,blocket,"Fåtölj ""Eva hög"", Dux, stomme i bok, med fluffig klädsel. bruno mathsson",DUX Pernilla 69
+48,1394,3208,0.7827,fåtölj,0.75-0.92,olika,två 50-talsfåtöljer i trä mot safaristol med svart läder,auctionet,auctionet,"KARMSTOLAR, ""CILLA"", TVÅ STYCKEN, FÖR IKEA. erik wörtz","""Colonial Chair"", karmstol, Carl Hansen & Søn, Danmark, modell OW149, formgivningsår 1959."
+49,23519,27694,0.7949,fåtölj,0.75-0.92,olika,beige tygrecliner mot mörkbrun läderrecliner,blocket,blocket,Fåtölj säljes,Skinnfåtölj IMG Norway
+50,4446,2458,0.8853,fåtölj,0.75-0.92,samma_modell_annan_variant,korallrosa tuftad öronlappsfåtölj mot två blågrå av samma modell,auctionet,auctionet,"Textilklädsel. ""Farmor"". AB O.H. Sjögren, plakettmärkt undertill. carl malmsten. fåtölj","Fåtöljer ett par ""Oscar"". carl malmsten"
+51,43365,83009,0.2559,bord,0.20-0.30,olika,ornamenterat runt trädgårdsbord mot höj- och sänkbart skrivbord,blocket,blocket,Vackert bord i metall.,DPJ höj- & sänkbart skrivbord
+52,55062,49675,0.2289,bord,0.20-0.30,olika,mörkt trä sidobord mot ovalt ljust matbord,blocket,blocket,Litet bord,Soffbord
+53,22159,39007,0.2393,bord,0.20-0.30,olika,litet rött sidobord mot mörkt skrivbord med lådor,blocket,blocket,Avlastningsbord,Skrivbord Jysk
+54,45983,39040,0.2076,bord,0.20-0.30,olika,kromat pelarbord mot vitt bord med svart metallstativ,blocket,blocket,Sidobord,Modernt konsolbord/sidobord i mycket fint skick
+55,35595,83342,0.2004,bord,0.20-0.30,olika,glasskrivbord med metallstativ mot skärmdump från jysk.se,blocket,blocket,VITTSJÖ bord svart/glas 100x36 cm,Utemöbler - soffbord Jysk
+56,51817,80328,0.3577,bord,0.30-0.45,olika,soffbord i ek med hylla mot antikt runt bord med svarvad fot,blocket,blocket,Teakbord,Runt träbord med svarvat ben svart/brunt
+57,11707,37178,0.3057,bord,0.30-0.45,olika,glasbord med svängda ben mot runt marmorbord,auctionet,blocket,"SOFFBORD, glas och smide, 1900-talets senare del.",Soffbord i marmor
+58,13543,41023,0.415,bord,0.30-0.45,olika,vitt skrivbord med lådor mot mörkt runt sidobord,blocket,blocket,Helt nytt skrivbord 120cm,Fritz Hansen Tray sidobord 60cm diameter
+59,46265,46650,0.4216,bord,0.30-0.45,olika,svart bordsskiva mot vitt höj- och sänkbart bord,blocket,blocket,Stort Svart Skrivbord från Ikea,Bekant skrivbord från ikea
+60,89086,88913,0.342,bord,0.30-0.45,olika,litet runt träbord mot svart hyllställ,blocket,blocket,"STOCKHOLM Satsbord, set om 2, valnötsfaner",Soffbord
+61,42685,80773,0.5586,bord,0.45-0.60,olika,enkelt ekbord mot antikt björkbord med svängda ben,blocket,blocket,Litet bord,"Halvmånebord, i björk från 1800-talet"
+62,42104,53303,0.4924,bord,0.45-0.60,olika,ljust bord på trädäck mot grovt ekbord,blocket,blocket,IKEA Linmon bord med metallben,Soffbord massiv ek
+63,35982,50210,0.5698,bord,0.45-0.60,olika,ovalt sidobord på metallfot mot ovalt mörkt soffbord,blocket,blocket,"Två små soffbord, nya!",Soffbord massivt trä H&M Home
+64,44965,11707,0.4751,bord,0.45-0.60,olika,skärmdump ikea holmerud mot glasbord med metallstativ,blocket,auctionet,Soffbord IKEA,"SOFFBORD, glas och smide, 1900-talets senare del."
+65,42909,6847,0.4866,bord,0.45-0.60,olika,metallbord på gräs mot grå konsolbord med lådor,blocket,auctionet,STADIGT BORD - 88 x 60 CM !!,"SKRIVBORD, 1900-talets början, svartmålad skrivskiva, två lådor med beslag i gustaviansk s"
+66,5196,92124,0.6699,bord,0.60-0.75,olika,satsbord i trä mot långt rustikt matbord,auctionet,blocket,"satsbord, 3 st, bonad björk, Svenska Möbelfabrikerna Bodafors. axel larsson",Antikt slagbord klaffbord
+67,42626,54877,0.6992,bord,0.60-0.75,olika,vitt soffbord mot glas- och metallsoffbord,blocket,blocket,Vitt soffbord,Soffbord med glasskiva och förvaring
+68,88096,11725,0.6016,bord,0.60-0.75,olika,utomhusbord med bänkar mot mörkt bord på hjul,blocket,auctionet,Grythyttan med renoveringsbehov,"Soffbord, för Cado, Danmark, 1900-talets andra hälft. arne vodder"
+69,45850,7062,0.6089,bord,0.60-0.75,olika,litet rött pelarbord mot antikt ovalt bord med svarvade ben,blocket,auctionet,"SIDOBORD INTARSIA, MAHOGNY, 1900-TAL.","MÅNBORD, 2 delar, sent 1800-tal."
+70,12682,36127,0.6133,bord,0.60-0.75,olika,vitt bord mot marmorsidobord med svart ram,blocket,blocket,Ikea malm smink bord helt nytt,Mio Nancy sidobord
+71,55594,61653,0.7524,bord,0.75-0.92,olika,teaksidobord mot konsolbord med svart skiva och metallram,blocket,blocket,Teakbord,Avlastningsbord
+72,5943,11679,0.7544,bord,0.75-0.92,olika,teaksoffbord med spretiga ben mot teaksoffbord med mönstrad skiva,auctionet,auctionet,"SOFFBORD, teak och bok med mässingsfötter, Ellbe, 1900-talets mitt.","SOFFBORD, ""Elddans"", Algot P Törneman, Seffle Möbelfabrik, signerat, numrerat 33/200, date"
+73,4763,11679,0.7676,bord,0.75-0.92,olika,50-talsbord med svängda ben mot teaksoffbord med röd skiva,auctionet,auctionet,"SOFFBORD Mahogny, 1900-talets mitt.","SOFFBORD, ""Elddans"", Algot P Törneman, Seffle Möbelfabrik, signerat, numrerat 33/200, date"
+74,55594,7015,0.8062,bord,0.75-0.92,olika,teaksidobord mot antikt bord med svarvade ben,blocket,auctionet,Teakbord,"SPELBORD, sent 1800-tal."
+75,6842,5260,0.8125,bord,0.75-0.92,olika,vit gustaviansk halvmånekonsol mot ovalt intarsiabord,auctionet,auctionet,"KONSOLBORD, 1900-talets andra hälft, gustaviansk stil, ''Signum Gustavus'', bemålad.","Sybord, ""Nya Frida"", fanérad i björk, med dekor av intarsia, låda i sargen. carl malmsten"
+76,50635,28998,0.2423,matgrupp,0.20-0.30,olika,vitt matbord med vita stolar mot svarta läderstolar,blocket,blocket,Matgrupp med 4 stolar,2 st Soffor plus matbord med 4 st stolar
+77,49954,48235,0.2966,matgrupp,0.20-0.30,olika,mörkt runt klaffbord mot vitt matbord med grå stolar,blocket,blocket,Matgrupp,Matgrupp
+78,40489,48028,0.2225,matgrupp,0.20-0.30,olika,rustikt bord med metallben mot vitt bord med grå stolar,blocket,blocket,Mio matbord och stol i trä och sammet,Matbord med 2 stolar
+91,50815,57468,0.7393,matgrupp,0.60-0.75,olika,ovalt ekbord med spjälstolar mot mörkt bord med vit iläggsskiva,blocket,blocket,"Skandinavisk matgrupp i ek: Ovalt, förlängningsbart bord + 6 stolar","Matbord, 4 stolar samt en byrå"
+92,40498,39369,0.6284,matgrupp,0.60-0.75,olika,ovalt bord med beige stolar mot runt glasbord med svarta skalstolar,blocket,blocket,Matgrupp,Runt matbord med stolar
+93,47343,48758,0.6147,matgrupp,0.60-0.75,olika,bord med vita spjälstolar mot ekbord med svartsitsiga stolar,blocket,blocket,Mat/köksbord med 4 stolar,Matbord och stolar säljes
+94,58457,84831,0.6367,matgrupp,0.60-0.75,olika,turkosmålad matgrupp utomhus mot mörkt bord med rottingstolar,blocket,blocket,Stor matsalsgrupp,Matgrupp utomhus med bord och stolar
+95,51821,38727,0.6006,matgrupp,0.60-0.75,olika,mörkt bord med grå sammetsstolar mot studiofoto träbord med grå stolar,blocket,blocket,Fin matgrupp med 6 stolar i svart,Matgrupp från Jysk
+96,41769,55940,0.8174,matgrupp,0.75-0.92,olika,cremevitt bord med vita spjälstolar mot mörkbrunt bord med mörka stolar,blocket,blocket,EXKLUSIV MATGRUPP MED 8 STOLAR INkL. SIDEBOARD,Massivt ekbord med 8 stolar
+97,50671,51479,0.7881,matgrupp,0.75-0.92,olika,runt marmorbord med svarta stolar mot runt mörkt bord med svarta stolar,blocket,blocket,Matgrupp,Matbord och 4 stolar
+98,57564,53085,0.8184,matgrupp,0.75-0.92,olika,furubord med korsryggsstolar mot vitt bord med vita spjälbaksstolar,blocket,blocket,Matgrupp IKEA (Ingolf stolar + förlängningsbart furubord),"Wilma matgrupp från Mio, matbord med 6 stolar vit/ek"
+99,51513,48496,0.7842,matgrupp,0.75-0.92,olika,ovalt ekbord med spjälstolar mot rustikt mörkt bord,blocket,blocket,Matbord med 4 stolar och sideboard,Ekbord med 6 stolar + inläggskiva
+100,51513,48123,0.7651,matgrupp,0.75-0.92,olika,ovalt ekbord med spjälstolar mot ovalt furubord i furupanelrum,blocket,blocket,Matbord med 4 stolar och sideboard,Stor maktgrupp med 8 stolar
+101,51279,84123,0.2217,stol,0.20-0.30,olika,svarta skalstolar utomhus mot vita plastfåtöljer,blocket,blocket,Pina Chair Magis kontorsstol,"2 IKEA SKARPÖ utestolar – Vita, nyskick! för uteplats/balkong"
+102,37899,57976,0.2822,stol,0.20-0.30,olika,svart gamingstol mot polerad aluminiumstol,blocket,blocket,Gamingstol Dacota Gaming,Stol - Magis Déjà-Vu
+115,57128,35807,0.4888,stol,0.45-0.60,olika,furustolar på gräs mot rottingstolar på gräs,blocket,blocket,"Göran Malmvall - 4st stolar, furu, Svensk Fur",Brafab stolar
+116,42308,13635,0.6875,stol,0.60-0.75,olika,svart plastskalstol mot två marinblå quiltade sammetsstolar,blocket,blocket,Svart matstol med träben,Svarta sammetsstolar
+117,51810,91218,0.6338,stol,0.60-0.75,olika,svart kontorsstol med meshrygg mot trave svarta kontorsstolar,blocket,blocket,Kontorsstol / arbetsstol med hög rygg (Sitland spririt executive),Ikea kontorsstol
+118,2540,57577,0.6387,stol,0.60-0.75,olika,antik gustaviansk stol mot två furustolar med spjälrygg,auctionet,blocket,"STOL, gustavianskt stockholmsarbete, Melchior Lundberg d.ä.:s art, Svenska modellen, träsk",Retro pinnstolar 2 st
+119,35807,2753,0.6196,stol,0.60-0.75,olika,rottingstolar på gräs mot fyra Cesca-liknande stolar i krom och rotting,blocket,auctionet,Brafab stolar,"STOLAR 4 stycken, Bauhausmodell, 1900-talets andra hälft."
+120,57022,12562,0.6353,stol,0.60-0.75,olika,brun antik läderskrivbordsstol mot vit korsryggsstol med armstöd,blocket,blocket,Skrivbordsstol tidigt 1900 tal,LAGERREA! Stol Med Armstöd I Vit Massivt Trä
+121,38735,43395,0.8555,stol,0.75-0.92,olika,två högryggade meshkontorsstolar men olika modell (lädersits mot röda detaljer),blocket,blocket,JÄRVFJÄLLET kontorsstol i svart läder nästan som Ny,Datorstol
+122,46742,54393,0.752,stol,0.75-0.92,samma_modell_annan_variant,grön mot svart 70-talskontorsstol med kromkryss - samma familj,blocket,blocket,Norsktillverkad kontorsstol,Kinnarps / Hydraulisk frisörstol
+123,44706,42370,0.7749,stol,0.75-0.92,olika,två antika trästolar med rutig sits mot vitmålad lyrryggstol,blocket,blocket,köksstolar,"Trästolar, vita 4st"
+124,12504,58196,0.7563,stol,0.75-0.92,samma_modell_annan_variant,två grå meshkontorsstolar av samma slag,blocket,blocket,NeueChair skrivbordsstol – NY i förpackning,"Herman Miller skrivbordsstol, grå"
+125,36603,47607,0.8423,stol,0.75-0.92,samma_modell_annan_variant,två svarta läderkontorsstolar med armstöd,blocket,blocket,Kontorsstol från Ikea Renberget,3st kontorsstolar
+126,9092,62021,0.2222,hylla,0.20-0.30,olika,gammalt furuskåp mot mahognyvitrin,auctionet,blocket,"SKÅP, målad furu, 1800-tal.",Vitrinskåp i trä med glasdörr
+145,60384,68410,0.6523,hylla,0.60-0.75,olika,skärmdump vita vägghyllor mot furubokhylla,blocket,blocket,Hylla 140x50,Äldre bokhylla IKEA Markör
+146,8102,9453,0.7515,hylla,0.75-0.92,olika,teakhyllsystem med skåp mot teakbokhylla med skåpsockel,auctionet,auctionet,"BOKHYLLOR, 3 sektioner, 1900-talets mitt, teak.","BOKHYLLA, Bräntorps Industrier, Nybro, 1960-tal."
+147,59811,58707,0.8828,hylla,0.75-0.92,samma_modell_annan_variant,IKEA Billy i svartbrunt mot ekmönstrat - samma modell olika finish,blocket,blocket,Bokhylla Billy,Bokhylla Billy ek
+148,8025,89789,0.75,hylla,0.75-0.92,olika,hög teakbokhylla på hjul mot mörkblå bokhylla,auctionet,blocket,"BOKHYLLA, teak, 1950/1960-tal.",Billy bokhylla
+149,72853,13967,0.8071,hylla,0.75-0.92,olika,gul smal hyllmodul mot vit metall- och trähylla,blocket,blocket,IKEA HÖRDA SKÅP,Bokhylla JYSK RUDERSDAL
+150,8706,9833,0.8711,hylla,0.75-0.92,olika,ekvitrinskåp mot teakvitrin med lådsockel,auctionet,auctionet,"BOKSKÅP, ek, jugend, 1900-talets första hälft.","Vitrinskåp, ""Krus"", Westbergs möbler, Tranås., tvådelat, underskåp med infälld dekor. yngv"
+169,10464,89777,0.6519,byrå,0.60-0.75,olika,teakbyrå med spretiga ben mot antik intarsiabyrå med marmorskiva,auctionet,blocket,"BYRÅ, teakfanér, 1950/60-tal.",byrå i gustaviansk stil
+170,11044,61410,0.6089,byrå,0.60-0.75,olika,mahognybyrå med svängd front mot mörkt rokokonattbord,auctionet,blocket,"BYRÅ, välvd front, 4 lådor, fanérat trä, mässingsbeslag, 1800-tal.",Byrå/Sängbord
+171,11065,11258,0.8301,byrå,0.75-0.92,olika,två olika rokokobyråer i bombéform - olika individer,auctionet,auctionet,"BYRÅ Rokokostil, 1900-talets andra hälft.","BYRÅ, med stenskiva, rokokostil."
+172,210,6407,0.79,byrå,0.75-0.92,samma_variant,två ekniattbord med låda och öppen hylla mot ett likadant,auctionet,auctionet,"SÄNGBORD, 1 par, ek, 1900 - talets andra hälft.","SÄNGBORD, funkis, 1900-talets mitt."
+173,69638,92418,0.7808,byrå,0.75-0.92,olika,ljusgrön målad byrå mot hög smal mörk byrå med många lådor,blocket,blocket,Byrå,Byrå
+174,11036,11070,0.876,byrå,0.75-0.92,samma_modell_annan_variant,ekbyrå med messingsbeslag mot svartmålad av samma form,auctionet,auctionet,"BYRÅ, sengustaviansk, bronserade beslag, lådkanter, ben och sidostycken med mässingsdetalj","BYRÅ, 1900-talets mitt."
+175,69169,65649,0.7803,byrå,0.75-0.92,olika,bred furubyrå mot antik furubyrå med tre lådor,blocket,blocket,Byrå,Byrå
+176,73282,90245,0.2014,säng,0.20-0.30,olika,vit spjälsäng mot mörk stoppad säng,blocket,blocket,Barnsäng Juniorsäng,Säng säljes - Uppsala
+177,20387,20002,0.2742,säng,0.20-0.30,olika,säng med mörk gavel mot säng med träspjälgavel,blocket,blocket,Kontinentalsäng 140,Jensen sänggavel i trä med sängbord
+178,18785,75247,0.2988,säng,0.20-0.30,olika,grå tuftad sänggavel mot grå stoppad sängbotten,blocket,blocket,Elegant sänggavel i väldigt fint skick,Mio kontinentalsäng / enkelsäng – fint skick (OEKO-TEX)
+179,73316,75718,0.2739,säng,0.20-0.30,olika,mörk sängbotten med madrass mot vit loftsäng för barn,blocket,blocket,EN BRA SÄNG MED TVÅ DELAR PLUS EN BÄDDMADRASS,Loftsäng Oliver Furniture
+180,76154,18800,0.2808,säng,0.20-0.30,olika,grå dagbädd mot säng med grå tuftad gavel,blocket,blocket,IKEA säng med 2 st bäddmadrasser,IKEA säng med förvaring och sänggavel
+193,19217,73880,0.7402,säng,0.60-0.75,olika,grå stoppad säng med ben mot vit enkel säng,blocket,blocket,Jensen säng 120x200 med Bamboo-bäddmadrass – mycket fint skick,IKEA säng med madrass grå
+194,20347,19354,0.6572,säng,0.60-0.75,olika,mörkgrå kontinentalsäng mot mörk träsängram,blocket,blocket,SOVA Kontinentalsäng Antracit 160x200cm,IKEA Tonstad sängram med resårmadrass 90x200 brun
+195,75549,73313,0.6113,säng,0.60-0.75,olika,säng med grå tuftad gavel mot vit spjälgavelsäng,blocket,blocket,Viking Beds säng med gavel,Vit sängram 120× 200
+196,19556,75249,0.7886,säng,0.75-0.92,samma_modell_annan_variant,gräddvit tuftad sänggavel mot blågrå av samma modell,blocket,blocket,Beige sänggavel,Sänggavel till 180 säng
+197,75383,19851,0.7544,säng,0.75-0.92,olika,mörk sängbotten mot rutig madrass på ram,blocket,blocket,Bekväm Säng i 120 finnes här!,Hästens ställbar säng 105x210cm rutigt tyg be ngt
+198,74854,75070,0.7661,säng,0.75-0.92,olika,mörk kontinentalsängbotten mot mörk säng med två madrasser,blocket,blocket,säng från mio,IKEA sängram / sängstomme Malm
+199,19003,76526,0.8481,säng,0.75-0.92,samma_modell_annan_variant,grå tuftad sänggavel mot mörkbrun av samma modell,blocket,blocket,Sänggavel,Sänggavel 90 mörkgrå textil
+200,93129,19979,0.7642,säng,0.75-0.92,samma_modell_annan_variant,beige stoppad sänggavel mot grå av samma modell,blocket,blocket,Sänggavel i linnetyg till 140-säng,TEMPUR Form sänggavel Warm stone

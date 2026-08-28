@@ -1,0 +1,25 @@
+{
+  "n": 40,
+  "tokens": 82484,
+  "model": "google/gemini-2.5-flash",
+  "endpoint": "https://tyxqxodnfyzxpwdgtypd.supabase.co/functions/v1/attribute-vision",
+  "modes": {
+    "edge": 39
+  },
+  "failures": 0,
+  "per_attribute": {
+    "corner": {
+      "n": 40,
+      "abstain_rate": 0.0,
+      "answer_rate": 0.975,
+      "accuracy_when_answering": 0.923,
+      "accuracy_overall": 0.9,
+      "confusion": {
+        "False -> False": 18,
+        "False -> True": 1,
+        "True -> False": 2,
+        "True -> True": 18
+      }
+    }
+  }
+}

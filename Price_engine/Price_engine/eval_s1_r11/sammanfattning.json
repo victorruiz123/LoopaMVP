@@ -1,0 +1,33 @@
+{
+  "totalt": {
+    "kärnnamn + bild": {
+      "möbler": 11,
+      "svar_gavs": 11,
+      "accuracy_intervall_överlapp": 1.0,
+      "accuracy_default_inom_facit": 0.8182,
+      "median_avvikelse_när_utanför": 0.1389,
+      "för_högt": 1,
+      "för_lågt": 1
+    }
+  },
+  "per_felklass": {
+    "kärnnamn + bild": {
+      "storlek": {
+        "fall": 4,
+        "överlapp": 1.0,
+        "default_inom": 0.5
+      },
+      "tunt": {
+        "fall": 5,
+        "överlapp": 1.0,
+        "default_inom": 1.0
+      },
+      "övrigt": {
+        "fall": 2,
+        "överlapp": 1.0,
+        "default_inom": 1.0
+      }
+    }
+  },
+  "spec_fingerprint": "c2df1cffa221"
+}

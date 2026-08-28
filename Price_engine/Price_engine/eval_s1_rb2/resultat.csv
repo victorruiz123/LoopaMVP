@@ -1,0 +1,14 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,effectiveN,sizeMethod,sizeQuery,sizeWarning,filtersConverted,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse,felklass
+1,IKEA norsborg,kärnnamn + bild,500,1000,411.0,876.0,4279.0,15,weighted,type_system:image+union3,13.5,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,True,0.0,tunt
+2,Bolia soffa med puff,kärnnamn + bild,8000,11000,872.0,2599.0,28511.0,15,weighted,type_system:text+union3,9.8,none,,,variant,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,False,-0.675125,tunt
+3,Mio Harper soffa,kärnnamn + bild,4000,6500,5500.0,7000.0,10500.0,41,filtered,type_system:text+union3,41.0,none,,"3-sits,4-sits",,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,False,0.07692307692307693,övrigt
+4,Jysk Egedal,kärnnamn + bild,1000,2000,684.0,1041.0,1736.0,15,none,unresolved,15.0,none,,,,,none,low,True,True,0.0,tunt
+5,Jysk Allese,kärnnamn + bild,4000,6500,2274.0,3347.0,4966.0,12,ignored,type_system:image+union3,12.0,none,,,,"['baddsoffa', 'hornsoffa', 'soffa']",none,low,True,False,-0.16325,tunt
+6,Jysk fåtölj,kärnnamn + bild,350,1000,500.0,700.0,1000.0,101,filtered,type_system:text,101.0,none,,,,['fatolj'],none,high,True,True,0.0,övrigt
+7,Swedese Lamino,kärnnamn + bild,8500,12000,4999.0,9900.0,12000.0,38,weighted,type_system:image+union2,29.0,none,,,variant,"['fatolj', 'stol']",none,high,True,True,0.0,övrigt
+8,DUX Bruno Mathsson Eva,kärnnamn + bild,3500,6500,2750.0,5500.0,6500.0,15,weighted,type_system:image+union2,13.5,none,,,variant,"['fatolj', 'stol']",none,high,True,True,0.0,tunt
+9, Matbord trä,kärnnamn + bild,3000,7000,330.0,867.0,2000.0,26,filtered,type_system:text+union2,18.1,none,,,,"['matbord', 'matgrupp']",none,low,False,False,-0.711,övrigt
+10,Mio matgrupp,kärnnamn + bild,3000,5000,583.0,1500.0,2500.0,220,filtered,type_system:text,220.0,none,,"6 stolar,4 stolar,8 stolar,3 stolar",,['matgrupp'],none,low,False,False,-0.5,övrigt
+11,byCrea Matgrupp,kärnnamn + bild,5000,15000,,,,0,ignored,type_system:text,0.0,none,,,,['matgrupp'],none,none,False,False,,tunt
+12,DUX säng 303,kärnnamn + bild,50000,80000,,,,0,ignored,type_system:text,0.0,none,,,,['sang'],none,none,False,False,,tunt
+13,IKEA skotterud,kärnnamn + bild,1000,2500,1500.0,1800.0,2250.0,55,filtered,type_system:image,55.0,none,,,,['sang'],none,high,True,True,0.0,övrigt

@@ -1,0 +1,23 @@
+nr,möbel,läge,facit_low,facit_high,low,default,high,n,variantMethod,variantSource,effectiveN,filtersConverted,variant,imageFiltered,confidence,träff_intervall,träff_default,avvikelse
+1,IKEA Ektorp,kärnnamn,400,900,600,800,1500,166,none,none,166.0,,,none,high,True,True,0.0
+1,IKEA Ektorp,kärnnamn + bild,400,900,600,750,1200,166,none,unresolved,56.5,bild,,weighted,high,True,True,0.0
+2,IKEA Söderhamn bäddsoffa,kärnnamn,2000,2500,1900,2200,3000,269,none,none,269.0,,,none,high,True,True,0.0
+2,IKEA Söderhamn bäddsoffa,kärnnamn + bild,2000,2500,2200,2500,3500,134,filtered,dinov2,134.0,,['soffa'],filtered,high,True,True,0.0
+3,IKEA Vimle,kärnnamn,1500,3000,2000,2500,4000,117,none,none,117.0,,,none,high,True,True,0.0
+3,IKEA Vimle,kärnnamn + bild,1500,3000,1000,2000,3500,40,filtered,dinov2,29.5,ledord,['soffa'],filtered,high,True,True,0.0
+4,Mio Cordelia,kärnnamn,1500,3000,858,1542,4420,11,none,none,11.0,,,none,low,True,True,0.0
+4,Mio Cordelia,kärnnamn + bild,1500,3000,858,1542,4420,11,none,single_candidate,6.5,bild,,weighted,low,True,True,0.0
+5,IKEA Jennylund,kärnnamn,200,700,191,304,627,15,none,none,15.0,,,none,low,True,True,0.0
+5,IKEA Jennylund,kärnnamn + bild,200,700,191,304,627,15,none,single_candidate,15.0,,,none,low,True,True,0.0
+6,IKEA Strandmon,kärnnamn,1000,2000,700,1000,1400,83,none,none,83.0,,,none,high,True,True,0.0
+6,IKEA Strandmon,kärnnamn + bild,1000,2000,500,800,1000,41,filtered,dinov2,41.0,,['fåtölj'],filtered,high,True,False,-0.2
+7,Sofacompany Clara Rak bäddsoffa,kärnnamn,7000,10000,6000,7500,9000,2,none,none,2.0,,,none,low,True,True,0.0
+7,Sofacompany Clara Rak bäddsoffa,kärnnamn + bild,7000,10000,6000,7500,9000,2,none,single_candidate,2.0,,,none,low,True,True,0.0
+8,Sweef Valen 224 Rak soffa,kärnnamn,7000,12000,5695,8016,11705,15,none,none,15.0,,,none,low,True,True,0.0
+8,Sweef Valen 224 Rak soffa,kärnnamn + bild,7000,12000,5695,8331,12052,15,none,single_candidate,9.0,bild,,weighted,low,True,True,0.0
+9,Mio Santos,kärnnamn,700,1000,290,837,1913,24,none,none,24.0,,,none,low,True,True,0.0
+9,Mio Santos,kärnnamn + bild,700,1000,210,1000,3659,24,weighted,dinov2,9.6,"variant,bild",['matbord'],weighted,low,True,True,0.0
+10,IKEA PINNTORP,kärnnamn,600,800,117,452,791,15,none,none,15.0,,,none,low,True,False,-0.24666666666666667
+10,IKEA PINNTORP,kärnnamn + bild,600,800,117,452,791,15,none,single_candidate,15.0,,,none,low,True,False,-0.24666666666666667
+11,Kinnarps Capella X / Capella Classic,kärnnamn,1300,1600,1000,1480,2240,3,none,none,3.0,,,none,low,True,True,0.0
+11,Kinnarps Capella X / Capella Classic,kärnnamn + bild,1300,1600,1000,1480,2240,3,none,single_candidate,3.0,,,none,low,True,True,0.0

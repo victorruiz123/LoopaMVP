@@ -1,0 +1,609 @@
+product_types:
+  soffa:
+  - soffa
+  - soffor
+  baddsoffa:
+  - baddsoffa
+  - baddsoffor
+  - bäddsoffa
+  - bäddsoffor
+  - sovsoffa
+  - sovsoffor
+  hornsoffa:
+  - hornsoffa
+  - hornsoffor
+  - hörnsoffa
+  - hörnsoffor
+  - vinkelsoffa
+  - l-soffa
+  - u-soffa
+  - usoffa
+  - u soffa
+  - u-formad
+  - u formad
+  - dubbeldivan
+  - dubbel divan
+  - hornsoffan
+  - hörnsoffan
+  divansoffa:
+  - divansoffa
+  - divansoffor
+  - schaslongsoffa
+  - schäslongsoffa
+  soffgrupp:
+  - soffgrupp
+  - soffgrupper
+  - sittgrupp
+  - sittgrupper
+  fatolj:
+  - fatolj
+  - fatoljer
+  - fåtölj
+  - fåtöljer
+  - lansstol
+  - länstol
+  - reclinerfatolj
+  - reclinerfåtölj
+  gungstol:
+  - gungstol
+  - gungstolar
+  stol:
+  - stol
+  - stolar
+  pinnstol:
+  - pinnstol
+  - pinnstolar
+  matstol:
+  - matstol
+  - matstolar
+  - matsalsstol
+  - matsalsstolar
+  barstol:
+  - barstol
+  - barstolar
+  kontorsstol:
+  - kontorsstol
+  - kontorsstolar
+  - skrivbordsstol
+  - skrivbordsstolar
+  karmstol:
+  - karmstol
+  - karmstolar
+  taburett:
+  - taburett
+  - taburetter
+  matgrupp:
+  - matgrupp
+  - matgrupper
+  - matsalsgrupp
+  - matsalsgrupper
+  - matbordsgrupp
+  matbord:
+  - matbord
+  - matsalsbord
+  - koksbord
+  - köksbord
+  bord:
+  - bord
+  soffbord:
+  - soffbord
+  - salongsbord
+  sidobord:
+  - sidobord
+  - avlastningsbord
+  - lampbord
+  - brickbord
+  - hallbord
+  skrivbord:
+  - skrivbord
+  - datorbord
+  - sekretar
+  - sekretär
+  sangbord:
+  - sangbord
+  - sängbord
+  - nattduksbord
+  - nattygsbord
+  konsolbord:
+  - konsolbord
+  sang:
+  - sang
+  - sangar
+  - säng
+  - sängar
+  - sangram
+  - sängram
+  kontinentalsang:
+  - kontinentalsang
+  - kontinentalsäng
+  vaningssang:
+  - vaningssang
+  - våningssäng
+  - loftsang
+  - loftsäng
+  barnsang:
+  - barnsang
+  - barnsäng
+  - spjalsang
+  - spjälsäng
+  madrass:
+  - madrass
+  - madrasser
+  - baddmadrass
+  - bäddmadrass
+  sanggavel:
+  - sanggavel
+  - sanggavlar
+  - sänggavel
+  - sänggavlar
+  byra:
+  - byra
+  - byrå
+  - byraer
+  - byråer
+  - kommod
+  - kommoder
+  - dragkista
+  skotbord:
+  - skotbord
+  - skötbord
+  hylla:
+  - hylla
+  - hyllor
+  bokhylla:
+  - bokhylla
+  - bokhyllor
+  vagghylla:
+  - vagghylla
+  - vägghylla
+  - vagghyllor
+  - vägghyllor
+  skohylla:
+  - skohylla
+  - skohyllor
+  hatthylla:
+  - hatthylla
+  - hatthyllor
+  skap:
+  - skap
+  - skåp
+  garderob:
+  - garderob
+  - garderober
+  - kladskap
+  - klädskåp
+  vitrinskap:
+  - vitrinskap
+  - vitrinskåp
+  - vitrin
+  - vitriner
+  badrumsskap:
+  - badrumsskap
+  - badrumsskåp
+  skank:
+  - skank
+  - skänk
+  - skankar
+  - skänkar
+  sideboard:
+  - sideboard
+  - sideboards
+  - buffe
+  - buffé
+  tvbank:
+  - tv-bank
+  - tv-bänk
+  - tvbank
+  - tvbänk
+  - tv-mobel
+  - tv-möbel
+  - mediamobel
+  - mediamöbel
+  matta:
+  - matta
+  - mattor
+  - ryamatta
+  - ryamattor
+  - hallmatta
+  - gangmatta
+  - gångmatta
+  - entrematta
+  - entrématta
+  spegel:
+  - spegel
+  - speglar
+  - helkroppsspegel
+  - helkroppsspeglar
+  lampa:
+  - lampa
+  - lampor
+  taklampa:
+  - taklampa
+  - taklampor
+  - plafond
+  - plafonder
+  - pendel
+  - pendlar
+  golvlampa:
+  - golvlampa
+  - golvlampor
+  bordslampa:
+  - bordslampa
+  - bordslampor
+  vagglampa:
+  - vagglampa
+  - vägglampa
+  - vagglampor
+  - vägglampor
+  pall:
+  - pall
+  - pallar
+  fotpall:
+  - fotpall
+  - fotpallar
+  puff:
+  - puff
+  - puffar
+  - sittpuff
+  - sittpuffar
+  bank:
+  - bank
+  - bänk
+  - bankar
+  - bänkar
+  - sittbank
+  - sittbänk
+  kladhangare:
+  - kladhangare
+  - klädhängare
+  - hallmobel
+  - hallmöbel
+  - skostall
+  utemobel:
+  - utemobel
+  - utemöbel
+  - tradgardsmobel
+  - trädgårdsmöbel
+  solstol:
+  - solstol
+  - solstolar
+  hammock:
+  - hammock
+  - hammockar
+  parasoll:
+  - parasoll
+bundle_signals:
+- med
+- +
+- och
+- samt
+- inkl
+- inklusive
+- tillhorande
+- tillhörande
+- matchande
+- medfoljer
+- medföljer
+- ingar
+- ingår
+- set
+- mobelset
+- möbelset
+- mobelgrupp
+- möbelgrupp
+- grupp
+- paket
+- paketpris
+- komplett
+- hela
+- allt
+- st
+- styck
+- par
+- tva
+- två
+- tre
+- fyra
+- fem
+- sex
+- bonus
+- extra
+- plus
+accessory_signals:
+- kladsel
+- klädsel
+- overdrag
+- överdrag
+- fodral
+- dyna
+- dynor
+- sittdyna
+- ryggdyna
+- kudde
+- kuddar
+- ben
+- benen
+- soffben
+- bordsben
+- beslag
+- skruv
+- gavel
+- dorr
+- dörr
+- lada
+- låda
+- reservdel
+- reservdelar
+- delar
+- monteringsanvisning
+- bruksanvisning
+- manual
+- endast
+- bara
+- enbart
+- passar
+- hyllplan
+- hyllplanet
+comparison_signals:
+- liknande
+- liknar
+- likt
+- stil
+- typ
+- ala
+- kopia
+- replika
+- lookalike
+- inspirerad
+- motsvarande
+- jamfor
+- jämför
+- jmf
+- paminner
+- påminner
+low_price_signals:
+- bortskankes
+- bortskänkes
+- skankes
+- skänkes
+- gratis
+- trasig
+- trasigt
+- defekt
+- sonder
+- sönder
+- skadad
+- lagas
+- renoveringsobjekt
+- fixarobjekt
+- projekt
+- akut
+- flyttar
+- flackar
+- fläckar
+- hal
+- hål
+- revor
+- repor
+- slitage
+- sliten
+- nedsutten
+high_price_signals:
+- nypris
+- ordinarie
+- ordpris
+- varde
+- värde
+- kostade
+- inkopspris
+- inköpspris
+- nyskick
+- oanvand
+- oanvänd
+- oppnad
+- oöppnad
+- kvitto
+- garanti
+- kartong
+plural_map:
+  stolar: stol
+  mattor: matta
+  soffor: soffa
+  sangar: sang
+  sängar: säng
+  hyllor: hylla
+  lampor: lampa
+  byraer: byra
+  byråer: byrå
+  fatoljer: fatolj
+  fåtöljer: fåtölj
+  bord: bord
+  pallar: pall
+  puffar: puff
+  bankar: bank
+  bänkar: bänk
+  speglar: spegel
+  skapar: skap
+brands:
+  ikea:
+  - ikea
+  mio:
+  - mio
+  swedese:
+  - swedese
+  ekens:
+  - ekens
+  dux:
+  - dux
+  jysk:
+  - jysk
+  rusta:
+  - rusta
+  bolia:
+  - bolia
+  - glismand
+  - rudiger
+  - rüdiger
+  ire:
+  - ire
+  ekornes:
+  - ekornes
+  - stressless
+  norrgavel:
+  - norrgavel
+  lammhults:
+  - lammhults
+  string:
+  - string
+  artek:
+  - artek
+  hay:
+  - hay
+  muuto:
+  - muuto
+  vitra:
+  - vitra
+  kartell:
+  - kartell
+  trademax:
+  - trademax
+  furniturebox:
+  - furniturebox
+  emhome:
+  - em
+  - emhome
+  chilli:
+  - chilli
+  jotex:
+  - jotex
+families:
+  sittmobel:
+  - soffa
+  - baddsoffa
+  - hornsoffa
+  - divansoffa
+  - soffgrupp
+  - fatolj
+  - gungstol
+  - stol
+  - pinnstol
+  - matstol
+  - barstol
+  - kontorsstol
+  - karmstol
+  - taburett
+  - pall
+  - fotpall
+  - puff
+  - bank
+  - solstol
+  bord:
+  - matgrupp
+  - matbord
+  - bord
+  - soffbord
+  - sidobord
+  - skrivbord
+  - sangbord
+  - konsolbord
+  - skotbord
+  sang:
+  - sang
+  - kontinentalsang
+  - vaningssang
+  - barnsang
+  - madrass
+  - sanggavel
+  forvaring:
+  - byra
+  - hylla
+  - bokhylla
+  - vagghylla
+  - skohylla
+  - hatthylla
+  - skap
+  - garderob
+  - vitrinskap
+  - badrumsskap
+  - skank
+  - sideboard
+  - tvbank
+  - kladhangare
+  textil:
+  - matta
+  belysning:
+  - lampa
+  - taklampa
+  - golvlampa
+  - bordslampa
+  - vagglampa
+  ovrigt:
+  - spegel
+  - utemobel
+  - hammock
+  - parasoll
+model_name_stoplist:
+  lux: adjektiv, 0,98 Mio men beskriver utförande inte modell
+  fri: fraktord, halva frasen 'fri leverans'
+_notes:
+  hornsoffa: u-soffa m.fl. tillagda 2026-08-20. De fanns i type_system/lexicon.py CORNER_WORDS men saknades
+    har, sa samma fraga gav typer=[] i cellfiltret och hornsoffa i attributkedjan. Tva lexikon oense om
+    samma ord ger fel som inte syns i nagot enskilt test.
+form_words:
+  _note: Slutna listor som bild-LLM:en valjer ur. Orden MASTE finnas i product_types eller accessory_words,
+    annars skriver modellen ord motorn inte kan lasa. tests/test_form_layer.py laser det.
+  soffa:
+  - rak soffa
+  - hörnsoffa
+  - u-soffa
+  - bäddsoffa
+  - divansoffa
+  - schäslongsoffa
+  bord:
+  - matbord
+  - soffbord
+  - sidobord
+  - skrivbord
+  stol:
+  - fåtölj
+  - matstol
+  - kontorsstol
+  - pinnstol
+  forvaring:
+  - hylla
+  - byrå
+  - skänk
+  - vitrinskåp
+  - garderob
+  _guidance:
+    _om: 'Texterna läses BARA av bild-LLM:en och matchas aldrig mot korpusen, så de
+      skrivs med korrekt svenska. De var förut ASCII-vikta ("BADA andar", "schaslong")
+      helt i onödan. Omskrivna 2026-08-20 (ovaliderad): felet de rättar är att modellen
+      kallade en rak soffa med LÖS puff bredvid för divansoffa, och en U-soffa för
+      hörnsoffa. Skillnaden fastsittande/fristående saknades i definitionerna.'
+    u-soffa: 'sitsen skjuter ut åt samma håll i BÅDA ändarna, så soffan bildar ett U.
+      Detta gäller ÄVEN om soffan också har ett hörn — två utskjutande ändar slår alltid
+      hörnsoffa.'
+    hörnsoffa: 'sitsen viker av ungefär 90 grader i ETT hörn och bildar ett L. Utskjutande
+      liggdel i bara den ena änden.'
+    divansoffa: 'rak soffa där sitsen fortsätter i en FASTSITTANDE liggdel utan armstöd i
+      ena änden, utan hörnmodul.'
+    schäslongsoffa: 'samma som divansoffa; välj den om annonsen säger schäslong'
+    rak soffa: 'sitsen går rakt hela vägen med armstöd i båda ändarna. En LÖS puff eller
+      fotpall bredvid gör den INTE till divansoffa — den förblir rak soffa.'
+    bäddsoffa: 'går att fälla ut till säng'
+accessory_words:
+  _note: 'Tillbehor LLM:en far skriva in i fragan som ''+ <ord>'' sa buntlogiken ser dem.
+    schaslong och divan ar BORTTAGNA: de ar sektionsord (delar av en modulsoffa), inte
+    tillbehor. ''+ schaslong'' hade gjort en hel soffa till en bunt.'
+  _inkludering: 'SMALNAD 2026-08-20 (ovaliderad). Listan holl tidigare aven dyna, kudde,
+    sidobord och kladsel. De ar rekvisita i stajlade foton, inte varor i affaren: matningen
+    av set_items gav 100 % falsklarm pa INKLUDERING. Ett sidobord bredvid en Lamino skrevs
+    in som ''+ sidobord'' och gjorde fotot till en bunt. Kvar star bara tillbehor som (a)
+    normalt saljs som EN enhet med mobeln och (b) flyttar priset markbart — en fotpall till
+    en Lamino ar ~40 % av varden, en soffkudde ar ~0.'
+  words:
+  - fotpall
+  - sittpuff
+  - stolar
+  - hyllplan
