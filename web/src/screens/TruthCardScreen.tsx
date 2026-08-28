@@ -1,6 +1,7 @@
 import type { ConditionResult, GeneratedListing } from "../types";
 import { formatSek } from "../lib/price";
 import GradeBadge from "../components/GradeBadge";
+import TraderaPublish from "../components/TraderaPublish";
 
 const STATUS_LABELS: Record<string, string> = {
   full: "Allt belagt med källa",
@@ -48,7 +49,12 @@ export default function TruthCardScreen({
           <p className="muted small">Letar upp modell och specifikationer…</p>
         </section>
       ) : (
-        <TruthCard card={card} result={result} />
+        <>
+          <TruthCard card={card} result={result} />
+          {/* Sist på kortet, efter allt som ska granskas. Publiceringen är det enda på den här
+              skärmen som lämnar appen, så den ska komma efter att säljaren läst vad som skickas. */}
+          <TraderaPublish jobId={result.jobId} />
+        </>
       )}
 
       {/* Bara en väg ut härifrån. "Tillbaka" i foten upprepade pilen längst upp, och två knappar
@@ -90,7 +96,8 @@ function TruthCard({ card, result }: { card: GeneratedListing; result: Condition
           <div>
             <div className="truth-verdict-label">{result.grade?.label ?? "—"}</div>
             <div className="muted small">
-              {result.damages.filter((d) => d.sellerAction !== "rejected").length} synliga skador
+              {result.damages.filter((d) => d.sellerAction !== "rejected").length} synliga skador ·{" "}
+              {result.images.length} vyer · {result.reviewed ? "två besiktningar" : "en besiktning"}
             </div>
           </div>
           <div className="truth-price">
@@ -130,15 +137,8 @@ function TruthCard({ card, result }: { card: GeneratedListing; result: Condition
         {card.listing.conditionText && <p className="truth-listing-condition">{card.listing.conditionText}</p>}
       </section>
 
-      {(card.pricing.retailPriceSek || card.pricing.rationale) && (
-        <section className="truth-block">
-          <h3>Nypris</h3>
-          <div className="truth-retail">
-            {card.pricing.retailPriceSek ? formatSek(card.pricing.retailPriceSek) : "Kunde inte beläggas"}
-          </div>
-          {card.pricing.rationale && <p className="muted small">{card.pricing.rationale}</p>}
-        </section>
-      )}
+      {/* Nypris visas inte. Säljaren ska förhålla sig till vad möbeln är värd i dag, inte till vad
+          den kostade ny. Fältet finns kvar i `card.pricing` för den som behöver det. */}
 
       {card.sources.length > 0 && (
         <section className="truth-block">

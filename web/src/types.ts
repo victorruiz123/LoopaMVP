@@ -10,7 +10,15 @@ export type DamageType =
 
 export type Severity = "S1" | "S2" | "S3" | "S4";
 export type Impact = "cosmetic" | "functional" | "structural";
-export type VerificationState = "CONFIRMED" | "REJECTED" | "UNCERTAIN";
+/**
+ * `NOT_RUN` betyder att andrabesiktningen aldrig kördes — inte att fyndet underkändes och inte att det
+ * godkändes. Kortet är ett attest och får inte antyda en kontroll som inte gjorts.
+ *
+ * Fyndet STÅR ändå: det rapporterades av inspektionen och räknas i betyg och pris precis som förut.
+ * Se effectiveVerification i grade.ts och isPriceable i pricing.ts — båda filtrerade tidigare på
+ * `=== "CONFIRMED"` och hade tyst tömt både betyget och prisunderlaget på varje fynd.
+ */
+export type VerificationState = "CONFIRMED" | "REJECTED" | "UNCERTAIN" | "NOT_RUN";
 export type CoverageState = "INSPECTED_CLEAR" | "INSPECTED_DAMAGE" | "NOT_SUFFICIENTLY_VISIBLE";
 export type ConditionGrade = "A" | "B" | "C" | "D" | "E" | "F";
 export type CanonicalCondition = "Nyskick" | "Mycket bra skick" | "Bra skick" | "Okej skick";
@@ -167,6 +175,26 @@ export interface ListingResult {
   latencyMs: number;
 }
 
+/** En modellkandidat ur identifieringen. Samma form som landningssidans SellerProductCandidate. */
+export interface ModelCandidate {
+  brand: string;
+  model: string;
+  variant: string | null;
+  productType: string | null;
+  confidence: "strong" | "likely" | "possible";
+  /** Kort text som skiljer kandidaterna åt, t.ex. "hög rygg, teakstomme". */
+  distinguishingDetail: string | null;
+}
+
+/**
+ * Var identifieringen står.
+ *
+ * `needs_selection` är inte ett fel utan hela poängen: tvetydighet mellan VERKLIGA produkter lämnas
+ * till säljaren i stället för att slås ut med fler modellanrop. Bryggan behandlade det tidigare som
+ * ett misslyckande, så just det fall kandidatflödet finns för visade "Annonsen kunde inte skapas".
+ */
+export type IdentityStatus = "identifying" | "needs_selection" | "resolved" | "unavailable";
+
 export interface ConditionResult {
   jobId: string;
   createdAt: string;
@@ -177,6 +205,11 @@ export interface ConditionResult {
    * de rapporterades — men listan kan ännu ändras när granskningen landar.
    */
   reviewPending: boolean;
+  /**
+   * Om andrabesiktningen faktiskt kördes. Kortet är ett attest och ska kunna säga vad det bygger på —
+   * en (1) besiktning eller två — i stället för att låta läsaren anta det starkare alternativet.
+   */
+  reviewed: boolean;
   /** modell, specifikationer och annonstext — null bara när inget märke angavs */
   listing: ListingResult | null;
   coverage: CoverageState;
@@ -199,6 +232,44 @@ export interface JobProgress {
   message: string;
 }
 
+/**
+ * Var publiceringen till Tradera står. Saknas fältet har jobbet aldrig publicerats — det är inte
+ * samma sak som ett misslyckat försök, och knappen ska se olika ut i de två fallen.
+ */
+export interface TraderaPublication {
+  status: "publishing" | "published" | "error";
+  requestId: number | null;
+  itemId: number | null;
+  url: string | null;
+  error: string | null;
+  startedAt: string;
+  publishedAt: string | null;
+}
+
+/** Vad som KOMMER att publiceras. Visas i bekräftelsesteget så säljaren ser det innan de trycker. */
+export interface TraderaPlan {
+  title: string;
+  categoryId: number;
+  categoryName: string;
+  price: number;
+  priceSource: "condition" | "listing";
+  condition: string | null;
+  imageCount: number;
+  /** "fixed" = Endast Köp Nu till `price`. "auction" = utropspris `price`, inget Köp Nu. */
+  mode: "auction" | "fixed";
+  /** Bara satt för auktion — Traderas Köp Nu-annonser får sin längd av Tradera, inte av oss. */
+  durationDays: number | null;
+}
+
+/** Svaret från GET/POST /api/jobs/:id/tradera. */
+export interface TraderaState {
+  configured: boolean;
+  missingEnv: string[];
+  publication: TraderaPublication | null;
+  plan: TraderaPlan | null;
+  blockedReason: string | null;
+}
+
 export interface ConditionJob {
   id: string;
   createdAt: string;
@@ -209,6 +280,19 @@ export interface ConditionJob {
   identity: FurnitureIdentity | null;
   /** bildrutorna jobbet skapades med — det ett omtag spelar upp igen */
   images?: CapturedImage[];
+  /** Var modellidentifieringen står. Driver kandidatskärmen. */
+  identityStatus?: IdentityStatus;
+  /** Upp till fyra troliga modeller av märket, bäst först. */
+  candidates?: ModelCandidate[];
+  /** Den säljaren valde, eller den identifieringen kunde avgöra själv. */
+  selected?: ModelCandidate | null;
+  identityError?: string | null;
+  /** När nuvarande fas började — för fasloggningen. */
+  phaseStartedAt?: number;
+  /** Annonsen när den blev klar före skickresultatet — flyttas in i resultatet när det finns. */
+  pendingListing?: ListingResult | null;
+  /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
+  tradera?: TraderaPublication | null;
 }
 
 export interface JobSummary {

@@ -15,8 +15,10 @@
     "server:check": "npm --prefix server run check",
     "price:dev": "cd Price_engine/Price_engine && PRICE_ENGINE_DATA=\"$(cd ../vips-ml-data/vips-fas0 && pwd)\" PRICE_ENGINE_DAMAGE=1 .venv/bin/python -m uvicorn price_engine.api:app --host 127.0.0.1 --port 8000",
     "web:dev": "npm --prefix web run dev",
+    "web:dev:http": "HTTPS=0 npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
-    "install:all": "npm install && npm --prefix server install && npm --prefix web install"
+    "install:all": "npm install && npm --prefix server install && npm --prefix web install",
+    "tradera:lookup": "tsx server/src/integrations/tradera/reference-lookup.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

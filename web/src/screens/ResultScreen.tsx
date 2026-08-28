@@ -156,6 +156,14 @@ export default function ResultScreen({
         </div>
       )}
 
+      {/* Kortet är ett attest. Det ska säga vad det bygger på — antal vyer, hur många besiktningar,
+          när — i stället för att låta läsaren anta det starkare alternativet. */}
+      <p className="provenance">
+        {result.images.length} {result.images.length === 1 ? "vy" : "vyer"} ·{" "}
+        {result.reviewed ? "två besiktningar" : "en besiktning"} ·{" "}
+        {new Date(result.createdAt).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
+      </p>
+
       <h3 className="damage-summary-line">
         {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}
       </h3>

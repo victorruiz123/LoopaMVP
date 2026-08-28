@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { imageUrl, listJobs } from "../api";
 import type { FurnitureIdentity, JobSummary } from "../types";
 import GradeBadge from "../components/GradeBadge";
@@ -16,13 +16,11 @@ export default function HomeScreen({
 }) {
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [brand, setBrand] = useState("");
-  const [model, setModel] = useState("");
   // Collapsed by default: the saved list used to render ABOVE the scan card, so once a few furniture
   // pieces had piled up the primary action was several screens down. History is something you look up
   // occasionally; starting a scan is why you opened the page.
   const [historyOpen, setHistoryOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const modelRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     listJobs()
@@ -33,11 +31,13 @@ export default function HomeScreen({
   const finished = jobs?.filter((j) => j.progress.stage === "done") ?? [];
   // The model name is what the price engine searches the ad corpus on; without it there is nothing to
   // price. The brand narrows that search but is not required — not every piece carries one.
-  const canStart = model.trim().length > 0;
+  // Bara märket krävs. Modellen letar systemet upp ur bilderna och säljaren bekräftar den efteråt —
+  // ett fält färre att fylla i, och identifieringen sker på bilderna i stället för på minnet.
+  const canStart = brand.trim().length > 0;
 
   function start() {
     if (!canStart) return;
-    onStartScan({ brand: brand.trim() || null, model: model.trim() });
+    onStartScan({ brand: brand.trim(), model: "" });
   }
 
   return (
@@ -52,8 +52,8 @@ export default function HomeScreen({
           <span className="accent">säljer du?</span>
         </h1>
         <p className="home-lede">
-          Märke och modell först — sedan filmar du ett varv runt möbeln. Du får tillbaka skick, skador och
-          prisförslag i ett svar.
+          Märket först — sedan filmar du ett varv runt möbeln. Vi föreslår modellen, du väljer, och
+          får specifikationer, pris och skick.
         </p>
       </header>
 
@@ -81,22 +81,6 @@ export default function HomeScreen({
           </span>
         </button>
 
-        <div className="form-row">
-          <label className="form-row-label" htmlFor="model-input">
-            Modell
-          </label>
-          <input
-            id="model-input"
-            ref={modelRef}
-            className="form-row-input"
-            value={model}
-            onChange={(e) => setModel(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && start()}
-            placeholder="t.ex. Landskrona 3-sits"
-            autoComplete="off"
-            enterKeyHint="go"
-          />
-        </div>
       </div>
 
       <div className="home-cta">
@@ -105,8 +89,8 @@ export default function HomeScreen({
         </button>
         <p className="form-hint">
           {canStart
-            ? "Prisförslaget bygger på liknande annonser för just den här modellen."
-            : "Modellnamnet behövs för prisförslaget. Märket är valfritt men smalnar av underlaget."}
+            ? "Vi föreslår upp till fyra modeller av märket när bilderna är inne."
+            : "Märket behövs för att kunna hitta modellen."}
         </p>
       </div>
 

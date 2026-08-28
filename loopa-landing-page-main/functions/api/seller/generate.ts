@@ -165,11 +165,28 @@ type Env = GeminiEnv
 // stopped at 26s. No seller code path can intentionally reach 30s.
 
 /** Hard orchestration ceiling. Everything in flight is aborted and the best available result is returned. Deliberately below the 30s product limit. */
-const OVERALL_DEADLINE_MS = 26_000
+/**
+ * Budgetarna är env-styrbara sedan Loopa Condition började anropa den här handlern.
+ *
+ * Standardvärdena är oförändrade och gäller loopa.nu, där research ÄR kritiska vägen och säljaren
+ * väntar på den. I Loopa Condition kör identifieringen parallellt med skickbedömningen, som ändå tar
+ * 20-40 s — där kostar en större researchbudget ingenting alls på kritiska vägen.
+ *
+ * Varför det spelar roll: 9 s mot en uppmätt latens på 6,2 s för tre bilder är knappt någon marginal,
+ * och när sökningen faller finns INGA kandidater att erbjuda — de läses enbart ur grundad text. En
+ * timeout här är alltså skillnaden mellan fyra modellförslag och "vi kunde inte peka ut någon modell".
+ */
+const envMs = (name: string, fallback: number) => {
+  const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[name]
+  const n = raw ? Number.parseInt(raw, 10) : NaN
+  return Number.isFinite(n) && n > 0 ? n : fallback
+}
+
+const OVERALL_DEADLINE_MS = envMs('SELLER_OVERALL_DEADLINE_MS', 26_000)
 /** Grounded research. Measured 3.6-8.0s at this image cap; best-effort, never fatal. */
-const RESEARCH_BUDGET_MS = 9_000
+const RESEARCH_BUDGET_MS = envMs('SELLER_RESEARCH_BUDGET_MS', 9_000)
 /** One retry, and ONLY when the first attempt came back ungrounded (fast and cheap) rather than failing. */
-const RESEARCH_RETRY_BUDGET_MS = 7_000
+const RESEARCH_RETRY_BUDGET_MS = envMs('SELLER_RESEARCH_RETRY_BUDGET_MS', 7_000)
 /** Structuring. Measured ~2.9-3.2s. This call IS the listing, so it gets a generous ceiling. */
 const STRUCTURE_BUDGET_MS = 10_000
 /** Realistic time to keep in reserve for structuring when deciding whether a research retry still fits — measured latency plus headroom, not the full ceiling. */
@@ -907,10 +924,18 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     // or format-noncompliant research run just continues as before.
     if (!resolution && research.ok) {
       const { candidates, explicitNone } = parseCandidates(research.text, brand)
-      const auto = pickAutoCandidate(candidates)
+      // SELLER_ALWAYS_ASK: fråga säljaren även när en kandidat dominerar.
+      //
+      // Standardregeln hoppar över valet när toppkandidaten är STARK och konkurrenterna bara
+      // MÖJLIGA — avbryt bara vid verklig tvetydighet. Loopa Condition kör med den avstängd: att
+      // presentera EN modell som fastställd är fel när den är gissad, och en säljare som ser fyra
+      // förslag och känner igen sin möbel kostar två sekunder. Med flaggan på räcker en kandidat för
+      // att fråga; utan den krävs som förut två.
+      const alwaysAsk = (env as { SELLER_ALWAYS_ASK?: string }).SELLER_ALWAYS_ASK === '1'
+      const auto = alwaysAsk ? null : pickAutoCandidate(candidates)
       if (auto) {
         resolved = { model: auto.model, variant: auto.variant, productType: auto.productType, source: 'auto' }
-      } else if (candidates.length >= 2 || explicitNone) {
+      } else if (candidates.length >= (alwaysAsk ? 1 : 2) || explicitNone) {
         const totalServerMs = Date.now() - startedAt
         console.log(
           `[seller/generate] phase=identify outcome=needs_selection candidates=${candidates.length} research_ms=${researchMs} research_retry=${researchRetried} gemini_calls=${geminiCalls} total_ms=${totalServerMs}`,

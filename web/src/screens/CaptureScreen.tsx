@@ -5,6 +5,14 @@ import { extractBestFrames, EXTRACTION_TARGET_MS, type ExtractionReport } from "
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 
 const MAX_UPLOAD_WIDTH = 1280;
+/**
+ * Måste följa MAX_IMAGES_PER_JOB i server/src/config.ts.
+ *
+ * Klienten tog tidigare tio bilder medan servern kapade vid sex, så bild sju till tio laddades upp,
+ * skalades, visades i granskningsrutan — och kastades sedan tyst innan inspektionen. Säljaren såg tio
+ * vyer och fick sex bedömda, utan att något sa det.
+ */
+const MAX_IMAGES = 6;
 const MAX_RECORD_MS = 60000; // hard ceiling only — a lap normally ends itself well before this
 const FULL_LAP_DEG = 360;
 /** No orientation events within this long means no usable sensor: fall back to stopping by hand. */
@@ -160,13 +168,23 @@ export default function CaptureScreen({
   }
 
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []).slice(0, 10);
-    for (const file of files) {
+    const picked = Array.from(e.target.files ?? []);
+    e.target.value = ""; // så samma filer kan väljas igen efter ett misslyckat försök
+    const room = MAX_IMAGES - shots.length;
+    if (room <= 0) {
+      setProcessingError(`Redan ${MAX_IMAGES} bilder valda — ta bort någon först.`);
+      return;
+    }
+    setProcessingError(
+      picked.length > room
+        ? `Tog de ${room} första — högst ${MAX_IMAGES} bilder bedöms.`
+        : null,
+    );
+    for (const file of picked.slice(0, room)) {
       const dataUrl = await fileToResizedDataUrl(file);
       addShot(dataUrl, "manual");
     }
     if (mode === "choose") setMode("review");
-    e.target.value = "";
   }
 
   async function startRecording() {
@@ -301,8 +319,12 @@ export default function CaptureScreen({
             <p className="muted">Välj en färdig film — vi extraherar bildrutorna åt dig.</p>
           </div>
         </button>
-        <button className="btn btn-text" onClick={() => fileInputRef.current?.click()}>
-          Ladda upp befintliga bilder
+        <button className="choose-card" onClick={() => fileInputRef.current?.click()}>
+          <span className="choose-icon">🖼️</span>
+          <div>
+            <strong>Ladda upp bilder</strong>
+            <p className="muted">Har du redan foton? Välj upp till {MAX_IMAGES} — ingen film behövs.</p>
+          </div>
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
         <input ref={videoFileInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleVideoFileUpload} />
@@ -417,7 +439,10 @@ export default function CaptureScreen({
   return (
     <div className="screen screen-light">
       <h2>Dessa vyer kommer att inspekteras</h2>
-      <p className="muted">{shots.length} bilder valda. Ser något håll ut att saknas? Lägg till fler nedan.</p>
+      <p className="muted">
+        {shots.length} av högst {MAX_IMAGES} bilder valda.
+        {shots.length < MAX_IMAGES ? " Ser något håll ut att saknas? Lägg till fler nedan." : ""}
+      </p>
       {extraction && (
         <p className="muted small">
           Uttaget: {extraction.method} · {(extraction.ms / 1000).toFixed(1)} s · {extraction.buckets} vyer ·{" "}
@@ -437,10 +462,10 @@ export default function CaptureScreen({
       </div>
       {processingError && <p className="error-text">{processingError}</p>}
       <div className="review-add-actions">
-        <button className="btn btn-text" onClick={() => enterMode("photo")}>
+        <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
           + Ta fler bilder
         </button>
-        <button className="btn btn-text" onClick={() => fileInputRef.current?.click()}>
+        <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
           + Ladda upp
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />

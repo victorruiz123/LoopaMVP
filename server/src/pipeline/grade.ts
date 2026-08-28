@@ -127,6 +127,9 @@ function gradeFromOverallCondition(oc: OverallCondition): { grade: ConditionGrad
 function effectiveVerification(d: Damage): "CONFIRMED" | "REJECTED" | "UNCERTAIN" {
   if (d.sellerAction === "rejected") return "REJECTED";
   if (d.sellerAction === "confirmed" || d.sellerAction === "corrected") return "CONFIRMED";
+  // Ett ogranskat fynd står som det rapporterades — samma regel som när granskningen fanns men föll.
+  // Betygsgränserna och S1-S4 är oförändrade; det är bara etiketten på fyndet som ändrats.
+  if (d.verification === "NOT_RUN") return "CONFIRMED";
   return d.verification;
 }
 

@@ -36,7 +36,15 @@ export type DamageType =
 
 export type Severity = "S1" | "S2" | "S3" | "S4";
 export type Impact = "cosmetic" | "functional" | "structural";
-export type VerificationState = "CONFIRMED" | "REJECTED" | "UNCERTAIN";
+/**
+ * `NOT_RUN` betyder att andrabesiktningen aldrig kördes — inte att fyndet underkändes och inte att det
+ * godkändes. Kortet är ett attest och får inte antyda en kontroll som inte gjorts.
+ *
+ * Fyndet STÅR ändå: det rapporterades av inspektionen och räknas i betyg och pris precis som förut.
+ * Se effectiveVerification i grade.ts och isPriceable i pricing.ts — båda filtrerade tidigare på
+ * `=== "CONFIRMED"` och hade tyst tömt både betyget och prisunderlaget på varje fynd.
+ */
+export type VerificationState = "CONFIRMED" | "REJECTED" | "UNCERTAIN" | "NOT_RUN";
 export type CoverageState = "INSPECTED_CLEAR" | "INSPECTED_DAMAGE" | "NOT_SUFFICIENTLY_VISIBLE";
 export type ConditionGrade = "A" | "B" | "C" | "D" | "E" | "F";
 
@@ -134,6 +142,26 @@ export interface GradeExplanation {
   /** longer bullet trace, debug-only, never shown in the seller report */
   reasons: string[];
 }
+
+/** En modellkandidat ur identifieringen. Samma form som landningssidans SellerProductCandidate. */
+export interface ModelCandidate {
+  brand: string;
+  model: string;
+  variant: string | null;
+  productType: string | null;
+  confidence: "strong" | "likely" | "possible";
+  /** Kort text som skiljer kandidaterna åt, t.ex. "hög rygg, teakstomme". */
+  distinguishingDetail: string | null;
+}
+
+/**
+ * Var identifieringen står.
+ *
+ * `needs_selection` är inte ett fel utan hela poängen: tvetydighet mellan VERKLIGA produkter lämnas
+ * till säljaren i stället för att slås ut med fler modellanrop. Bryggan behandlade det tidigare som
+ * ett misslyckande, så just det fall kandidatflödet finns för visade "Annonsen kunde inte skapas".
+ */
+export type IdentityStatus = "identifying" | "needs_selection" | "resolved" | "unavailable";
 
 /** What the seller typed before filming. The price engine needs a name to search the corpus for. */
 export interface FurnitureIdentity {
@@ -243,6 +271,11 @@ export interface ConditionResult {
    * de rapporterades — men listan kan ännu ändras när granskningen landar.
    */
   reviewPending: boolean;
+  /**
+   * Om andrabesiktningen faktiskt kördes. Kortet är ett attest och ska kunna säga vad det bygger på —
+   * en (1) besiktning eller två — i stället för att låta läsaren anta det starkare alternativet.
+   */
+  reviewed: boolean;
   /** modell, specifikationer och annonstext — null bara när inget märke angavs */
   listing: ListingResult | null;
   coverage: CoverageState;
@@ -256,6 +289,21 @@ export interface ConditionResult {
   costUsd: number;
   geminiCallCount: number;
   latencyMs: number;
+}
+
+/**
+ * Var publiceringen till Tradera står. Sätts först när säljaren tryckt på knappen — ett jobb utan
+ * `tradera` har aldrig publicerats och ska inte se ut som ett misslyckat försök.
+ */
+export interface TraderaPublication {
+  status: "publishing" | "published" | "error";
+  /** Traderas kö-id. Finns bara i loggen och i felsökning — annonsen adresseras med itemId. */
+  requestId: number | null;
+  itemId: number | null;
+  url: string | null;
+  error: string | null;
+  startedAt: string;
+  publishedAt: string | null;
 }
 
 export interface ConditionJob {
@@ -276,6 +324,17 @@ export interface ConditionJob {
    * what a retry replays.
    */
   images?: CapturedImage[];
+  /** Var modellidentifieringen står. Driver kandidatskärmen. */
+  identityStatus?: IdentityStatus;
+  /** Upp till fyra troliga modeller av märket, bäst först. */
+  candidates?: ModelCandidate[];
+  /** Den säljaren valde, eller den identifieringen kunde avgöra själv. */
+  selected?: ModelCandidate | null;
+  identityError?: string | null;
+  /** När nuvarande fas började — för fasloggningen. */
+  phaseStartedAt?: number;
+  /** Annonsen när den blev klar före skickresultatet — flyttas in i resultatet när det finns. */
+  pendingListing?: ListingResult | null;
   /**
    * Annonsen, när besiktningen föll men generatorn hann bli klar.
    *
@@ -284,6 +343,8 @@ export interface ConditionJob {
    * betalt och som säljaren fortfarande har nytta av.
    */
   listing?: ListingResult | null;
+  /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
+  tradera?: TraderaPublication | null;
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

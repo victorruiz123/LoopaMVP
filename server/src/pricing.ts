@@ -66,7 +66,8 @@ const GRADE_BY_SEVERITY: Record<Severity, number> = { S1: 0, S2: 1, S3: 2, S4: 2
 function isPriceable(d: Damage): boolean {
   if (d.sellerAction === "rejected") return false;
   if (d.sellerAction === "confirmed" || d.sellerAction === "corrected") return true;
-  return d.verification === "CONFIRMED";
+  // NOT_RUN = aldrig granskad, inte underkänd. Fyndet ska värderas som det rapporterades.
+  return d.verification === "CONFIRMED" || d.verification === "NOT_RUN";
 }
 
 function categoryFor(d: Damage): string | undefined {

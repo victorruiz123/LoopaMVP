@@ -15,6 +15,31 @@
 export const MAX_IMAGES_PER_JOB = 6;
 
 /**
+ * Andrabesiktningen — `verify_findings` — körs INTE i det skarpa flödet sedan 2026-08-28.
+ *
+ * Skälet är mätt: steget kostade 15,6 s median (upp till 54 s) och var den enskilt största posten på
+ * kritiska vägen, men över 16 inspelade körningar på 5 möbler ändrade det betyget noll gånger och
+ * fyndlistan en gång.
+ *
+ * Koden är kvar och flaggan finns för att mätningen ska gå att göra om. `VERIFY_FINDINGS=1` ger exakt
+ * det beteende som gällde före urkopplingen. Underlaget bakom beslutet saknar möbler med strukturella
+ * eller funktionella skador — precis där en andrabesiktning borde vara värd mest — så posten är öppen,
+ * inte stängd.
+ */
+/**
+ * EN deadline för hela jobbet, satt när det skapas.
+ *
+ * Alla tidigare gränser satt på enskilda anrop, och därför band ingen av dem helheten: inspektionen
+ * har 60 s + 30 s reserv, identifieringen sin egen budget, prismotorn sin. Ett jobb kunde stå i
+ * minuter utan att någon enskild gräns överskreds — och när processen startade om band ingenting alls.
+ *
+ * Den här klockan bryr sig inte om vilken fas jobbet står i eller hur många omförsök som pågår.
+ */
+export const JOB_DEADLINE_MS = Number(process.env.JOB_DEADLINE_MS ?? 240_000);
+
+export const VERIFY_ENABLED = process.env.VERIFY_FINDINGS === "1";
+
+/**
  * Send EVERY finding to the review pass. The second inspector both sanity-checks what was found and
  * looks for what was missed, so there is no useful subset to gate on. The threshold gate below is kept
  * as the fallback if this is ever turned off — measured, it let 41 of 42 findings through untouched.

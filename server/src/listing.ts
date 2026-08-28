@@ -1,7 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadImageAsBase64 } from "./imageUtils.js";
-import type { CapturedImage, FurnitureIdentity, ListingResult } from "./types.js";
+import type { CapturedImage, FurnitureIdentity, ListingResult, ModelCandidate } from "./types.js";
 
 /**
  * Annonsgeneratorn bor i loopa-landing-page-main och ANROPAS, inte kopieras.
@@ -20,45 +20,75 @@ const GENERATE_MODULE = pathToFileURL(
 ).href;
 
 /** Hur länge vi väntar. Generatorn har en egen inre deadline på 26 s; det här är bara ett skyddsnät. */
-const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 45000);
+const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 70000);
+
+/**
+ * Rundligare budgetar än loopa.nu kör med, av en enda anledning: identifieringen ligger INTE på vår
+ * kritiska väg. Den löper parallellt med skickbedömningen, som tar 20-40 s ändå.
+ *
+ * Deras 9 s mot en uppmätt latens på 6,2 s lämnade ingen marginal, och en fallen sökning ger noll
+ * kandidater — modellförslagen läses enbart ur grundad text. Att spara sekunder som ändå går åt någon
+ * annanstans var att betala med hela funktionen.
+ */
+// Sätts i process.env, INTE i request-env. Generatorns budgetar är konstanter som utvärderas när
+// modulen laddas, och modulen laddas dynamiskt först vid första anropet — alltså efter de här raderna.
+// Skickade som request-env hade de aldrig fått någon effekt alls.
+process.env.SELLER_RESEARCH_BUDGET_MS ??= "24000";
+process.env.SELLER_RESEARCH_RETRY_BUDGET_MS ??= "16000";
+process.env.SELLER_OVERALL_DEADLINE_MS ??= "60000";
 /** Generatorn tar högst 10 och beskär själv per steg. Fler bildrutor gör bara nyttolasten dyr. */
 const MAX_LISTING_IMAGES = 6;
 
-type Handler = (context: { request: Request; env: { GEMINI_API_KEY?: string } }) => Promise<Response>;
+type Handler = (context: { request: Request; env: Record<string, string | undefined> }) => Promise<Response>;
+
+/** Vad ett anrop mot annonsgeneratorn kan svara. `needs_selection` är ett giltigt svar, inte ett fel. */
+export type SellerCall =
+  | { kind: "needs_selection"; candidates: ModelCandidate[] }
+  | { kind: "ok"; listing: ListingResult }
+  | { kind: "unavailable"; reason: string };
+
+/** Andra anropets identitetsbesked: säljarens val, ett handskrivet namn, eller uttalat okänt. */
+export type Resolution =
+  | { kind: "seller_selected"; selected: ModelCandidate }
+  | { kind: "manual"; manualModel: string }
+  | { kind: "unknown" };
 
 function unavailable(reason: string, startedAt: number): ListingResult {
   return { status: "unavailable", unavailableReason: reason, result: null, latencyMs: Date.now() - startedAt };
 }
 
 /**
- * Modell, specifikationer och färdig annonstext för möbeln.
+ * Ett anrop mot annonsgeneratorn.
  *
- * Kastar aldrig. Annonsen är ett tillägg till besiktningen, och en generator som ligger nere får inte
- * kosta säljaren den skanning de redan betalat ett Gemini-anrop för — samma regel som priset lyder
- * under. Generatorn själv svarar dessutom hellre degraderat än med fel, så ett `status: "fallback"`
- * med bara färg och en titel är ett giltigt svar och inte ett misslyckande.
+ * UTAN `resolution` är det fas 1 — identifieringen. Den svarar antingen med en färdig annons (märket
+ * och bilderna räckte för att avgöra modellen själv) eller med `needs_selection` och upp till fyra
+ * kandidater som säljaren får välja mellan.
+ *
+ * MED `resolution` är det fas 2 — annonsen, byggd på den valda modellen.
+ *
+ * Kastar aldrig. Generatorn svarar hellre degraderat än med fel, och en generator som ligger nere får
+ * inte kosta säljaren den skanning de redan betalat ett Gemini-anrop för.
  */
-export async function generateListing(
-  identity: FurnitureIdentity | null,
+export async function callSellerGenerate(
+  brandOrIdentity: FurnitureIdentity | string | null,
   images: CapturedImage[],
   jobDir: string,
-): Promise<ListingResult | null> {
-  if (!identity) return null;
+  resolution?: Resolution,
+): Promise<SellerCall> {
   const startedAt = Date.now();
+  const identity = typeof brandOrIdentity === "string" ? { brand: brandOrIdentity, model: "" } : brandOrIdentity;
+  if (!identity) return { kind: "unavailable", reason: "Inget märke angavs, så det fanns inget att söka på." };
 
-  // Generatorn kräver ett märke. Har säljaren bara skrivit modellnamn är DET den bästa söknyckeln
-  // vi har — bättre än att hoppa över annonsen helt.
+  // Generatorn kräver ett märke. Har säljaren bara skrivit modellnamn är DET den bästa söknyckeln.
   const brand = identity.brand?.trim() || identity.model.trim();
+  if (!brand) return { kind: "unavailable", reason: "Inget märke angavs." };
   const fullName = [identity.brand, identity.model].filter(Boolean).join(" ").trim();
 
   let onRequestPost: Handler;
   try {
     ({ onRequestPost } = (await import(GENERATE_MODULE)) as { onRequestPost: Handler });
   } catch (err) {
-    return unavailable(
-      `Annonsgeneratorn gick inte att ladda: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}`,
-      startedAt,
-    );
+    return { kind: "unavailable", reason: `Annonsgeneratorn gick inte att ladda: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}` };
   }
 
   let payloadImages: Array<{ mimeType: string; dataBase64: string }>;
@@ -70,9 +100,9 @@ export async function generateListing(
       }),
     );
   } catch {
-    return unavailable("Bildrutorna gick inte att läsa.", startedAt);
+    return { kind: "unavailable", reason: "Bildrutorna gick inte att läsa." };
   }
-  if (payloadImages.length === 0) return unavailable("Inga bildrutor att skicka.", startedAt);
+  if (payloadImages.length === 0) return { kind: "unavailable", reason: "Inga bildrutor att skicka." };
 
   try {
     const response = await Promise.race([
@@ -82,30 +112,47 @@ export async function generateListing(
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             brand,
-            productHint: identity.model,
-            // Det säljaren faktiskt skrev, ordagrant. Generatorn söker på det.
-            sellerNote: fullName,
+            productHint: identity.model || undefined,
+            sellerNote: fullName || brand,
             images: payloadImages,
+            ...(resolution ? { resolution } : {}),
           }),
         }),
-        env: { GEMINI_API_KEY: process.env.GEMINI_API_KEY },
+        env: {
+          GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+          // Alltid fråga säljaren vilken modell det är, aldrig avgöra själv — se generate.ts.
+          SELLER_ALWAYS_ASK: process.env.SELLER_ALWAYS_ASK ?? "1",
+        },
       }),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("timeout")), LISTING_TIMEOUT_MS),
-      ),
+      new Promise<never>((_, reject) => setTimeout(() => reject(new Error("timeout")), LISTING_TIMEOUT_MS)),
     ]);
 
-    const body = (await response.json()) as { ok?: boolean; error?: string; result?: unknown };
-    if (!body.ok || !body.result) {
-      return unavailable(body.error ?? `Annonsgeneratorn svarade ${response.status}.`, startedAt);
+    const body = (await response.json()) as {
+      ok?: boolean;
+      kind?: string;
+      error?: string;
+      candidates?: ModelCandidate[];
+      result?: unknown;
+    };
+
+    // `ok: true, kind: "needs_selection"` — tvetydighet mellan riktiga produkter. Bryggan krävde
+    // tidigare `body.result` och rapporterade därför just det här som "Annonsen kunde inte skapas".
+    if (body.ok && body.kind === "needs_selection") {
+      return { kind: "needs_selection", candidates: (body.candidates ?? []).slice(0, 4) };
     }
-    return { status: "ok", unavailableReason: null, result: body.result as ListingResult["result"], latencyMs: Date.now() - startedAt };
+    if (!body.ok || !body.result) {
+      return { kind: "unavailable", reason: body.error ?? `Annonsgeneratorn svarade ${response.status}.` };
+    }
+    return {
+      kind: "ok",
+      listing: { status: "ok", unavailableReason: null, result: body.result as ListingResult["result"], latencyMs: Date.now() - startedAt },
+    };
   } catch (err) {
     const reason =
       err instanceof Error && err.message === "timeout"
         ? `Annonsgeneratorn svarade inte inom ${Math.round(LISTING_TIMEOUT_MS / 1000)} s.`
         : `Annonsgeneratorn misslyckades: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}`;
     console.warn(`[condition-grading] listing unavailable — ${reason}`);
-    return unavailable(reason, startedAt);
+    return { kind: "unavailable", reason };
   }
 }

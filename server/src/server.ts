@@ -8,18 +8,22 @@ try {
 } catch {
   // no .env file yet — GEMINI_API_KEY must be set some other way, checked below.
 }
-import { createJob, getJob, jobDir, listJobs, persist, getDebugTrace } from "./jobStore.js";
+import { createJob, failOrphanedJobs, getJob, jobDir, listJobs, persist, getDebugTrace, watchJobDeadline } from "./jobStore.js";
 import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
 import { estimatePrice, repriceResult } from "./pricing.js";
+import { finalizeWithModel, runIdentify } from "./pipeline/identify.js";
+import type { Resolution } from "./listing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
 import { mapRawDefect } from "./pipeline/inspect.js";
 import { loadImageAsBase64 } from "./imageUtils.js";
 import { getImageDimensions } from "./imageUtils.js";
-import { MAX_IMAGES_PER_JOB } from "./config.js";
-import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, Severity } from "./types.js";
+import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
+import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
+import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
+import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
 const MAX_BODY_BYTES = 60 * 1024 * 1024; // up to ~10 camera-resolution JPEGs as base64
@@ -60,11 +64,18 @@ interface CreateJobBody {
   images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual" }>;
 }
 
-/** A model name is what the price engine searches on; without one there is nothing to price. */
+/**
+ * Märket räcker för att starta. Modellen letar systemet upp ur bilderna.
+ *
+ * Tidigare krävdes modellnamnet, skrivet för hand, innan något kunde börja — och identifieringen låg
+ * sist i flödet, där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris
+ * redan räknats på den. Nu är ordningen den omvända: märke in, bilder in, modell fram, sedan resten.
+ */
 function readIdentity(body: { brand?: string | null; model?: string | null }): FurnitureIdentity | null {
-  const model = body.model?.trim();
-  if (!model) return null;
-  return { brand: body.brand?.trim() || null, model };
+  const brand = body.brand?.trim() || null;
+  const model = body.model?.trim() || "";
+  if (!brand && !model) return null;
+  return { brand, model };
 }
 
 /**
@@ -133,8 +144,31 @@ async function createConditionJob(body: CreateJobBody): Promise<{ jobId: string;
   job.images = images;
   await persist(job);
 
-  // Fire and forget: the caller polls for progress.
+  // EN klocka för hela jobbet, startad här. Den enda gräns som binder oavsett fas och oavsett hur
+  // många omförsök som pågår i något av spåren.
+  const stopDeadline = watchJobDeadline(job.id, JOB_DEADLINE_MS);
+  void (async () => {
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 1000));
+      const current = await getJob(job.id);
+      if (!current || current.progress.stage === "done" || current.progress.stage === "error") break;
+    }
+    stopDeadline();
+  })();
+
+  // Två spår, parallellt. Besiktningen behöver inte modellen och identifieringen behöver inte
+  // betyget — de delar bara bildrutorna. Kedjade hade de lagt sina tider ovanpå varandra.
   void runConditionGrading(job.id, images, body.productContext ?? null, identity);
+  if (identity?.brand && !identity.model) {
+    job.identityStatus = "identifying";
+    await persist(job);
+    void runIdentify(job.id, identity.brand, images);
+  } else if (identity?.model) {
+    // Säljaren angav modellen själv — hoppa identifieringen, gå direkt till annons och pris.
+    job.identityStatus = "resolved";
+    await persist(job);
+    void finalizeWithModel(job.id, { kind: "manual", manualModel: identity.model });
+  }
   return { jobId: job.id, imageCount: images.length };
 }
 
@@ -192,10 +226,81 @@ async function handleRetry(id: string, res: ServerResponse) {
   sendJson(res, 202, { jobId: job.id, imageCount: images.length });
 }
 
+/**
+ * Säljaren väljer modell. Startar fas 2: annonsen byggs på valet, och priset räknas när
+ * skickbedömningen är klar.
+ */
+async function handleSelectModel(id: string, req: IncomingMessage, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  const body = await readJsonBody<{ candidate?: ModelCandidate; manualModel?: string }>(req);
+
+  let resolution: Resolution;
+  if (body.candidate?.model) resolution = { kind: "seller_selected", selected: body.candidate };
+  else if (body.manualModel?.trim()) resolution = { kind: "manual", manualModel: body.manualModel.trim() };
+  else return sendJson(res, 400, { error: "candidate eller manualModel krävs" });
+
+  void finalizeWithModel(id, resolution);
+  sendJson(res, 202, { ok: true });
+}
+
 async function handleGetDebug(id: string, res: ServerResponse) {
   const trace = await getDebugTrace(id);
   if (!trace) return sendJson(res, 404, { error: "No debug trace for this job (not finished, or job not found)" });
   sendJson(res, 200, trace);
+}
+
+// ---- Tradera: publicerar truth-cardet som en riktig annons ----------------
+
+/**
+ * Allt klienten behöver för att rita knappen: om integrationen ens är påkopplad, vad som skulle
+ * publiceras, och var ett pågående försök står.
+ */
+function traderaState(job: ConditionJob) {
+  const readiness = planTraderaPublish(job);
+  return {
+    configured: traderaConfigured(),
+    missingEnv: missingTraderaEnv(),
+    publication: job.tradera ?? null,
+    plan: readiness.ok ? readiness.plan : null,
+    blockedReason: readiness.ok ? null : readiness.reason,
+  };
+}
+
+async function handleGetTradera(jobId: string, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  sendJson(res, 200, traderaState(job));
+}
+
+/**
+ * Startar publiceringen och svarar direkt.
+ *
+ * Tradera KÖAR annonsen — publiceringen tar 10–60 s och kan inte hållas i ett HTTP-svar. Jobbet
+ * markeras som "publicerar" innan bakgrundsarbetet startar, så en andra tryckning inte kan lägga upp
+ * samma möbel två gånger, och klienten pollar GET på samma väg.
+ */
+async function handlePublishTradera(jobId: string, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+
+  if (!traderaConfigured()) {
+    return sendJson(res, 503, {
+      error: `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`,
+      ...traderaState(job),
+    });
+  }
+  if (job.tradera?.status === "publishing") return sendJson(res, 202, traderaState(job));
+  if (job.tradera?.status === "published") {
+    return sendJson(res, 409, { error: "Annonsen är redan publicerad på Tradera.", ...traderaState(job) });
+  }
+
+  const readiness = planTraderaPublish(job);
+  if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...traderaState(job) });
+
+  await markTraderaPublishing(job);
+  void runTraderaPublish(job.id);
+  sendJson(res, 202, traderaState(job));
 }
 
 // ---- public API: /v1/condition, authenticated with x-api-key ---------------
@@ -480,8 +585,15 @@ const server = http.createServer(async (req, res) => {
       if (segments.length === 4 && segments[3] === "debug" && req.method === "GET") {
         return await handleGetDebug(segments[2], res);
       }
+      if (segments.length === 4 && segments[3] === "model" && req.method === "POST") {
+        return await handleSelectModel(segments[2], req, res);
+      }
       if (segments.length === 4 && segments[3] === "retry" && req.method === "POST") {
         return await handleRetry(segments[2], res);
+      }
+      if (segments.length === 4 && segments[3] === "tradera") {
+        if (req.method === "POST") return await handlePublishTradera(segments[2], res);
+        if (req.method === "GET") return await handleGetTradera(segments[2], res);
       }
       if (segments.length === 5 && segments[3] === "images" && req.method === "GET") {
         return await handleGetImage(segments[2], segments[4], res);
@@ -513,6 +625,10 @@ const server = http.createServer(async (req, res) => {
 // Loopback ONLY. The whole /api surface is unauthenticated — it is what the local UI talks to — and
 // binding to every interface put it on the network for anyone on the same WiFi to call without a key.
 // The phone still reaches it: it loads the page from vite, and vite proxies /api from this machine.
+void failOrphanedJobs().then((n) => {
+  if (n > 0) console.warn(`[condition-grading] ${n} avbrutna jobb märktes som fel vid uppstart`);
+});
+
 server.listen(PORT, "127.0.0.1", () => {
   console.log(`[condition-grading-server] listening on http://localhost:${PORT}`);
   if (!process.env.GEMINI_API_KEY) {

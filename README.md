@@ -259,6 +259,38 @@ sexbilders i en kvalitetssiffra. De sexton befintliga inspelade är inspelade me
 två går att **belägga** — källjobben är raderade och bevisen ger bara en undre gräns. De övriga
 fjorton står som `unknown` hellre än som ett antagande förklätt till mätning.
 
+### Öppen post: andrabesiktningen urkopplad
+
+`verify_findings` körs inte i det skarpa flödet sedan **2026-08-28**. Koden är kvar bakom
+`VERIFY_FINDINGS=1`, som ger exakt det beteende som gällde före urkopplingen.
+
+Skälet är mätt. Steget kostade **15,6 s median, upp till 54 s**, och var den enskilt största posten på
+kritiska vägen till kortet. Över 16 inspelade körningar på 5 möbler ändrade det **betyget noll gånger**
+och **fyndlistan en gång** (`video-1-run3`, ett avslaget fynd).
+
+Den accepterade kostnaden: ett fynd som granskningen hade avvisat kommer nu med i kortet — ett fall av
+sexton i det underlag vi har.
+
+**Posten är öppen, inte stängd.** Underlaget är fem möbler i betygsspannet A–C, utan en enda strukturell
+eller funktionell skada — precis där en andrabesiktning borde vara värd mest. Att ett kontrollsteg
+aldrig utlöstes på ett litet och lätt underlag är inte samma sak som att det är onödigt. Helgens
+inspelningar, särskilt möbler med skador på baksidor och undersidor, är mätningen som stänger den:
+
+```bash
+VERIFY_FINDINGS=1 npm run server:dev     # kör med granskningen på, för A/B
+npm run verify:impact                    # steget mätt mot fixturerna
+```
+
+Två följdeffekter värda att känna till:
+
+- **Regressionssviten kan inte se den här ändringen.** Fixturerna fryser vid *ingången* till dedup och
+  bär sina `verification`-värden inbakade, så en omspelning kör varken granskningen eller den nya
+  vägen. `npm run regress` är grön för att den mäter något annat, inte för att inget ändrats.
+- **Prismotorn ligger nu oskyddad på kritiska vägen.** Den spekulativa prissättningen fanns för att
+  löpa parallellt med granskningen; utan granskning finns inget att överlappa med, och `price_publish`
+  gick från ~0 s (spekulationsträff) till **9,7–12,6 s** seriellt. Det är nu den största posten efter
+  inspektionen.
+
 ### Att återställa
 
 Läget före det här arbetet ligger som tagg:
@@ -286,6 +318,49 @@ Två saker ska hända då, och gjorde det inte förut:
   `{"error":{"code":504,...}}` rakt i ansiktet på säljaren. `web/src/lib/errors.ts` översätter i stället
   till vad som hände, om det var deras fel och vad de ska göra — och döljer knappen "Försök igen" när ett
   omtag omöjligt kan hjälpa, som vid en saknad API-nyckel. Råtexten finns kvar under "Tekniska detaljer".
+
+## Modellvalet
+
+Säljaren skriver **bara märket**. Modellen letar systemet upp ur bilderna och säljaren bekräftar den:
+upp till fyra kandidater, "är det någon av dessa?", plus möjligheten att skriva namnet själv.
+
+Ordningen är omvänd mot tidigare. Förut skrevs modellen för hand först, och identifieringen låg SIST —
+i truth-cardet, där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris
+redan räknats på den. Nu: märke -> bilder -> **välj modell** -> specifikationer -> pris -> skick ->
+truth-card.
+
+Maskineriet kommer från `loopa-landing-page-main` och **anropas, inte kopieras**:
+`_shared/seller-candidates.ts` läser `KANDIDAT:`-rader ur den grundade sökningen, och
+`seller/generate.ts` svarar `needs_selection` i stället för ett färdigt resultat när det finns något
+att välja mellan.
+
+### Två ändringar mot deras standardbeteende
+
+**`SELLER_ALWAYS_ASK=1`.** Deras `pickAutoCandidate` hoppar över valskärmen när toppkandidaten är
+STARK och konkurrenterna bara MÖJLIGA — avbryt bara vid verklig tvetydighet. Vi kör med den av: att
+presentera EN modell som fastställd är fel när den är gissad, och en säljare som känner igen sin möbel
+bland fyra förslag kostar två sekunder. Med flaggan på räcker en kandidat för att fråga.
+
+**Ett svar utan kandidater accepteras inte som fastställt.** Faller den grundade sökningen kan
+generatorn ändå leverera en annons — men kandidater läses ENBART ur grundad text, så modellnamnet i
+det läget är en gissning. `runIdentify` sätter då `needs_selection` med noll kandidater och låter
+säljaren skriva själv, i stället för att visa gissningen som "din modell".
+
+### Vad som körs parallellt
+
+```
+bilder ─┬─ identifiering ──> [säljaren väljer] ─┬─ annons  (specifikationer)
+        │                                       └─ pris    (behöver skadelistan)
+        └─ skickbedömning ─────────────────────────┘
+```
+
+Annonsen och priset behöver inte varandra — annonsen byggs på modellen och bilderna, priset på
+modellen och skadelistan. Kedjade betydde det att prissättningen inte ens började förrän annonsen var
+klar: den stod still i 13-20 sekunder medan säljaren läste specifikationerna, för att sedan ta sina
+tio när de klickade vidare. Nu löper de bredvid varandra.
+
+**Nypris visas inte**, varken i specifikationerna eller i truth-cardet. Säljaren ska förhålla sig till
+vad möbeln är värd i dag. Fältet finns kvar i datan.
 
 ## Truth-cardet
 

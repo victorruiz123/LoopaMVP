@@ -1,4 +1,4 @@
-import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, PriceEstimate } from "./types";
+import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, TraderaState } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -44,9 +44,39 @@ export async function fetchPrice(identity: FurnitureIdentity): Promise<PriceEsti
   return body.price;
 }
 
+/** Säljarens modellval. Startar fas 2: annonsen byggs på valet och priset räknas när skicket är klart. */
+export async function selectModel(
+  jobId: string,
+  choice: { candidate?: ModelCandidate; manualModel?: string },
+): Promise<void> {
+  const res = await fetch(`/api/jobs/${jobId}/model`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(choice),
+  });
+  await json(res);
+}
+
 /** Kör om pipelinen på de bildrutor jobbet redan har — ingen ny filmning, ingen ny uppladdning. */
 export async function retryJob(jobId: string): Promise<{ jobId: string; imageCount: number }> {
   const res = await fetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
+  return json(res);
+}
+
+/**
+ * Var Tradera-publiceringen står, och vad som skulle publiceras.
+ *
+ * Pollas medan status är "publishing": Tradera köar annonsen och kön tar 10-60 s, så servern svarar
+ * direkt och arbetar vidare i bakgrunden.
+ */
+export async function getTraderaState(jobId: string): Promise<TraderaState> {
+  const res = await fetch(`/api/jobs/${jobId}/tradera`);
+  return json(res);
+}
+
+/** Publicerar truth-cardet som en riktig annons på Loopas Tradera-konto. Svarar innan den är uppe. */
+export async function publishToTradera(jobId: string): Promise<TraderaState> {
+  const res = await fetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
   return json(res);
 }
 
