@@ -334,10 +334,11 @@ export interface InspectionResult {
 
 export async function inspectFurniture(images: CapturedImage[], jobDir: string, productContext: string | null): Promise<InspectionResult> {
   const originalsDir = path.join(jobDir, "originals");
-  const parts: ImagePart[] = [];
-  for (const img of images) {
-    parts.push(await loadImageAsBase64(path.join(originalsDir, img.path)));
-  }
+  // Parallellt: varje bild är en oberoende diskläsning plus en base64-kodning, och seriellt lades
+  // deras tider ihop rakt av innan Gemini ens fick frågan.
+  const parts: ImagePart[] = await Promise.all(
+    images.map((img) => loadImageAsBase64(path.join(originalsDir, img.path))),
+  );
 
   const imageList = images.map((img, i) => `Bild ${i}: ${img.source === "manual" ? "manuellt foto" : "video-vy"}${img.viewLabel ? ` (${img.viewLabel})` : ""}`).join(", ");
   const contextLine = productContext ? `\nKänd produktinfo (kan vara ofullständig): ${productContext}` : "";

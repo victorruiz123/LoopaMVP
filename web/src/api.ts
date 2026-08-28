@@ -1,4 +1,4 @@
-import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity } from "./types";
+import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, PriceEstimate } from "./types";
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -25,6 +25,23 @@ export async function createJob(
     body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null }),
   });
   return json(res);
+}
+
+/**
+ * Prisförslag på bara märke och modell, utan jobb och utan bilder.
+ *
+ * Startas i samma ögonblick som säljaren lämnar startsidan och löper medan de filmar. Prismotorn
+ * svarar på ungefär 5-11 s; en varvfilmning tar 30-40. Priset är alltså framme innan de ens tryckt
+ * stopp, och ligger färdigt när prisvyn öppnas.
+ */
+export async function fetchPrice(identity: FurnitureIdentity): Promise<PriceEstimate> {
+  const res = await fetch("/api/price", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ brand: identity.brand, model: identity.model }),
+  });
+  const body = await json<{ price: PriceEstimate }>(res);
+  return body.price;
 }
 
 /** Kör om pipelinen på de bildrutor jobbet redan har — ingen ny filmning, ingen ny uppladdning. */

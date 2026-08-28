@@ -178,6 +178,59 @@ export interface PriceEstimate {
   latencyMs: number;
 }
 
+/** En egenskap generatorn hittat och kunnat belägga — mått, material, färg, årsmodell. */
+export interface ListingAttribute {
+  key: string;
+  label: string;
+  value: string;
+  sourceUrl?: string | null;
+}
+
+export interface ListingSource {
+  title: string;
+  url: string;
+  qualityTier?: 1 | 2 | 3;
+}
+
+/**
+ * Annonsgeneratorns svar, som det kommer ur loopa-landing-page-main. Bara de fält truth-cardet visar
+ * är typade här — resten följer med orört i `raw` för den som vill gräva.
+ */
+export interface GeneratedListing {
+  identity: {
+    brand: string | null;
+    exactProduct: string | null;
+    variant: string | null;
+    category: string | null;
+    confidence: "high" | "medium" | "low";
+    uncertain: boolean;
+    uncertaintyNote: string | null;
+  };
+  attributes: ListingAttribute[];
+  pricing: {
+    retailPriceSek: number | null;
+    suggestedPriceSek: number | null;
+    priceRangeMinSek: number | null;
+    priceRangeMaxSek: number | null;
+    rationale: string | null;
+  };
+  listing: { title: string; description: string; conditionText: string };
+  sources: ListingSource[];
+  /** "full" | "partial" | "fallback" — hur mycket generatorn kunde belägga. */
+  status?: string;
+  missingFields?: string[];
+  missingNotes?: string[];
+}
+
+/** Truth-cardets halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
+export interface ListingResult {
+  /** "pending" medan generatorn fortfarande kör — den startar samtidigt som besiktningen. */
+  status: "pending" | "ok" | "unavailable";
+  unavailableReason: string | null;
+  result: GeneratedListing | null;
+  latencyMs: number;
+}
+
 export interface ConditionResult {
   jobId: string;
   createdAt: string;
@@ -185,6 +238,13 @@ export interface ConditionResult {
   identity: FurnitureIdentity | null;
   /** null only when no identity was given — otherwise always set, possibly to a status that has no number */
   price: PriceEstimate | null;
+  /**
+   * true medan andrabesiktningen fortfarande kör. Resultatet är giltigt och visas — fynden står som
+   * de rapporterades — men listan kan ännu ändras när granskningen landar.
+   */
+  reviewPending: boolean;
+  /** modell, specifikationer och annonstext — null bara när inget märke angavs */
+  listing: ListingResult | null;
   coverage: CoverageState;
   coverageNote: string | null;
   grade: GradeExplanation | null;
@@ -216,6 +276,14 @@ export interface ConditionJob {
    * what a retry replays.
    */
   images?: CapturedImage[];
+  /**
+   * Annonsen, när besiktningen föll men generatorn hann bli klar.
+   *
+   * De två grenarna är oberoende: annonsgeneratorn behöver bara bildrutorna och märket. Att låta ett
+   * Gemini-avbrott i besiktningen kasta ett färdigt truth-card vore att slänga arbete som redan är
+   * betalt och som säljaren fortfarande har nytta av.
+   */
+  listing?: ListingResult | null;
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

@@ -99,6 +99,25 @@ export function mapDamagesForPricing(damages: Damage[]): Array<Record<string, un
   });
 }
 
+/**
+ * Kanonisk nyckel för EXAKT det prismotorn matas med.
+ *
+ * Ren funktion, för att spekulationen i run.ts måste kunna svara på frågan "blev det någon skillnad?"
+ * utan att gissa. Jämförelsen sker på den MAPPADE listan — den prismotorn faktiskt får — och inte på
+ * skadeobjekten: två olika `Damage` kan mappa till samma avdragspost (severity S3 och S4 blir båda
+ * grad 2), och då är priset detsamma och spekulationen giltig. Objektidentitet hade sagt "ändrat" där
+ * ingenting som påverkar priset ändrats.
+ *
+ * Sorteras, eftersom `mapDamagesForPricing` bevarar inmatningsordningen och verify kan flytta om ett
+ * fynd utan att ändra vad som står i det.
+ */
+export function pricingSignature(damages: Damage[], canonicalCondition: string | null): string {
+  const mapped = mapDamagesForPricing(damages)
+    .map((entry) => JSON.stringify(entry, Object.keys(entry).sort()))
+    .sort();
+  return JSON.stringify({ condition: canonicalCondition, damages: mapped });
+}
+
 function unavailable(reason: string, startedAt: number): PriceEstimate {
   return {
     status: "unavailable",
@@ -149,6 +168,8 @@ export async function estimatePrice(
   damages: Damage[],
   canonicalCondition: string | null,
   coverImageBase64: string | null,
+  /** Avbryter anropet i förtid — används när ett spekulativt pris visar sig vara på fel lista. */
+  signal?: AbortSignal,
 ): Promise<PriceEstimate | null> {
   if (!identity?.model?.trim()) return null;
   const startedAt = Date.now();
@@ -178,13 +199,16 @@ export async function estimatePrice(
         ...(PRICE_ENGINE_API_KEY ? { "x-api-key": PRICE_ENGINE_API_KEY } : {}),
       },
       body: JSON.stringify(body),
-      signal: AbortSignal.timeout(PRICE_TIMEOUT_MS),
+      // Två skäl att sluta vänta: vår egen tidsgräns, eller att svaret blivit inaktuellt.
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(PRICE_TIMEOUT_MS)]) : AbortSignal.timeout(PRICE_TIMEOUT_MS),
     });
   } catch (err) {
     const reason =
       err instanceof Error && err.name === "TimeoutError"
         ? `Prismotorn svarade inte inom ${Math.round(PRICE_TIMEOUT_MS / 1000)} s.`
-        : `Prismotorn gick inte att nå på ${PRICE_ENGINE_URL}. Är den igång?`;
+        : err instanceof Error && err.name === "AbortError"
+          ? "Prisförfrågan avbröts — skadelistan ändrades."
+          : `Prismotorn gick inte att nå på ${PRICE_ENGINE_URL}. Är den igång?`;
     console.warn(`[condition-grading] price engine unreachable — ${reason}`);
     return unavailable(reason, startedAt);
   }

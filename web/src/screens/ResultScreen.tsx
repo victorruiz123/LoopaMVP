@@ -6,6 +6,7 @@ import DamageCard from "../components/DamageCard";
 import EvidenceViewer from "../components/EvidenceViewer";
 import TechnicalPanel from "../components/TechnicalPanel";
 import PricePanel from "../components/PricePanel";
+import { ChevronRight } from "../components/icons";
 import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
@@ -19,10 +20,12 @@ export default function ResultScreen({
   jobId,
   onRestart,
   onHome,
+  onSeeTruthCard,
 }: {
   jobId: string;
   onRestart: () => void;
   onHome: () => void;
+  onSeeTruthCard?: () => void;
 }) {
   const [result, setResult] = useState<ConditionResult | null>(null);
   const [imagesExpanded, setImagesExpanded] = useState(false);
@@ -38,7 +41,23 @@ export default function ResultScreen({
   const addPhotoInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    getJob(jobId).then((j) => setResult(j.result));
+    let cancelled = false;
+    // Delresultatet publiceras innan andrabesiktningen är klar, så vyn fortsätter fråga tills
+    // granskningen landat — annars stod säljaren kvar med en fyndlista märkt "pågår" för alltid.
+    const poll = async () => {
+      try {
+        const j = await getJob(jobId);
+        if (cancelled) return;
+        if (j.result) setResult(j.result);
+        if (j.result?.reviewPending || j.result?.listing?.status === "pending") setTimeout(poll, 1500);
+      } catch {
+        if (!cancelled) setTimeout(poll, 2500);
+      }
+    };
+    poll();
+    return () => {
+      cancelled = true;
+    };
   }, [jobId]);
 
   if (!result) {
@@ -130,6 +149,13 @@ export default function ResultScreen({
         {result.price && <PricePanel price={result.price} />}
       </div>
 
+      {result.reviewPending && (
+        <div className="review-banner">
+          <span className="review-spinner" aria-hidden="true" />
+          Andrabesiktningen pågår — listan kan ändras när den är klar.
+        </div>
+      )}
+
       <h3 className="damage-summary-line">
         {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}
       </h3>
@@ -184,6 +210,16 @@ export default function ResultScreen({
           ⚠️ Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
           {result.coverageNote ? ` ${result.coverageNote}` : ""}
         </div>
+      )}
+
+      {onSeeTruthCard && (
+        <button className="btn btn-primary next-step" onClick={onSeeTruthCard}>
+          <span>Se truth-card</span>
+          <span className="next-step-meta">
+            {result.listing?.status === "pending" ? "skapas…" : result.listing?.status === "ok" ? "klart" : ""}
+            <ChevronRight size={18} />
+          </span>
+        </button>
       )}
 
       <div className="result-footer">

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-08-25T23:25:27.114Z",
+  "generatedAt": "2026-08-28T14:18:05.761Z",
   "fixtures": [
     {
       "id": "01-nyskick-inga-defekter",
@@ -172,7 +172,7 @@
       },
       "observed": {
         "label": "Slitet skick",
-        "rationale": "Möbeln är tydligt använd med 1 synlig skada, bland annat skador. Möbeln uppvisar även märkbart allmänt slitage. Funktionen kan vara påverkad.",
+        "rationale": "Möbeln är tydligt använd med 1 synlig skada, bland annat lösa delar. Möbeln uppvisar även märkbart allmänt slitage. Funktionen kan vara påverkad.",
         "meanConfidence": 80,
         "reasons": [
           "Allvarligaste bekräftade fyndet: loose_component på höger armstöd (S2).",
@@ -317,6 +317,617 @@
           "Allvarligaste bekräftade fyndet: scratch på sitsens ovansida (S1).",
           "3 mindre skador hittades sammanlagt.",
           "Helhetsintryck: minimal slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-1-run1",
+      "snapshot": {
+        "grade": "A",
+        "canonicalCondition": "Nyskick",
+        "damageCount": 0,
+        "types": [],
+        "severityHistogram": {},
+        "impactHistogram": {},
+        "verificationHistogram": {},
+        "coverage": "INSPECTED_CLEAR",
+        "wearLevel": "minimal",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 0,
+        "dedupAfter": 0
+      },
+      "observed": {
+        "label": "Nyskick",
+        "rationale": "Inga synliga tecken på användning hittades.",
+        "meanConfidence": null,
+        "reasons": [
+          "Inga bekräftade lokala skador hittades.",
+          "Helhetsintryck: minimal slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-1-run2",
+      "snapshot": {
+        "grade": "B",
+        "canonicalCondition": "Mycket bra skick",
+        "damageCount": 1,
+        "types": [
+          "general_wear"
+        ],
+        "severityHistogram": {
+          "S1": 1
+        },
+        "impactHistogram": {
+          "cosmetic": 1
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 1
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 1,
+        "dedupAfter": 1
+      },
+      "observed": {
+        "label": "Mycket gott skick",
+        "rationale": "Möbeln är tydligt använd med 1 synlig skada, bland annat slitage. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 65,
+        "reasons": [
+          "1 mindre kosmetisk skada hittades.",
+          "Helhetsintryck: light slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-1-run3",
+      "snapshot": {
+        "grade": "B",
+        "canonicalCondition": "Mycket bra skick",
+        "damageCount": 2,
+        "types": [
+          "compressed_upholstery",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 2
+        },
+        "impactHistogram": {
+          "cosmetic": 2
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 1,
+          "REJECTED": 1
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 2,
+        "dedupAfter": 2
+      },
+      "observed": {
+        "label": "Mycket gott skick",
+        "rationale": "Möbeln är tydligt använd med 1 synlig skada, bland annat nedtryckt stoppning. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 84,
+        "reasons": [
+          "1 mindre kosmetisk skada hittades.",
+          "Helhetsintryck: light slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-1-run4",
+      "snapshot": {
+        "grade": "B",
+        "canonicalCondition": "Mycket bra skick",
+        "damageCount": 1,
+        "types": [
+          "compressed_upholstery"
+        ],
+        "severityHistogram": {
+          "S1": 1
+        },
+        "impactHistogram": {
+          "cosmetic": 1
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 1
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 1,
+        "dedupAfter": 1
+      },
+      "observed": {
+        "label": "Mycket gott skick",
+        "rationale": "Möbeln är tydligt använd med 1 synlig skada, bland annat nedtryckt stoppning. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 80,
+        "reasons": [
+          "1 mindre kosmetisk skada hittades.",
+          "Helhetsintryck: light slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-2-run1",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "scratch",
+          "worn_material",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 2,
+          "S2": 2
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat slitage. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 85,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: worn_material på ryggstöd (S2).",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-2-run2",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "scratch",
+          "scuff",
+          "scuff",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 3,
+          "S2": 1
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat slitage. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 81,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: worn_material på ryggstöd (S2).",
+          "3 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-2-run3",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 3,
+        "types": [
+          "scratch",
+          "scuff",
+          "scuff"
+        ],
+        "severityHistogram": {
+          "S1": 3
+        },
+        "impactHistogram": {
+          "cosmetic": 3
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 3
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 3,
+        "dedupAfter": 3
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 3 synliga skador, bland annat skrapmärken. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 85,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: scuff på ryggstöd (S1).",
+          "3 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-2-run4",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 3,
+        "types": [
+          "scratch",
+          "scuff",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 3
+        },
+        "impactHistogram": {
+          "cosmetic": 3
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 3
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 3,
+        "dedupAfter": 3
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 3 synliga skador, bland annat slitage. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 80,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: worn_material på ryggstöd (S1).",
+          "3 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-3-run1",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "scuff",
+          "worn_material",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 4
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat nagg. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 78,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: chip på sitsram (S1).",
+          "4 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-3-run2",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "scuff",
+          "scuff",
+          "scuff"
+        ],
+        "severityHistogram": {
+          "S1": 4
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat skrapmärken. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 81,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: scuff på vänster framben (S1).",
+          "4 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-3-run3",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "discoloration",
+          "scuff",
+          "scuff"
+        ],
+        "severityHistogram": {
+          "S1": 4
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat skrapmärken. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 80,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: scuff på vänster framben (S1).",
+          "4 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-3-run4",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "scuff",
+          "scuff",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 4
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat nagg. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 85,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: chip på sitsens ram (S1).",
+          "4 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-3-run5",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 4,
+        "types": [
+          "chip",
+          "scuff",
+          "scuff",
+          "worn_material"
+        ],
+        "severityHistogram": {
+          "S1": 4
+        },
+        "impactHistogram": {
+          "cosmetic": 4
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 4
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 4,
+        "dedupAfter": 4
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 4 synliga skador, bland annat nagg. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 85,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: chip på sitsens ram (S1).",
+          "4 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-4-run1",
+      "snapshot": {
+        "grade": "B",
+        "canonicalCondition": "Mycket bra skick",
+        "damageCount": 2,
+        "types": [
+          "peeling_flaking",
+          "scuff"
+        ],
+        "severityHistogram": {
+          "S1": 2
+        },
+        "impactHistogram": {
+          "cosmetic": 2
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 2
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 2,
+        "dedupAfter": 2
+      },
+      "observed": {
+        "label": "Mycket gott skick",
+        "rationale": "Möbeln är tydligt använd med 2 synliga skador, bland annat flagnande ytor. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 80,
+        "reasons": [
+          "2 mindre kosmetisk skadar hittades.",
+          "Helhetsintryck: light slitage, isolerat."
+        ]
+      }
+    },
+    {
+      "id": "video-4-run2",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 3,
+        "types": [
+          "chip",
+          "peeling_flaking",
+          "scuff"
+        ],
+        "severityHistogram": {
+          "S1": 3
+        },
+        "impactHistogram": {
+          "cosmetic": 3
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 3
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "moderate",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 3,
+        "dedupAfter": 3
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 3 synliga skador, bland annat nagg. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 80,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: chip på sitsens ovansida (S1).",
+          "3 mindre skador hittades sammanlagt.",
+          "Helhetsintryck: light slitage, måttligt utbrett."
+        ]
+      }
+    },
+    {
+      "id": "video-5-run1",
+      "snapshot": {
+        "grade": "C",
+        "canonicalCondition": "Bra skick",
+        "damageCount": 2,
+        "types": [
+          "discoloration",
+          "fraying"
+        ],
+        "severityHistogram": {
+          "S1": 1,
+          "S2": 1
+        },
+        "impactHistogram": {
+          "cosmetic": 2
+        },
+        "verificationHistogram": {
+          "CONFIRMED": 2
+        },
+        "coverage": "INSPECTED_DAMAGE",
+        "wearLevel": "light",
+        "affectedExtent": "isolated",
+        "functionalityAffected": false,
+        "structuralIntegrityOk": true,
+        "dedupBefore": 2,
+        "dedupAfter": 2
+      },
+      "observed": {
+        "label": "Gott begagnat skick",
+        "rationale": "Möbeln är tydligt använd med 2 synliga skador, bland annat fransade kanter. Inga funktionella eller strukturella skador hittades.",
+        "meanConfidence": 83,
+        "reasons": [
+          "Allvarligaste bekräftade fyndet: fraying på ryggstödets sidokant (S2).",
+          "Helhetsintryck: light slitage, isolerat."
         ]
       }
     }

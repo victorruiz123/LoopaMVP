@@ -214,6 +214,21 @@ export async function callGeminiStructured<T>(opts: {
   }
   const data = JSON.parse(text) as T;
   const tokensUsed = response.usageMetadata?.totalTokenCount ?? 0;
+  // MÄTNING, ingen beteendeändring: bara totalTokenCount sparades, och den döljer exakt det vi
+  // behöver veta — hur mycket av svarstiden som gick till resonemang ingen ser, och hur mycket till
+  // text vi faktiskt använder. Nyttolastens storlek loggas bredvid, eftersom bilderna går inline i
+  // varje anrop och samma bildrutor korsar tråden två gånger per jobb.
+  const u = response.usageMetadata as
+    | { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number; totalTokenCount?: number }
+    | undefined;
+  const payloadBytes = opts.images.reduce((n, img) => n + Math.floor((img.base64.length * 3) / 4), 0);
+  console.info(
+    `[tokens] ${opts.purpose} model=${modelUsed} ms=${latencyMs} ` +
+      `prompt=${u?.promptTokenCount ?? "?"} thoughts=${u?.thoughtsTokenCount ?? "?"} ` +
+      `output=${u?.candidatesTokenCount ?? "?"} total=${u?.totalTokenCount ?? "?"} ` +
+      `images=${opts.images.length} payload_kb=${Math.round(payloadBytes / 1024)} ` +
+      `json_chars=${text.length}`,
+  );
 
   await writeCache(cacheKeyFor(modelUsed), { data, tokensUsed, modelUsed });
   return { data, tokensUsed, cached: false, purpose: opts.purpose, modelUsed, latencyMs };

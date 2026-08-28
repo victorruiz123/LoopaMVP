@@ -7,6 +7,9 @@
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "baseline": "tsx tests/baseline.ts",
+    "regress": "tsx tests/baseline.ts --check",
+    "fixture:add": "tsx tests/fixtureAdd.ts",
+    "verify:impact": "tsx tests/verify-impact.ts",
     "record": "tsx tests/record.ts",
     "server:dev": "npm --prefix server run dev",
     "server:check": "npm --prefix server run check",

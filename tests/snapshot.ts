@@ -184,3 +184,19 @@ export function buildObserved(deduped: Damage[], grade: GradeExplanation): Obser
     reasons: grade.reasons,
   };
 }
+
+/** En rad som beskriver underlaget. Delad, så regressen och verify-impact aldrig kan glida isär. */
+export function describeCorpus(fixtures: Fixture[]): string {
+  const rec = fixtures.filter((f) => f.source === "recorded");
+  const items = new Set(rec.map((f) => f.distinct_item_id));
+  const byCount = new Map<string, number>();
+  for (const f of rec) {
+    const key = f.frame_count === null ? "okänt antal" : `${f.frame_count} bildrutor`;
+    byCount.set(key, (byCount.get(key) ?? 0) + 1);
+  }
+  const spread = [...byCount.entries()].sort().map(([k, n]) => `${n} med ${k}`).join(" · ");
+  return (
+    `${rec.length} inspelade körningar över ${items.size} distinkta möbler (${spread})` +
+    ` · ${fixtures.length - rec.length} syntetiska (handskrivna, räknas aldrig som mätning)`
+  );
+}

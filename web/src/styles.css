@@ -618,3 +618,106 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
   background: rgba(255,255,255,0.05); color: #A8A29E; font-size: 11px;
   text-align: left; word-break: break-word;
 }
+
+/* ---- prisvyn ---- */
+.price-hero-head { margin-bottom: 18px; }
+.price-identity {
+  display: flex; align-items: center; gap: 10px; margin-top: 6px;
+  font-size: 22px; font-weight: 800; letter-spacing: -0.025em; color: var(--brand-ink);
+}
+.price-big-card {
+  background: var(--brand-surface); border-radius: 22px; padding: 26px 20px 22px; text-align: center;
+  box-shadow: var(--lift); display: flex; flex-direction: column; gap: 9px;
+}
+.price-main-xl { font-size: 46px; letter-spacing: -0.04em; }
+.price-caveat {
+  margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted);
+  border-top: 1px solid var(--hairline); padding-top: 12px;
+}
+/* Platshållare i sifferns egen storlek, så kortet inte hoppar i höjd när priset landar. */
+.price-skeleton {
+  height: 50px; width: 62%; margin: 4px auto 2px; border-radius: 12px;
+  background: linear-gradient(90deg, #F3EDE4 25%, #FAF6F0 50%, #F3EDE4 75%);
+  background-size: 240% 100%; animation: price-shimmer 1.3s var(--ease-ui) infinite;
+}
+@keyframes price-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
+
+.next-step {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 22px; min-height: 54px; border-radius: 15px; font-size: 17px; letter-spacing: -0.01em;
+}
+.next-step-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.85; font-weight: 600; }
+
+/* ---- delresultat ---- */
+.review-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: #FBF0E2; color: #8A5A16; border-radius: 14px; padding: 11px 14px;
+  font-size: 13.5px; line-height: 1.4;
+}
+.review-spinner {
+  width: 14px; height: 14px; flex-shrink: 0; border-radius: 999px;
+  border: 2px solid rgba(138, 90, 22, 0.25); border-top-color: #8A5A16;
+  animation: review-spin 0.8s linear infinite;
+}
+@keyframes review-spin { to { transform: rotate(360deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .price-skeleton, .review-spinner { animation-duration: 3s; }
+}
+
+/* ---- truth-card ---- */
+.btn-back { align-self: flex-start; padding-left: 0; }
+.truth-card {
+  background: var(--brand-surface); border-radius: 22px; padding: 22px 20px;
+  box-shadow: var(--lift); display: flex; flex-direction: column; gap: 7px;
+}
+.truth-kicker {
+  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
+  color: var(--brand-muted-soft);
+}
+.truth-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--brand-ink); }
+.truth-sub { font-size: 15px; color: var(--brand-muted); }
+/* Hur mycket generatorn kunde belägga står på kortet, inte i en fotnot: en annons där måtten är
+   gissade ska inte se likadan ut som en där de har en källa. */
+.truth-confidence {
+  align-self: flex-start; margin-top: 6px; font-size: 12px; font-weight: 700;
+  border-radius: 999px; padding: 5px 11px;
+}
+.truth-confidence-full { background: #E3F0E4; color: #2F6B3A; }
+.truth-confidence-partial { background: #FBF0E2; color: #8A5A16; }
+.truth-confidence-fallback { background: #F5E9E7; color: #8A3A2C; }
+.truth-caveat { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted); }
+
+.truth-block {
+  background: var(--brand-surface); border-radius: 18px; padding: 16px 18px;
+  box-shadow: var(--lift);
+}
+.truth-block h3 {
+  margin: 0 0 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--brand-muted-soft);
+}
+.truth-verdict { display: flex; align-items: center; gap: 12px; }
+.truth-verdict-label { font-size: 16px; font-weight: 700; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
+.truth-price {
+  margin-left: auto; font-size: 22px; font-weight: 800; letter-spacing: -0.025em;
+  color: var(--brand-ink-strong); font-variant-numeric: tabular-nums; text-align: right;
+}
+.truth-price .small { display: block; font-weight: 500; letter-spacing: 0; }
+
+.truth-specs { margin: 0; display: flex; flex-direction: column; }
+.truth-spec { display: flex; gap: 14px; padding: 9px 0; align-items: baseline; }
+.truth-spec + .truth-spec { border-top: 1px solid var(--hairline); }
+.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: 14px; color: var(--brand-muted); }
+.truth-spec dd { margin: 0; flex: 1; font-size: 15px; font-weight: 600; color: var(--brand-ink-strong); }
+.truth-src { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--brand-accent); }
+
+.truth-listing-title { font-size: 17px; font-weight: 700; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
+.truth-listing-body { margin: 8px 0 0; font-size: 15px; line-height: 1.55; color: #4A4139; white-space: pre-wrap; }
+.truth-listing-condition { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--brand-muted); }
+.truth-retail { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--brand-ink-strong); }
+.truth-sources { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
+.truth-sources a { font-size: 14px; color: var(--brand-accent); word-break: break-word; }
+.truth-missing ul { margin: 0; padding-left: 18px; color: var(--brand-muted); font-size: 14px; line-height: 1.5; }
+
+.result-footer .btn { white-space: nowrap; }
+.truth-done { margin-top: 4px; min-height: 52px; border-radius: 15px; font-size: 17px; }

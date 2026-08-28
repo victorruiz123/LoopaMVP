@@ -15,7 +15,7 @@
 
 import { existsSync, readFileSync, writeFileSync, readdirSync } from "node:fs";
 import path from "node:path";
-import { buildObserved, buildSnapshot, runFixture, type Fixture, type Snapshot } from "./snapshot.js";
+import { buildObserved, buildSnapshot, describeCorpus, loadFixtures, runFixture, type Fixture, type Snapshot } from "./snapshot.js";
 
 const rebaseline = process.argv.includes("--rebaseline");
 const checkOnly = process.argv.includes("--check");
@@ -92,10 +92,13 @@ if (checkOnly) {
     console.log(`~ ${cur.id}`);
     console.log(diffs.join("\n"));
   }
+  // Grupperna redovisas var för sig: de syntetiska fixturernas verification-tillstånd är handskrivna
+  // och säger inget om vad modellen gör, och flera körningar av samma möbel är inte oberoende fall.
+  console.log(`\nUnderlag: ${describeCorpus(loadFixtures())}`);
   console.log(
     changed === 0
-      ? "\nInga skillnader mot baseline."
-      : `\n${changed} av ${baseline.fixtures.length} fixturer ändrade.`,
+      ? "Inga skillnader mot baseline."
+      : `${changed} av ${baseline.fixtures.length} fixturer ändrade.`,
   );
   process.exit(0);
 }

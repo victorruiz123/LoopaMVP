@@ -1,0 +1,128 @@
+@import 'tailwindcss';
+
+@theme {
+  --font-sans: 'Inter', system-ui, 'Segoe UI', Roboto, sans-serif;
+
+  --color-cream: #faf7f1;
+  --color-cream-soft: #f3efe6;
+  --color-ink: #14110d;
+  --color-body: #5c5750;
+  --color-accent: #e4572e;
+  --color-accent-dark: #c8481f;
+  --color-line: #e6e1d4;
+  --color-card: #ffffff;
+
+  --shadow-card: 0 1px 2px rgba(20, 17, 13, 0.04), 0 8px 24px -12px rgba(20, 17, 13, 0.12);
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  background: var(--color-cream);
+  color: var(--color-body);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Kept inside @layer base so Tailwind utilities (which live in the higher-
+   priority utilities layer) can override these defaults. As UNLAYERED css
+   this rule silently beat `text-white` etc. on headings — confirmed live:
+   the /brands final CTA's first heading line rendered ink-on-ink
+   (invisible) on the dark section because of exactly this. */
+@layer base {
+  h1,
+  h2,
+  h3,
+  h4 {
+    color: var(--color-ink);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    margin: 0;
+  }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+::selection {
+  background: var(--color-accent);
+  color: white;
+}
+
+.container-loopa {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 1.5rem;
+}
+
+@media (min-width: 768px) {
+  .container-loopa {
+    padding-inline: 2.5rem;
+  }
+}
+
+@keyframes scan-line {
+  0% {
+    top: -20%;
+  }
+  100% {
+    top: 110%;
+  }
+}
+
+.animate-scan-line {
+  animation: scan-line 2.2s ease-in-out infinite;
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
+}
+
+/* Preview-transformation motion (the page's one deliberate motion moment):
+   product tiles cascade in with a per-tile inline animation-delay. `both`
+   keeps delayed tiles invisible until their turn. */
+@keyframes rise-in {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-rise-in {
+  animation: rise-in 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -400px 0;
+  }
+  100% {
+    background-position: 400px 0;
+  }
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(90deg, var(--color-cream-soft) 25%, #eae5d8 50%, var(--color-cream-soft) 75%);
+  background-size: 800px 100%;
+  animation: shimmer 1.4s linear infinite;
+}

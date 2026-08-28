@@ -120,30 +120,28 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
 
   // ALL images: the second inspector has to be able to find what the first one missed, which it cannot
   // do from crops alone. Labelled by index so evidence coordinates refer to something identifiable.
-  const referenceParts: ImagePart[] = [];
-  for (let i = 0; i < images.length; i++) {
-    const part = await loadImageAsBase64(path.join(jobDir, "originals", images[i].path));
-    referenceParts.push({ ...part, label: `Bild ${i}` });
-  }
+  const referenceParts: ImagePart[] = await Promise.all(
+    images.map(async (img, i) => ({ ...(await loadImageAsBase64(path.join(jobDir, "originals", img.path))), label: `Bild ${i}` })),
+  );
 
   // Crop FIRST, number after: the numbering has to come from the crops that actually exist.
-  const attempts: CropAttempt[] = [];
-  for (const d of toVerify) {
-    const primary = d.evidence[0];
-    const image = primary ? imageById.get(primary.imageId) : undefined;
-    if (!primary || !image) {
-      attempts.push({ damage: d, cropRelPath: null });
-      continue;
-    }
-    const originalAbs = path.join(jobDir, "originals", image.path);
-    const cropRelPath = path.join("crops", `${d.id}.jpg`).replace(/\\/g, "/");
-    try {
-      await cropEvidence(originalAbs, primary.mark, path.join(jobDir, cropRelPath));
-      attempts.push({ damage: d, cropRelPath });
-    } catch {
-      attempts.push({ damage: d, cropRelPath: null });
-    }
-  }
+  // Parallellt, men med ordningen bevarad genom Promise.all: varje beskärning är ett eget
+  // sharp-anrop, och tio fynd betydde tio sharp-anrop efter varandra innan granskningen kunde börja.
+  const attempts: CropAttempt[] = await Promise.all(
+    toVerify.map(async (d): Promise<CropAttempt> => {
+      const primary = d.evidence[0];
+      const image = primary ? imageById.get(primary.imageId) : undefined;
+      if (!primary || !image) return { damage: d, cropRelPath: null };
+      const originalAbs = path.join(jobDir, "originals", image.path);
+      const cropRelPath = path.join("crops", `${d.id}.jpg`).replace(/\\/g, "/");
+      try {
+        await cropEvidence(originalAbs, primary.mark, path.join(jobDir, cropRelPath));
+        return { damage: d, cropRelPath };
+      } catch {
+        return { damage: d, cropRelPath: null };
+      }
+    }),
+  );
 
   const { numbered, uncroppable } = buildVerifyPayload(attempts, images);
 
@@ -154,11 +152,9 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
 
   // Each crop carries its own label part, emitted immediately before the image, so "Utsnitt 3"
   // is something the model can actually see rather than something the prompt merely claims.
-  const cropParts: ImagePart[] = [];
-  for (const crop of numbered) {
-    const part = await loadImageAsBase64(path.join(jobDir, crop.cropRelPath));
-    cropParts.push({ ...part, label: crop.label });
-  }
+  const cropParts: ImagePart[] = await Promise.all(
+    numbered.map(async (crop) => ({ ...(await loadImageAsBase64(path.join(jobDir, crop.cropRelPath))), label: crop.label })),
+  );
 
   const findingList = numbered
     .map((c, i) => `Fynd ${i + 1}: ${c.damage.type} på ${c.damage.part} (${c.damage.semanticLocation}). ${c.damage.description}`)

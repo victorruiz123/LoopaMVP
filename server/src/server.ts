@@ -13,7 +13,7 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
-import { repriceResult } from "./pricing.js";
+import { estimatePrice, repriceResult } from "./pricing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
 import { mapRawDefect } from "./pipeline/inspect.js";
 import { loadImageAsBase64 } from "./imageUtils.js";
@@ -61,7 +61,7 @@ interface CreateJobBody {
 }
 
 /** A model name is what the price engine searches on; without one there is nothing to price. */
-function readIdentity(body: CreateJobBody): FurnitureIdentity | null {
+function readIdentity(body: { brand?: string | null; model?: string | null }): FurnitureIdentity | null {
   const model = body.model?.trim();
   if (!model) return null;
   return { brand: body.brand?.trim() || null, model };
@@ -136,6 +136,22 @@ async function createConditionJob(body: CreateJobBody): Promise<{ jobId: string;
   // Fire and forget: the caller polls for progress.
   void runConditionGrading(job.id, images, body.productContext ?? null, identity);
   return { jobId: job.id, imageCount: images.length };
+}
+
+/**
+ * Price for a brand + model, with no job and no photos behind it.
+ *
+ * The price engine never needed the walkaround: it searches an ad corpus on the name, and the damage
+ * list is a deduction applied afterwards. So this answer exists the moment the seller has typed the
+ * two fields — which is why the app asks for it while they are still filming, and why the price is on
+ * screen before the inspection has finished its first Gemini call.
+ */
+async function handlePreliminaryPrice(req: IncomingMessage, res: ServerResponse) {
+  const body = await readJsonBody<{ brand?: string | null; model?: string | null }>(req);
+  const identity = readIdentity(body);
+  if (!identity) return sendJson(res, 400, { error: "model is required" });
+  const price = await estimatePrice(identity, [], null, null);
+  sendJson(res, 200, { identity, price });
 }
 
 async function handleCreateJob(req: IncomingMessage, res: ServerResponse) {
@@ -451,6 +467,10 @@ const server = http.createServer(async (req, res) => {
   try {
     if (segments[0] === "health") {
       return sendJson(res, 200, { ok: true, service: "condition-grading-server" });
+    }
+
+    if (segments[0] === "api" && segments[1] === "price" && segments.length === 2 && req.method === "POST") {
+      return await handlePreliminaryPrice(req, res);
     }
 
     if (segments[0] === "api" && segments[1] === "jobs") {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createJob, type CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
-import { extractBestFrames } from "../lib/videoFrames";
+import { extractBestFrames, EXTRACTION_TARGET_MS, type ExtractionReport } from "../lib/videoFrames";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 
 const MAX_UPLOAD_WIDTH = 1280;
@@ -57,6 +57,9 @@ export default function CaptureScreen({
   const [hasRotation, setHasRotation] = useState<boolean | null>(null);
   const trackerRef = useRef<RotationTracker | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
+  /** Vilken väg bildruteuttaget tog och hur länge det tog — synligt, så en seg körning går att felsöka. */
+  const [extraction, setExtraction] = useState<ExtractionReport | null>(null);
+  const [processingMs, setProcessingMs] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -143,7 +146,7 @@ export default function CaptureScreen({
     setProcessingError(null);
     setMode("processing");
     try {
-      const frames = await extractBestFrames(file);
+      const frames = await extractBestFrames(file, setExtraction);
       frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
       // Straight into the analysis. The frames were picked by the selector, not by the seller, so
       // there is nothing for them to approve — and being asked to sign off on someone else's choice
@@ -206,7 +209,7 @@ export default function CaptureScreen({
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
       setMode("processing");
       try {
-        const frames = await extractBestFrames(blob);
+        const frames = await extractBestFrames(blob, setExtraction);
         frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
         await startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
       } catch (err) {
@@ -227,6 +230,14 @@ export default function CaptureScreen({
     trackerRef.current = null;
     recorderRef.current?.stop();
   }
+
+  useEffect(() => {
+    if (mode !== "processing") return;
+    const startedAt = Date.now();
+    setProcessingMs(0);
+    const timer = setInterval(() => setProcessingMs(Date.now() - startedAt), 250);
+    return () => clearInterval(timer);
+  }, [mode]);
 
   useEffect(() => {
     if (!recording) return;
@@ -379,11 +390,15 @@ export default function CaptureScreen({
 
   // ---- processing video ----
   if (mode === "processing") {
+    const slow = processingMs > EXTRACTION_TARGET_MS;
     return (
       <div className="screen screen-light center-column">
         <div className="spinner" />
         <p>Bearbetar video…</p>
-        <p className="muted small">Väljer de bästa vyerna</p>
+        <p className="muted small">
+          Väljer de bästa vyerna{processingMs > 1200 ? ` · ${(processingMs / 1000).toFixed(0)} s` : ""}
+        </p>
+        {slow && <p className="muted small">Lång film eller långsam avkodning — det tar aldrig mer än 20 sekunder.</p>}
       </div>
     );
   }
@@ -403,6 +418,12 @@ export default function CaptureScreen({
     <div className="screen screen-light">
       <h2>Dessa vyer kommer att inspekteras</h2>
       <p className="muted">{shots.length} bilder valda. Ser något håll ut att saknas? Lägg till fler nedan.</p>
+      {extraction && (
+        <p className="muted small">
+          Uttaget: {extraction.method} · {(extraction.ms / 1000).toFixed(1)} s · {extraction.buckets} vyer ·{" "}
+          {extraction.framesSeen} bildrutor granskade
+        </p>
+      )}
       <div className="review-grid">
         {shots.map((s) => (
           <div key={s.id} className="review-thumb">

@@ -135,6 +135,138 @@ Ett undantag hanteras explicit: **Sits** är både ett märke och ordet i "3-sit
 Bruno Mathsson och Svenskt Tenn har liknande låga kvoter men står kvar på sin textmätning: de nämns
 oftare i annonstext än korpusen bryr sig om att tagga dem, och det är riktig signal, inte en krock.
 
+## Snabbheten
+
+Tre mätta flaskhalsar, tre olika åtgärder. Alla siffror är körda mot en 30 s 1280x960-inspelning
+respektive riktiga jobb, inte uppskattade.
+
+### Bildruteuttaget: 12,8 s -> 4,0 s
+
+Sökning var *hela* kostnaden — 345 ms per sökning, 40 sökningar. MediaRecorder skriver nästan inga
+nyckelbildrutor, så varje `currentTime`-hopp avkodar framåt från en avlägsen nyckelruta och kastar
+nästan allt. Att söka från fyra `<video>`-element parallellt gjorde det *långsammare* (14,2 s): fyra
+avkodare trängs om samma kärnor och gör om samma arbete.
+
+Rätt åtgärd var att sluta söka. `extractByPlayback` spelar klippet en gång i 16x fart och tar emot
+varje bildruta via `requestVideoFrameCallback` — linjär avkodning, varje ruta avkodad exakt en gång.
+
+| metod | tid | kandidater | medelskärpa |
+|---|---|---|---|
+| sökning, 40 kandidater | 12,8 s | 40 | 12,86 |
+| uppspelning 4x | 7,5 s | 271 | 12,99 |
+| uppspelning 8x | 4,8 s | 150 | 12,96 |
+| **uppspelning 16x** | **3,7 s** | **93** | **12,91** |
+
+Snabbare *och* skarpare, vilket inte är en avvägning: passet ser två till sju gånger fler kandidater
+än de 40 sökversionen tog, så bästa-i-bucket väljs ur en större hög. Sökvägen finns kvar som reserv
+och används när `requestVideoFrameCallback` saknas, uppspelning nekas, farten klampas under 3x eller
+för få buckets fylls — den nya vägen kan alltså bara bli en förbättring.
+
+#### Tidsbudgeten
+
+Första versionen av det här kunde ta flera minuter, av tre fel som multiplicerade varandra:
+
+1. Uppspelningen avbröts på en **förutsägelse** — "det här borde ha tagit 13,5 s" — och kastade varje
+   bildruta den redan avkodat. En avkodare som bara är långsammare än gissningen gör ändå framsteg.
+2. Sedan kördes ett **helt nytt 40-sökningssvep** ovanpå. Faserna lades ihop; en budget som får
+   spenderas två gånger är ingen budget.
+3. Varje sökning hade **8 sekunders timeout**. 40 × 8 = 320 sekunder i värsta fall.
+
+Nu gäller **en delad deadline** för hela modulen. Uppspelningen slutar när filmen tar slut, när
+avkodaren stannat (ingen bildruta på 2,5 s) eller när deadline passerats — aldrig på en gissning, och
+den behåller alltid det den hunnit. Sökning **fyller bara hål**, bredd först: mitten av varje saknad
+bucket innan någon bucket får en andra kandidat, så täckningen av möbeln säkras före skärpan inom en
+vy. Extra kandidater köps bara för tid som ryms i målbudgeten på 5 s, prövat per sökning.
+
+`openVideo` var dessutom modulens sista obundna väntan: `loadedmetadata` är inte garanterad att komma,
+och en container webbläsaren halvt känner igen kunde lämna elementet utan både event och fel. "Bearbetar
+video…" i evighet är det värsta felet i hela inspelningsflödet, eftersom varvet redan är filmat.
+
+Mätt, 51 s / 1920x1440:
+
+| väg | tid | vyer |
+|---|---|---|
+| uppspelning (normalfallet) | 3,7 s | 8/8 |
+| utan `requestVideoFrameCallback` | 5,2 s | 8/8 |
+| uppspelning nekad | 5,3 s | 8/8 |
+| farten klampad till 1x (Safari-liknande) | 5,2 s | 8/8 |
+| absolut tak | 20 s | — |
+| trasig fil | 0,01 s | fel |
+
+Uttaget loggar numera vilken väg det tog (`[videoFrames] playback · 3.5s · 8/8 vyer · 61 bildrutor
+sedda · fart 16x`) och visar samma rad på granskningsskärmen, så en seg körning går att felsöka utan
+att bygga om något.
+
+**Priset:** urvalet är inte längre bitidentiskt mellan körningar. Vilka rutor som *presenteras*
+varierar någon millisekund, så samma film kan ge något olika bildrutor. Sökvägen var deterministisk.
+Testsviten fryser på post-verifierade defekter och berörs inte, men en omkörning av samma *film*
+träffar inte längre Gemini-cachen. Ett omtag på ett jobb gör det, eftersom det spelar upp de sparade
+bildrutorna.
+
+### Priset går parallellt med filmningen
+
+Prismotorn behövde aldrig videon: den söker i annonskorpusen på märke och modell, och skadelistan är
+ett avdrag som läggs på efteråt. `POST /api/price` svarar därför på de två fälten ensamma. Appen
+startar den frågan i samma ögonblick som säljaren lämnar startsidan, medan de går sitt varv.
+
+Prismotorn svarar på 5-11 s. En varvfilmning tar 30-40. Priset står alltså färdigt när prisvyn
+öppnas, och säljaren väntar noll sekunder på det.
+
+Skärmordningen följer av det: pris först, skick sedan. Prisvyn säger rakt ut att siffran är *före*
+skickbedömning — en siffra som tyst sjunker mellan två skärmar läser som ett svek även när den är
+riktigare.
+
+### Skicket publiceras i två steg
+
+Granskningen förbättrar fyndlistan men är inte ett villkor för den — faller den bort behålls fynden
+som de rapporterades. Alltså finns det ett giltigt svar redan när huvudinspektionen är klar, och att
+hålla det inne gav säljaren en spinner i stället för sitt resultat.
+
+`run.ts` publicerar därför resultatet två gånger: ett delresultat direkt efter inspektionen, märkt
+`reviewPending`, och det slutgiltiga när granskningen och prissättningen landat. Mätt på ett ocachat
+jobb med fem bilder:
+
+```
+delresultat publicerat   55,1 s   (huvudinspektionen tog 54,9 s — Gemini under last)
+slutresultat             75,4 s   (granskning 15,1 s + prissättning)
+```
+
+**20,3 sekunder tidigare.** Slutresultatet är oförändrat; det är väntetiden fram till första svaret
+som försvinner. Resultatvyn visar en banner medan granskningen pågår och uppdaterar sig själv när den
+landar.
+
+Dessutom laddas bilder och beskärningar numera parallellt i `inspect.ts` och `verify.ts` i stället
+för i tur och ordning — tio fynd betydde tio `sharp`-anrop efter varandra innan granskningen kunde
+börja.
+
+### Öppen post: 8 -> 6 bildrutor
+
+Videovägen valde åtta vyer fram till 2026-08-28 och väljer sex sedan dess. Ändringen är gjord på
+
+- en **uppskattad** tidsvinst: ~8 s, interpolerad ur två mätpunkter (4 bildrutor -> 21,2 s,
+  8 bildrutor -> 36,9 s). Sexbildersfallet är aldrig mätt — båda försöken slog i Gemini 503.
+- en **omätt** kvalitetskostnad: två vyer färre av möbeln. En skada som bara syns från ett håll har
+  färre chanser att hamna i en vald bildruta, och exakt hur mycket färre vet vi inte.
+
+Det här är alltså en skuld, inte ett avklarat beslut. `npm run fixture:add -- <film> --label X
+--compare-frames 6,8` är mätningen som stänger den: samma film genom pipelinen två gånger i samma
+sittning, plus en tredje körning som ger brusnivån. Kör den på inspelningsdagen, på möbler med
+skador på baksidor och undersidor — det är där två vyer färre borde märkas, och det är precis vad
+dagens fixturunderlag (fem möbler, betyg A-C, inga strukturella eller funktionella skador) saknar.
+
+Fixturerna bär `frame_count` så att gamla åttabildersskörningar inte tyst blandas ihop med nya
+sexbilders i en kvalitetssiffra. De sexton befintliga inspelade är inspelade med åtta vyer, men bara
+två går att **belägga** — källjobben är raderade och bevisen ger bara en undre gräns. De övriga
+fjorton står som `unknown` hellre än som ett antagande förklätt till mätning.
+
+### Att återställa
+
+Läget före det här arbetet ligger som tagg:
+
+```bash
+git reset --hard pre-speedup
+```
+
 ## När analysen faller
 
 Anropen mot Gemini gör ETT försök på primärmodellen och ett på reservmodellen — ingen backoff-kedja,
@@ -154,6 +286,51 @@ Två saker ska hända då, och gjorde det inte förut:
   `{"error":{"code":504,...}}` rakt i ansiktet på säljaren. `web/src/lib/errors.ts` översätter i stället
   till vad som hände, om det var deras fel och vad de ska göra — och döljer knappen "Försök igen" när ett
   omtag omöjligt kan hjälpa, som vid en saknad API-nyckel. Råtexten finns kvar under "Tekniska detaljer".
+
+## Truth-cardet
+
+Tredje motorn i flödet: `loopa-landing-page-main` tar bildrutorna och märket och letar upp VAD möbeln
+är — exakt modell, mått, material, nypris — och skriver en färdig annonstext, med källor.
+
+Den **anropas, inte kopieras**. `functions/api/seller/generate.ts` är en Cloudflare Pages Function men
+skriven mot webbstandard: den tar en `Request`, returnerar en `Response` och läser sin enda hemlighet
+ur ett `env`-objekt den får in. Node har allt det globalt, så
+[`server/src/listing.ts`](server/src/listing.ts) anropar handlern rakt av. En portad kopia hade
+fungerat i dag och glidit isär i morgon.
+
+Sökvägen byggs vid körning med flit: en statisk import hade dragit in landningssidans egen
+TypeScript-uppsättning i skickmotorns typkontroll utan att tillföra något — kontraktet i `types.ts` är
+ändå vårt eget.
+
+### Tre grenar, en körning
+
+```
+bildrutor + märke ─┬─ inspect → verify → grade ──┐
+                   │                             ├─ price (behöver skadelistan)
+                   └─ annonsgenerator ───────────┘
+```
+
+Annonsgeneratorn behöver bara bildrutorna och märket — inte betyget, inte skadelistan. Den startar
+därför samtidigt som besiktningen och väntas in allra sist. Kedjad efter besiktningen hade den lagt
+sina 15–26 sekunder ovanpå i stället för bredvid.
+
+Resultatet publiceras i tre steg: delresultat efter inspektionen, skick + pris efter granskningen, och
+annonsen när den landar. Den sista publiceringen väntar inte in de andra och tvärtom — den långsammaste
+grenen får inte sätta allas tempo.
+
+Faller besiktningen medan generatorn lyckas sparas annonsen ändå på jobbet. Grenarna delar inga
+anrop, och ett Gemini-avbrott i den ena ska inte kasta arbete den andra redan betalat för.
+
+### Ordningen på skärmen
+
+**Pris → skick → truth-card.** Priset visas först men räknas *sist*: prismotorn drar av för skadorna,
+så en siffra hämtad innan skickgraderingen är klar är en annan siffra än den riktiga. Prisvyn väntar
+därför in `reviewPending: false` innan den visar något tal alls. Ett preliminärt pris som sedan sjunker
+läser som ett svek även när det är riktigare.
+
+Generatorn svarar hellre degraderat än med fel — `status` säger `full`, `partial` eller `fallback`, och
+truth-cardet visar det på kortet i stället för i en fotnot. En annons där måtten är gissade ska inte se
+likadan ut som en där de har en källa.
 
 ## Prissättningen
 
