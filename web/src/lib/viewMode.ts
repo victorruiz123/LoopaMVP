@@ -4,7 +4,12 @@ import { useSyncExternalStore } from "react";
  * Dator- eller mobilvy.
  *
  * Appen är byggd som ett telefonflöde — en 480 px kolumn — och på en 27-tumsskärm låg den som en
- * smal remsa mitt i ett tomt fält. Läget avgörs därför automatiskt och kan skrivas över för hand.
+ * smal remsa mitt i ett tomt fält. Läget avgörs därför automatiskt ur fönstret.
+ *
+ * Ingen knapp i gränssnittet ändrar det: valet har ett rätt svar som webbläsaren redan känner till,
+ * och ett reglage för det hade varit en fråga utan innehåll. Nyckeln nedan läses ändå vid start, så
+ * `localStorage.setItem("loopa.view-mode", "desktop")` från konsolen tvingar fram ett läge när man
+ * vill se det andra på samma skärm.
  *
  * Automatiken frågar efter TVÅ saker: bredd OCH pekdon. Bara bredd hade gett datorvy åt en telefon i
  * liggande läge, och bara pekdon hade gett den åt ett smalt fönster på en laptop. `pointer: fine`
@@ -13,8 +18,8 @@ import { useSyncExternalStore } from "react";
 export type ViewMode = "mobile" | "desktop";
 
 const DESKTOP_QUERY = "(min-width: 900px) and (pointer: fine)";
-/** Under den här bredden finns inget val att göra, och reglaget göms. */
-export const SWITCHABLE_QUERY = "(min-width: 860px)";
+/** Bredden där layouten kan byta läge alls — det är den ändringen komponenterna ska väckas av. */
+const SWITCHABLE_QUERY = "(min-width: 860px)";
 const STORAGE_KEY = "loopa.view-mode";
 
 function detect(): ViewMode {
@@ -48,8 +53,8 @@ export function getViewMode(): ViewMode {
   return override ?? detect();
 }
 
-/** null = låt automatiken bestämma igen. */
-export function setViewModeOverride(mode: ViewMode | null) {
+/** null = låt automatiken bestämma igen. Nås från konsolen, inte från gränssnittet. */
+function setViewModeOverride(mode: ViewMode | null) {
   override = mode;
   try {
     if (mode) localStorage.setItem(STORAGE_KEY, mode);
@@ -58,10 +63,6 @@ export function setViewModeOverride(mode: ViewMode | null) {
     /* se readOverride */
   }
   notify();
-}
-
-export function isViewModeForced(): boolean {
-  return override !== null;
 }
 
 /** Sätts på <html> innan React ritar första bildrutan, så layouten aldrig hoppar mellan lägena. */
@@ -85,7 +86,6 @@ export function useViewMode(): ViewMode {
   return useSyncExternalStore(subscribe, getViewMode);
 }
 
-/** Om reglaget är värt att visa alls — ett telefonfönster har inget att välja mellan. */
-export function useCanSwitchView(): boolean {
-  return useSyncExternalStore(subscribe, () => window.matchMedia(SWITCHABLE_QUERY).matches);
-}
+// Handtaget för att prova det andra läget på samma skärm. Inget i appen anropar det.
+(window as unknown as { loopaSetViewMode?: typeof setViewModeOverride }).loopaSetViewMode =
+  setViewModeOverride;

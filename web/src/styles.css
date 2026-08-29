@@ -1470,30 +1470,10 @@ body {
 /* ==========================================================================
    Dator- och mobilvy
    ==========================================================================
-   Läget sätts som `data-view` på <html> av lib/viewMode.ts — automatiskt ur bredd
-   och pekdon, eller för hand med reglaget. Allt under rubriken DATORVYN är TILLÄGG
-   för datorläget: basreglerna ovanför är telefonens, och en dator som får
-   telefonvyn ska få den hel.
-
-   Reglaget självt hör till båda lägena och står därför kvar här uppe. */
+   Läget sätts som `data-view` på <html> av lib/viewMode.ts, ur fönstrets bredd och
+   pekdon. Allt under rubriken DATORVYN är TILLÄGG för datorläget: basreglerna
+   ovanför är telefonens, och en dator som får telefonvyn ska få den hel. */
 .app-bar-actions { display: flex; align-items: center; gap: 10px; }
-
-/* Samma segmenterade kontroll som inloggningens flikar: en ljus tumme som flyttar sig,
-   inte två knappar som tänds och släcks. Två lägen där ett alltid gäller är ett reglage. */
-.view-switch {
-  display: inline-flex; gap: 2px; padding: 2px;
-  background: var(--field); border-radius: 999px;
-}
-.view-switch-btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: none; background: none; cursor: pointer; font-family: inherit;
-  font-size: 13px; font-weight: 600; letter-spacing: -0.01em; color: var(--muted);
-  padding: 6px 12px; border-radius: 999px;
-  transition: background 160ms var(--ease-ui), color 160ms var(--ease-ui);
-}
-.view-switch-btn:hover { color: var(--ink); }
-.view-switch-btn-on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-card); }
-.view-switch-btn:focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* Delar av markupen finns bara för datorvyn — de är inte gömda på telefonen, de är
    utelämnade. Ett flöde som hålls i handen har inte plats för att förklara sig. */
@@ -1938,8 +1918,8 @@ body {
    ==========================================================================
    Ett eget lager, sist i filen, så att varje regel här vinner över basen utan att
    behöva klättra i specificitet. Allt är prefixat `[data-view="desktop"]`, som
-   sätts på <html> — stänger man av datorläget faller appen tillbaka till
-   telefonflödet helt och hållet, utan rester.
+   sätts på <html> — faller datorläget bort går appen tillbaka till telefonflödet
+   helt och hållet, utan rester.
 
    Hållningen: kolumnen blir ett rutnät. En telefonvy uppförstorad är en app någon
    glömt maximera; det som gör en datorvy är att två saker man behöver samtidigt
