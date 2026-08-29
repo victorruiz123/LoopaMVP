@@ -279,11 +279,15 @@ export async function resolveCandidateImages(
     for (const c of missing) {
       const model = normalise(c.model);
       if (!model) continue;
+      // Två per kandidat: den första länken är oftast produktsidan, den andra en variant av den. Utan
+      // taket hade en enda kandidat kunnat äta upp hela hoppet och lämna de andra utan.
+      let taken = 0;
       for (const link of pages.flatMap((p) => p.links)) {
-        if (hop.length >= MAX_HOP_FETCHES) break;
+        if (taken >= 2 || hop.length >= MAX_HOP_FETCHES) break;
         if (seen.has(link) || !` ${normalise(link)} `.includes(` ${model} `)) continue;
         seen.add(link);
         hop.push({ title: c.model, url: link, qualityTier: 2 });
+        taken++;
       }
     }
     if (hop.length > 0) {
