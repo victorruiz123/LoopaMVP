@@ -6,6 +6,7 @@ import DamageCard from "../components/DamageCard";
 import EvidenceViewer from "../components/EvidenceViewer";
 import TechnicalPanel from "../components/TechnicalPanel";
 import { AlertIcon, ArrowLeftIcon, CameraIcon, ChevronRight, PhotosIcon, PlusIcon } from "../components/icons";
+import FlowSteps from "../components/FlowSteps";
 import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
@@ -147,6 +148,8 @@ export default function ResultScreen({
       <button className="btn btn-text btn-back" onClick={onHome}>
         <ArrowLeftIcon /> Startsidan
       </button>
+
+      <FlowSteps current={4} />
 
       {result.identity && (
         <h2 className="result-identity">{[result.identity.brand, result.identity.model].filter(Boolean).join(" ")}</h2>

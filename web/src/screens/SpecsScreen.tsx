@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import type { GeneratedListing } from "../types";
 import { ArrowLeftIcon, ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
+import FlowSteps from "../components/FlowSteps";
 import FurnitureRender from "../components/FurnitureRender";
 import { archetypeFor, buildModel, parseDimensions } from "../lib/furnitureModel";
 import { usePageTitle } from "../lib/pageTitle";
@@ -72,9 +73,7 @@ export default function SpecsScreen({
       </button>
 
       <header className="specs-head">
-        <span className="brand-pill">
-          <span className="brand-dot" /> STEG 2 AV 4
-        </span>
+        <FlowSteps current={2} />
         <div className="price-identity">
           {card.identity.brand && <BrandAvatar name={card.identity.brand} size={30} />}
           <span>{name}</span>

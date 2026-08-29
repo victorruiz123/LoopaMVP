@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ModelCandidate } from "../types";
 import { ChevronRight } from "../components/icons";
+import FlowSteps from "../components/FlowSteps";
 import { usePageTitle } from "../lib/pageTitle";
 
 /**
@@ -28,9 +29,7 @@ export default function ModelSelectScreen({
   return (
     <div className="screen screen-light">
       <header className="home-header">
-        <span className="brand-pill">
-          <span className="brand-dot" /> STEG 1 AV 4
-        </span>
+        <FlowSteps current={1} />
         <h1 className="home-title">
           Vilken modell
           <br />

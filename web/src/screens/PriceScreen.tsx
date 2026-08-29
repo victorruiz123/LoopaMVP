@@ -4,6 +4,7 @@ import { getJob } from "../api";
 import { formatSek, variantLabel } from "../lib/price";
 import { ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
+import FlowSteps from "../components/FlowSteps";
 import PriceLadderPicker from "../components/PriceLadderPicker";
 import { usePageTitle } from "../lib/pageTitle";
 
@@ -66,9 +67,7 @@ export default function PriceScreen({
   return (
     <div className="screen screen-light price-screen">
       <header className="price-hero-head">
-        <span className="brand-pill">
-          <span className="brand-dot" /> PRISFÖRSLAG
-        </span>
+        <FlowSteps current={3} />
         <div className="price-identity">
           {identity.brand && <BrandAvatar name={identity.brand} size={30} />}
           <span>{[identity.brand, identity.model].filter(Boolean).join(" ")}</span>
