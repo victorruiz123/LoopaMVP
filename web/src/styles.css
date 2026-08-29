@@ -26,6 +26,24 @@
   /* Ett steg mörkare än --field: piller och ikonknappar som ska läsa som nedsänkta
      i sidan. Låg som hsl(40 24% 88%) på fem ställen utan namn. */
   --surface-sunk: hsl(40 24% 88%);
+  /* Nedtryckt rad. Knappt synlig med flit — en rad i en lista ska kvittera trycket,
+     inte byta färg. Låg som hsl(43 40% 97%) på tre ställen. */
+  --surface-pressed: hsl(43 40% 97%);
+
+  /* Text på mörk botten, tre steg. Åtta snarlika grå (38 7% 38 / 38 7% 56 / 38 9% 66 /
+     38 9% 70 / 38 9% 72 / 38 11% 76) gjorde att analysvyn och felkortet inte kunde
+     hålla samma nivå ens när de menade samma sak. */
+  --on-dark-strong: hsl(38 11% 76%);
+  --on-dark: hsl(38 9% 66%);
+  --on-dark-faint: hsl(38 7% 38%);
+
+  /* Blädden under ark, skuggor och överlägg. Samma bläck överallt, bara olika mycket
+     av det — därför komponenter och inte en färdig färg. */
+  --scrim: 30 20% 10%;
+
+  /* Skimret i platshållare. Stod ordagrant på två ställen — prisets och kandidatens —
+     och de två hade redan hunnit glida isär en gång. */
+  --skeleton: linear-gradient(90deg, hsl(40 28% 92%) 25%, hsl(42 40% 98%) 50%, hsl(40 28% 92%) 75%);
 
   /* Tegelorange, inte signalorange. Skillnaden mot den gamla #f97316 syns mest
      bredvid trä och beige möbelfoton, som är vad appen mest av allt visar. */
@@ -146,7 +164,7 @@ body {
 .center-column { align-items: center; justify-content: center; text-align: center; }
 
 .muted { color: var(--muted); }
-.screen-dark .muted { color: hsl(38 9% 66%); }
+.screen-dark .muted { color: var(--on-dark); }
 .small { font-size: 0.85em; }
 .error-text { color: var(--danger-dark); }
 .warning-text { color: var(--amber-ink); font-size: 0.85em; }
@@ -357,7 +375,7 @@ body {
   box-shadow: var(--shadow-card);
   transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
 }
-.card-row:active { background: hsl(43 40% 97%); }
+.card-row:active { background: var(--surface-pressed); }
 .card-row:focus-visible { outline: none; box-shadow: var(--focus); }
 .card-row-thumb {
   width: 52px; height: 52px; border-radius: var(--r-sm); object-fit: cover;
@@ -494,7 +512,7 @@ body {
    ========================================================================== */
 .sheet-root { position: fixed; inset: 0; z-index: 60; }
 .sheet-overlay {
-  position: absolute; inset: 0; background: hsl(30 20% 10% / 0.45);
+  position: absolute; inset: 0; background: hsl(var(--scrim) / 0.45);
   -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
   opacity: 0; transition: opacity 320ms var(--ease-ui);
 }
@@ -503,7 +521,7 @@ body {
   position: absolute; left: 0; right: 0; bottom: 0; height: 78vh;
   display: flex; flex-direction: column; overflow: hidden;
   background: var(--surface); border-radius: var(--r-xl) var(--r-xl) 0 0;
-  box-shadow: 0 -0.5px 0 hsl(30 20% 10% / 0.08), 0 -20px 60px hsl(30 20% 10% / 0.22);
+  box-shadow: 0 -0.5px 0 hsl(var(--scrim) / 0.08), 0 -20px 60px hsl(var(--scrim) / 0.22);
   transform: translateY(100%); transition: transform 420ms var(--ease-sheet);
   max-width: 480px; margin: 0 auto; will-change: transform;
 }
@@ -624,7 +642,7 @@ body {
   box-shadow: var(--shadow-card);
   transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
 }
-.choose-card:active { background: hsl(43 40% 97%); }
+.choose-card:active { background: var(--surface-pressed); }
 .choose-card-unavailable { opacity: 0.5; }
 /* Ikonbricka, som i Inställningar: en rundad kvadrat i accentton med symbolen i.
    Emojin som satt här ritades av operativsystemet och bytte både färg och stil
@@ -905,18 +923,18 @@ body {
 .analysis-image-wrap img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; }
 .analysis-identity { font-size: 15px; font-weight: 700; margin-bottom: 12px; text-align: center; }
 .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; text-align: left; }
-.checklist-item { display: flex; align-items: center; gap: 12px; font-size: 16px; color: hsl(38 7% 56%); }
+.checklist-item { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--on-dark); }
 .checklist-marker { display: flex; align-items: center; justify-content: center; width: 20px; flex-shrink: 0; }
 .checklist-dot {
   width: 9px; height: 9px; border-radius: 999px;
   box-shadow: inset 0 0 0 1.6px currentColor;
 }
 .checklist-active .checklist-dot { background: currentColor; box-shadow: none; }
-.checklist-done { color: hsl(38 9% 66%); }
+.checklist-done { color: var(--on-dark); }
 .checklist-done .checklist-marker { color: var(--green); }
 .checklist-active { color: #fff; font-weight: 600; }
 .checklist-active .checklist-marker { color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
-.checklist-pending { color: hsl(38 7% 38%); }
+.checklist-pending { color: var(--on-dark-faint); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
 /* ==========================================================================
@@ -927,7 +945,7 @@ body {
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 .grade-hero-label { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.grade-hero-rationale { margin: 0; color: hsl(38 11% 76%); font-size: 15px; line-height: 1.5; max-width: 340px; }
+.grade-hero-rationale { margin: 0; color: var(--on-dark-strong); font-size: 15px; line-height: 1.5; max-width: 340px; }
 .grade-badge {
   border-radius: 999px; color: #fff; font-weight: 700; display: flex; align-items: center;
   justify-content: center; flex-shrink: 0;
@@ -1119,7 +1137,7 @@ body {
 .dispute-verdict {
   position: fixed; left: var(--safe-left); right: var(--safe-right);
   bottom: var(--safe-bottom-sm); padding: 14px 16px; border-radius: var(--r);
-  box-shadow: 0 6px 24px hsl(30 20% 10% / 0.18); cursor: pointer; z-index: 50;
+  box-shadow: 0 6px 24px hsl(var(--scrim) / 0.18); cursor: pointer; z-index: 50;
 }
 .dispute-good { background: var(--green-light); color: var(--green-dark); }
 .dispute-warn { background: var(--amber-light); color: var(--amber-ink); }
@@ -1142,14 +1160,14 @@ body {
 /* Mörk botten: rubriken ärver skärmens vita, inte --ink. */
 .screen-dark .failure-title { color: inherit; }
 .failure-title { margin: 0; }
-.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: hsl(38 9% 70%); }
+.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: var(--on-dark-strong); }
 .failure-card .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
-.failure-secondary { color: hsl(38 9% 70%); }
+.failure-secondary { color: var(--on-dark-strong); }
 .failure-details { margin-top: 8px; width: 100%; }
 .failure-details summary { font-size: 12px; color: var(--muted); cursor: pointer; }
 .failure-details code {
   display: block; margin-top: 8px; padding: 10px; border-radius: var(--r-sm);
-  background: rgba(255,255,255,0.06); color: hsl(38 9% 72%); font-size: 11px;
+  background: rgba(255,255,255,0.06); color: var(--on-dark); font-size: 11px;
   text-align: left; word-break: break-word;
 }
 
@@ -1192,7 +1210,7 @@ body {
 /* Platshållare i sifferns egen storlek, så kortet inte hoppar i höjd när priset landar. */
 .price-skeleton {
   height: 50px; width: 62%; margin: 4px auto 2px; border-radius: var(--r-sm);
-  background: linear-gradient(90deg, hsl(40 28% 92%) 25%, hsl(42 40% 98%) 50%, hsl(40 28% 92%) 75%);
+  background: var(--skeleton);
   background-size: 240% 100%; animation: price-shimmer 1.3s var(--ease-ui) infinite;
 }
 @keyframes price-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
@@ -1362,7 +1380,7 @@ body {
   padding: 12px 14px 12px 12px; box-shadow: var(--shadow-card); cursor: pointer; font-family: inherit;
   transition: background 120ms var(--ease-ui);
 }
-.candidate:active { background: hsl(43 40% 97%); }
+.candidate:active { background: var(--surface-pressed); }
 .candidate:focus-visible { outline: none; box-shadow: var(--focus); }
 .candidate-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .candidate-name { flex: 1; font-size: 18px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
@@ -1380,13 +1398,13 @@ body {
 .candidate-photo {
   flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r); overflow: hidden;
   background: var(--field); display: flex; align-items: center; justify-content: center;
-  box-shadow: inset 0 0 0 1px hsl(30 20% 10% / 0.05);
+  box-shadow: inset 0 0 0 1px hsl(var(--scrim) / 0.05);
 }
 .candidate-photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
 /* Platshållare i bildens storlek, så listan inte hoppar när bilderna tonar in. */
 .candidate-photo-empty {
   width: 100%; height: 100%;
-  background: linear-gradient(90deg, hsl(40 28% 92%) 25%, hsl(42 40% 98%) 50%, hsl(40 28% 92%) 75%);
+  background: var(--skeleton);
   background-size: 240% 100%; animation: price-shimmer 1.4s var(--ease-ui) infinite;
 }
 .manual-model-link { align-self: center; margin-top: 4px; }
@@ -1489,7 +1507,7 @@ body {
 .brand-search { position: relative; margin-bottom: 12px; flex-shrink: 0; }
 .brand-search-icon {
   position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
-  display: flex; color: #A79D93; pointer-events: none;
+  display: flex; color: var(--muted-soft); pointer-events: none;
 }
 .brand-search input {
   width: 100%; border: none; border-radius: 13px; height: 46px;
@@ -1497,7 +1515,7 @@ body {
   background: rgba(42, 27, 18, 0.055); color: var(--brand-ink);
   transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
 }
-.brand-search input::placeholder { color: #A79D93; }
+.brand-search input::placeholder { color: var(--muted-soft); }
 .brand-search input:focus { outline: none; background: #fff; box-shadow: var(--focus); }
 .brand-search-clear {
   position: absolute; right: 0; top: 50%; transform: translateY(-50%);
@@ -1608,7 +1626,7 @@ body {
 .render-canvas:active { cursor: grabbing; }
 /* Kontaktskuggan: möbelns eget avtryck på golvet, suddat. Mörkare än en generell skugga, för det
    är den enda kontakten mellan möbeln och rummet — utan den svävar den i rutan. */
-.render-contact { fill: hsl(30 20% 10% / 0.26); }
+.render-contact { fill: hsl(var(--scrim) / 0.26); }
 /* Nere till vänster: höger sida upptas av djupmåttet på höga möbler, och överkanten av
    möbeln själv. Nedre vänstra hörnet är tomt i alla arketyper. */
 .render-hint {
