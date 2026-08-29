@@ -37,8 +37,11 @@ const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 70000);
 process.env.SELLER_RESEARCH_BUDGET_MS ??= "24000";
 process.env.SELLER_RESEARCH_RETRY_BUDGET_MS ??= "16000";
 process.env.SELLER_OVERALL_DEADLINE_MS ??= "60000";
-// Alla bildrutor till sökningen, inte de tre första. Se RESEARCH_IMAGE_CAP i generate.ts.
-process.env.SELLER_RESEARCH_IMAGE_CAP ??= "6";
+// Bildtaket lämnas på generatorns 3. Att höja det till 6 såg ut som en gratis förbättring — fler
+// vinklar åt identifieringen, betald av en budget vi ändå inte använde. Mätt på samma IKEA-stol,
+// tio körningar per läge, gav taket 3 kandidater i 8 fall av 10 och taket 6 bara i 2 av 10: den
+// tyngre nyttolasten får den grundade sökningen att falla (sources=0), och utan grundad text finns
+// inga kandidater alls. Budgeten var aldrig det som begränsade.
 /** Generatorn tar högst 10 och beskär själv per steg. Fler bildrutor gör bara nyttolasten dyr. */
 const MAX_LISTING_IMAGES = 6;
 

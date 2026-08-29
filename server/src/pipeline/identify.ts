@@ -1,4 +1,4 @@
-import { callSellerGenerate, type Resolution } from "../listing.js";
+import { callSellerGenerate, type Resolution, type SellerCall } from "../listing.js";
 import { resolveCandidateImages } from "../candidateImages.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { estimatePrice } from "../pricing.js";
@@ -6,6 +6,17 @@ import type { CapturedImage, ModelCandidate } from "../types.js";
 
 /** Hur länge prissättningen väntar på att skickbedömningen ska bli klar. */
 const CONDITION_WAIT_MS = 180_000;
+
+/**
+ * Gav försöket något att välja bland?
+ *
+ * Att bara fråga efter `kind` räcker inte: generatorn svarar `needs_selection` även när den skrivit
+ * "KANDIDAT: INGEN", och det är en tom väljarskärm precis som ett `ok` utan modellnamn. Villkoret
+ * räknar kandidater, för det är kandidater säljaren ska se.
+ */
+function barren(call: SellerCall): boolean {
+  return call.kind !== "needs_selection" || call.candidates.length === 0;
+}
 
 /**
  * Fas 1: vilken modell är det här?
@@ -36,10 +47,10 @@ export async function runIdentify(jobId: string, brand: string, images: Captured
    * stället för att vänta på ett tredje.
    */
   let call = await callSellerGenerate(brand, images, dir);
-  if (call.kind !== "needs_selection") {
+  if (barren(call)) {
     console.info(`[identify] ${jobId.slice(0, 8)} inga kandidater på första försöket — försöker igen`);
     const second = await callSellerGenerate(brand, images, dir);
-    if (second.kind === "needs_selection") call = second;
+    if (!barren(second)) call = second;
   }
   const job = getJobSync(jobId) ?? (await getJob(jobId));
   if (!job) return;

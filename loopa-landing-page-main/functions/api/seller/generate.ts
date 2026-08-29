@@ -176,17 +176,17 @@ type Env = GeminiEnv
  * och när sökningen faller finns INGA kandidater att erbjuda — de läses enbart ur grundad text. En
  * timeout här är alltså skillnaden mellan fyra modellförslag och "vi kunde inte peka ut någon modell".
  */
-const envMs = (name: string, fallback: number) => {
+const envInt = (name: string, fallback: number) => {
   const raw = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.[name]
   const n = raw ? Number.parseInt(raw, 10) : NaN
   return Number.isFinite(n) && n > 0 ? n : fallback
 }
 
-const OVERALL_DEADLINE_MS = envMs('SELLER_OVERALL_DEADLINE_MS', 26_000)
+const OVERALL_DEADLINE_MS = envInt('SELLER_OVERALL_DEADLINE_MS', 26_000)
 /** Grounded research. Measured 3.6-8.0s at this image cap; best-effort, never fatal. */
-const RESEARCH_BUDGET_MS = envMs('SELLER_RESEARCH_BUDGET_MS', 9_000)
+const RESEARCH_BUDGET_MS = envInt('SELLER_RESEARCH_BUDGET_MS', 9_000)
 /** One retry, and ONLY when the first attempt came back ungrounded (fast and cheap) rather than failing. */
-const RESEARCH_RETRY_BUDGET_MS = envMs('SELLER_RESEARCH_RETRY_BUDGET_MS', 7_000)
+const RESEARCH_RETRY_BUDGET_MS = envInt('SELLER_RESEARCH_RETRY_BUDGET_MS', 7_000)
 /** Structuring. Measured ~2.9-3.2s. This call IS the listing, so it gets a generous ceiling. */
 const STRUCTURE_BUDGET_MS = 10_000
 /** Realistic time to keep in reserve for structuring when deciding whether a research retry still fits — measured latency plus headroom, not the full ceiling. */
@@ -203,7 +203,7 @@ const STRUCTURE_RETRY_BUDGET_MS = 5_000
  * råd med fler bilder — och de behövs: bildrutorna kommer i filmningsordning, så de tre första är tre
  * närbilder från samma ögonblick av varvet. Att bara se dem är att bedöma en möbel på ett armstöd.
  */
-const RESEARCH_IMAGE_CAP = envMs('SELLER_RESEARCH_IMAGE_CAP', 3)
+const RESEARCH_IMAGE_CAP = envInt('SELLER_RESEARCH_IMAGE_CAP', 3)
 /** No search cost on the structuring call, so it sees more of the photos for a better condition read. */
 const STRUCTURE_IMAGE_CAP = 6
 /** Retry trades photo coverage for speed. */
