@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, CameraIcon, FolderIcon, PhotosIcon, SofaIcon, VideoIcon } from "../components/icons";
+import { ArrowLeftIcon, CameraIcon, CloseIcon, FolderIcon, PhotosIcon, PlusIcon, SofaIcon, VideoIcon } from "../components/icons";
 import { createJob, type CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
-import { extractBestFrames, EXTRACTION_TARGET_MS, type ExtractionReport } from "../lib/videoFrames";
+import { extractBestFrames, EXTRACTION_TARGET_MS } from "../lib/videoFrames";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 import { useViewMode } from "../lib/viewMode";
 import WalkaroundGuide from "../components/WalkaroundGuide";
@@ -96,8 +96,6 @@ export default function CaptureScreen({
   const [hasRotation, setHasRotation] = useState<boolean | null>(null);
   const trackerRef = useRef<RotationTracker | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
-  /** Vilken väg bildruteuttaget tog och hur länge det tog — synligt, så en seg körning går att felsöka. */
-  const [extraction, setExtraction] = useState<ExtractionReport | null>(null);
   const [processingMs, setProcessingMs] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -224,7 +222,7 @@ export default function CaptureScreen({
     setProcessingError(null);
     setMode("processing");
     try {
-      const frames = await extractBestFrames(file, setExtraction);
+      const frames = await extractBestFrames(file);
       frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
       // Straight into the analysis. The frames were picked by the selector, not by the seller, so
       // there is nothing for them to approve — and being asked to sign off on someone else's choice
@@ -321,7 +319,7 @@ export default function CaptureScreen({
       try {
         // Inspelningens egen längd följer med: en webm från MediaRecorder har ingen längd skriven i
         // huvudet, och klockan här är det närmaste ett facit som finns om filen inte vill säga något.
-        const frames = await extractBestFrames(blob, setExtraction, recordedMs);
+        const frames = await extractBestFrames(blob, undefined, recordedMs);
         frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
         await startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
       } catch (err) {
@@ -544,25 +542,18 @@ export default function CaptureScreen({
   // ---- review ----
   return (
     <div className="screen screen-light">
-      <h2>Dessa vyer kommer att inspekteras</h2>
+      <h2 className="screen-title">Dessa vyer kommer att inspekteras</h2>
       <p className="muted">
         {shots.length} av högst {MAX_IMAGES} bilder valda.
         {!videoOnly && shots.length < MAX_IMAGES ? " Ser något håll ut att saknas? Lägg till fler nedan." : ""}
       </p>
-      {extraction && (
-        <p className="muted small">
-          Uttaget: {extraction.method} · {(extraction.ms / 1000).toFixed(1)} s · {extraction.buckets} vyer ·{" "}
-          {extraction.framesSeen} bildrutor granskade
-          {extraction.dropped > 0 ? ` · ${extraction.dropped} oduglig bortsorterad` : ""}
-        </p>
-      )}
       <div className="review-grid">
         {shots.map((s) => (
           <div key={s.id} className="review-thumb">
             <img src={s.dataUrl} alt="" />
             {s.viewLabel && <span className="review-thumb-label">{s.viewLabel}</span>}
             <button className="review-thumb-remove" onClick={() => setShots((prev) => prev.filter((x) => x.id !== s.id))} aria-label="Ta bort">
-              ✕
+              <CloseIcon size={12} />
             </button>
           </div>
         ))}
@@ -571,11 +562,11 @@ export default function CaptureScreen({
       {/* Samma regel som på vägen in: i mobilvyn finns ingen väg att lägga till bilder ur filsystemet. */}
       {!videoOnly && (
         <div className="review-add-actions">
-          <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
-            + Ta fler bilder
+          <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
+            <PlusIcon size={15} /> Ta fler bilder
           </button>
-          <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
-            + Ladda upp
+          <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
+            <PlusIcon size={15} /> Ladda upp
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
         </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircleIcon } from "../components/icons";
+import { AlertIcon, CheckCircleIcon } from "../components/icons";
 import { getJob, retryJob } from "../api";
 import { explainError } from "../lib/errors";
 import type { CapturedShot } from "../api";
@@ -88,7 +88,7 @@ export default function AnalysisScreen({
       <div className="screen screen-dark center-column">
         <div className="failure-card">
           <span className="failure-mark" aria-hidden="true">
-            !
+            <AlertIcon size={24} />
           </span>
           <h2 className="failure-title">{explained.title}</h2>
           <p className="failure-body">{explained.body}</p>

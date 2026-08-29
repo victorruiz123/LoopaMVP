@@ -507,7 +507,7 @@ body {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding: 14px 16px 12px;
 }
-.sheet-header h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.025em; }
+.sheet-header h2 { margin: 0; }
 .sheet-close {
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   border: none; background: var(--field); color: var(--muted);
@@ -590,7 +590,13 @@ body {
 /* ==========================================================================
    Filmning
    ========================================================================== */
-.choose-title { text-align: center; margin: 4px 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+/* Appens h2. Storleken fanns redan på .choose-title, .failure-title och .sheet-header h2 —
+   tre gånger samma tre deklarationer — men granskningsvyns rubrik stod oklassad och fick
+   webbläsarens 1.5em, alltså ~25,5 px mitt bland 22:orna. */
+.screen-title, .choose-title, .failure-title, .sheet-header h2 {
+  margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+}
+.choose-title { text-align: center; margin-bottom: 8px; }
 .choose-card {
   display: flex; align-items: center; gap: 14px; background: var(--surface); border: none; border-radius: var(--r-lg);
   padding: 18px; text-align: left; cursor: pointer; font-family: inherit;
@@ -1080,11 +1086,13 @@ body {
 }
 .failure-mark {
   display: flex; align-items: center; justify-content: center;
-  width: 52px; height: 52px; border-radius: 999px;
+  width: 46px; height: 46px; border-radius: 999px;
   background: hsl(14 77% 54% / 0.18); color: var(--accent);
-  font-size: 26px; font-weight: 700; margin-bottom: 2px;
+  margin-bottom: 2px;
 }
-.failure-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+/* Mörk botten: rubriken ärver skärmens vita, inte --ink. */
+.screen-dark .failure-title { color: inherit; }
+.failure-title { margin: 0; }
 .failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: hsl(38 9% 70%); }
 .failure-card .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
 .failure-secondary { color: hsl(38 9% 70%); }
