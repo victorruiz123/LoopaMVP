@@ -88,6 +88,30 @@
   --safe-right: calc(16px + env(safe-area-inset-right));
   --safe-bottom-sm: calc(20px + env(safe-area-inset-bottom));
 
+  /* ---- typografisk skala ----
+     Filen hade 37 olika font-size, med par som 13/13,5 och 12/12,5 som ingen kan se
+     skillnad på men som gör att två rutor med samma innehåll ändå inte är samma ruta.
+     Stegen nedan är de som faktiskt bär text; rubrikstorlekar över 22 sätts per
+     komponent, eftersom de är enskilda tal på var sin skärm och inte en skala. */
+  --fs-2xs: 11px;   /* versala etiketter, chips */
+  --fs-xs: 12px;    /* bildtext, teknisk detalj */
+  --fs-sm: 13px;    /* hjälptext under ett fält */
+  --fs-md: 14px;    /* sekundär text, meta */
+  --fs-base: 15px;  /* brödtext i kort */
+  --fs-lg: 17px;    /* brödtext och knappar */
+  /* Fältens egen storlek, och den enda som inte får röras: under 16 px zoomar iOS in
+     hela sidan när ett fält får fokus, och layouten hoppar ur ram mitt i en inmatning. */
+  --fs-field: 16px;
+  --fs-title: 22px; /* skärmens rubrik */
+
+  /* ---- övergångar ----
+     Nio olika varaktigheter låg utspridda i filen utan att skillnaden betydde något.
+     Tre räcker: tryckets kvittens, färgbyten, och det som rör sig i rummet. Arkets
+     och skärmbytets egna längder står kvar där de är, de ÄR resan. */
+  --t-fast: 120ms;
+  --t: 160ms;
+  --t-slow: 240ms;
+
   --hairline: #ece7dc;
   --focus: 0 0 0 3.5px hsl(14 77% 54% / 0.28);
   --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
@@ -114,7 +138,7 @@ body {
   font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   background: var(--bg);
   color: var(--ink);
-  font-size: 17px;
+  font-size: var(--fs-lg);
   line-height: 1.47;
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
@@ -179,8 +203,8 @@ body {
   display: inline-flex; align-items: center; gap: 6px;
   border: none; background: var(--surface-sunk); color: var(--ink-soft);
   border-radius: 999px; padding: 7px 14px 7px 11px; min-height: var(--tap); cursor: pointer;
-  font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
-  transition: opacity 140ms var(--ease-ui);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 600; letter-spacing: -0.01em;
+  transition: opacity var(--t) var(--ease-ui);
 }
 .app-bar-profile:active { opacity: 0.6; }
 .app-bar-profile:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -192,11 +216,11 @@ body {
   border-radius: var(--r);
   padding: 14px 20px;
   font-family: inherit;
-  font-size: 17px;
+  font-size: var(--fs-lg);
   font-weight: 600;
   letter-spacing: -0.015em;
   cursor: pointer;
-  transition: opacity 120ms var(--ease-ui), background 140ms var(--ease-ui);
+  transition: opacity var(--t-fast) var(--ease-ui), background var(--t) var(--ease-ui);
 }
 /* En fylld yta i EN färg. Gradienten och den orange glöden under knappen är
    marknadsföringsspråk — de drar blicken till knappen som objekt i stället för till
@@ -205,7 +229,7 @@ body {
 .btn-primary:not(:disabled):active { opacity: 0.82; }
 .btn-green { background: var(--green); }
 .btn-green:not(:disabled):active { opacity: 0.82; }
-.btn-small { padding: 8px 16px; min-height: var(--tap); width: auto; font-size: 14px; }
+.btn-small { padding: 8px 16px; min-height: var(--tap); width: auto; font-size: var(--fs-md); }
 .btn-text { background: none; color: var(--accent); padding: 10px; box-shadow: none; font-weight: 600; }
 .btn-text:active { opacity: 0.55; }
 .btn-ghost { background: rgba(0,0,0,0.45); color: #fff; box-shadow: none; }
@@ -247,7 +271,7 @@ body {
   letter-spacing: -0.032em; color: var(--ink);
 }
 .auth-wordmark-inline { font-size: 1.02em; }
-.auth-lede { margin: 0; font-size: 16px; line-height: 1.45; color: var(--muted); }
+.auth-lede { margin: 0; font-size: var(--fs-lg); line-height: 1.45; color: var(--muted); }
 
 /* Flikpillret: en vit tumme som glider under texten i stället för två knappar som
    tänds och släcks. Rörelsen är det som säger att de två sidorna är samma formulär. */
@@ -267,8 +291,8 @@ body {
 .auth-tabs-thumb-right { transform: translateX(100%); }
 .auth-tab {
   position: relative; z-index: 1; border: none; background: none; cursor: pointer;
-  padding: 8px 0; font-family: inherit; font-size: 14px; font-weight: 600;
-  letter-spacing: -0.01em; color: var(--ink); transition: opacity 200ms var(--ease-ui);
+  padding: 8px 0; font-family: inherit; font-size: var(--fs-md); font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink); transition: opacity var(--t-slow) var(--ease-ui);
   opacity: 0.55;
 }
 .auth-tab-active { opacity: 1; }
@@ -279,7 +303,7 @@ body {
 }
 .auth-form { display: flex; flex-direction: column; gap: 16px; }
 .auth-field { display: flex; flex-direction: column; gap: 6px; }
-.auth-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.auth-label { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); }
 .auth-input-wrap { position: relative; display: block; }
 .auth-input-icon {
   position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
@@ -288,8 +312,8 @@ body {
 .auth-input-wrap input {
   width: 100%; height: 48px; border-radius: var(--r); border: 1px solid var(--border);
   background: var(--surface); color: var(--ink);
-  padding: 0 40px 0 38px; font-family: inherit; font-size: 16px;
-  transition: border-color 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+  padding: 0 40px 0 38px; font-family: inherit; font-size: var(--fs-field);
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
 }
 .auth-input-wrap input::placeholder { color: var(--muted-soft); }
 .auth-input-wrap input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
@@ -300,19 +324,19 @@ body {
   width: var(--tap); height: var(--tap); padding: 0;
 }
 .auth-input-toggle:hover { color: var(--ink); }
-.auth-submit { height: 50px; padding: 0; font-size: 17px; }
-.auth-message { margin: -4px 0 0; font-size: 13.5px; line-height: 1.45; border-radius: var(--r-sm); padding: 10px 12px; }
+.auth-submit { height: 50px; padding: 0; font-size: var(--fs-lg); }
+.auth-message { margin: -4px 0 0; font-size: var(--fs-sm); line-height: 1.45; border-radius: var(--r-sm); padding: 10px 12px; }
 .auth-message-error { background: var(--danger-light); color: var(--danger-dark); }
 .auth-message-info { background: var(--green-light); color: var(--green-dark); }
 /* Sloganen som bildtext, inte som andra rubrik. Två rader i displaystorlek i samma
    kort tävlar om att vara det man läser först, och den som vinner ska vara knappen. */
 .auth-tagline {
   margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--hairline);
-  text-align: center; font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+  text-align: center; font-size: var(--fs-sm); font-weight: 500; letter-spacing: 0.01em;
   color: var(--muted-soft);
 }
 .auth-terms {
-  margin: 22px 0 0; text-align: center; font-size: 12px; line-height: 1.5; color: var(--muted);
+  margin: 22px 0 0; text-align: center; font-size: var(--fs-xs); line-height: 1.5; color: var(--muted);
 }
 
 /* ==========================================================================
@@ -331,7 +355,7 @@ body {
   margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.profile-email { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+.profile-email { margin: 2px 0 0; font-size: var(--fs-md); color: var(--muted); }
 
 .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .profile-stat {
@@ -343,12 +367,12 @@ body {
   font-variant-numeric: tabular-nums;
 }
 .profile-stat-label {
-  margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  margin-top: 2px; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em;
   text-transform: uppercase; color: var(--muted-soft);
 }
 
 .profile-section-title {
-  margin: 10px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  margin: 10px 0 0; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
 }
 .profile-loading { display: flex; justify-content: center; padding: 30px 0; }
@@ -362,8 +386,8 @@ body {
   width: 46px; height: 46px; border-radius: 999px;
   background: var(--accent-light); color: var(--accent); margin-bottom: 12px;
 }
-.profile-empty-title { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--ink); }
-.profile-empty-hint { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); max-width: 30ch; }
+.profile-empty-title { margin: 0 0 4px; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+.profile-empty-hint { margin: 0; font-size: var(--fs-md); line-height: 1.45; color: var(--muted); max-width: 30ch; }
 .profile-signout { margin-top: 6px; align-self: center; color: var(--muted); }
 .profile-signout:hover { color: var(--danger-dark); }
 
@@ -373,7 +397,7 @@ body {
   background: var(--surface); border: none; border-radius: var(--r-lg);
   padding: 10px; cursor: pointer; font-family: inherit;
   box-shadow: var(--shadow-card);
-  transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
+  transition: border-color var(--t) var(--ease-ui), transform var(--t-fast) var(--ease-ui);
 }
 .card-row:active { background: var(--surface-pressed); }
 .card-row:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -383,10 +407,10 @@ body {
 }
 .card-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .card-row-title {
-  font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+  font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.card-row-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-row-meta { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
 .card-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; }
 
 /* ==========================================================================
@@ -399,7 +423,7 @@ body {
    rubriken under sig om samma blick — den ska tala om var man är, inte utropa det. */
 .brand-pill {
   display: inline-flex; align-items: center; gap: 7px;
-  color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em;
   text-transform: uppercase; margin-bottom: 10px;
 }
 .brand-dot { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
@@ -414,7 +438,7 @@ body {
    någon systemfärg. Ett ord i accentfärg gör samma sak utan att kosta läsbarhet. */
 .accent { color: var(--accent); }
 .home-lede {
-  margin: 12px 0 0; font-size: 17px; line-height: 1.45; color: var(--muted); max-width: 32ch;
+  margin: 12px 0 0; font-size: var(--fs-lg); line-height: 1.45; color: var(--muted); max-width: 32ch;
   letter-spacing: -0.012em;
 }
 .brand-header { text-align: center; }
@@ -429,38 +453,38 @@ body {
   position: relative;
   display: flex; align-items: center; gap: 12px; width: 100%;
   min-height: 58px; padding: 0 16px; background: none; border: none;
-  font-family: inherit; font-size: 17px; text-align: left;
+  font-family: inherit; font-size: var(--fs-lg); text-align: left;
 }
 /* Strecket dras från etikettens vänsterkant, inte från kortets. En separator som går
    ut i kanten delar kortet i två kort; en indragen håller ihop dem som en lista. */
 .form-row + .form-row::before {
   content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline);
 }
-.form-row-tappable { cursor: pointer; transition: background 140ms var(--ease-ui); }
+.form-row-tappable { cursor: pointer; transition: background var(--t) var(--ease-ui); }
 .form-row-tappable:active { background: var(--field); }
 .form-row-tappable:focus-visible { outline: none; box-shadow: var(--focus); }
-.form-row-label { flex-shrink: 0; font-size: 17px; font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
+.form-row-label { flex-shrink: 0; font-size: var(--fs-lg); font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
 .form-row-value {
   flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 9px;
   min-width: 0; overflow: hidden;
 }
 .form-row-text {
-  font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+  font-size: var(--fs-lg); font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
-.form-row-placeholder { font-size: 17px; color: var(--muted-soft); }
+.form-row-placeholder { font-size: var(--fs-lg); color: var(--muted-soft); }
 .form-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; margin-right: -3px; }
 .form-row-input {
   flex: 1; min-width: 0; border: none; background: none; padding: 0;
-  font-family: inherit; font-size: 17px; color: var(--ink); font-weight: 600;
+  font-family: inherit; font-size: var(--fs-lg); color: var(--ink); font-weight: 600;
   text-align: right; letter-spacing: -0.01em;
 }
 .form-row-input::placeholder { color: var(--muted-soft); font-weight: 400; }
 .form-row-input:focus { outline: none; }
 
 .home-cta { margin-top: 22px; margin-bottom: 26px; }
-.home-cta .btn-primary { min-height: 52px; border-radius: var(--r); font-size: 17px; }
-.form-hint { margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--muted); text-align: center; }
+.home-cta .btn-primary { min-height: 52px; border-radius: var(--r); font-size: var(--fs-lg); }
+.form-hint { margin: 10px 4px 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); text-align: center; }
 
 /* ---- märkesbrickor ----
    Färg, radie, vikt och spärr sätts per märke i brandLook.ts — här bara formen de delar.
@@ -473,7 +497,7 @@ body {
 /* Det valda märket sätts i sin egen bokstavsform, inte i appens. Raden är den enda platsen
    där ETT märke står för sig självt och har råd att låta som sig självt; i listan skulle
    tjugo olika typografier bara göra det svårare att hitta rätt. */
-.form-row-text-brand { font-size: 16px; }
+.form-row-text-brand { font-size: var(--fs-lg); }
 
 /* ---- sparade truth-cards på startsidan ---- */
 .collapsible-card {
@@ -482,12 +506,12 @@ body {
 }
 .collapsible-header {
   display: flex; justify-content: space-between; align-items: center; width: 100%;
-  background: none; border: none; font-family: inherit; font-size: 14px; cursor: pointer;
+  background: none; border: none; font-family: inherit; font-size: var(--fs-md); cursor: pointer;
   padding: 4px; min-height: var(--tap);
 }
-.collapsible-title { font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -0.015em; }
-.collapsible-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
-.collapsible-chevron { display: flex; color: var(--muted-soft); transition: transform 220ms var(--ease-ui); }
+.collapsible-title { font-size: var(--fs-lg); font-weight: 600; color: var(--ink); letter-spacing: -0.015em; }
+.collapsible-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--fs-md); }
+.collapsible-chevron { display: flex; color: var(--muted-soft); transition: transform var(--t-slow) var(--ease-ui); }
 .collapsible-chevron-open { transform: rotate(90deg); }
 
 .saved-section { background: var(--surface); border-radius: var(--r-lg); padding: 14px; box-shadow: var(--shadow-card); }
@@ -496,11 +520,11 @@ body {
 .saved-item {
   display: flex; align-items: center; gap: 10px; background: var(--surface); border: none; border-radius: var(--r); padding: 8px; cursor: pointer;
   text-align: left; width: 100%; font-family: inherit;
-  transition: border-color 140ms var(--ease-ui);
+  transition: border-color var(--t) var(--ease-ui);
 }
 .saved-thumb { width: 44px; height: 44px; border-radius: var(--r-sm); object-fit: cover; background: var(--field); }
-.saved-item-body { flex: 1; min-width: 0; font-size: 14px; }
-.saved-item-title { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.saved-item-body { flex: 1; min-width: 0; font-size: var(--fs-md); }
+.saved-item-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
 
 /* Siffror som inte hoppar i bredd när de uppdateras. */
 .price-main, .price-range-end em, .saved-item .small, .truth-price, .profile-stat-value {
@@ -540,11 +564,11 @@ body {
   position: relative; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   border: none; background: none; color: var(--muted); padding: 0;
   width: var(--tap); height: var(--tap); margin: -7px; cursor: pointer;
-  transition: color 140ms var(--ease-ui);
+  transition: color var(--t) var(--ease-ui);
 }
 .sheet-close::before {
   content: ""; position: absolute; width: 30px; height: 30px; border-radius: 999px;
-  background: var(--field); transition: background 140ms var(--ease-ui);
+  background: var(--field); transition: background var(--t) var(--ease-ui);
 }
 .sheet-close svg { position: relative; }
 .sheet-close:hover { color: var(--ink); }
@@ -558,9 +582,9 @@ body {
 }
 .sheet-search input {
   width: 100%; border: 1px solid transparent; border-radius: var(--r-sm); height: 42px;
-  padding: 0 34px; font-size: 16px; font-family: inherit;
+  padding: 0 34px; font-size: var(--fs-field); font-family: inherit;
   background: var(--field); color: var(--ink);
-  transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui), border-color 160ms var(--ease-ui);
+  transition: background var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui), border-color var(--t) var(--ease-ui);
 }
 .sheet-search input::placeholder { color: var(--muted-soft); }
 .sheet-search input:focus { outline: none; background: #fff; border-color: var(--accent); box-shadow: var(--focus); }
@@ -581,7 +605,7 @@ body {
 }
 .sheet-section-title {
   position: sticky; top: 0; z-index: 1;
-  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
   color: var(--muted-soft); padding: 10px 4px 8px; background: var(--surface);
 }
 .sheet-empty {
@@ -593,14 +617,14 @@ body {
   width: 54px; height: 54px; border-radius: 999px;
   background: var(--accent-light); color: var(--accent); margin-bottom: 15px;
 }
-.sheet-empty-title { margin: 0 0 5px; font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
-.sheet-empty-hint { margin: 0 0 20px; font-size: 14px; line-height: 1.45; color: var(--muted); max-width: 28ch; }
+.sheet-empty-title { margin: 0 0 5px; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.sheet-empty-hint { margin: 0 0 20px; font-size: var(--fs-md); line-height: 1.45; color: var(--muted); max-width: 28ch; }
 .brand-use-typed {
   display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
   border: none; border-radius: var(--r); background: var(--accent); color: #fff;
-  padding: 13px 20px; font-family: inherit; font-size: 17px; font-weight: 600;
+  padding: 13px 20px; font-family: inherit; font-size: var(--fs-lg); font-weight: 600;
   letter-spacing: -0.015em; cursor: pointer;
-  transition: opacity 120ms var(--ease-ui);
+  transition: opacity var(--t-fast) var(--ease-ui);
 }
 .brand-use-typed:active { opacity: 0.82; }
 .brand-use-typed:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -609,8 +633,8 @@ body {
 .brand-row {
   position: relative; display: flex; align-items: center; gap: 12px; width: 100%;
   border: none; background: none; padding: 9px 4px; min-height: 52px;
-  font-family: inherit; font-size: 17px; text-align: left; cursor: pointer;
-  transition: background 120ms var(--ease-ui); border-radius: var(--r-sm);
+  font-family: inherit; font-size: var(--fs-lg); text-align: left; cursor: pointer;
+  transition: background var(--t-fast) var(--ease-ui); border-radius: var(--r-sm);
 }
 /* Hårstrecket börjar där texten börjar, inte där raden gör. */
 .brand-rows li + li .brand-row::before {
@@ -633,14 +657,14 @@ body {
    tre gånger samma tre deklarationer — men granskningsvyns rubrik stod oklassad och fick
    webbläsarens 1.5em, alltså ~25,5 px mitt bland 22:orna. */
 .screen-title, .choose-title, .failure-title, .sheet-header h2 {
-  margin: 4px 0 0; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+  margin: 4px 0 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
 }
 .choose-title { text-align: center; margin-bottom: 8px; }
 .choose-card {
   display: flex; align-items: center; gap: 14px; background: var(--surface); border: none; border-radius: var(--r-lg);
   padding: 18px; text-align: left; cursor: pointer; font-family: inherit;
   box-shadow: var(--shadow-card);
-  transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
+  transition: border-color var(--t) var(--ease-ui), transform var(--t-fast) var(--ease-ui);
 }
 .choose-card:active { background: var(--surface-pressed); }
 .choose-card-unavailable { opacity: 0.5; }
@@ -652,8 +676,8 @@ body {
   width: 40px; height: 40px; border-radius: 10px;
   background: var(--accent-light); color: var(--accent);
 }
-.choose-card strong { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 600; color: var(--ink); }
-.choose-card p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
+.choose-card strong { display: block; margin-bottom: 2px; font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
+.choose-card p { margin: 0; font-size: var(--fs-md); line-height: 1.4; color: var(--muted); }
 
 .screen-camera { position: relative; padding: 0; background: #000; overflow: hidden; }
 /* `cover` var en beskärning, inte en inramning: en 3:4-ström i ett 9:19-fönster skalas till höjden och
@@ -671,14 +695,14 @@ body {
 .capture-mode-back { position: absolute; top: var(--safe-top); left: var(--safe-left); }
 .capture-top-bar {
   position: absolute; top: var(--safe-top); left: var(--safe-left); background: rgba(0,0,0,0.55); color: #fff;
-  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  padding: 6px 12px; border-radius: 999px; font-size: var(--fs-xs); font-weight: 700;
   display: flex; align-items: center; gap: 6px;
 }
 .rec-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--danger); }
 .capture-guidance {
   position: absolute; top: calc(44px + env(safe-area-inset-top)); left: var(--safe-left); right: var(--safe-right);
   background: rgba(0,0,0,0.58); color: #fff;
-  padding: 14px; border-radius: var(--r); font-size: 14px; text-align: center;
+  padding: 14px; border-radius: var(--r); font-size: var(--fs-md); text-align: center;
 }
 .capture-identity { text-align: center; margin: -4px 0 4px; font-weight: 700; color: var(--ink-soft); }
 .capture-filmstrip {
@@ -712,7 +736,7 @@ body {
 .camera-error-overlay {
   position: absolute; left: var(--safe-left); right: var(--safe-right);
   bottom: calc(90px + env(safe-area-inset-bottom)); background: rgba(0,0,0,0.78);
-  color: #fff; padding: 12px 14px; border-radius: var(--r); font-size: 13px; line-height: 1.4;
+  color: #fff; padding: 12px 14px; border-radius: var(--r); font-size: var(--fs-sm); line-height: 1.4;
 }
 
 /* varvring för rotationsspårningen */
@@ -738,14 +762,14 @@ body {
   position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px;
   color: #fff; text-shadow: 0 1px 3px rgba(0,0,0,0.6);
 }
-.lap-ring-label { font-size: 14px; font-weight: 700; }
+.lap-ring-label { font-size: var(--fs-md); font-weight: 700; }
 
 /* riktningspil när sensorn saknas och ringen inte kan ritas */
 .capture-direction {
   position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
   display: flex; align-items: center; gap: 8px; pointer-events: none;
   background: rgba(0,0,0,0.55); color: #fff; padding: 10px 16px; border-radius: 999px;
-  font-size: 14px; font-weight: 600;
+  font-size: var(--fs-md); font-weight: 600;
 }
 .capture-direction-arc { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
 .capture-direction-head { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
@@ -776,21 +800,21 @@ body {
   .capture-guide-title { font-size: 20px; }
 }
 .capture-guide-subject {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   background: rgba(255,255,255,0.18); padding: 5px 12px; border-radius: 999px;
 }
-.capture-guide-title { margin: 0; font-size: 23px; font-weight: 700; line-height: 1.2; }
+.capture-guide-title { margin: 0; font-size: var(--fs-title); font-weight: 700; line-height: 1.2; }
 .capture-guide-steps {
   counter-reset: step; margin: 0; padding: 0; list-style: none;
-  display: grid; gap: 9px; font-size: 14px; line-height: 1.35; color: rgba(255,255,255,0.94);
+  display: grid; gap: 9px; font-size: var(--fs-md); line-height: 1.35; color: rgba(255,255,255,0.94);
 }
 .capture-guide-steps li { display: flex; align-items: flex-start; gap: 9px; text-align: left; }
 .capture-guide-steps li::before {
   counter-increment: step; content: counter(step);
   flex: 0 0 20px; height: 20px; border-radius: 999px; background: rgba(255,255,255,0.22);
-  display: grid; place-items: center; font-size: 11px; font-weight: 700;
+  display: grid; place-items: center; font-size: var(--fs-2xs); font-weight: 700;
 }
-.capture-guide-cta { margin: 0; font-size: 13px; color: rgba(255,255,255,0.72); }
+.capture-guide-cta { margin: 0; font-size: var(--fs-sm); color: rgba(255,255,255,0.72); }
 
 /* scenen: soffan på snedden, telefonens bana runt den, allt i samma perspektiv */
 .guide3d { width: 100%; max-width: 320px; display: block; }
@@ -905,10 +929,10 @@ body {
   52% { transform: scale(1.06); opacity: 0.26; }
 }
 
-.identify-waiting-title { margin: 4px 0 0; font-size: 15px; font-weight: 600; }
+.identify-waiting-title { margin: 4px 0 0; font-size: var(--fs-base); font-weight: 600; }
 
 .model-search-word {
-  margin: 0; font-size: 17px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink-soft);
+  margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink-soft);
   animation: model-search-word-in 0.4s var(--ease-ui);
 }
 @keyframes model-search-word-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
@@ -921,9 +945,9 @@ body {
 }
 .analysis-image-wrap { border-radius: var(--r); overflow: hidden; margin-bottom: 18px; }
 .analysis-image-wrap img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; }
-.analysis-identity { font-size: 15px; font-weight: 700; margin-bottom: 12px; text-align: center; }
+.analysis-identity { font-size: var(--fs-base); font-weight: 700; margin-bottom: 12px; text-align: center; }
 .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; text-align: left; }
-.checklist-item { display: flex; align-items: center; gap: 12px; font-size: 16px; color: var(--on-dark); }
+.checklist-item { display: flex; align-items: center; gap: 12px; font-size: var(--fs-lg); color: var(--on-dark); }
 .checklist-marker { display: flex; align-items: center; justify-content: center; width: 20px; flex-shrink: 0; }
 .checklist-dot {
   width: 9px; height: 9px; border-radius: 999px;
@@ -944,24 +968,24 @@ body {
   background: var(--ink); color: #fff; border-radius: var(--r-lg); padding: 26px 20px; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
-.grade-hero-label { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
-.grade-hero-rationale { margin: 0; color: var(--on-dark-strong); font-size: 15px; line-height: 1.5; max-width: 340px; }
+.grade-hero-label { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.02em; }
+.grade-hero-rationale { margin: 0; color: var(--on-dark-strong); font-size: var(--fs-base); line-height: 1.5; max-width: 340px; }
 .grade-badge {
   border-radius: 999px; color: #fff; font-weight: 700; display: flex; align-items: center;
   justify-content: center; flex-shrink: 0;
 }
-.result-identity { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
-.damage-summary-line { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
+.result-identity { margin: 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
+.damage-summary-line { margin: 0; font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; }
 
 .coverage-warning {
   display: flex; align-items: flex-start; gap: 10px;
   background: var(--amber-light); color: var(--amber-ink); padding: 12px 14px;
-  border-radius: var(--r); font-size: 15px; line-height: 1.4;
+  border-radius: var(--r); font-size: var(--fs-base); line-height: 1.4;
 }
 .coverage-warning-mark { display: flex; flex-shrink: 0; margin-top: 1px; }
 
 .damage-groups { display: flex; flex-direction: column; gap: 18px; }
-.damage-group-header { font-weight: 700; font-size: 15px; margin-bottom: 8px; letter-spacing: -0.01em; }
+.damage-group-header { font-weight: 700; font-size: var(--fs-base); margin-bottom: 8px; letter-spacing: -0.01em; }
 .damage-list { display: flex; flex-direction: column; gap: 10px; }
 .damage-card {
   background: var(--surface); border-radius: var(--r-lg);
@@ -970,8 +994,8 @@ body {
 .damage-card-rejected { opacity: 0.5; }
 .damage-card-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .damage-card-title { display: flex; flex-direction: column; gap: 2px; }
-.damage-card-title strong { font-size: 15px; letter-spacing: -0.01em; }
-.damage-desc { display: block; margin: 0 0 10px; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+.damage-card-title strong { font-size: var(--fs-base); letter-spacing: -0.01em; }
+.damage-desc { display: block; margin: 0 0 10px; font-size: var(--fs-md); color: var(--ink-soft); line-height: 1.45; }
 /* Telefonens kort: texten ÄR knappen som öppnar bevisbilden. Ingen egen ram eller bakgrund —
    kortet är redan en yta, och en knapp inuti den hade sett ut som ytterligare ett kort. */
 .damage-card-open {
@@ -985,14 +1009,14 @@ body {
 /* Utan bild i kortet syns det inte att det FINNS en bild. Raden säger det, och hur många. */
 .damage-evidence-hint {
   display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
-  font-size: 13px; font-weight: 600; color: var(--accent);
+  font-size: var(--fs-sm); font-weight: 600; color: var(--accent);
 }
 .damage-card-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .damage-card-actions .btn-remove { color: var(--danger-dark); }
 .damage-card-body { display: flex; flex-direction: column; gap: 8px; }
-.damage-card-body label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.damage-card-body label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft); }
 .damage-card-body select, .damage-card-body input, .damage-card-body textarea {
-  font-family: inherit; font-size: 14px; padding: 9px 10px; border-radius: var(--r-sm);
+  font-family: inherit; font-size: var(--fs-md); padding: 9px 10px; border-radius: var(--r-sm);
   border: 1px solid var(--border); background: var(--surface); color: var(--ink);
 }
 .damage-card-body select:focus, .damage-card-body input:focus, .damage-card-body textarea:focus {
@@ -1000,7 +1024,7 @@ body {
 }
 .add-damage-actions { display: flex; flex-direction: column; gap: 2px; }
 
-.chip { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; flex-shrink: 0; }
+.chip { font-size: var(--fs-2xs); font-weight: 700; padding: 4px 9px; border-radius: 999px; flex-shrink: 0; }
 .chip-S1 { background: var(--green-light); color: var(--green-dark); }
 .chip-S2 { background: var(--amber-light); color: var(--amber-ink); }
 .chip-S3 { background: hsl(16 78% 93%); color: hsl(14 70% 32%); }
@@ -1029,18 +1053,18 @@ body {
 .marked-thumb-line line { stroke: var(--danger); stroke-width: 2; }
 .marked-thumb-angle { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; }
 
-.debug-link { display: block; text-align: center; font-size: 12px; color: var(--muted-soft); padding: 4px 0; }
+.debug-link { display: block; text-align: center; font-size: var(--fs-xs); color: var(--muted-soft); padding: 4px 0; }
 .next-step {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 22px; min-height: 54px; border-radius: var(--r); font-size: 17px; letter-spacing: -0.01em;
+  margin-top: 22px; min-height: 54px; border-radius: var(--r); font-size: var(--fs-lg); letter-spacing: -0.01em;
 }
-.next-step-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.9; font-weight: 600; }
+.next-step-meta { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); opacity: 0.9; font-weight: 600; }
 
 /* delresultat: granskningen pågår fortfarande */
 .review-banner {
   display: flex; align-items: center; gap: 10px;
   background: var(--amber-light); color: var(--amber-ink); border-radius: var(--r); padding: 11px 14px;
-  font-size: 13.5px; line-height: 1.4;
+  font-size: var(--fs-sm); line-height: 1.4;
 }
 .review-spinner {
   width: 14px; height: 14px; flex-shrink: 0; border-radius: 999px;
@@ -1057,10 +1081,10 @@ body {
   padding: calc(14px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 14px
     calc(14px + env(safe-area-inset-left));
 }
-.evidence-viewer-title { font-size: 13px; font-weight: 700; }
+.evidence-viewer-title { font-size: var(--fs-sm); font-weight: 700; }
 .zoom-controls {
   display: flex; align-items: center; background: rgba(255,255,255,0.15);
-  border-radius: 999px; padding: 0 4px; font-size: 12px;
+  border-radius: 999px; padding: 0 4px; font-size: var(--fs-xs);
 }
 .zoom-controls button {
   display: flex; align-items: center; justify-content: center;
@@ -1087,7 +1111,7 @@ body {
 }
 .evidence-dot::before {
   content: ""; width: 8px; height: 8px; border-radius: 999px;
-  background: rgba(255,255,255,0.3); transition: background 140ms var(--ease-ui);
+  background: rgba(255,255,255,0.3); transition: background var(--t) var(--ease-ui);
 }
 .evidence-dot.active::before { background: var(--accent); }
 .evidence-dot:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 999px; }
@@ -1096,11 +1120,11 @@ body {
    Teknisk panel (inspektionsvy, medvetet skild från säljarvyn ovanför)
    ========================================================================== */
 .tech-panel { margin-top: 10px; }
-.tech-body { margin-top: 12px; font-size: 13px; }
+.tech-body { margin-top: 12px; font-size: var(--fs-sm); }
 .tech-loading { padding: 8px 4px; }
 .tech-section { margin-bottom: 18px; }
 .tech-section h4 {
-  font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
   color: var(--muted-soft); margin: 0 0 8px;
 }
 .tech-kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 4px 12px; margin: 0; }
@@ -1108,15 +1132,15 @@ body {
 .tech-kv dd { margin: 0; }
 .tech-flag { color: var(--danger-dark); font-weight: 700; }
 .tech-table { width: 100%; border-collapse: collapse; }
-.tech-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; padding: 4px 8px 4px 0; }
+.tech-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: var(--fs-2xs); padding: 4px 8px 4px 0; }
 .tech-table td { padding: 5px 8px 5px 0; border-top: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
-.tech-note { margin: 8px 0 0; font-size: 12px; }
+.tech-note { margin: 8px 0 0; font-size: var(--fs-xs); }
 .tech-list { margin: 0; padding-left: 18px; color: var(--ink-soft); }
 .tech-list li { margin-bottom: 3px; }
 .tech-frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .tech-frames figure { margin: 0; }
 .tech-frames img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); background: var(--field); }
-.tech-frames figcaption { display: flex; flex-direction: column; font-size: 11px; margin-top: 4px; line-height: 1.35; }
+.tech-frames figcaption { display: flex; flex-direction: column; font-size: var(--fs-2xs); margin-top: 4px; line-height: 1.35; }
 .tech-findings { display: flex; flex-direction: column; gap: 10px; }
 .tech-finding { display: flex; gap: 10px; padding: 10px; border-radius: var(--r-sm); background: hsl(42 36% 96%); border-left: 3px solid var(--border); }
 .tech-finding-CONFIRMED { border-left-color: var(--green); }
@@ -1128,7 +1152,7 @@ body {
 .tech-finding-title { display: flex; flex-direction: column; margin-bottom: 6px; }
 .tech-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
 .tech-finding-desc { margin: 0; }
-.tech-finding-reason { margin: 4px 0 0; font-size: 12px; }
+.tech-finding-reason { margin: 4px 0 0; font-size: var(--fs-xs); }
 .tech-part-clean td { color: var(--muted-soft); }
 
 /* ==========================================================================
@@ -1141,8 +1165,8 @@ body {
 }
 .dispute-good { background: var(--green-light); color: var(--green-dark); }
 .dispute-warn { background: var(--amber-light); color: var(--amber-ink); }
-.dispute-verdict p { margin: 4px 0 6px; font-size: 14px; }
-.dispute-verdict .small { font-size: 11px; }
+.dispute-verdict p { margin: 4px 0 6px; font-size: var(--fs-md); }
+.dispute-verdict .small { font-size: var(--fs-2xs); }
 
 /* ==========================================================================
    Misslyckad analys
@@ -1160,14 +1184,14 @@ body {
 /* Mörk botten: rubriken ärver skärmens vita, inte --ink. */
 .screen-dark .failure-title { color: inherit; }
 .failure-title { margin: 0; }
-.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: var(--on-dark-strong); }
-.failure-card .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
+.failure-body { margin: 0 0 8px; font-size: var(--fs-base); line-height: 1.5; color: var(--on-dark-strong); }
+.failure-card .btn-primary { min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg); }
 .failure-secondary { color: var(--on-dark-strong); }
 .failure-details { margin-top: 8px; width: 100%; }
-.failure-details summary { font-size: 12px; color: var(--muted); cursor: pointer; }
+.failure-details summary { font-size: var(--fs-xs); color: var(--muted); cursor: pointer; }
 .failure-details code {
   display: block; margin-top: 8px; padding: 10px; border-radius: var(--r-sm);
-  background: rgba(255,255,255,0.06); color: var(--on-dark); font-size: 11px;
+  background: rgba(255,255,255,0.06); color: var(--on-dark); font-size: var(--fs-2xs);
   text-align: left; word-break: break-word;
 }
 
@@ -1177,7 +1201,7 @@ body {
 .price-hero-head { margin-bottom: 18px; }
 .price-identity {
   display: flex; align-items: center; gap: 10px; margin-top: 6px;
-  font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+  font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
 }
 .price-big-card {
   background: var(--surface); border-radius: var(--r-lg);
@@ -1185,13 +1209,13 @@ body {
   display: flex; flex-direction: column; gap: 9px;
 }
 .price-panel-head {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-soft);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-soft);
 }
 .price-main { font-size: 36px; font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
 .price-main-xl { font-size: 46px; letter-spacing: -0.04em; }
 .price-range { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
 .price-range-end { display: flex; flex-direction: column; gap: 1px; min-width: 84px; }
-.price-range-end em { font-style: normal; font-weight: 700; font-size: 15px; }
+.price-range-end em { font-style: normal; font-weight: 700; font-size: var(--fs-base); }
 .price-range-end-high { align-items: flex-end; }
 .price-range-end:first-of-type { align-items: flex-start; }
 .price-range-bar {
@@ -1204,7 +1228,7 @@ body {
 .price-basis { margin: 0; }
 .price-empty-title { margin: 0; font-weight: 700; }
 .price-caveat {
-  margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted);
+  margin: 10px 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted);
   border-top: 1px solid var(--hairline); padding-top: 12px;
 }
 /* Platshållare i sifferns egen storlek, så kortet inte hoppar i höjd när priset landar. */
@@ -1229,17 +1253,17 @@ body {
 .ladder-intro { margin: -5px 0 0; }
 .ladder-row { display: flex; flex-direction: column; gap: 7px; }
 .ladder-row-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.ladder-row-label { font-size: 14px; font-weight: 600; color: var(--muted); }
+.ladder-row-label { font-size: var(--fs-md); font-weight: 600; color: var(--muted); }
 .ladder-amount { display: inline-flex; align-items: baseline; gap: 4px; }
 /* Beloppet ÄR fältet: den som vill ha exakt 2 350 ska kunna skriva det utan att
    först leta rätt på ett redigeringsläge. Ramen tänds först vid fokus. */
 .ladder-amount-input {
   width: 6ch; padding: 3px 6px; border: 1px solid transparent; border-radius: var(--r-xs);
-  background: transparent; text-align: right; font: inherit; font-size: 22px; font-weight: 700;
+  background: transparent; text-align: right; font: inherit; font-size: var(--fs-title); font-weight: 700;
   letter-spacing: -0.02em; color: var(--ink); -moz-appearance: textfield;
 }
 .ladder-amount-input:focus { outline: none; border-color: var(--border); background: var(--field); }
-.ladder-amount-unit { font-size: 15px; font-weight: 600; color: var(--muted); }
+.ladder-amount-unit { font-size: var(--fs-base); font-weight: 600; color: var(--muted); }
 
 .ladder-slider { -webkit-appearance: none; appearance: none; width: 100%; height: 28px; background: none; margin: 0; }
 .ladder-slider::-webkit-slider-runnable-track { height: 6px; border-radius: 999px; background: var(--field); }
@@ -1259,7 +1283,7 @@ body {
 .ladder-slider:focus-visible { outline: none; }
 .ladder-slider:focus-visible::-webkit-slider-thumb { box-shadow: var(--focus); }
 .ladder-slider:focus-visible::-moz-range-thumb { box-shadow: var(--focus); }
-.ladder-hint { margin: -3px 0 0; font-size: 12.5px; color: var(--muted-soft); }
+.ladder-hint { margin: -3px 0 0; font-size: var(--fs-xs); color: var(--muted-soft); }
 
 .ladder-steps {
   list-style: none; margin: 2px 0 0; padding: 0; display: flex; gap: 6px;
@@ -1271,9 +1295,9 @@ body {
   align-items: center; padding: 8px 6px; border-radius: var(--r-sm); background: var(--field);
 }
 .ladder-step-week {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-soft);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-soft);
 }
-.ladder-step-price { font-size: 14px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.ladder-step-price { font-size: var(--fs-md); font-weight: 700; color: var(--ink); white-space: nowrap; }
 .ladder-step:first-child { background: var(--accent-light); }
 .ladder-step:first-child .ladder-step-week, .ladder-step:first-child .ladder-step-price { color: var(--accent-ink); }
 .ladder-step-floor { background: var(--green-light); }
@@ -1281,9 +1305,9 @@ body {
 .ladder-step-gap {
   min-width: 20px; flex: 0 0 auto; background: none; justify-content: center; color: var(--muted-soft);
 }
-.ladder-summary { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.ladder-summary { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
 /* Egen höjd även när den är tom, så kortet inte hoppar mellan "Sparar…" och tomt. */
-.ladder-status { margin: 0; min-height: 17px; font-size: 12.5px; color: var(--muted-soft); }
+.ladder-status { margin: 0; min-height: 17px; font-size: var(--fs-xs); color: var(--muted-soft); }
 .ladder-status-error { color: var(--danger-dark); }
 
 /* Stegens läge på en annons som redan ligger uppe. */
@@ -1302,57 +1326,57 @@ body {
   padding: 22px 20px; box-shadow: var(--lift); display: flex; flex-direction: column; gap: 7px;
 }
 .truth-kicker {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent);
 }
 .truth-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
-.truth-sub { font-size: 15px; color: var(--muted); }
+.truth-sub { font-size: var(--fs-base); color: var(--muted); }
 /* Hur mycket generatorn kunde belägga står på kortet, inte i en fotnot: en annons där måtten är
    gissade ska inte se likadan ut som en där de har en källa. */
 .truth-confidence {
-  align-self: flex-start; margin-top: 6px; font-size: 12px; font-weight: 700;
+  align-self: flex-start; margin-top: 6px; font-size: var(--fs-xs); font-weight: 700;
   border-radius: 999px; padding: 5px 11px;
 }
 .truth-confidence-full { background: var(--green-light); color: var(--green-dark); }
 .truth-confidence-partial { background: var(--amber-light); color: var(--amber-ink); }
 .truth-confidence-fallback { background: var(--danger-light); color: var(--danger-dark); }
-.truth-caveat { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
+.truth-caveat { margin: 6px 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
 
 .truth-block {
   background: var(--surface); border-radius: var(--r-lg);
   padding: 16px 18px; box-shadow: var(--shadow-card);
 }
 .truth-block h3 {
-  margin: 0 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  margin: 0 0 12px; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
 }
 .truth-verdict { display: flex; align-items: center; gap: 12px; }
-.truth-verdict-label { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.truth-verdict-label { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
 .truth-price {
-  margin-left: auto; font-size: 22px; font-weight: 700; letter-spacing: -0.025em;
+  margin-left: auto; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em;
   color: var(--ink); text-align: right;
 }
 .truth-price .small { display: block; font-weight: 500; letter-spacing: 0; color: var(--muted); }
 .truth-specs { margin: 0; display: flex; flex-direction: column; }
 .truth-spec { display: flex; gap: 14px; padding: 9px 0; align-items: baseline; }
 .truth-spec + .truth-spec { border-top: 1px solid var(--hairline); }
-.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: 14px; color: var(--muted); }
-.truth-spec dd { margin: 0; flex: 1; font-size: 15px; font-weight: 600; color: var(--ink); }
-.truth-src { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--accent); }
-.truth-listing-title { font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
-.truth-listing-body { margin: 8px 0 0; font-size: 15px; line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
-.truth-listing-condition { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: var(--fs-md); color: var(--muted); }
+.truth-spec dd { margin: 0; flex: 1; font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.truth-src { margin-left: 8px; font-size: var(--fs-xs); font-weight: 500; color: var(--accent); }
+.truth-listing-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.truth-listing-body { margin: 8px 0 0; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
+.truth-listing-condition { margin: 10px 0 0; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
 .truth-retail { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .truth-sources { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
-.truth-sources a { font-size: 14px; color: var(--accent); word-break: break-word; }
-.truth-missing ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
-.truth-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: 17px; }
-.provenance { margin: 0; font-size: 12.5px; color: var(--muted-soft); letter-spacing: 0.01em; }
+.truth-sources a { font-size: var(--fs-md); color: var(--accent); word-break: break-word; }
+.truth-missing ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; }
+.truth-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: var(--fs-lg); }
+.provenance { margin: 0; font-size: var(--fs-xs); color: var(--muted-soft); letter-spacing: 0.01em; }
 
 /* ==========================================================================
    Publicera på Tradera
    ========================================================================== */
 .tradera-block { display: flex; flex-direction: column; gap: 10px; }
-.tradera-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
+.tradera-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg); }
 .tradera-block p { margin: 0; }
 .tradera-waiting { display: flex; align-items: center; gap: 12px; }
 .tradera-plan { margin: 2px 0 0; }
@@ -1361,7 +1385,7 @@ body {
 .tradera-confirm-actions .btn-primary { flex: 2; }
 .tradera-error {
   padding: 10px 12px; border-radius: var(--r-sm); background: var(--danger-light); color: var(--danger-dark);
-  font-size: 14px; line-height: 1.45;
+  font-size: var(--fs-md); line-height: 1.45;
 }
 /* Publicerad: samma gröna kvitto som resten av appen ger för ett avslutat steg. */
 .tradera-done h3 { color: var(--green-dark); }
@@ -1378,17 +1402,17 @@ body {
   display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
   background: var(--surface); border: none; border-radius: var(--r-lg);
   padding: 12px 14px 12px 12px; box-shadow: var(--shadow-card); cursor: pointer; font-family: inherit;
-  transition: background 120ms var(--ease-ui);
+  transition: background var(--t-fast) var(--ease-ui);
 }
 .candidate:active { background: var(--surface-pressed); }
 .candidate:focus-visible { outline: none; box-shadow: var(--focus); }
 .candidate-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .candidate-name { flex: 1; font-size: 18px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
-.candidate-variant { font-size: 15px; color: var(--ink-soft); }
+.candidate-variant { font-size: var(--fs-base); color: var(--ink-soft); }
 /* Det som skiljer kandidaterna åt får mest visuell vikt efter namnet — det är det man väljer PÅ. */
-.candidate-detail { font-size: 14px; line-height: 1.4; color: var(--muted); margin-top: 2px; }
+.candidate-detail { font-size: var(--fs-md); line-height: 1.4; color: var(--muted); margin-top: 2px; }
 .candidate-confidence {
-  align-self: flex-start; margin-top: 8px; font-size: 11.5px; font-weight: 700;
+  align-self: flex-start; margin-top: 8px; font-size: var(--fs-2xs); font-weight: 700;
   border-radius: 999px; padding: 4px 10px;
 }
 .candidate-confidence-strong { background: var(--green-light); color: var(--green-dark); }
@@ -1426,7 +1450,7 @@ body {
 .flow-step-done { background: var(--accent); }
 .flow-steps-label {
   display: flex; align-items: baseline; gap: 8px; margin: 0;
-  color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  color: var(--muted); font-size: var(--fs-xs); font-weight: 600; letter-spacing: 0.06em;
   text-transform: uppercase;
 }
 /* Steget man står på sägs i accentfärg — siffran talar om hur långt, namnet om vad. */
@@ -1440,7 +1464,7 @@ body {
 
 .identify-fallback-note {
   margin: 0; padding: 11px 14px; border-radius: var(--r);
-  background: var(--amber-light); color: var(--amber-ink); font-size: 13.5px; line-height: 1.4;
+  background: var(--amber-light); color: var(--amber-ink); font-size: var(--fs-sm); line-height: 1.4;
 }
 .identify-fallback-floating {
   max-width: 480px; margin: 16px auto -8px; position: relative; z-index: 1;
@@ -1511,9 +1535,9 @@ body {
 }
 .brand-search input {
   width: 100%; border: none; border-radius: 13px; height: 46px;
-  padding: 0 38px; font-size: 16px; font-family: inherit;
+  padding: 0 38px; font-size: var(--fs-field); font-family: inherit;
   background: rgba(42, 27, 18, 0.055); color: var(--brand-ink);
-  transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+  transition: background var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
 }
 .brand-search input::placeholder { color: var(--muted-soft); }
 .brand-search input:focus { outline: none; background: #fff; box-shadow: var(--focus); }
@@ -1542,7 +1566,7 @@ body {
   flex-shrink: 0; width: 100%; min-height: 62px; padding: 0 16px 0 18px;
   border: none; border-radius: 16px; cursor: pointer; text-align: left;
   font-family: inherit; box-shadow: 0 1px 2px rgba(42, 27, 18, 0.05);
-  transition: transform 120ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+  transition: transform var(--t-fast) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
 }
 .brand-tile:active { transform: scale(0.99); }
 .brand-tile:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -1553,8 +1577,8 @@ body {
 
 /* Fyra typografiska hållningar, alla ur systemstacken — en lista på 204 märken får inte dra in
    204 webbfonter, och det som skiljer dem åt i en lista är vikt, spärr och form, inte teckensnittet. */
-.brand-font-wide .brand-tile-name { font-size: 21px; font-weight: 800; letter-spacing: 0.02em; }
-.brand-font-grotesk .brand-tile-name { font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.brand-font-wide .brand-tile-name { font-size: var(--fs-title); font-weight: 800; letter-spacing: 0.02em; }
+.brand-font-grotesk .brand-tile-name { font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
 .brand-font-compact .brand-tile-name { font-size: 18px; font-weight: 600; letter-spacing: 0.01em; text-transform: uppercase; }
 .brand-font-serif .brand-tile-name {
   font-family: Georgia, "Iowan Old Style", "Times New Roman", serif;
@@ -1563,7 +1587,7 @@ body {
 
 /* ---- måttsegmentet ---- */
 .dim-block { padding-bottom: 14px; }
-.dim-question { margin: -4px 0 12px; font-size: 15px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em; }
+.dim-question { margin: -4px 0 12px; font-size: var(--fs-base); font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em; }
 /* Måttfiguren är truth-cardets rendering, i måttstegets egen ram: samma ljusa yta som kortets
    scen, utan egen skugga — den ligger redan på ett kort. */
 .dim-render {
@@ -1574,8 +1598,8 @@ body {
 .dim-list { margin: 14px 0 0; display: flex; flex-direction: column; }
 .dim-row { display: flex; justify-content: space-between; align-items: baseline; padding: 9px 0; }
 .dim-row + .dim-row { border-top: 1px solid var(--hairline); }
-.dim-row dt { font-size: 14px; color: var(--brand-muted); }
-.dim-row dd { margin: 0; font-size: 16px; font-weight: 700; color: var(--brand-ink-strong); font-variant-numeric: tabular-nums; }
+.dim-row dt { font-size: var(--fs-md); color: var(--brand-muted); }
+.dim-row dd { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--brand-ink-strong); font-variant-numeric: tabular-nums; }
 
 
 /* ==========================================================================
@@ -1599,7 +1623,7 @@ body {
   position: absolute; top: 12px; left: 12px; z-index: 1;
   display: inline-flex; align-items: center; gap: 9px;
   background: var(--surface); border-radius: 999px; padding: 5px 15px 5px 5px;
-  font-size: 13.5px; font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
+  font-size: var(--fs-sm); font-weight: 600; letter-spacing: -0.01em; color: var(--ink);
   box-shadow: var(--shadow-card);
 }
 /* Produktbilden bär sin EGEN vita bakgrund, så ytan under den måste vara vit och inte scenens
@@ -1612,7 +1636,7 @@ body {
   object-fit: contain; padding: 20px 20px 16px;
 }
 .listing-cover-note {
-  margin: 0; padding: 0 4px; font-size: 12px; color: var(--muted-soft);
+  margin: 0; padding: 0 4px; font-size: var(--fs-xs); color: var(--muted-soft);
 }
 .listing-cover-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
 /* Renderingen när produktbilden tagit omslaget: samma ljusa yta som scenen, men inne i
@@ -1631,7 +1655,7 @@ body {
    möbeln själv. Nedre vänstra hörnet är tomt i alla arketyper. */
 .render-hint {
   position: absolute; left: 16px; bottom: 12px; pointer-events: none;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--muted-soft);
 }
 
@@ -1639,7 +1663,7 @@ body {
    luften ovanför. Vita konturen bakom texten gör att den läser även över möbeln. */
 .render-dims line { stroke: hsl(34 18% 7% / 0.35); stroke-width: 1.2; }
 .render-dims text {
-  font-size: 15px; font-weight: 600; letter-spacing: -0.01em; fill: var(--ink-soft);
+  font-size: var(--fs-base); font-weight: 600; letter-spacing: -0.01em; fill: var(--ink-soft);
   text-anchor: middle; paint-order: stroke; stroke: var(--field); stroke-width: 5px; stroke-linejoin: round;
 }
 /* Streckat = måttet stod inte i underlaget. En gissning ska inte ritas med samma penna. */
@@ -1649,9 +1673,9 @@ body {
 .render-pin { cursor: pointer; }
 .render-pin-stem { stroke: hsl(34 18% 7% / 0.5); stroke-width: 1.2; }
 .render-pin-foot { fill: hsl(34 18% 7% / 0.55); }
-.render-pin-dot { fill: var(--accent); stroke: #fff; stroke-width: 2.5; transition: r 140ms var(--ease-ui); }
+.render-pin-dot { fill: var(--accent); stroke: #fff; stroke-width: 2.5; transition: r var(--t) var(--ease-ui); }
 .render-pin-number {
-  fill: #fff; font-size: 14px; font-weight: 700; text-anchor: middle; dominant-baseline: central;
+  fill: #fff; font-size: var(--fs-md); font-weight: 700; text-anchor: middle; dominant-baseline: central;
   pointer-events: none;
 }
 /* Nålar på baksidan tonas ned i stället för att döljas — en skada som försvinner när man
@@ -1661,12 +1685,12 @@ body {
 
 /* ---- rubriken ---- */
 .listing-head { display: flex; flex-direction: column; gap: 3px; padding: 6px 2px 0; }
-.listing-brand { font-size: 13px; color: var(--muted); }
+.listing-brand { font-size: var(--fs-sm); color: var(--muted); }
 .listing-name {
   margin: 0; font-size: 30px; font-weight: 700; line-height: 1.05;
   letter-spacing: -0.03em; color: var(--ink); text-transform: uppercase;
 }
-.listing-variant { margin: 2px 0 0; font-size: 15px; color: var(--muted); }
+.listing-variant { margin: 2px 0 0; font-size: var(--fs-base); color: var(--muted); }
 
 /* ---- priset ---- */
 .listing-price { display: flex; flex-direction: column; gap: 5px; padding: 0 2px; }
@@ -1675,9 +1699,9 @@ body {
   font-size: 34px; font-weight: 700; letter-spacing: -0.035em; color: var(--ink);
   font-variant-numeric: tabular-nums; line-height: 1.05;
 }
-.listing-price-was { font-size: 17px; color: var(--muted-soft); text-decoration: line-through; }
-.listing-price-off { font-size: 15px; font-weight: 700; color: var(--accent); }
-.listing-price-note { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--muted); }
+.listing-price-was { font-size: var(--fs-lg); color: var(--muted-soft); text-decoration: line-through; }
+.listing-price-off { font-size: var(--fs-base); font-weight: 700; color: var(--accent); }
+.listing-price-note { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
 
 /* ---- korten ---- */
 .listing-block {
@@ -1685,7 +1709,7 @@ body {
   padding: 16px 18px; box-shadow: var(--shadow-card);
 }
 .listing-block h3 {
-  margin: 0 0 12px; font-size: 11px; font-weight: 600; letter-spacing: 0.08em;
+  margin: 0 0 12px; font-size: var(--fs-2xs); font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
 }
 
@@ -1696,10 +1720,10 @@ body {
 .listing-spec { padding: 11px 0; border-top: 1px solid var(--hairline); min-width: 0; }
 .listing-spec:first-child, .listing-spec:nth-child(2) { border-top: none; padding-top: 0; }
 .listing-spec dt {
-  margin-bottom: 3px; font-size: 10.5px; font-weight: 700; letter-spacing: 0.08em;
+  margin-bottom: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
 }
-.listing-spec dd { margin: 0; font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.listing-spec dd { margin: 0; font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
 
 /* ---- skickrapporten, numrerad som punkterna i bilden ---- */
 .listing-condition-head { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; }
@@ -1710,25 +1734,25 @@ body {
   background: none; border: none; font-family: inherit; cursor: pointer;
   padding: 12px 8px; margin: 0 -8px; border-radius: var(--r-sm);
   border-top: 1px solid var(--hairline);
-  transition: background 140ms var(--ease-ui);
+  transition: background var(--t) var(--ease-ui);
 }
 .pin-list li:first-child .pin-row { border-top: none; }
 .pin-row-active { background: var(--accent-light); }
 .pin-row:focus-visible { outline: none; box-shadow: var(--focus); }
 .pin-num {
   flex-shrink: 0; width: 24px; height: 24px; border-radius: 999px; margin-top: 1px;
-  background: var(--accent); color: #fff; font-size: 13px; font-weight: 700;
+  background: var(--accent); color: #fff; font-size: var(--fs-sm); font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
 }
 /* Grå nål = skadan kunde inte placeras på en del, så den står bara i listan. */
 .pin-num-unplaced { background: var(--muted-soft); }
 .pin-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
-.pin-title { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
+.pin-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
 .pin-part { margin-left: 7px; font-weight: 500; color: var(--muted); }
-.pin-desc { font-size: 14px; line-height: 1.45; color: var(--ink-soft); }
-.listing-pin-note { margin: 12px 0 0; font-size: 12px; color: var(--muted-soft); }
+.pin-desc { font-size: var(--fs-md); line-height: 1.45; color: var(--ink-soft); }
+.listing-pin-note { margin: 12px 0 0; font-size: var(--fs-xs); color: var(--muted-soft); }
 
-.listing-title-line { font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.listing-title-line { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
 .listing-provenance { display: flex; flex-direction: column; gap: 10px; }
 .listing-provenance .truth-confidence { margin-top: 0; }
 .listing-provenance .truth-caveat { margin: 0; }
@@ -1746,11 +1770,11 @@ body {
   position: relative; display: inline-flex; align-items: center; justify-content: center;
   width: var(--tap); height: var(--tap); margin: -4px; padding: 0;
   border: none; background: none; color: var(--ink-soft); cursor: pointer;
-  transition: opacity 140ms var(--ease-ui);
+  transition: opacity var(--t) var(--ease-ui);
 }
 .app-bar-icon::before {
   content: ""; position: absolute; width: 36px; height: 36px; border-radius: 999px;
-  background: var(--surface-sunk); transition: background 140ms var(--ease-ui);
+  background: var(--surface-sunk); transition: background var(--t) var(--ease-ui);
 }
 .app-bar-icon svg { position: relative; }
 .app-bar-icon:active { opacity: 0.6; }
@@ -1759,19 +1783,19 @@ body {
 .loopa-id-block { display: flex; flex-direction: column; gap: 10px; }
 .loopa-id-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .loopa-id-value {
-  font-size: 22px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink);
+  font-size: var(--fs-title); font-weight: 700; letter-spacing: 0.06em; color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 .loopa-id-copy {
   display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
   border: none; border-radius: 999px; padding: 8px 14px; min-height: var(--tap); cursor: pointer;
   background: var(--field); color: var(--ink-soft);
-  font-family: inherit; font-size: 14px; font-weight: 600;
-  transition: opacity 140ms var(--ease-ui);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 600;
+  transition: opacity var(--t) var(--ease-ui);
 }
 .loopa-id-copy:active { opacity: 0.6; }
 .loopa-id-copy:focus-visible { outline: none; box-shadow: var(--focus); }
-.loopa-id-link { align-self: flex-start; font-size: 14px; font-weight: 600; color: var(--accent); }
+.loopa-id-link { align-self: flex-start; font-size: var(--fs-md); font-weight: 600; color: var(--accent); }
 
 .public-card-screen { display: flex; flex-direction: column; gap: 14px; }
 .public-card-head { display: flex; flex-direction: column; gap: 8px; }
@@ -1784,7 +1808,7 @@ body {
 .public-card-submit { margin-top: 2px; }
 .public-card-error {
   margin: 0; padding: 12px 14px; border-radius: var(--r-sm);
-  background: var(--amber-light); color: var(--amber-ink); font-size: 14px;
+  background: var(--amber-light); color: var(--amber-ink); font-size: var(--fs-md);
 }
 .public-card-meta {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
@@ -1793,14 +1817,14 @@ body {
 .public-card-tradera { margin-top: 4px; }
 .public-card-cta {
   margin-top: 8px; padding-top: 16px; border-top: 1px solid var(--hairline);
-  font-size: 15px; font-weight: 600; color: var(--accent);
+  font-size: var(--fs-base); font-weight: 600; color: var(--accent);
 }
 
 /* ---- chatten på truth-cardet ---- */
 /* Ett block bland de andra, med samma yta och skugga. Chatten är en del av kortet och ska se ut som
    det — en flytande bubbla i hörnet hade tillhört sajten, inte möbeln. */
 .card-chat { display: flex; flex-direction: column; gap: 12px; }
-.card-chat-intro { margin: 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.card-chat-intro { margin: 0; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
 
 /* Strömmen har eget tak och egen rullning: kortet under chatten ska inte tryckas iväg av ett långt
    samtal, och den som scrollar tillbaka upp i kortet ska hitta det där det stod. */
@@ -1813,7 +1837,7 @@ body {
 .card-chat-turn-assistant { align-self: flex-start; }
 .card-chat-bubble {
   border-radius: var(--r); padding: 10px 13px;
-  font-size: 14.5px; line-height: 1.5;
+  font-size: var(--fs-md); line-height: 1.5;
   white-space: pre-wrap; overflow-wrap: anywhere;
 }
 .card-chat-turn-user .card-chat-bubble {
@@ -1824,7 +1848,7 @@ body {
 }
 /* Ett fel är vårt, inte botens. Gult och inte grått, så det inte läses som ett svar på frågan. */
 .card-chat-bubble-failed { background: var(--amber-light); color: var(--amber-ink); }
-.card-chat-note { margin: 0 2px; font-size: 12px; line-height: 1.4; color: var(--muted-soft); }
+.card-chat-note { margin: 0 2px; font-size: var(--fs-xs); line-height: 1.4; color: var(--muted-soft); }
 
 .card-chat-typing { display: inline-flex; align-items: center; gap: 4px; padding: 14px 13px; }
 .card-chat-typing span {
@@ -1842,8 +1866,8 @@ body {
 .card-chat-suggestion {
   border: 1px solid var(--border); border-radius: 999px; padding: 8px 13px; min-height: var(--tap);
   background: var(--surface); color: var(--ink-soft);
-  font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
-  transition: background 140ms var(--ease-ui);
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  transition: background var(--t) var(--ease-ui);
 }
 .card-chat-suggestion:active { background: var(--field); }
 .card-chat-suggestion:disabled { opacity: 0.5; cursor: default; }
@@ -1853,7 +1877,7 @@ body {
   display: flex; align-items: center; gap: 8px;
   border: 1px solid var(--border); border-radius: 999px; background: var(--field);
   padding: 3px 3px 3px 15px;
-  transition: box-shadow 160ms var(--ease-ui), background 160ms var(--ease-ui);
+  transition: box-shadow var(--t) var(--ease-ui), background var(--t) var(--ease-ui);
 }
 .card-chat-form:focus-within { background: #fff; box-shadow: var(--focus); }
 .card-chat-form-icon { display: inline-flex; flex-shrink: 0; color: var(--muted-soft); }
@@ -1862,14 +1886,14 @@ body {
   border: none; background: none; outline: none;
   /* 16px och inte mindre: under det zoomar iOS in hela sidan när fältet får fokus, och kortet
      hoppar ur ram mitt i en fråga. */
-  font-family: inherit; font-size: 16px; color: var(--ink);
+  font-family: inherit; font-size: var(--fs-field); color: var(--ink);
 }
 .card-chat-form input::placeholder { color: var(--muted-soft); }
 .card-chat-send {
   flex-shrink: 0; width: var(--tap); height: var(--tap); border: none; border-radius: 50%;
   display: inline-flex; align-items: center; justify-content: center;
   background: var(--accent); color: #fff; cursor: pointer;
-  transition: opacity 140ms var(--ease-ui);
+  transition: opacity var(--t) var(--ease-ui);
 }
 .card-chat-send:active { opacity: 0.7; }
 .card-chat-send:disabled { opacity: 0.35; cursor: default; }
@@ -1882,16 +1906,16 @@ body {
 .admin-badge {
   display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px;
   background: var(--accent-light); color: var(--accent);
-  font-size: 11px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
 }
-.admin-lede { margin: -4px 0 0; font-size: 14px; color: var(--muted); }
+.admin-lede { margin: -4px 0 0; font-size: var(--fs-md); color: var(--muted); }
 .admin-note {
   margin: 0; padding: 10px 12px; border-radius: var(--r-sm);
-  background: var(--field); color: var(--muted); font-size: 13px; line-height: 1.45;
+  background: var(--field); color: var(--muted); font-size: var(--fs-sm); line-height: 1.45;
 }
 .admin-search {
   width: 100%; padding: 11px 14px; border: 1px solid var(--border); border-radius: var(--r-sm);
-  background: var(--surface); color: var(--ink); font-family: inherit; font-size: 15px;
+  background: var(--surface); color: var(--ink); font-family: inherit; font-size: var(--fs-base);
 }
 .admin-search::placeholder { color: var(--muted-soft); }
 .admin-search:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
@@ -1901,7 +1925,7 @@ body {
   width: 52px; height: 52px; border-radius: 999px; flex-shrink: 0; overflow: hidden;
   display: flex; align-items: center; justify-content: center;
   background: var(--accent-light); color: var(--accent);
-  font-size: 16px; font-weight: 700; letter-spacing: 0.01em;
+  font-size: var(--fs-lg); font-weight: 700; letter-spacing: 0.01em;
 }
 .admin-avatar img, .admin-avatar-img { width: 100%; height: 100%; object-fit: cover; border-radius: 999px; }
 .admin-tag {
@@ -1918,15 +1942,15 @@ body {
   padding: 10px 12px; border-radius: var(--r-sm);
   background: var(--field);
 }
-.admin-stub-title { font-size: 14px; font-weight: 600; color: var(--muted); }
-.admin-stub-meta { font-size: 12px; color: var(--muted-soft); }
+.admin-stub-title { font-size: var(--fs-md); font-weight: 600; color: var(--muted); }
+.admin-stub-meta { font-size: var(--fs-xs); color: var(--muted-soft); }
 
 /* En dämpad knapp: adminpanelen är en genväg för en handfull konton, inte profilens huvudhandling. */
 .profile-admin-link {
   margin-top: 8px; width: 100%;
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;
   background: var(--surface); color: var(--ink); border: 1px solid var(--border);
-  font-size: 15px;
+  font-size: var(--fs-base);
 }
 .profile-admin-link:active { opacity: 0.7; }
 
@@ -2030,8 +2054,8 @@ body {
 /* Knappen lyfter en aning och lägger en färgad skugga under sig. Ett tryck på en
    telefon svarar med opacitet för att fingret ändå täcker knappen; en mus gör det inte. */
 [data-view="desktop"] .btn {
-  transition: opacity 120ms var(--ease-ui), background 140ms var(--ease-ui),
-    color 140ms var(--ease-ui), transform 160ms var(--ease-spring), box-shadow 200ms var(--ease-ui);
+  transition: opacity var(--t-fast) var(--ease-ui), background var(--t) var(--ease-ui),
+    color var(--t) var(--ease-ui), transform var(--t) var(--ease-spring), box-shadow var(--t-slow) var(--ease-ui);
 }
 [data-view="desktop"] .btn-primary:not(:disabled):hover {
   background: var(--accent-dark);
@@ -2042,7 +2066,7 @@ body {
 [data-view="desktop"] .btn-green:not(:disabled):hover { background: var(--green-dark); }
 [data-view="desktop"] .profile-admin-link:hover { background: var(--field); }
 [data-view="desktop"] .next-step:not(:disabled):hover .next-step-meta { transform: translateX(2px); }
-[data-view="desktop"] .next-step-meta { transition: transform 200ms var(--ease-spring); }
+[data-view="desktop"] .next-step-meta { transition: transform var(--t-slow) var(--ease-spring); }
 
 /* Korten lyfter i stället för att byta bottenfärg. En vit yta som blir beige läser som
    markerad; en som lyfter läser som gripbar — och det är vad de är, allihop är knappar. */
@@ -2050,7 +2074,7 @@ body {
 [data-view="desktop"] .saved-item,
 [data-view="desktop"] .candidate,
 [data-view="desktop"] .choose-card {
-  transition: transform 180ms var(--ease-spring), box-shadow 220ms var(--ease-ui), background 140ms var(--ease-ui);
+  transition: transform var(--t-slow) var(--ease-spring), box-shadow var(--t-slow) var(--ease-ui), background var(--t) var(--ease-ui);
 }
 [data-view="desktop"] .card-row:hover,
 [data-view="desktop"] .candidate:hover,
@@ -2059,10 +2083,10 @@ body {
 [data-view="desktop"] .card-row:hover .card-row-chevron,
 [data-view="desktop"] .candidate:hover .candidate-chevron { color: var(--accent); }
 [data-view="desktop"] .card-row-chevron, [data-view="desktop"] .candidate-chevron {
-  transition: color 160ms var(--ease-ui);
+  transition: color var(--t) var(--ease-ui);
 }
 [data-view="desktop"] .collapsible-header:hover .collapsible-title { color: var(--accent); }
-[data-view="desktop"] .collapsible-title { transition: color 160ms var(--ease-ui); }
+[data-view="desktop"] .collapsible-title { transition: color var(--t) var(--ease-ui); }
 
 /* ==========================================================================
    Startsidan — rutnät i stället för rulle
@@ -2092,7 +2116,7 @@ body {
    304 px vänsterspalt spiller ut ur den — clamp ger samma rubrik en storlek den ryms i. */
 [data-view="desktop"] .home-title { font-size: clamp(38px, 3.6vw, 54px); letter-spacing: -0.042em; }
 [data-view="desktop"] .home-lede { font-size: 18px; max-width: 32ch; margin-top: 16px; }
-[data-view="desktop"] .brand-pill { font-size: 12px; letter-spacing: 0.08em; }
+[data-view="desktop"] .brand-pill { font-size: var(--fs-xs); letter-spacing: 0.08em; }
 /* Pricken andas. Det är sidans enda ofrivilliga rörelse och den enda plats där en
    sådan hör hemma — den säger att här finns en maskin som arbetar. */
 [data-view="desktop"] .brand-dot { animation: brand-dot-pulse 2.8s var(--ease-ui) infinite; }
@@ -2109,14 +2133,14 @@ body {
 }
 [data-view="desktop"] .home-steps li {
   display: flex; align-items: center; gap: 12px;
-  font-size: 15px; font-weight: 500; color: var(--ink-soft); letter-spacing: -0.01em;
+  font-size: var(--fs-base); font-weight: 500; color: var(--ink-soft); letter-spacing: -0.01em;
 }
 [data-view="desktop"] .home-steps li::before {
   counter-increment: hstep; content: counter(hstep);
   flex: 0 0 26px; height: 26px; border-radius: 999px;
   background: var(--accent-light); color: var(--accent-ink);
   display: grid; place-items: center;
-  font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;
+  font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
 }
 
 /* ---- märkesmosaiken ----
@@ -2134,17 +2158,17 @@ body {
 }
 [data-view="desktop"] .brand-tile {
   min-height: 78px; border-radius: 18px; padding: 0 14px 0 18px;
-  transition: transform 220ms var(--ease-spring), box-shadow 240ms var(--ease-ui);
+  transition: transform var(--t-slow) var(--ease-spring), box-shadow var(--t-slow) var(--ease-ui);
 }
 [data-view="desktop"] .brand-tile:hover {
   transform: translateY(-3px);
   box-shadow: 0 16px 30px -16px rgba(42, 27, 18, 0.45);
 }
 [data-view="desktop"] .brand-tile:active { transform: translateY(-1px) scale(0.99); }
-[data-view="desktop"] .brand-tile-go { transition: transform 220ms var(--ease-spring), opacity 160ms var(--ease-ui); }
+[data-view="desktop"] .brand-tile-go { transition: transform var(--t-slow) var(--ease-spring), opacity var(--t) var(--ease-ui); }
 [data-view="desktop"] .brand-tile:hover .brand-tile-go { opacity: 1; transform: translateX(4px); }
 [data-view="desktop"] .brand-tile-custom:hover { border-style: solid; border-color: var(--accent); }
-[data-view="desktop"] .brand-search input { height: 50px; font-size: 16px; }
+[data-view="desktop"] .brand-search input { height: 50px; font-size: var(--fs-field); }
 [data-view="desktop"] .brand-search input:hover { background: rgba(42, 27, 18, 0.08); }
 [data-view="desktop"] .brand-search input:focus:hover { background: #fff; }
 
@@ -2201,7 +2225,7 @@ body {
   padding: 12px 12px 16px; text-align: center;
 }
 [data-view="desktop"] .candidate-photo { width: 100%; height: auto; aspect-ratio: 4 / 3; }
-[data-view="desktop"] .candidate-name { flex: 0 0 auto; margin-top: 12px; font-size: 17px; }
+[data-view="desktop"] .candidate-name { flex: 0 0 auto; margin-top: 12px; font-size: var(--fs-lg); }
 [data-view="desktop"] .candidate-chevron { display: none; }
 [data-view="desktop"] .manual-model { max-width: 460px; align-self: center; width: 100%; }
 [data-view="desktop"] .identify-fallback-floating { max-width: 860px; }
@@ -2227,11 +2251,10 @@ body {
   border-top: 1px solid var(--hairline);
 }
 [data-view="desktop"] .truth-block { padding: 20px 22px; }
-[data-view="desktop"] .specs-head .price-identity { font-size: 26px; }
 /* Mätaren följer inte skärmens bredd. Fyra segment utsträckta över en meter läser
    som en avdelare, inte som en räkning. */
 [data-view="desktop"] .flow-steps { max-width: 420px; }
-[data-view="desktop"] .flow-steps-label { font-size: 12.5px; }
+[data-view="desktop"] .flow-steps-label { font-size: var(--fs-xs); }
 
 /* ==========================================================================
    Prisförslaget — beskedet till vänster, reglagen till höger
@@ -2256,7 +2279,7 @@ body {
 [data-view="desktop"] .price-screen > .form-hint { grid-column: 1; grid-row: 4; }
 [data-view="desktop"] .price-big-card { padding: 32px 26px 26px; }
 [data-view="desktop"] .price-main-xl { font-size: 58px; letter-spacing: -0.045em; }
-[data-view="desktop"] .price-identity { font-size: 24px; }
+[data-view="desktop"] .price-identity { font-size: 26px; }
 [data-view="desktop"] .ladder-card { padding: 22px 22px 20px; }
 /* Reglagen är tumstora på telefonen. Med en mus i handen behövs inte den ytan, men
    tumman ska svara på att pekaren är över den. */
@@ -2287,10 +2310,10 @@ body {
 [data-view="desktop"] .result-screen > .collapsible-card,
 [data-view="desktop"] .result-screen > .tech-panel { grid-column: 1 / -1; }
 [data-view="desktop"] .grade-hero { padding: 32px 24px; gap: 12px; }
-[data-view="desktop"] .grade-hero-label { font-size: 25px; }
+[data-view="desktop"] .grade-hero-label { font-size: 26px; }
 [data-view="desktop"] .damage-summary-line { font-size: 20px; }
 [data-view="desktop"] .damage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px; }
-[data-view="desktop"] .damage-card { transition: box-shadow 200ms var(--ease-ui); }
+[data-view="desktop"] .damage-card { transition: box-shadow var(--t-slow) var(--ease-ui); }
 [data-view="desktop"] .damage-card:hover { box-shadow: var(--shadow-raised); }
 [data-view="desktop"] .add-damage-actions { flex-direction: row; gap: 8px; }
 [data-view="desktop"] .add-damage-actions .btn-text {
@@ -2335,7 +2358,7 @@ body {
    det de är: en avläsning, inte sidans innehåll. */
 [data-view="desktop"] .profile-stats { grid-template-columns: repeat(2, minmax(0, 210px)); gap: 12px; }
 [data-view="desktop"] .profile-stat { padding: 16px 18px; }
-[data-view="desktop"] .profile-stat-value { font-size: 27px; }
+[data-view="desktop"] .profile-stat-value { font-size: 26px; }
 [data-view="desktop"] .card-list {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 12px;
 }
@@ -2399,7 +2422,7 @@ body {
    700 px kvar när webbläsarens egen ram är borta, och det som ska vika är förklaringen —
    inte märkeslistan, som är sidans enda handling. */
 @media (max-height: 820px) {
-  [data-view="desktop"] .home-lede { font-size: 17px; margin-top: 12px; }
+  [data-view="desktop"] .home-lede { font-size: var(--fs-lg); margin-top: 12px; }
   [data-view="desktop"] .home-steps { margin-top: 18px; gap: 10px; }
 }
 @media (max-height: 700px) {
