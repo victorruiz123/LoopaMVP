@@ -121,9 +121,12 @@ export default function EvidenceViewer({
       {damage.evidence.length > 1 && (
         <div className="evidence-dots">
           {damage.evidence.map((_, i) => (
-            <span
+            <button
               key={i}
+              type="button"
               className={`evidence-dot ${i === index ? "active" : ""}`}
+              aria-label={`Bild ${i + 1} av ${damage.evidence.length}`}
+              aria-current={i === index}
               onClick={() => {
                 setIndex(i);
                 setZoomIdx(0);
