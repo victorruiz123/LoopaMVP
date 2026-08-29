@@ -4,16 +4,20 @@ import type { FurnitureIdentity, JobSummary } from "../types";
 import GradeBadge from "../components/GradeBadge";
 import BrandSheet from "../components/BrandSheet";
 import BrandAvatar from "../components/BrandAvatar";
-import { ChevronRight } from "../components/icons";
+import { ChevronRight, UserIcon } from "../components/icons";
+import { useAuth } from "../auth/AuthProvider";
 import { formatPriceRange } from "../lib/price";
 
 export default function HomeScreen({
   onStartScan,
   onOpenJob,
+  onOpenProfile,
 }: {
   onStartScan: (identity: FurnitureIdentity) => void;
   onOpenJob: (jobId: string) => void;
+  onOpenProfile: () => void;
 }) {
+  const { profile, user } = useAuth();
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [brand, setBrand] = useState("");
   // Collapsed by default: the saved list used to render ABOVE the scan card, so once a few furniture
@@ -42,6 +46,16 @@ export default function HomeScreen({
 
   return (
     <div className="screen screen-light home">
+      {/* Loopa-ordmärket i vänsterkant, profilen i höger — samma placering som i Vips egna app,
+          så samma gest hittar rätt på båda hållen. */}
+      <div className="app-bar">
+        <span className="app-wordmark">Loopa</span>
+        <button className="app-bar-profile" onClick={onOpenProfile} aria-label="Din profil">
+          <UserIcon size={17} />
+          <span className="app-bar-profile-name">{shortName(profile?.full_name ?? profile?.username, user?.email)}</span>
+        </button>
+      </div>
+
       <header className="home-header">
         <span className="brand-pill">
           <span className="brand-dot" /> SKICK &amp; PRIS
@@ -52,8 +66,8 @@ export default function HomeScreen({
           <span className="accent">säljer du?</span>
         </h1>
         <p className="home-lede">
-          Märket först — sedan filmar du ett varv runt möbeln. Vi föreslår modellen, du väljer, och
-          får specifikationer, pris och skick.
+          Välj märke och filma ett varv runt möbeln. Du får modellen, specifikationerna, priset och
+          skicket.
         </p>
       </header>
 
@@ -89,8 +103,8 @@ export default function HomeScreen({
         </button>
         <p className="form-hint">
           {canStart
-            ? "Vi föreslår upp till fyra modeller av märket när bilderna är inne."
-            : "Märket behövs för att kunna hitta modellen."}
+            ? "Du får upp till fyra modellförslag när bilderna är inne."
+            : "Märket behövs för att hitta modellen."}
         </p>
       </div>
 
@@ -107,7 +121,7 @@ export default function HomeScreen({
       {finished.length > 0 && (
         <section className="collapsible-card">
           <button className="collapsible-header" onClick={() => setHistoryOpen((v) => !v)}>
-            <span className="collapsible-title">Sparade möbler</span>
+            <span className="collapsible-title">Sparade truth-cards</span>
             <span className="collapsible-meta">
               {finished.length} st
               <span className={`collapsible-chevron ${historyOpen ? "collapsible-chevron-open" : ""}`}>
@@ -140,6 +154,12 @@ export default function HomeScreen({
       )}
     </div>
   );
+}
+
+/** Förnamnet räcker i topplisten; hela adressen gör knappen bredare än rubriken under den. */
+function shortName(name: string | null | undefined, email: string | null | undefined): string {
+  const source = name || email?.split("@")[0] || "Profil";
+  return source.split(/\s+/)[0];
 }
 
 function describe(job: JobSummary): string {

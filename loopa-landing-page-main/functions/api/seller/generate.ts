@@ -195,7 +195,15 @@ const STRUCTURE_RESERVE_MS = 8_000
 const STRUCTURE_RETRY_BUDGET_MS = 5_000
 
 /** Grounded latency scales steeply with image payload (measured: 2 img 3.6s → 5 img 8.0s). Identification rarely needs more than the frontal plus a couple of angles; the seller's full-quality photos are untouched. */
-const RESEARCH_IMAGE_CAP = 3
+/**
+ * Env-styrbart sedan Loopa Condition började anropa handlern.
+ *
+ * Standardvärdet 3 är deras latenstuning: grundad sökning skalar brant med bildantal, och på loopa.nu
+ * ÄR sökningen kritiska vägen. Hos oss löper identifieringen parallellt med skickbedömningen och har
+ * råd med fler bilder — och de behövs: bildrutorna kommer i filmningsordning, så de tre första är tre
+ * närbilder från samma ögonblick av varvet. Att bara se dem är att bedöma en möbel på ett armstöd.
+ */
+const RESEARCH_IMAGE_CAP = envMs('SELLER_RESEARCH_IMAGE_CAP', 3)
 /** No search cost on the structuring call, so it sees more of the photos for a better condition read. */
 const STRUCTURE_IMAGE_CAP = 6
 /** Retry trades photo coverage for speed. */
@@ -264,9 +272,12 @@ Ingen kategori och ingen modell är angiven. Avgör själv från bilderna vad de
 
 DEL 1 — KANDIDATER (snabbt):
 Avgör vilka VERKLIGA produkter/modeller från varumärket bilderna troligen visar. Sök på varumärket + det du ser i bilderna. Fastna ALDRIG i att välja mellan snarlika modeller — är flera rimliga listar du dem och går vidare; säljaren väljer sedan själv.
-Skriv varje kandidat EXAKT så här, en per rad (max 4):
-KANDIDAT: märke | modellnamn | variant eller - | produkttyp | STARK eller TROLIG eller MÖJLIG | kort synlig detalj som skiljer den från de andra
-Regler: endast verkliga modellnamn du sett i sökresultaten eller säkert vet existerar. Hitta ALDRIG på ett modellnamn, och fyll aldrig ut listan för sakens skull — en trovärdig kandidat är bättre än fyra påhittade. Om ingen trovärdig kandidat finns, skriv exakt: KANDIDAT: INGEN
+Skriv varje kandidat EXAKT så här, en per rad (sikta på 3-4, max 4):
+KANDIDAT: märke | modellnamn | variant eller - | produkttyp | STARK eller TROLIG eller MÖJLIG | kort synlig detalj som skiljer den från de andra | produktsidans URL
+Lämna ALLTID exakt 4 kandidater, ordnade efter hur väl de stämmer med bilderna — starkast först.
+De platser som blir över när färre än fyra verkligen stämmer fyller du med varumärkets modeller i samma produktkategori som LIKNAR den på bilderna mest, märkta MÖJLIG. Säljaren ser sin egen möbel och avfärdar en felaktig kandidat på en sekund, men kan aldrig välja en modell du inte visade.
+Sista fältet är URL:en till den produktsida där du såg JUST den modellen — en enda adress, ordagrant ur sökresultatet, ingen text runt den. Har du ingen sida för modellen skriver du -. Lägg ALDRIG källan i detaljfältet i stället; detaljfältet är bara den synliga skillnaden.
+Regler: endast verkliga modellnamn du sett i sökresultaten eller säkert vet finns i varumärkets sortiment — hitta ALDRIG på ett modellnamn, och ta aldrig med en modell ur en annan produktkategori bara för att fylla en plats. Hittar du inte fyra verkliga modeller lämnar du färre. Finns ingen trovärdig kandidat alls, skriv exakt: KANDIDAT: INGEN
 
 DEL 2 — SPECIFIKATIONER (viktigast):
 Ditt huvudjobb är att hitta produktens VERKLIGA specifikationer online — identifieringen är bara porten dit. Utgå från din främsta kandidat och sök t.ex. "[märke] [modell] mått", "[märke] [modell] material", "[märke] [modell] pris".
@@ -945,6 +956,9 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
             ok: true,
             kind: 'needs_selection',
             candidates,
+            // Källorna följer med: anroparen kan slå upp hur varje kandidat SER UT innan säljaren
+            // väljer. Rent additivt — inget anrop till, ingen fas ändrad, ingen latens.
+            sources: research.sources,
             timings: { researchMs, structureMs: 0, researchRetried, structureRetried: false, geminiCalls, groundedCalls, totalServerMs },
           },
           200,

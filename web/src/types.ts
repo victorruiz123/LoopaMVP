@@ -184,6 +184,17 @@ export interface ModelCandidate {
   confidence: "strong" | "likely" | "possible";
   /** Kort text som skiljer kandidaterna åt, t.ex. "hög rygg, teakstomme". */
   distinguishingDetail: string | null;
+  /**
+   * Produktbild, hämtad ur den källa den grundade sökningen pekade ut.
+   *
+   * `undefined` = letar fortfarande, `null` = ingen bild hittades. Fylls i EFTER att kandidaterna
+   * redan visats, så väljarskärmen dyker upp lika snabbt som förut och bilderna tonar in.
+   */
+  /** Produktsida modellen påstår sig ha sett. Verifieras genom hämtning, aldrig betrodd rakt av. */
+  sourceUrl?: string | null;
+  imageUrl?: string | null;
+  /** Sidan bilden kom från, så påståendet går att kontrollera. */
+  imageSource?: string | null;
 }
 
 /**
@@ -218,6 +229,12 @@ export interface ConditionResult {
   damages: Damage[];
   overallCondition: OverallCondition | null;
   images: CapturedImage[];
+  /**
+   * Vilken bild som representerar möbeln — omslag på Tradera, miniatyr på startsidan, typunderlag
+   * till prismotorn. Aldrig bara `images[0]`: bildrutorna ligger i filmningsordning och den första
+   * är ofta kameran innan den exponerat. Se pipeline/cover.ts.
+   */
+  coverImageId: string | null;
   modelUsed: string;
   tokensUsed: number;
   costUsd: number;
@@ -293,6 +310,8 @@ export interface ConditionJob {
   pendingListing?: ListingResult | null;
   /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
   tradera?: TraderaPublication | null;
+  /** Supabase-användaren som skapade jobbet. Det är den profilen truth-cardet sparas i. */
+  ownerId?: string | null;
 }
 
 export interface JobSummary {
@@ -304,6 +323,10 @@ export interface JobSummary {
   price: PriceEstimate | null;
   thumbnailImageId: string | null;
   error: string | null;
+  /** Om annonsgeneratorn hann bli klar — det är det som gör jobbet till ett truth-card. */
+  hasTruthCard: boolean;
+  /** Den genererade annonsrubriken, som den står på kortet. Bättre listrad än märke + modell. */
+  listingTitle: string | null;
 }
 
 // ---- debug trace (GET /api/jobs/:id/debug) ----

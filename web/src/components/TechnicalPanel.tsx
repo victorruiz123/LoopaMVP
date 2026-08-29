@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { ChevronRight, SlidersIcon } from "./icons";
 import { cropUrl, debugUrl, getDebugTrace, imageUrl } from "../api";
 import { IMPACT_LABELS, SEVERITY_LABELS, TYPE_LABELS } from "../lib/labels";
 import { CONFIDENCE_LABELS, DEDUCTION_SOURCE_LABELS, formatSek, variantLabel } from "../lib/price";
@@ -27,8 +28,15 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
   return (
     <section className="collapsible-card tech-panel">
       <button className="collapsible-header" onClick={() => setOpen((v) => !v)}>
-        <span>🔬 Teknisk information</span>
-        <span className="muted">{open ? "dölj ›" : "visa ›"}</span>
+        <span className="collapsible-title collapsible-title-icon">
+          <SlidersIcon size={17} />
+          Teknisk information
+        </span>
+        <span className="collapsible-meta">
+          <span className={`collapsible-chevron ${open ? "collapsible-chevron-open" : ""}`}>
+            <ChevronRight size={16} />
+          </span>
+        </span>
       </button>
 
       {!open ? null : error ? (
@@ -67,7 +75,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
                   <tr key={i}>
                     <td>{c.purpose}</td>
                     <td>{c.modelUsed}</td>
-                    <td>{c.cached ? "✓ träff" : "— nytt"}</td>
+                    <td>{c.cached ? "Cache" : "Nytt"}</td>
                     <td>{c.tokensUsed.toLocaleString("sv-SE")}</td>
                     <td>{c.cached ? "—" : `${(c.latencyMs / 1000).toFixed(1)} s`}</td>
                   </tr>

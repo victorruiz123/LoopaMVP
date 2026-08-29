@@ -1,6 +1,7 @@
 import type { ConditionResult, GeneratedListing } from "../types";
 import { formatSek } from "../lib/price";
 import GradeBadge from "../components/GradeBadge";
+import { ArrowLeftIcon } from "../components/icons";
 import TraderaPublish from "../components/TraderaPublish";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -31,7 +32,7 @@ export default function TruthCardScreen({
   return (
     <div className="screen screen-light">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        ← Tillbaka till skicket
+        <ArrowLeftIcon /> Tillbaka till skicket
       </button>
 
       {!listing || listing.status === "unavailable" ? (

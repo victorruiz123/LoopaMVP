@@ -1,4 +1,5 @@
 import { callSellerGenerate, type Resolution } from "../listing.js";
+import { resolveCandidateImages } from "../candidateImages.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { estimatePrice } from "../pricing.js";
 import type { CapturedImage, ModelCandidate } from "../types.js";
@@ -20,14 +21,58 @@ const CONDITION_WAIT_MS = 180_000;
 export async function runIdentify(jobId: string, brand: string, images: CapturedImage[]): Promise<void> {
   const dir = jobDir(jobId);
   const startedAt = Date.now();
-  const call = await callSellerGenerate(brand, images, dir);
+
+  /**
+   * Ett nytt försök när sökningen inte gav några kandidater.
+   *
+   * Felet är inte en timeout utan att modellen ibland avstår från att söka: den svarar snabbt, med
+   * `sources=0`, och utan grundad text finns inga kandidater att erbjuda — kandidater läses ENBART
+   * ur grundad text. Mätt över fyra körningar i rad gav två stycken tre kandidater vardera medan två
+   * gav noll, med samma bilder och samma märke.
+   *
+   * Vi har råd att fråga igen: identifieringen löper parallellt med skickbedömningen, som tar 20-40 s
+   * ändå. Ett andra försök kostar alltså ingenting på kritiska vägen. Ett, inte fler — svarar den
+   * likadant två gånger är det inte slumpen längre, och då ska säljaren få skriva namnet själv i
+   * stället för att vänta på ett tredje.
+   */
+  let call = await callSellerGenerate(brand, images, dir);
+  if (call.kind !== "needs_selection") {
+    console.info(`[identify] ${jobId.slice(0, 8)} inga kandidater på första försöket — försöker igen`);
+    const second = await callSellerGenerate(brand, images, dir);
+    if (second.kind === "needs_selection") call = second;
+  }
   const job = getJobSync(jobId) ?? (await getJob(jobId));
   if (!job) return;
 
   if (call.kind === "needs_selection") {
     job.identityStatus = "needs_selection";
     job.candidates = call.candidates;
-    console.info(`[identify] ${jobId.slice(0, 8)} needs_selection candidates=${call.candidates.length} ms=${Date.now() - startedAt}`);
+    console.info(
+      `[identify] ${jobId.slice(0, 8)} needs_selection candidates=${call.candidates.length}` +
+        ` sources=${call.sources.length} ms=${Date.now() - startedAt}`,
+    );
+    await persist(job);
+
+    /**
+     * Produktbilderna hämtas EFTER att kandidaterna sparats, aldrig före.
+     *
+     * Väljarskärmen ska dyka upp exakt lika snabbt som förut — bilderna är en förbättring av den, inte
+     * ett villkor för den. En kandidat vars bild aldrig landar är fortfarande fullt valbar.
+     */
+    void resolveCandidateImages(call.candidates, call.sources)
+      .then(async (withImages) => {
+        const fresh = getJobSync(jobId) ?? (await getJob(jobId));
+        if (!fresh || fresh.identityStatus !== "needs_selection") return;
+        fresh.candidates = withImages;
+        await persist(fresh);
+        const hits = withImages.filter((c) => c.imageUrl).length;
+        console.info(
+          `[identify] ${jobId.slice(0, 8)} bilder ${hits}/${withImages.length}` +
+            ` (källor: ${call.sources.map((s) => s.url.slice(0, 60)).join(", ") || "inga"})`,
+        );
+      })
+      .catch(() => {});
+    return;
   } else if (call.kind === "ok") {
     /**
      * Generatorn kom fram till ett svar utan att kunna erbjuda kandidater — i praktiken när den

@@ -6,7 +6,7 @@ import DamageCard from "../components/DamageCard";
 import EvidenceViewer from "../components/EvidenceViewer";
 import TechnicalPanel from "../components/TechnicalPanel";
 import PricePanel from "../components/PricePanel";
-import { ChevronRight } from "../components/icons";
+import { AlertIcon, CameraIcon, ChevronRight, PhotosIcon, PlusIcon } from "../components/icons";
 import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
@@ -195,11 +195,13 @@ export default function ResultScreen({
 
       {!addingDamage ? (
         <div className="add-damage-actions">
-          <button className="btn btn-text" onClick={() => addPhotoInputRef.current?.click()} disabled={addingFromPhoto}>
-            {addingFromPhoto ? "Bedömer närbilden…" : "📷 Lägg till skada med närbild"}
+          <button className="btn btn-text icon-btn" onClick={() => addPhotoInputRef.current?.click()} disabled={addingFromPhoto}>
+            <CameraIcon size={17} />
+            {addingFromPhoto ? "Bedömer närbilden…" : "Lägg till skada med närbild"}
           </button>
-          <button className="btn btn-text" onClick={() => setAddingDamage(true)}>
-            + Lägg till för hand
+          <button className="btn btn-text icon-btn" onClick={() => setAddingDamage(true)}>
+            <PlusIcon size={16} />
+            Lägg till för hand
           </button>
         </div>
       ) : (
@@ -215,8 +217,13 @@ export default function ResultScreen({
 
       {result.coverage === "NOT_SUFFICIENTLY_VISIBLE" && (
         <div className="coverage-warning">
-          ⚠️ Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
-          {result.coverageNote ? ` ${result.coverageNote}` : ""}
+          <span className="coverage-warning-mark" aria-hidden="true">
+            <AlertIcon size={17} />
+          </span>
+          <span>
+            Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
+            {result.coverageNote ? ` ${result.coverageNote}` : ""}
+          </span>
         </div>
       )}
 
@@ -232,17 +239,25 @@ export default function ResultScreen({
 
       <div className="result-footer">
         <button className="btn btn-text" onClick={onHome}>
-          Till startsidan
+          Startsidan
         </button>
         <button className="btn btn-primary" onClick={onRestart}>
-          Starta en ny skanning
+          Skanna en möbel till
         </button>
       </div>
 
       <section className="collapsible-card">
         <button className="collapsible-header" onClick={() => setImagesExpanded((v) => !v)}>
-          <span>🖼️ Tagna bilder</span>
-          <span className="muted">{result.images.length} bilder ›</span>
+          <span className="collapsible-title collapsible-title-icon">
+            <PhotosIcon size={17} />
+            Tagna bilder
+          </span>
+          <span className="collapsible-meta">
+            {result.images.length}
+            <span className={`collapsible-chevron ${imagesExpanded ? "collapsible-chevron-open" : ""}`}>
+              <ChevronRight size={16} />
+            </span>
+          </span>
         </button>
         {imagesExpanded && (
           <div className="taken-images-grid">

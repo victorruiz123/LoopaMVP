@@ -152,6 +152,17 @@ export interface ModelCandidate {
   confidence: "strong" | "likely" | "possible";
   /** Kort text som skiljer kandidaterna åt, t.ex. "hög rygg, teakstomme". */
   distinguishingDetail: string | null;
+  /**
+   * Produktbild, hämtad ur den källa den grundade sökningen pekade ut.
+   *
+   * `undefined` = letar fortfarande, `null` = ingen bild hittades. Fylls i EFTER att kandidaterna
+   * redan visats, så väljarskärmen dyker upp lika snabbt som förut och bilderna tonar in.
+   */
+  /** Produktsida modellen påstår sig ha sett. Verifieras genom hämtning, aldrig betrodd rakt av. */
+  sourceUrl?: string | null;
+  imageUrl?: string | null;
+  /** Sidan bilden kom från, så påståendet går att kontrollera. */
+  imageSource?: string | null;
 }
 
 /**
@@ -284,6 +295,12 @@ export interface ConditionResult {
   damages: Damage[];
   overallCondition: OverallCondition | null;
   images: CapturedImage[];
+  /**
+   * Vilken bild som representerar möbeln — omslag på Tradera, miniatyr på startsidan, typunderlag
+   * till prismotorn. Aldrig bara `images[0]`: bildrutorna ligger i filmningsordning och den första
+   * är ofta kameran innan den exponerat. Se pipeline/cover.ts.
+   */
+  coverImageId: string | null;
   modelUsed: string;
   tokensUsed: number;
   costUsd: number;
@@ -309,6 +326,13 @@ export interface TraderaPublication {
 export interface ConditionJob {
   id: string;
   createdAt: string;
+  /**
+   * Supabase-användaren som skapade jobbet — profilen truth-cardet sparas i.
+   *
+   * Sätts EN gång, när filmningen laddas upp, och läses bara av listningen. Pipelinen ser den aldrig.
+   * Valfri: jobb från före inloggningen saknar den, och de ska fortsätta gå att öppna.
+   */
+  ownerId?: string | null;
   progress: JobProgress;
   result: ConditionResult | null;
   error: string | null;

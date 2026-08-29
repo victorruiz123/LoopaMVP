@@ -13,6 +13,7 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
+import { userFromRequest } from "./supabaseAuth.js";
 import { estimatePrice, repriceResult } from "./pricing.js";
 import { finalizeWithModel, runIdentify } from "./pipeline/identify.js";
 import type { Resolution } from "./listing.js";
@@ -23,6 +24,7 @@ import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
 import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
+import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -31,7 +33,7 @@ const MAX_BODY_BYTES = 60 * 1024 * 1024; // up to ~10 camera-resolution JPEGs as
 function setCors(res: ServerResponse) {
   res.setHeader("Access-Control-Allow-Origin", "*");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
 }
 
 function sendJson(res: ServerResponse, status: number, body: unknown) {
@@ -92,7 +94,7 @@ async function regradeAndReprice(job: ConditionJob): Promise<void> {
 }
 
 async function coverImageBase64(job: ConditionJob): Promise<string | null> {
-  const first = job.result?.images[0];
+  const first = coverFirst(job.result?.images ?? [], job.result?.coverImageId ?? null)[0];
   if (!first) return null;
   try {
     const part = await loadImageAsBase64(path.join(jobDir(job.id), "originals", first.path));
@@ -106,12 +108,15 @@ async function coverImageBase64(job: ConditionJob): Promise<string | null> {
  * The one place a job is created. Both the local web UI and the public API go through this, so the API
  * cannot drift from what the app does — "exactly the same pipeline" is structural, not a promise.
  */
-async function createConditionJob(body: CreateJobBody): Promise<{ jobId: string; imageCount: number } | { error: string }> {
+async function createConditionJob(
+  body: CreateJobBody,
+  ownerId: string | null = null,
+): Promise<{ jobId: string; imageCount: number } | { error: string }> {
   if (!Array.isArray(body.images) || body.images.length === 0) {
     return { error: "At least one image is required" };
   }
   const identity = readIdentity(body);
-  const job = await createJob(body.productContext ?? null, identity);
+  const job = await createJob(body.productContext ?? null, identity, ownerId);
   const dir = jobDir(job.id);
   const originalsDir = path.join(dir, "originals");
   await mkdir(originalsDir, { recursive: true });
@@ -189,7 +194,10 @@ async function handlePreliminaryPrice(req: IncomingMessage, res: ServerResponse)
 }
 
 async function handleCreateJob(req: IncomingMessage, res: ServerResponse) {
-  const out = await createConditionJob(await readJsonBody<CreateJobBody>(req));
+  // Ägaren avgörs HÄR, vid uppladdningen, och aldrig senare. Ett truth-card som får sin profil
+  // efteråt är ett truth-card som kan hamna i fel — filmningen och kontot hör ihop från början.
+  const user = await userFromRequest(req);
+  const out = await createConditionJob(await readJsonBody<CreateJobBody>(req), user?.id ?? null);
   if ("error" in out) return sendJson(res, 400, out);
   sendJson(res, 202, out);
 }
@@ -256,8 +264,8 @@ async function handleGetDebug(id: string, res: ServerResponse) {
  * Allt klienten behöver för att rita knappen: om integrationen ens är påkopplad, vad som skulle
  * publiceras, och var ett pågående försök står.
  */
-function traderaState(job: ConditionJob) {
-  const readiness = planTraderaPublish(job);
+async function traderaState(job: ConditionJob) {
+  const readiness = await planTraderaPublish(job);
   return {
     configured: traderaConfigured(),
     missingEnv: missingTraderaEnv(),
@@ -270,7 +278,7 @@ function traderaState(job: ConditionJob) {
 async function handleGetTradera(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  sendJson(res, 200, traderaState(job));
+  sendJson(res, 200, await traderaState(job));
 }
 
 /**
@@ -287,20 +295,20 @@ async function handlePublishTradera(jobId: string, res: ServerResponse) {
   if (!traderaConfigured()) {
     return sendJson(res, 503, {
       error: `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`,
-      ...traderaState(job),
+      ...(await traderaState(job)),
     });
   }
-  if (job.tradera?.status === "publishing") return sendJson(res, 202, traderaState(job));
+  if (job.tradera?.status === "publishing") return sendJson(res, 202, await traderaState(job));
   if (job.tradera?.status === "published") {
-    return sendJson(res, 409, { error: "Annonsen är redan publicerad på Tradera.", ...traderaState(job) });
+    return sendJson(res, 409, { error: "Annonsen är redan publicerad på Tradera.", ...(await traderaState(job)) });
   }
 
-  const readiness = planTraderaPublish(job);
-  if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...traderaState(job) });
+  const readiness = await planTraderaPublish(job);
+  if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...(await traderaState(job)) });
 
   await markTraderaPublishing(job);
   void runTraderaPublish(job.id);
-  sendJson(res, 202, traderaState(job));
+  sendJson(res, 202, await traderaState(job));
 }
 
 // ---- public API: /v1/condition, authenticated with x-api-key ---------------
@@ -328,21 +336,39 @@ async function handleApiGet(jobId: string, req: IncomingMessage, res: ServerResp
   });
 }
 
-async function handleListJobs(res: ServerResponse) {
-  const jobs = await listJobs();
+/**
+ * Säljarens egna truth-cards, och bara de.
+ *
+ * Ägarlösa jobb ligger kvar synliga för alla: de skapades innan appen hade konton, och att dölja dem
+ * hade tömt historiken för den som byggde upp den. Allt som skapas härefter bär en ägare.
+ */
+async function handleListJobs(req: IncomingMessage, res: ServerResponse) {
+  const user = await userFromRequest(req);
+  const all = await listJobs();
+  const jobs = all.filter((j) => !j.ownerId || j.ownerId === user?.id);
+  // Jobb från före omslagsvalet får sitt uträknat här, en gång, och sparat. Utan det behåller de sin
+  // första bildruta som miniatyr — den som ofta är svart.
+  await Promise.all(jobs.map((j) => resolveCoverImageId(j)));
   sendJson(
     res,
     200,
-    jobs.map((j) => ({
-      id: j.id,
-      createdAt: j.createdAt,
-      progress: j.progress,
-      grade: j.result?.grade ?? null,
-      identity: j.identity ?? null,
-      price: j.result?.price ?? null,
-      thumbnailImageId: j.result?.images[0]?.id ?? null,
-      error: j.error,
-    })),
+    jobs.map((j) => {
+      // Annonsen kan sitta på tre ställen: i resultatet, kvar på jobbet när besiktningen föll, eller
+      // ännu inte inflyttad. Profilen ska visa kortet i alla tre fallen.
+      const listing = j.result?.listing ?? j.listing ?? j.pendingListing ?? null;
+      return {
+        id: j.id,
+        createdAt: j.createdAt,
+        progress: j.progress,
+        grade: j.result?.grade ?? null,
+        identity: j.identity ?? null,
+        price: j.result?.price ?? null,
+        thumbnailImageId: j.result?.coverImageId ?? j.result?.images[0]?.id ?? null,
+        error: j.error,
+        hasTruthCard: listing?.status === "ok" && !!listing.result,
+        listingTitle: listing?.result?.listing.title ?? null,
+      };
+    }),
   );
 }
 
@@ -580,7 +606,7 @@ const server = http.createServer(async (req, res) => {
 
     if (segments[0] === "api" && segments[1] === "jobs") {
       if (segments.length === 2 && req.method === "POST") return await handleCreateJob(req, res);
-      if (segments.length === 2 && req.method === "GET") return await handleListJobs(res);
+      if (segments.length === 2 && req.method === "GET") return await handleListJobs(req, res);
       if (segments.length === 3 && req.method === "GET") return await handleGetJob(segments[2], res);
       if (segments.length === 4 && segments[3] === "debug" && req.method === "GET") {
         return await handleGetDebug(segments[2], res);

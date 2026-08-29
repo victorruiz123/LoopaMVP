@@ -2,6 +2,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadImageAsBase64 } from "./imageUtils.js";
 import type { CapturedImage, FurnitureIdentity, ListingResult, ModelCandidate } from "./types.js";
+import type { SourceRef } from "./candidateImages.js";
 
 /**
  * Annonsgeneratorn bor i loopa-landing-page-main och ANROPAS, inte kopieras.
@@ -36,6 +37,8 @@ const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 70000);
 process.env.SELLER_RESEARCH_BUDGET_MS ??= "24000";
 process.env.SELLER_RESEARCH_RETRY_BUDGET_MS ??= "16000";
 process.env.SELLER_OVERALL_DEADLINE_MS ??= "60000";
+// Alla bildrutor till sökningen, inte de tre första. Se RESEARCH_IMAGE_CAP i generate.ts.
+process.env.SELLER_RESEARCH_IMAGE_CAP ??= "6";
 /** Generatorn tar högst 10 och beskär själv per steg. Fler bildrutor gör bara nyttolasten dyr. */
 const MAX_LISTING_IMAGES = 6;
 
@@ -43,7 +46,7 @@ type Handler = (context: { request: Request; env: Record<string, string | undefi
 
 /** Vad ett anrop mot annonsgeneratorn kan svara. `needs_selection` är ett giltigt svar, inte ett fel. */
 export type SellerCall =
-  | { kind: "needs_selection"; candidates: ModelCandidate[] }
+  | { kind: "needs_selection"; candidates: ModelCandidate[]; sources: SourceRef[] }
   | { kind: "ok"; listing: ListingResult }
   | { kind: "unavailable"; reason: string };
 
@@ -132,13 +135,14 @@ export async function callSellerGenerate(
       kind?: string;
       error?: string;
       candidates?: ModelCandidate[];
+      sources?: SourceRef[];
       result?: unknown;
     };
 
     // `ok: true, kind: "needs_selection"` — tvetydighet mellan riktiga produkter. Bryggan krävde
     // tidigare `body.result` och rapporterade därför just det här som "Annonsen kunde inte skapas".
     if (body.ok && body.kind === "needs_selection") {
-      return { kind: "needs_selection", candidates: (body.candidates ?? []).slice(0, 4) };
+      return { kind: "needs_selection", candidates: (body.candidates ?? []).slice(0, 4), sources: body.sources ?? [] };
     }
     if (!body.ok || !body.result) {
       return { kind: "unavailable", reason: body.error ?? `Annonsgeneratorn svarade ${response.status}.` };

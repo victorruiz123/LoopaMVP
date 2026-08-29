@@ -2,12 +2,6 @@ import { useState } from "react";
 import type { ModelCandidate } from "../types";
 import { ChevronRight } from "../components/icons";
 
-const CONFIDENCE_LABELS: Record<ModelCandidate["confidence"], string> = {
-  strong: "Trolig träff",
-  likely: "Möjlig",
-  possible: "Mindre trolig",
-};
-
 /**
  * Vilken modell är det?
  *
@@ -51,17 +45,16 @@ export default function ModelSelectScreen({
         <div className="candidate-list">
           {candidates.map((c, i) => (
             <button key={`${c.model}-${i}`} className="candidate" onClick={() => onSelect(c)}>
-              <div className="candidate-body">
-                <div className="candidate-name">{c.model}</div>
-                {c.variant && <div className="candidate-variant">{c.variant}</div>}
-                {/* Det som skiljer kandidaterna åt, inte en upprepning av namnet — det är hela
-                    anledningen till att en människa kan avgöra det här på två sekunder. */}
-                {c.distinguishingDetail && <div className="candidate-detail">{c.distinguishingDetail}</div>}
-                <span className={`candidate-confidence candidate-confidence-${c.confidence}`}>
-                  {CONFIDENCE_LABELS[c.confidence]}
-                  {c.productType ? ` · ${c.productType}` : ""}
-                </span>
-              </div>
+              {/* Bild och namn, inget annat. Bilden ÄR jämförelsen — en säljare känner igen sin
+                  möbel på en sekund och behöver inte läsa sig till skillnaden. */}
+              <span className="candidate-photo">
+                {c.imageUrl ? (
+                  <img src={c.imageUrl} alt="" loading="lazy" onError={(e) => e.currentTarget.remove()} />
+                ) : (
+                  <span className="candidate-photo-empty" aria-hidden="true" />
+                )}
+              </span>
+              <span className="candidate-name">{c.model}</span>
               <span className="candidate-chevron">
                 <ChevronRight size={18} />
               </span>

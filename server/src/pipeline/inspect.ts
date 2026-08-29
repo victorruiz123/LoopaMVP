@@ -83,6 +83,11 @@ const RESPONSE_SCHEMA = {
       description: "NOT_SUFFICIENTLY_VISIBLE only if large parts of the furniture were never clearly visible in ANY image. Never use this just because damage was found.",
     },
     coverage_note: { type: Type.STRING, description: "One sentence if coverage is insufficient (which side/part), else empty string." },
+    cover_image_index: {
+      type: Type.INTEGER,
+      description:
+        "0-baserat index på den bild som bäst duger som ANNONSENS OMSLAG: hela möbeln synlig och rakt FRAMIFRÅN, i fokus, utan skymmande föremål. Välj aldrig en närbild, en bild där möbeln är beskuren, eller en bild tagen bakifrån eller uppifrån. Finns ingen bild framifrån, välj den som visar möbeln mest komplett.",
+    },
     defects: {
       type: Type.ARRAY,
       description:
@@ -122,6 +127,8 @@ const RESPONSE_SCHEMA = {
       required: ["overall_wear_level", "affected_extent", "functionality_affected", "structural_integrity_ok", "clearly_used_appearance", "observations"],
     },
   },
+  // cover_image_index står MEDVETET utanför required: utelämnar modellen det ska svaret fortfarande
+  // parsa, och duglighetsspärren i cover.ts väljer ändå en bildruta som går att visa.
   required: ["furniture_type", "inspection_coverage", "coverage_note", "defects", "parts_inspected", "overall_condition"],
 };
 
@@ -166,6 +173,7 @@ interface RawInspectionResponse {
   furniture_type: string;
   inspection_coverage: CoverageState;
   coverage_note: string;
+  cover_image_index?: number;
   defects: RawDefect[];
   parts_inspected: RawPartInspection[];
   overall_condition: RawOverallCondition;
@@ -327,6 +335,8 @@ export interface InspectionResult {
   partsInspected: PartInspection[];
   coverage: CoverageState;
   coverageNote: string | null;
+  /** Modellens val av omslagsbild, som index i den inskickade listan. null om den inte svarade. */
+  coverImageIndex: number | null;
   defects: Damage[];
   overallCondition: OverallCondition;
   callMeta: CallMeta;
@@ -379,6 +389,7 @@ export async function inspectFurniture(images: CapturedImage[], jobDir: string, 
     })),
     coverage: data.inspection_coverage,
     coverageNote: data.coverage_note || null,
+    coverImageIndex: Number.isInteger(data.cover_image_index) ? data.cover_image_index! : null,
     defects,
     overallCondition,
     callMeta: { purpose: "main_inspection", tokensUsed, cached, modelUsed, latencyMs },

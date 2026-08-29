@@ -7,6 +7,9 @@ import SpecsScreen from "./screens/SpecsScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
 import TruthCardScreen from "./screens/TruthCardScreen";
+import AuthScreen from "./screens/AuthScreen";
+import ProfileScreen from "./screens/ProfileScreen";
+import { useAuth } from "./auth/AuthProvider";
 import { getJob, selectModel, type CapturedShot } from "./api";
 import type { ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
 
@@ -18,7 +21,8 @@ type Screen =
   | { name: "price"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
   | { name: "analysis"; jobId: string; previewShots: CapturedShot[]; identity: FurnitureIdentity }
   | { name: "result"; jobId: string }
-  | { name: "truthcard"; jobId: string; result: ConditionResult };
+  | { name: "truthcard"; jobId: string; result: ConditionResult }
+  | { name: "profile" };
 
 /**
  * Flödet: märke -> bilder -> VÄLJ MODELL -> specifikationer -> pris -> skick -> truth-card.
@@ -28,6 +32,24 @@ type Screen =
  * där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris redan räknats.
  */
 export default function App() {
+  const { user, loading } = useAuth();
+
+  // Inloggningen ligger FÖRE flödet, inte inuti det. Ett truth-card som skapas utan konto har ingen
+  // profil att hamna i, och att fråga efter inloggning först när kortet är klart hade betytt att
+  // säljaren filmar ett varv och sedan får veta att resultatet inte kan sparas.
+  if (loading) {
+    return (
+      <div className="screen screen-light center-column">
+        <div className="spinner" />
+      </div>
+    );
+  }
+  if (!user) return <AuthScreen />;
+
+  return <SignedInApp />;
+}
+
+function SignedInApp() {
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const homeKey = useRef(0);
 
@@ -43,6 +65,7 @@ export default function App() {
           key={homeKey.current}
           onStartScan={(identity) => setScreen({ name: "capture", identity })}
           onOpenJob={(jobId) => setScreen({ name: "result", jobId })}
+          onOpenProfile={() => setScreen({ name: "profile" })}
         />
       );
     case "capture":
@@ -118,6 +141,19 @@ export default function App() {
           onHome={goHome}
         />
       );
+    case "profile":
+      return (
+        <ProfileScreen
+          onBack={goHome}
+          // Profilen öppnar kortet, inte fyndlistan: det är truth-cardet som sparats, och vägen
+          // tillbaka till skicket finns kvar inifrån det.
+          onOpenJob={async (jobId) => {
+            const job = await getJob(jobId);
+            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result });
+            else setScreen({ name: "result", jobId });
+          }}
+        />
+      );
   }
 }
 
@@ -171,7 +207,12 @@ function IdentifyGate({
   const [sent, setSent] = useState(false);
   const { job, gaveUp, failed } = useJobPoll(
     jobId,
-    (j) => j.identityStatus === "needs_selection" || j.identityStatus === "unavailable" || j.identityStatus === "resolved",
+    // Slutar först när bilderna landat också — annars stannar pollningen i samma ögonblick som
+    // kandidaterna kommer, och bilderna som hämtas strax efter når aldrig skärmen.
+    (j) =>
+      j.identityStatus === "unavailable" ||
+      j.identityStatus === "resolved" ||
+      (j.identityStatus === "needs_selection" && (j.candidates ?? []).every((c) => c.imageUrl !== undefined)),
   );
 
   async function choose(choice: { candidate?: ModelCandidate; manualModel?: string }) {

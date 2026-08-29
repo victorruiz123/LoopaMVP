@@ -1,4 +1,23 @@
+import { supabase } from "./lib/supabase";
 import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, TraderaState } from "./types";
+
+/**
+ * Varje anrop bär säljarens Supabase-token.
+ *
+ * Det är den servern knyter jobbet till ett konto med — utan huvudet vet den inte vems truth-card
+ * som skapas, och profilen skulle antingen bli tom eller visa allas möbler.
+ *
+ * Bild-URL:erna (imageUrl/cropUrl) går utanför den här vägen: de sätts som src på <img> och kan inte
+ * bära huvuden. De ligger kvar öppna, precis som förut.
+ */
+async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const headers = new Headers(init.headers);
+  if (session?.access_token) headers.set("Authorization", `Bearer ${session.access_token}`);
+  return fetch(input, { ...init, headers });
+}
 
 async function json<T>(res: Response): Promise<T> {
   if (!res.ok) {
@@ -19,7 +38,7 @@ export async function createJob(
   images: CapturedShot[],
   identity: FurnitureIdentity | null,
 ): Promise<{ jobId: string; imageCount: number }> {
-  const res = await fetch("/api/jobs", {
+  const res = await authFetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null }),
@@ -35,7 +54,7 @@ export async function createJob(
  * stopp, och ligger färdigt när prisvyn öppnas.
  */
 export async function fetchPrice(identity: FurnitureIdentity): Promise<PriceEstimate> {
-  const res = await fetch("/api/price", {
+  const res = await authFetch("/api/price", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ brand: identity.brand, model: identity.model }),
@@ -49,7 +68,7 @@ export async function selectModel(
   jobId: string,
   choice: { candidate?: ModelCandidate; manualModel?: string },
 ): Promise<void> {
-  const res = await fetch(`/api/jobs/${jobId}/model`, {
+  const res = await authFetch(`/api/jobs/${jobId}/model`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(choice),
@@ -59,7 +78,7 @@ export async function selectModel(
 
 /** Kör om pipelinen på de bildrutor jobbet redan har — ingen ny filmning, ingen ny uppladdning. */
 export async function retryJob(jobId: string): Promise<{ jobId: string; imageCount: number }> {
-  const res = await fetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
+  const res = await authFetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
   return json(res);
 }
 
@@ -70,13 +89,13 @@ export async function retryJob(jobId: string): Promise<{ jobId: string; imageCou
  * direkt och arbetar vidare i bakgrunden.
  */
 export async function getTraderaState(jobId: string): Promise<TraderaState> {
-  const res = await fetch(`/api/jobs/${jobId}/tradera`);
+  const res = await authFetch(`/api/jobs/${jobId}/tradera`);
   return json(res);
 }
 
 /** Publicerar truth-cardet som en riktig annons på Loopas Tradera-konto. Svarar innan den är uppe. */
 export async function publishToTradera(jobId: string): Promise<TraderaState> {
-  const res = await fetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
+  const res = await authFetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
   return json(res);
 }
 
@@ -85,17 +104,17 @@ export function debugUrl(jobId: string): string {
 }
 
 export async function getDebugTrace(id: string): Promise<DebugTrace> {
-  const res = await fetch(debugUrl(id));
+  const res = await authFetch(debugUrl(id));
   return json(res);
 }
 
 export async function getJob(id: string): Promise<ConditionJob> {
-  const res = await fetch(`/api/jobs/${id}`);
+  const res = await authFetch(`/api/jobs/${id}`);
   return json(res);
 }
 
 export async function listJobs(): Promise<JobSummary[]> {
-  const res = await fetch("/api/jobs");
+  const res = await authFetch("/api/jobs");
   return json(res);
 }
 
@@ -114,7 +133,7 @@ export async function actOnDamage(
   action: "confirm" | "reject" | "edit",
   patch?: Partial<Pick<Damage, "type" | "part" | "semanticLocation" | "severity" | "impact" | "description">>,
 ): Promise<ConditionResult> {
-  const res = await fetch(`/api/jobs/${jobId}/damages/${damageId}`, {
+  const res = await authFetch(`/api/jobs/${jobId}/damages/${damageId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ action, patch }),
@@ -130,7 +149,7 @@ export interface DisputeResult {
 
 /** Seller disputes one finding and backs it with a fresh close-up; Gemini adjudicates. */
 export async function disputeDamage(jobId: string, damageId: string, dataUrl: string): Promise<DisputeResult> {
-  const res = await fetch(`/api/jobs/${jobId}/damages/${damageId}/dispute`, {
+  const res = await authFetch(`/api/jobs/${jobId}/damages/${damageId}/dispute`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dataUrl }),
@@ -146,7 +165,7 @@ export interface AddFromPhotoResult {
 
 /** Seller photographs damage the walkaround missed; Gemini describes it and it joins the findings. */
 export async function addDamageFromPhoto(jobId: string, dataUrl: string): Promise<AddFromPhotoResult> {
-  const res = await fetch(`/api/jobs/${jobId}/damages/from-photo`, {
+  const res = await authFetch(`/api/jobs/${jobId}/damages/from-photo`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dataUrl }),
@@ -158,7 +177,7 @@ export async function addDamage(
   jobId: string,
   damage: Pick<Damage, "type" | "part" | "semanticLocation" | "severity" | "impact" | "description">,
 ): Promise<ConditionResult> {
-  const res = await fetch(`/api/jobs/${jobId}/damages`, {
+  const res = await authFetch(`/api/jobs/${jobId}/damages`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(damage),

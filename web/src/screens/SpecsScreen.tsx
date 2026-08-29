@@ -1,5 +1,5 @@
 import type { GeneratedListing } from "../types";
-import { ChevronRight } from "../components/icons";
+import { ArrowLeftIcon, ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
 
 const STATUS_LABELS: Record<string, string> = {
@@ -28,7 +28,7 @@ export default function SpecsScreen({
   return (
     <div className="screen screen-light">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        ← Byt modell
+        <ArrowLeftIcon /> Byt modell
       </button>
 
       <header className="specs-head">

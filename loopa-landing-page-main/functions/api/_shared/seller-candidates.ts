@@ -44,6 +44,45 @@ function cleanField(raw: string | undefined, maxLen: number): string | null {
   return v.slice(0, maxLen)
 }
 
+const URL_IN_TEXT = /https?:\/\/[^\s"'<>()\[\]|]+/i
+const URL_IN_TEXT_G = new RegExp(URL_IN_TEXT.source, 'gi')
+
+/**
+ * Produktsidan för kandidaten, var på raden modellen än råkade lägga den.
+ *
+ * Sista fältet är platsen formatet ber om, men modellen citerar lika gärna källan inuti detaljen
+ * ("… hög rygg (källa: https://…)") — den blir tillsagd i HONESTY_RULE att göra just det efter varje
+ * faktauppgift. Läser man bara fältet blir `sourceUrl` i praktiken alltid null, och då står
+ * bildhämtningen ensam på den grundade sökningens 4-6 träffar, som sällan täcker alla kandidaterna.
+ * Det var därför en kandidat fick bild och nästa inte, olika varje körning.
+ */
+function extractSourceUrl(parts: string[]): string | null {
+  for (const raw of [parts[6], ...parts]) {
+    const hit = (raw || '').match(URL_IN_TEXT)?.[0]
+    if (!hit) continue
+    // Adressen står ofta sist i en mening eller inuti en parentes.
+    const url = hit.replace(/[.,;:)\]]+$/, '')
+    if (url.length <= 300) return url
+  }
+  return null
+}
+
+/**
+ * Detaljen, utan källhänvisningen.
+ *
+ * URL:en tas bort INNAN längdkapningen. Annars åt en citerad adress upp de 120 tecknen och säljaren
+ * fick läsa en avhuggen länk i stället för det som skiljer modellerna åt.
+ */
+function cleanDetail(raw: string | undefined): string | null {
+  const stripped = (raw || '')
+    .replace(/\(\s*källa:?[^)]*\)?/gi, ' ')
+    .replace(URL_IN_TEXT_G, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/[\s|,;:–-]+$/, '')
+    .trim()
+  return cleanField(stripped, 120)
+}
+
 /**
  * Parses "KANDIDAT: märke | modell | variant | produkttyp | STARK/TROLIG/MÖJLIG | detalj"
  * lines out of the grounded research prose. Tolerant about everything except
@@ -77,7 +116,10 @@ export function parseCandidates(text: string, fallbackBrand: string): ParsedCand
       variant: cleanField(parts[2], 80),
       productType: cleanField(parts[3], 60),
       confidence: parseConfidence(parts[4]),
-      distinguishingDetail: cleanField(parts[5], 120),
+      distinguishingDetail: cleanDetail(parts[5]),
+      // Additivt sjunde fält: produktsidan modellen säger sig ha sett. ALDRIG betrodd som sanning —
+      // anroparen hämtar den och kontrollerar att sidans titel nämner modellen innan den används.
+      sourceUrl: extractSourceUrl(parts),
     }
     const key = `${candidate.brand} ${candidate.model}`.toLowerCase()
     if (out.some((c) => `${c.brand} ${c.model}`.toLowerCase() === key)) continue

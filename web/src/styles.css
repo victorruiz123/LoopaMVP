@@ -1,97 +1,604 @@
+/* ==========================================================================
+   Vips designsystem, buret hit från vips-buy-sell-hub.
+   ==========================================================================
+   Appen körde tidigare en varm gräddpalett (#f4efe9 / #ea580c) som var nära Vips
+   men inte densamma — en säljare som gick mellan de två apparna såg två olika
+   produkter. Tokens nedan ÄR Vips index.css, samma HSL-värden, så orange är samma
+   orange och grå är samma grå på båda hållen.
+
+   Formen är däremot appens egen: Vips webb kör 6-8 px radier för en tät
+   marknadsplatsvy, medan det här är en telefonapp med stora kort i ett flöde.
+   Radierna följer Vips egna inloggning och hero-ytor (12-16 px), inte listvyerna. */
+:root {
+  /* --- Paletten från vips-buy-sell-hub, oförändrad --- */
+  /* Sidan är svagt grå och korten rent vita. Tidigare var det tvärtom nästan lika:
+     en vit sida med vita kort som bara gick att skilja åt med en ram runt vartenda
+     ett. Låter man bakgrunden bära skillnaden behövs varken ram eller tung skugga —
+     korten ligger på ytan i stället för att vara inritade på den. */
+  --bg: hsl(220 16% 96%);
+  --surface: #ffffff;
+  --ink: hsl(220 13% 13%);
+  --ink-soft: hsl(220 13% 28%);
+  --muted: hsl(220 9% 46%);
+  --muted-soft: hsl(220 9% 58%);
+  --border: hsl(220 13% 91%);
+  --field: hsl(220 13% 95%);
+
+  --accent: hsl(24 95% 53%);
+  --accent-dark: hsl(24 95% 42%);
+  --accent-light: hsl(24 95% 96%);
+  --accent-ink: hsl(24 95% 25%);
+  --green: hsl(142 71% 45%);
+  --green-dark: hsl(142 71% 32%);
+  --green-light: hsl(142 60% 95%);
+  --danger: hsl(0 84% 60%);
+  --danger-dark: hsl(0 70% 42%);
+  --danger-light: hsl(0 84% 96%);
+  --amber: hsl(38 92% 50%);
+  --amber-ink: hsl(28 74% 30%);
+  --amber-light: hsl(45 93% 94%);
+
+
+  /* En skugga, inte tre. Djupet ska antyda att kortet ligger ovanpå sidan, inte
+     rita en gloria runt det — därför låg opacitet och nästan ingen spridning. */
+  --shadow-card: 0 1px 2px hsl(220 20% 20% / 0.05);
+  --shadow-raised: 0 1px 2px hsl(220 20% 20% / 0.05), 0 6px 18px hsl(220 20% 20% / 0.05);
+  --shadow-hero: var(--shadow-raised);
+  --lift: var(--shadow-card);
+
+  /* Radierna följer iOS: kontroller 12, grupperade kort 14, ark 20. Ett kort och
+     knappen i det ska inte dela radie — då ser knappen inklistrad ut. */
+  --r-xs: 6px;
+  --r-sm: 10px;
+  --r: 12px;
+  --r-lg: 14px;
+  --r-xl: 20px;
+
+  --hairline: hsl(220 13% 91%);
+  --focus: 0 0 0 3.5px hsl(24 95% 53% / 0.25);
+  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Gamla namn kvar som alias. Reglerna som fortfarande läser dem får Vips-värden
+     i stället för gräddpaletten, i stället för att peka på variabler som inte finns. */
+  --brand-surface: var(--surface);
+  --brand-field-bg: var(--field);
+  --brand-border: var(--border);
+  --brand-accent: var(--accent);
+  --brand-ink: var(--ink);
+  --brand-ink-strong: var(--ink);
+  --brand-muted: var(--muted);
+  --brand-muted-soft: var(--muted-soft);
+  --brand-label: var(--ink-soft);
+  --brand-cta: var(--accent);
+  --brand-lift: var(--lift);
+}
+
 * { box-sizing: border-box; }
 html, body, #root { height: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: #f4efe9;
-  color: #1c1917;
+  font-family: Roboto, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 17px;
+  line-height: 1.47;
+  letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  /* Den grå blixten vid tryck på iOS hör till en webbsida, inte till en app. */
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Loopa-ordmärket i Poppins. Negativ spärr med flit: Poppins är geometrisk och sitter
+   naturligt glest, och ett ordmärke ska hålla ihop som en form snarare än läsas som fem
+   bokstäver. Fallbacken är en grotesk — laddas inte fonten ska "Loopa" fortfarande läsas
+   som en logotyp och inte byta karaktär. */
+.app-wordmark, .auth-wordmark, .auth-wordmark-inline {
+  font-family: Poppins, Roboto, -apple-system, sans-serif;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
 }
 
 .screen {
   max-width: 480px;
   margin: 0 auto;
   min-height: 100vh;
-  padding: 20px 16px 40px;
+  padding: 16px 16px 40px;
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
-.screen-light { background: linear-gradient(180deg, #fdf6ee 0%, #f4efe9 100%); }
-.screen-dark { background: #17140f; color: #f4efe9; }
+.screen-light { background: var(--bg); }
+.screen-dark { background: var(--ink); color: #fff; }
 .center-column { align-items: center; justify-content: center; text-align: center; }
 
-.muted { color: #78716c; }
-.screen-dark .muted { color: #a8a29e; }
+.muted { color: var(--muted); }
+.screen-dark .muted { color: hsl(220 9% 65%); }
 .small { font-size: 0.85em; }
-.error-text { color: #dc2626; }
-.warning-text { color: #b45309; font-size: 0.85em; }
+.error-text { color: var(--danger-dark); }
+.warning-text { color: var(--amber-ink); font-size: 0.85em; }
 
-/* ---- buttons ---- */
+/* ---- topplist ---- */
+.app-bar {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 4px; min-height: 36px;
+}
+.app-wordmark { font-size: 30px; line-height: 1; }
+.app-bar-profile {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: none; background: hsl(220 13% 91%); color: var(--ink-soft);
+  border-radius: 999px; padding: 7px 14px 7px 11px; cursor: pointer;
+  font-family: inherit; font-size: 14px; font-weight: 600; letter-spacing: -0.01em;
+  transition: opacity 140ms var(--ease-ui);
+}
+.app-bar-profile:active { opacity: 0.6; }
+.app-bar-profile:focus-visible { outline: none; box-shadow: var(--focus); }
+.app-bar-profile-name { max-width: 11ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---- knappar ---- */
 .btn {
   border: none;
-  border-radius: 12px;
+  border-radius: var(--r);
   padding: 14px 20px;
-  font-size: 15px;
+  font-family: inherit;
+  font-size: 17px;
   font-weight: 600;
+  letter-spacing: -0.015em;
   cursor: pointer;
+  transition: opacity 120ms var(--ease-ui), background 140ms var(--ease-ui);
 }
-.btn-primary { background: #ea580c; color: #fff; width: 100%; }
-.btn-green { background: #16a34a; }
-.btn-small { padding: 8px 16px; width: auto; }
-.btn-text { background: none; color: #ea580c; padding: 10px; }
-.btn-ghost { background: rgba(0,0,0,0.4); color: #fff; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-.btn-back { align-self: flex-start; background: none; color: #78716c; padding: 4px 0; }
+/* En fylld yta i EN färg. Gradienten och den orange glöden under knappen är
+   marknadsföringsspråk — de drar blicken till knappen som objekt i stället för till
+   vad den gör. Återkopplingen ligger i tryckets opacitet, som i iOS. */
+.btn-primary { background: var(--accent); color: #fff; width: 100%; }
+.btn-primary:not(:disabled):active { opacity: 0.82; }
+.btn-green { background: var(--green); }
+.btn-green:not(:disabled):active { opacity: 0.82; }
+.btn-small { padding: 8px 16px; width: auto; font-size: 14px; }
+.btn-text { background: none; color: var(--accent); padding: 10px; box-shadow: none; font-weight: 600; }
+.btn-text:active { opacity: 0.55; }
+.btn-ghost { background: rgba(0,0,0,0.45); color: #fff; box-shadow: none; }
+.btn:disabled { background: var(--field); color: var(--muted-soft); cursor: not-allowed; box-shadow: none; }
+.btn-text:disabled { background: none; }
+.btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.btn-back {
+  align-self: flex-start; background: none; color: var(--muted); padding: 6px 0;
+  display: inline-flex; align-items: center; gap: 6px; font-weight: 600; box-shadow: none;
+}
+.btn-back:hover { color: var(--ink); }
 
-/* ---- home ---- */
-.brand-header { text-align: center; }
+/* ==========================================================================
+   Inloggning — Vips egen: rutnät, tre suddiga klot, flikpiller, orange CTA
+   ========================================================================== */
+/* Inloggningen är ren.
+   Här låg tidigare ett rutnät och tre suddiga klot i orange och grönt — hämtat från
+   en landningssida, där dekoren ska stoppa en förbipasserande. Den som öppnar sin
+   egen app är redan här, och då är dekoren bara något som ligger bakom fälten. Kvar
+   är en enda mycket svag ljusning uppåt, så ytan inte blir helt platt. */
+.auth-screen {
+  position: relative; min-height: 100vh; overflow: hidden;
+  background:
+    radial-gradient(120% 55% at 50% 0%, hsl(24 95% 53% / 0.05), transparent 70%),
+    var(--bg);
+}
+
+.auth-inner {
+  position: relative; z-index: 1; max-width: 420px; margin: 0 auto;
+  padding: 44px 20px calc(40px + env(safe-area-inset-bottom));
+  display: flex; flex-direction: column;
+}
+.auth-wordmark { font-size: 34px; line-height: 1; text-align: center; margin-bottom: 34px; }
+.auth-hero { text-align: center; margin-bottom: 24px; }
+.auth-title {
+  margin: 0 0 8px; font-size: 30px; font-weight: 700; line-height: 1.15;
+  letter-spacing: -0.032em; color: var(--ink);
+}
+.auth-wordmark-inline { font-size: 1.02em; }
+.auth-lede { margin: 0; font-size: 16px; line-height: 1.45; color: var(--muted); }
+
+/* Flikpillret: en vit tumme som glider under texten i stället för två knappar som
+   tänds och släcks. Rörelsen är det som säger att de två sidorna är samma formulär. */
+/* Segmenterad kontroll med iOS mått: 2 px spår runt tumman, radie 9 inuti radie 11.
+   Ett piller med helrunda ändar läser som två knappar; den mjukt rundade rektangeln
+   läser som ETT reglage med två lägen — vilket är vad det är. */
+.auth-tabs {
+  position: relative; display: grid; grid-template-columns: 1fr 1fr;
+  background: hsl(220 13% 90%); padding: 2px; border-radius: 11px; margin-bottom: 22px;
+}
+.auth-tabs-thumb {
+  position: absolute; top: 2px; bottom: 2px; left: 2px; width: calc(50% - 2px);
+  background: #fff; border-radius: 9px;
+  box-shadow: 0 3px 8px hsl(220 20% 20% / 0.12), 0 1px 1px hsl(220 20% 20% / 0.04);
+  transition: transform 280ms var(--ease-sheet);
+}
+.auth-tabs-thumb-right { transform: translateX(100%); }
+.auth-tab {
+  position: relative; z-index: 1; border: none; background: none; cursor: pointer;
+  padding: 8px 0; font-family: inherit; font-size: 14px; font-weight: 600;
+  letter-spacing: -0.01em; color: var(--ink); transition: opacity 200ms var(--ease-ui);
+  opacity: 0.55;
+}
+.auth-tab-active { opacity: 1; }
+
+.auth-card {
+  background: var(--surface);
+  border-radius: var(--r-lg); box-shadow: var(--shadow-card); padding: 22px 20px;
+}
+.auth-form { display: flex; flex-direction: column; gap: 16px; }
+.auth-field { display: flex; flex-direction: column; gap: 6px; }
+.auth-label { font-size: 13px; font-weight: 700; color: var(--ink); }
+.auth-input-wrap { position: relative; display: block; }
+.auth-input-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  display: flex; color: var(--muted); pointer-events: none;
+}
+.auth-input-wrap input {
+  width: 100%; height: 48px; border-radius: var(--r); border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink);
+  padding: 0 40px 0 38px; font-family: inherit; font-size: 16px;
+  transition: border-color 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+}
+.auth-input-wrap input::placeholder { color: var(--muted-soft); }
+.auth-input-wrap input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
+.auth-input-toggle {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  display: flex; align-items: center; justify-content: center;
+  border: none; background: none; color: var(--muted); cursor: pointer; padding: 4px;
+}
+.auth-input-toggle:hover { color: var(--ink); }
+.auth-submit { height: 50px; padding: 0; font-size: 17px; }
+.auth-message { margin: -4px 0 0; font-size: 13.5px; line-height: 1.45; border-radius: var(--r-sm); padding: 10px 12px; }
+.auth-message-error { background: var(--danger-light); color: var(--danger-dark); }
+.auth-message-info { background: var(--green-light); color: var(--green-dark); }
+/* Sloganen som bildtext, inte som andra rubrik. Två rader i displaystorlek i samma
+   kort tävlar om att vara det man läser först, och den som vinner ska vara knappen. */
+.auth-tagline {
+  margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--hairline);
+  text-align: center; font-size: 13px; font-weight: 500; letter-spacing: 0.01em;
+  color: var(--muted-soft);
+}
+.auth-terms {
+  margin: 22px 0 0; text-align: center; font-size: 12px; line-height: 1.5; color: var(--muted);
+}
+
+/* ==========================================================================
+   Profilen — sparade truth-cards
+   ========================================================================== */
+.profile { gap: 14px; }
+.profile-head { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+.profile-avatar {
+  width: 56px; height: 56px; border-radius: 999px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--accent); color: #fff;
+  font-size: 20px; font-weight: 600; letter-spacing: 0.01em;
+}
+.profile-identity { min-width: 0; }
+.profile-name {
+  margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.profile-email { margin: 2px 0 0; font-size: 14px; color: var(--muted); }
+
+.profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.profile-stat {
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 14px 16px; box-shadow: var(--shadow-card);
+}
+.profile-stat-value {
+  font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.profile-stat-label {
+  margin-top: 2px; font-size: 11px; font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+
+.profile-section-title {
+  margin: 10px 0 0; font-size: 12px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.profile-loading { display: flex; justify-content: center; padding: 30px 0; }
+.profile-empty {
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  background: var(--surface); border: 1px dashed var(--border); border-radius: var(--r-lg);
+  padding: 30px 22px;
+}
+.profile-empty-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent); margin-bottom: 12px;
+}
+.profile-empty-title { margin: 0 0 4px; font-size: 16px; font-weight: 700; color: var(--ink); }
+.profile-empty-hint { margin: 0; font-size: 14px; line-height: 1.45; color: var(--muted); max-width: 30ch; }
+.profile-signout { margin-top: 6px; align-self: center; color: var(--muted); }
+.profile-signout:hover { color: var(--danger-dark); }
+
+.card-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.card-row {
+  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 10px; cursor: pointer; font-family: inherit;
+  box-shadow: var(--shadow-card);
+  transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
+}
+.card-row:active { background: hsl(220 16% 97%); }
+.card-row:focus-visible { outline: none; box-shadow: var(--focus); }
+.card-row-thumb {
+  width: 52px; height: 52px; border-radius: var(--r-sm); object-fit: cover;
+  background: var(--field); flex-shrink: 0;
+}
+.card-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.card-row-title {
+  font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.card-row-meta { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.card-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; }
+
+/* ==========================================================================
+   Startsidan
+   ========================================================================== */
+.home { gap: 0; }
+.home-header { margin-bottom: 24px; }
+/* Ett ögonbryn, inte en etikett. "STEG 2 AV 4" i en orange pill konkurrerar med
+   rubriken under sig om samma blick — den ska tala om var man är, inte utropa det. */
 .brand-pill {
-  display: inline-flex; align-items: center; gap: 6px;
-  background: #1c1917; color: #fdba74; font-size: 11px; font-weight: 700;
-  letter-spacing: 0.05em; padding: 6px 12px; border-radius: 999px; margin-bottom: 14px;
+  display: inline-flex; align-items: center; gap: 7px;
+  color: var(--muted); font-size: 12px; font-weight: 600; letter-spacing: 0.06em;
+  text-transform: uppercase; margin-bottom: 10px;
 }
-.brand-dot { width: 6px; height: 6px; border-radius: 999px; background: #ea580c; }
+.brand-dot { width: 5px; height: 5px; border-radius: 999px; background: var(--accent); }
+.home-title {
+  font-size: 34px; font-weight: 700; line-height: 1.08; margin: 0;
+  /* Stor text behöver dras ihop. Utan negativ spärr ser en 34-punkters rubrik gles
+     och luddig ut — det är den enskilt tydligaste skillnaden mot systemtypografi. */
+  letter-spacing: -0.033em; color: var(--ink);
+}
+/* Rubriken bär sin egen färg. Gradienttext går inte att läsa som text — den läser som
+   en bild av text, tappar kontrast mot bakgrunden i sin ljusa ände och kan inte ärva
+   någon systemfärg. Ett ord i accentfärg gör samma sak utan att kosta läsbarhet. */
+.accent { color: var(--accent); }
+.home-lede {
+  margin: 12px 0 0; font-size: 17px; line-height: 1.45; color: var(--muted); max-width: 32ch;
+  letter-spacing: -0.012em;
+}
+.brand-header { text-align: center; }
 .brand-header h1 { font-size: 26px; margin: 0; line-height: 1.2; }
-.accent { background: linear-gradient(90deg, #ea580c, #f59e0b); -webkit-background-clip: text; background-clip: text; color: transparent; }
 
-.saved-section { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+/* grupperad lista, iOS-stil */
+.form-group {
+  background: var(--surface); border-radius: var(--r-lg);
+  overflow: hidden; box-shadow: var(--shadow-card);
+}
+.form-row {
+  position: relative;
+  display: flex; align-items: center; gap: 12px; width: 100%;
+  min-height: 58px; padding: 0 16px; background: none; border: none;
+  font-family: inherit; font-size: 17px; text-align: left;
+}
+/* Strecket dras från etikettens vänsterkant, inte från kortets. En separator som går
+   ut i kanten delar kortet i två kort; en indragen håller ihop dem som en lista. */
+.form-row + .form-row::before {
+  content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline);
+}
+.form-row-tappable { cursor: pointer; transition: background 140ms var(--ease-ui); }
+.form-row-tappable:active { background: var(--field); }
+.form-row-tappable:focus-visible { outline: none; box-shadow: var(--focus); }
+.form-row-label { flex-shrink: 0; font-size: 17px; font-weight: 500; color: var(--ink); letter-spacing: -0.01em; }
+.form-row-value {
+  flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 9px;
+  min-width: 0; overflow: hidden;
+}
+.form-row-text {
+  font-size: 17px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.form-row-placeholder { font-size: 17px; color: var(--muted-soft); }
+.form-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; margin-right: -3px; }
+.form-row-input {
+  flex: 1; min-width: 0; border: none; background: none; padding: 0;
+  font-family: inherit; font-size: 17px; color: var(--ink); font-weight: 600;
+  text-align: right; letter-spacing: -0.01em;
+}
+.form-row-input::placeholder { color: var(--muted-soft); font-weight: 400; }
+.form-row-input:focus { outline: none; }
+
+.home-cta { margin-top: 22px; margin-bottom: 26px; }
+.home-cta .btn-primary { min-height: 52px; border-radius: var(--r); font-size: 17px; }
+.form-hint { margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--muted); text-align: center; }
+
+/* ---- monogram ---- */
+.brand-avatar {
+  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border-radius: 999px; font-weight: 700; letter-spacing: 0.01em;
+  /* Inre ring i stället för yttre kant: håller cirkelns diameter exakt och ger tonen
+     en kontur även mot en yta i nästan samma färg. */
+  box-shadow: inset 0 0 0 1px hsl(220 13% 13% / 0.06);
+}
+
+/* ---- sparade truth-cards på startsidan ---- */
+.collapsible-card {
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 12px 14px; box-shadow: var(--shadow-card);
+}
+.collapsible-header {
+  display: flex; justify-content: space-between; align-items: center; width: 100%;
+  background: none; border: none; font-family: inherit; font-size: 14px; cursor: pointer; padding: 4px;
+}
+.collapsible-title { font-size: 16px; font-weight: 600; color: var(--ink); letter-spacing: -0.015em; }
+.collapsible-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 14px; }
+.collapsible-chevron { display: flex; color: var(--muted-soft); transition: transform 220ms var(--ease-ui); }
+.collapsible-chevron-open { transform: rotate(90deg); }
+
+.saved-section { background: var(--surface); border-radius: var(--r-lg); padding: 14px; box-shadow: var(--shadow-card); }
 .saved-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.saved-list { display: flex; flex-direction: column; gap: 8px; }
+.saved-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
 .saved-item {
-  display: flex; align-items: center; gap: 10px; background: #fafaf9; border: 1px solid #eee;
-  border-radius: 12px; padding: 8px; cursor: pointer; text-align: left; width: 100%;
+  display: flex; align-items: center; gap: 10px; background: var(--surface); border-radius: var(--r); padding: 8px; cursor: pointer;
+  text-align: left; width: 100%; font-family: inherit;
+  transition: border-color 140ms var(--ease-ui);
 }
-.saved-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; background: #eee; }
-.saved-item-body { flex: 1; font-size: 14px; }
+.saved-thumb { width: 44px; height: 44px; border-radius: var(--r-sm); object-fit: cover; background: var(--field); }
+.saved-item-body { flex: 1; min-width: 0; font-size: 14px; }
+.saved-item-title { font-size: 15px; font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
 
+/* Siffror som inte hoppar i bredd när de uppdateras. */
+.price-main, .price-range-end em, .saved-item .small, .truth-price, .profile-stat-value {
+  font-variant-numeric: tabular-nums;
+}
 
-/* ---- capture: mode choice ---- */
-.choose-title { text-align: center; margin: 4px 0 8px; }
+/* ==========================================================================
+   Bottensheet (märkesväljaren)
+   ========================================================================== */
+.sheet-root { position: fixed; inset: 0; z-index: 60; }
+.sheet-overlay {
+  position: absolute; inset: 0; background: hsl(220 13% 13% / 0.45);
+  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+  opacity: 0; transition: opacity 320ms var(--ease-ui);
+}
+.sheet-overlay-shown { opacity: 1; }
+.sheet {
+  position: absolute; left: 0; right: 0; bottom: 0; height: 78vh;
+  display: flex; flex-direction: column; overflow: hidden;
+  background: var(--surface); border-radius: var(--r-xl) var(--r-xl) 0 0;
+  box-shadow: 0 -0.5px 0 hsl(220 13% 13% / 0.08), 0 -20px 60px hsl(220 13% 13% / 0.22);
+  transform: translateY(100%); transition: transform 420ms var(--ease-sheet);
+  max-width: 480px; margin: 0 auto; will-change: transform;
+}
+.sheet-shown { transform: translateY(0); }
+/* Under dragningen får inget tweenas — arket ska sitta fast i fingret. */
+.sheet-dragging { transition: none; }
+.sheet-grip { flex-shrink: 0; touch-action: none; cursor: grab; }
+.sheet-grip:active { cursor: grabbing; }
+.sheet-handle { width: 36px; height: 5px; border-radius: 999px; background: var(--border); margin: 8px auto 0; }
+.sheet-header {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 14px 16px 12px;
+}
+.sheet-header h2 { margin: 0; font-size: 22px; font-weight: 700; color: var(--ink); letter-spacing: -0.025em; }
+.sheet-close {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  border: none; background: var(--field); color: var(--muted);
+  width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
+  transition: background 140ms var(--ease-ui), color 140ms var(--ease-ui);
+}
+.sheet-close:hover { background: hsl(220 13% 91%); color: var(--ink); }
+.sheet-close:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.sheet-search { position: relative; padding: 0 16px 10px; flex-shrink: 0; }
+.sheet-search-icon {
+  position: absolute; left: 28px; top: 50%; transform: translateY(-55%);
+  display: flex; color: var(--muted-soft); pointer-events: none;
+}
+.sheet-search input {
+  width: 100%; border: 1px solid transparent; border-radius: var(--r-sm); height: 42px;
+  padding: 0 34px; font-size: 16px; font-family: inherit;
+  background: var(--field); color: var(--ink);
+  transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui), border-color 160ms var(--ease-ui);
+}
+.sheet-search input::placeholder { color: var(--muted-soft); }
+.sheet-search input:focus { outline: none; background: #fff; border-color: var(--accent); box-shadow: var(--focus); }
+.sheet-search-clear {
+  position: absolute; right: 26px; top: 50%; transform: translateY(-55%);
+  display: flex; align-items: center; justify-content: center;
+  width: 19px; height: 19px; border-radius: 999px; border: none; cursor: pointer;
+  background: var(--muted-soft); color: #fff; padding: 0;
+}
+.sheet-body {
+  flex: 1; overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+}
+.sheet-section-title {
+  position: sticky; top: 0; z-index: 1;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted-soft); padding: 10px 4px 8px; background: var(--surface);
+}
+.sheet-empty {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  min-height: 62%; padding: 24px 16px; text-align: center;
+}
+.sheet-empty-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 54px; height: 54px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent); margin-bottom: 15px;
+}
+.sheet-empty-title { margin: 0 0 5px; font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.sheet-empty-hint { margin: 0 0 20px; font-size: 14px; line-height: 1.45; color: var(--muted); max-width: 28ch; }
+.brand-use-typed {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
+  border: none; border-radius: var(--r); background: var(--accent); color: #fff;
+  padding: 13px 20px; font-family: inherit; font-size: 17px; font-weight: 600;
+  letter-spacing: -0.015em; cursor: pointer;
+  transition: opacity 120ms var(--ease-ui);
+}
+.brand-use-typed:active { opacity: 0.82; }
+.brand-use-typed:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.brand-rows { list-style: none; margin: 0; padding: 0; }
+.brand-row {
+  position: relative; display: flex; align-items: center; gap: 12px; width: 100%;
+  border: none; background: none; padding: 9px 4px; min-height: 52px;
+  font-family: inherit; font-size: 17px; text-align: left; cursor: pointer;
+  transition: background 120ms var(--ease-ui); border-radius: var(--r-sm);
+}
+/* Hårstrecket börjar där texten börjar, inte där raden gör. */
+.brand-rows li + li .brand-row::before {
+  content: ""; position: absolute; top: 0; left: 50px; right: 0; height: 1px; background: var(--hairline);
+}
+.brand-row:active { background: var(--field); }
+.brand-row:active::before, .brand-row-selected::before { opacity: 0; }
+.brand-row:focus-visible { outline: none; box-shadow: var(--focus); }
+.brand-row-selected { background: var(--accent-light); }
+.brand-row-name {
+  flex: 1; font-weight: 500; color: var(--ink); letter-spacing: -0.015em;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.brand-row-check { display: flex; color: var(--accent); flex-shrink: 0; }
+
+/* ==========================================================================
+   Filmning
+   ========================================================================== */
+.choose-title { text-align: center; margin: 4px 0 8px; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
 .choose-card {
-  display: flex; align-items: center; gap: 14px; background: #fff; border: none; border-radius: 16px;
-  padding: 18px; text-align: left; cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+  display: flex; align-items: center; gap: 14px; background: var(--surface); border-radius: var(--r-lg);
+  padding: 18px; text-align: left; cursor: pointer; font-family: inherit;
+  box-shadow: var(--shadow-card);
+  transition: border-color 140ms var(--ease-ui), transform 120ms var(--ease-ui);
 }
-.choose-icon { font-size: 32px; flex-shrink: 0; }
-.choose-card strong { display: block; margin-bottom: 2px; }
-.choose-card p { margin: 0; font-size: 0.85em; }
+.choose-card:active { background: hsl(220 16% 97%); }
+.choose-card-unavailable { opacity: 0.5; }
+/* Ikonbricka, som i Inställningar: en rundad kvadrat i accentton med symbolen i.
+   Emojin som satt här ritades av operativsystemet och bytte både färg och stil
+   mellan telefonerna — fyra kort i rad blev fyra olika formspråk. */
+.choose-icon {
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  width: 40px; height: 40px; border-radius: 10px;
+  background: var(--accent-light); color: var(--accent);
+}
+.choose-card strong { display: block; margin-bottom: 2px; font-size: 17px; font-weight: 600; color: var(--ink); }
+.choose-card p { margin: 0; font-size: 14px; line-height: 1.4; color: var(--muted); }
 
-/* ---- capture: camera ---- */
 .screen-camera { position: relative; padding: 0; background: #000; overflow: hidden; }
 .camera-feed { width: 100%; height: 100vh; object-fit: cover; display: block; }
 .camera-placeholder { position: absolute; top: 16px; left: 16px; }
 .capture-overlay-frame {
-  position: absolute; inset: 12% 8% 22% 8%; border: 2px solid rgba(255,255,255,0.6); border-radius: 24px; pointer-events: none;
+  position: absolute; inset: 12% 8% 22% 8%; border: 2px solid rgba(255,255,255,0.6);
+  border-radius: var(--r-xl); pointer-events: none;
 }
 .capture-mode-back { position: absolute; top: 16px; left: 16px; }
 .capture-top-bar {
-  position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,0.5); color: #fff;
-  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; display: flex; align-items: center; gap: 6px;
+  position: absolute; top: 16px; left: 16px; background: rgba(0,0,0,0.55); color: #fff;
+  padding: 6px 12px; border-radius: 999px; font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; gap: 6px;
 }
-.rec-dot { width: 8px; height: 8px; border-radius: 999px; background: #ef4444; }
+.rec-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--danger); }
 .capture-guidance {
-  position: absolute; top: 60px; left: 16px; right: 16px; background: rgba(0,0,0,0.55); color: #fff;
-  padding: 14px; border-radius: 14px; font-size: 14px; text-align: center;
+  position: absolute; top: 60px; left: 16px; right: 16px; background: rgba(0,0,0,0.58); color: #fff;
+  padding: 14px; border-radius: var(--r); font-size: 14px; text-align: center;
 }
+.capture-identity { text-align: center; margin: -4px 0 4px; font-weight: 700; color: var(--ink-soft); }
 .capture-filmstrip { position: absolute; bottom: 110px; left: 16px; right: 16px; display: flex; gap: 6px; overflow-x: auto; }
 .filmstrip-thumb { width: 44px; height: 44px; border-radius: 999px; object-fit: cover; border: 2px solid #fff; flex-shrink: 0; }
 
@@ -99,23 +606,33 @@ body {
   position: absolute; bottom: 20px; left: 0; right: 0; display: flex; flex-direction: column;
   align-items: center; gap: 14px;
 }
-.shutter-btn {
-  width: 68px; height: 68px; border-radius: 999px; background: #fff; border: 4px solid rgba(255,255,255,0.5);
-  cursor: pointer;
-}
+.shutter-btn { width: 68px; height: 68px; border-radius: 999px; background: #fff; border: 4px solid rgba(255,255,255,0.5); cursor: pointer; }
 .btn-done { width: auto; padding: 10px 24px; }
-
 .video-controls { position: absolute; bottom: 28px; left: 0; right: 0; display: flex; justify-content: center; }
-.record-btn {
-  width: 72px; height: 72px; border-radius: 999px; background: #ef4444; border: 4px solid #fff; cursor: pointer;
-}
-.record-btn-stop { border-radius: 12px; width: 32px; height: 32px; background: #fff; border: none; }
+.record-btn { width: 72px; height: 72px; border-radius: 999px; background: var(--danger); border: 4px solid #fff; cursor: pointer; }
+.record-btn-stop { border-radius: var(--r-xs); width: 32px; height: 32px; background: #fff; border: none; }
 .record-btn-stop::before { content: ""; }
-.video-error { position: absolute; top: 100px; left: 16px; right: 16px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 10px; text-align: center; }
+.video-error { position: absolute; top: 100px; left: 16px; right: 16px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: var(--r-sm); text-align: center; }
+.camera-error-overlay {
+  position: absolute; left: 16px; right: 16px; bottom: 90px; background: rgba(0,0,0,0.78);
+  color: #fff; padding: 12px 14px; border-radius: var(--r); font-size: 13px; line-height: 1.4;
+}
 
-/* ---- capture: review ---- */
+/* varvring för rotationsspårningen */
+.lap-ring {
+  position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+  display: flex; align-items: center; justify-content: center; pointer-events: none;
+}
+.lap-ring-track { fill: none; stroke: rgba(255,255,255,0.25); stroke-width: 5; }
+.lap-ring-fill { fill: none; stroke: var(--green); stroke-width: 5; stroke-linecap: round; transition: stroke-dasharray 0.15s linear; }
+.lap-ring-fill-fast { stroke: var(--amber); }
+.lap-tick { fill: rgba(255,255,255,0.45); }
+.lap-tick-done { fill: var(--green); }
+.lap-ring-label { position: absolute; color: #fff; font-size: 15px; font-weight: 700; text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
+
+/* granskning av bildrutorna */
 .review-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
-.review-thumb { position: relative; border-radius: 12px; overflow: hidden; aspect-ratio: 3/4; background: #eee; }
+.review-thumb { position: relative; border-radius: var(--r); overflow: hidden; aspect-ratio: 3/4; background: var(--field); }
 .review-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .review-thumb-label {
   position: absolute; bottom: 4px; left: 4px; background: rgba(0,0,0,0.6); color: #fff; font-size: 10px;
@@ -126,77 +643,114 @@ body {
   background: rgba(0,0,0,0.6); color: #fff; cursor: pointer; font-size: 12px;
 }
 .review-add-actions { display: flex; gap: 8px; }
-.review-add-actions .btn-text { flex: 1; background: #fff; border-radius: 10px; }
+.review-add-actions .btn-text {
+  flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+}
+.taken-images-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
+.taken-images-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); }
 
+/* ---- spinner ---- */
 .spinner {
-  width: 32px; height: 32px; border-radius: 999px; border: 3px solid rgba(0,0,0,0.15); border-top-color: #ea580c;
+  width: 32px; height: 32px; border-radius: 999px;
+  border: 3px solid hsl(220 13% 91%); border-top-color: var(--accent);
   animation: spin 0.8s linear infinite;
 }
-.screen-dark .spinner { border-color: rgba(255,255,255,0.15); border-top-color: #ea580c; }
+.screen-dark .spinner { border-color: rgba(255,255,255,0.15); border-top-color: var(--accent); }
 .spinner-small { width: 20px; height: 20px; border-width: 2px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-/* ---- analysis: checklist ---- */
-.analysis-card { background: #221d16; border-radius: 20px; padding: 24px; width: 100%; max-width: 340px; }
-.analysis-image-wrap { border-radius: 16px; overflow: hidden; margin-bottom: 18px; }
+/* ==========================================================================
+   Analys — checklistan medan pipelinen kör
+   ========================================================================== */
+.analysis-card {
+  background: var(--ink); border-radius: var(--r-xl); padding: 24px; width: 100%; max-width: 340px;
+}
+.analysis-image-wrap { border-radius: var(--r); overflow: hidden; margin-bottom: 18px; }
 .analysis-image-wrap img { width: 100%; display: block; aspect-ratio: 4/3; object-fit: cover; }
+.analysis-identity { font-size: 15px; font-weight: 700; margin-bottom: 12px; text-align: center; }
 .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; text-align: left; }
-.checklist-item { display: flex; align-items: center; gap: 12px; font-size: 15px; color: #78716c; }
-.checklist-marker { font-size: 16px; width: 20px; text-align: center; }
-.checklist-done { color: #a8a29e; }
-.checklist-done .checklist-marker { color: #16a34a; }
+.checklist-item { display: flex; align-items: center; gap: 12px; font-size: 16px; color: hsl(220 9% 58%); }
+.checklist-marker { display: flex; align-items: center; justify-content: center; width: 20px; flex-shrink: 0; }
+.checklist-dot {
+  width: 9px; height: 9px; border-radius: 999px;
+  box-shadow: inset 0 0 0 1.6px currentColor;
+}
+.checklist-active .checklist-dot { background: currentColor; box-shadow: none; }
+.checklist-done { color: hsl(220 9% 65%); }
+.checklist-done .checklist-marker { color: var(--green); }
 .checklist-active { color: #fff; font-weight: 600; }
-.checklist-active .checklist-marker { color: #ea580c; animation: pulse 1.2s ease-in-out infinite; }
-.checklist-pending { color: #57534e; }
+.checklist-active .checklist-marker { color: var(--accent); animation: pulse 1.2s ease-in-out infinite; }
+.checklist-pending { color: hsl(220 9% 40%); }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.35; } }
 
-/* ---- result ---- */
+/* ==========================================================================
+   Resultatet — betyg, pris, fynd
+   ========================================================================== */
+.report-hero { display: flex; flex-direction: column; gap: 8px; }
 .grade-hero {
-  background: #1c1712; color: #fff; border-radius: 24px; padding: 26px 20px; text-align: center;
+  background: var(--ink); color: #fff; border-radius: var(--r-lg); padding: 26px 20px; text-align: center;
   display: flex; flex-direction: column; align-items: center; gap: 10px;
 }
 /* Betyget sitter överst och priset under: när de är staplade sluts hörnen mot varandra
    så paret läses som ett svar med två delar, inte som två fristående kort. */
-.report-hero .grade-hero { border-radius: 24px 24px 10px 10px; }
-.report-hero .price-panel { border-radius: 10px 10px 24px 24px; }
-.grade-hero-label { font-size: 22px; font-weight: 800; }
-.grade-hero-rationale { margin: 0; color: #d6d3d1; font-size: 15px; line-height: 1.5; max-width: 340px; }
-
-.damage-summary-line { margin: 0; font-size: 17px; font-weight: 700; }
-
-.collapsible-card { background: #fff; border-radius: 16px; padding: 14px; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-.collapsible-header { display: flex; justify-content: space-between; width: 100%; background: none; border: none; font-size: 14px; cursor: pointer; padding: 4px; }
-.taken-images-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-top: 10px; }
-.taken-images-grid img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 8px; }
-
+.report-hero .grade-hero { border-radius: var(--r-lg) var(--r-lg) var(--r-xs) var(--r-xs); }
+.report-hero .price-panel { border-radius: var(--r-xs) var(--r-xs) var(--r-lg) var(--r-lg); }
+.grade-hero-label { font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+.grade-hero-rationale { margin: 0; color: hsl(220 9% 75%); font-size: 15px; line-height: 1.5; max-width: 340px; }
 .grade-badge {
-  border-radius: 999px; color: #fff; font-weight: 800; display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
+  border-radius: 999px; color: #fff; font-weight: 700; display: flex; align-items: center;
+  justify-content: center; flex-shrink: 0;
 }
+.result-identity { margin: 0; font-size: 21px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
+.damage-summary-line { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: -0.02em; }
 
-.coverage-warning { background: #fef3c7; color: #92400e; padding: 12px 14px; border-radius: 12px; font-size: 14px; }
+.coverage-warning {
+  display: flex; align-items: flex-start; gap: 10px;
+  background: var(--amber-light); color: var(--amber-ink); padding: 12px 14px;
+  border-radius: var(--r); font-size: 15px; line-height: 1.4;
+}
+.coverage-warning-mark { display: flex; flex-shrink: 0; margin-top: 1px; }
 
 .damage-groups { display: flex; flex-direction: column; gap: 18px; }
-.damage-group-header { font-weight: 700; font-size: 15px; margin-bottom: 8px; }
-.damage-list { display: flex; flex-direction: column; gap: 12px; }
-.damage-card { background: #fff; border-radius: 16px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); padding: 12px; }
+.damage-group-header { font-weight: 700; font-size: 15px; margin-bottom: 8px; letter-spacing: -0.01em; }
+.damage-list { display: flex; flex-direction: column; gap: 10px; }
+.damage-card {
+  background: var(--surface); border-radius: var(--r-lg);
+  overflow: hidden; box-shadow: var(--shadow-card); padding: 12px;
+}
 .damage-card-rejected { opacity: 0.5; }
 .damage-card-header-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .damage-card-title { display: flex; flex-direction: column; gap: 2px; }
-.damage-card-title strong { font-size: 15px; }
+.damage-card-title strong { font-size: 15px; letter-spacing: -0.01em; }
+.damage-desc { margin: 0 0 10px; font-size: 14px; color: var(--ink-soft); line-height: 1.45; }
+.damage-card-actions { display: flex; justify-content: flex-end; gap: 12px; }
+.damage-card-actions .btn-remove { color: var(--danger-dark); }
+.damage-card-body { display: flex; flex-direction: column; gap: 8px; }
+.damage-card-body label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--ink-soft); }
+.damage-card-body select, .damage-card-body input, .damage-card-body textarea {
+  font-family: inherit; font-size: 14px; padding: 9px 10px; border-radius: var(--r-sm);
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+}
+.damage-card-body select:focus, .damage-card-body input:focus, .damage-card-body textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: var(--focus);
+}
+.add-damage-actions { display: flex; flex-direction: column; gap: 2px; }
+
 .chip { font-size: 11px; font-weight: 700; padding: 4px 9px; border-radius: 999px; flex-shrink: 0; }
-.chip-S1 { background: #dcfce7; color: #166534; }
-.chip-S2 { background: #fef3c7; color: #92400e; }
-.chip-S3 { background: #fed7aa; color: #9a3412; }
-.chip-S4 { background: #fecaca; color: #991b1b; }
+.chip-S1 { background: var(--green-light); color: var(--green-dark); }
+.chip-S2 { background: var(--amber-light); color: var(--amber-ink); }
+.chip-S3 { background: hsl(24 95% 93%); color: hsl(24 90% 32%); }
+.chip-S4 { background: var(--danger-light); color: var(--danger-dark); }
+.chip-neutral { background: var(--field); color: var(--ink-soft); }
+.chip-verify-CONFIRMED { background: var(--green-light); color: var(--green-dark); }
+.chip-verify-REJECTED { background: var(--danger-light); color: var(--danger-dark); }
+.chip-verify-UNCERTAIN { background: var(--amber-light); color: var(--amber-ink); }
 
-.damage-evidence-main { display: block; width: 100%; border: none; padding: 0; cursor: pointer; margin-bottom: 8px; }
-.damage-evidence-main .marked-thumb-lg { width: 100%; height: auto; border-radius: 12px; }
-
+.damage-evidence-main { display: block; width: 100%; border: none; padding: 0; cursor: pointer; margin-bottom: 8px; background: none; }
+.damage-evidence-main .marked-thumb-lg { width: 100%; height: auto; border-radius: var(--r); }
 .evidence-mini-rail { display: flex; gap: 8px; overflow-x: auto; padding: 2px 0 8px; }
-
 .marked-thumb {
-  position: relative; border-radius: 10px; overflow: hidden; border: none;
+  position: relative; border-radius: var(--r-sm); overflow: hidden; border: none;
   padding: 0; flex-shrink: 0; cursor: pointer; background: #111;
   display: flex; align-items: center; justify-content: center;
 }
@@ -205,27 +759,38 @@ body {
 .marked-thumb-inner { position: relative; max-width: 100%; max-height: 100%; }
 .marked-thumb-lg .marked-thumb-inner { width: 100%; }
 .marked-thumb-inner img { width: 100%; height: 100%; display: block; }
-.marked-thumb-box { position: absolute; border: 3px solid #ef4444; border-radius: 3px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.1); }
+.marked-thumb-box { position: absolute; border: 3px solid var(--danger); border-radius: 3px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.1); }
 .marked-thumb-sm .marked-thumb-box { border-width: 2px; }
 .marked-thumb-line { position: absolute; inset: 0; }
-.marked-thumb-line line { stroke: #ef4444; stroke-width: 2; }
+.marked-thumb-line line { stroke: var(--danger); stroke-width: 2; }
 .marked-thumb-angle { position: absolute; bottom: 2px; right: 2px; background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; padding: 1px 4px; border-radius: 4px; }
-
-.damage-desc { margin: 0 0 10px; font-size: 14px; color: #44403c; line-height: 1.4; }
-.damage-card-actions { display: flex; justify-content: flex-end; gap: 16px; }
-.damage-card-actions .btn-remove { color: #dc2626; }
-.damage-card-body { display: flex; flex-direction: column; gap: 8px; }
-.damage-card-body label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: #57534e; }
-.damage-card-body select, .damage-card-body input, .damage-card-body textarea {
-  font-family: inherit; font-size: 14px; padding: 8px 10px; border-radius: 8px; border: 1px solid #e7e5e4;
-}
 
 .result-footer { display: flex; gap: 10px; padding-top: 8px; }
 .result-footer .btn-text { flex: 1; }
 .result-footer .btn-primary { flex: 2; }
-.debug-link { display: block; text-align: center; font-size: 12px; color: #a8a29e; padding: 4px 0; }
+.result-footer .btn { white-space: nowrap; }
+.debug-link { display: block; text-align: center; font-size: 12px; color: var(--muted-soft); padding: 4px 0; }
+.next-step {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 22px; min-height: 54px; border-radius: var(--r); font-size: 17px; letter-spacing: -0.01em;
+}
+.next-step-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.9; font-weight: 600; }
 
-/* ---- evidence viewer ---- */
+/* delresultat: granskningen pågår fortfarande */
+.review-banner {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--amber-light); color: var(--amber-ink); border-radius: var(--r); padding: 11px 14px;
+  font-size: 13.5px; line-height: 1.4;
+}
+.review-spinner {
+  width: 14px; height: 14px; flex-shrink: 0; border-radius: 999px;
+  border: 2px solid hsl(38 60% 78%); border-top-color: var(--amber-ink);
+  animation: spin 0.8s linear infinite;
+}
+
+/* ==========================================================================
+   Bevisvisaren
+   ========================================================================== */
 .evidence-viewer { position: fixed; inset: 0; background: #000; z-index: 50; display: flex; flex-direction: column; }
 .evidence-viewer-top { display: flex; align-items: center; justify-content: space-between; padding: 14px; color: #fff; }
 .evidence-viewer-title { font-size: 13px; font-weight: 700; }
@@ -238,365 +803,65 @@ body {
 .evidence-viewer-image-wrap { position: relative; max-width: 100%; max-height: 100%; transform-origin: center center; }
 .evidence-viewer-image-wrap img { width: 100%; height: 100%; display: block; user-select: none; }
 .evidence-line-overlay { position: absolute; inset: 0; width: 100%; height: 100%; }
-.evidence-line-overlay line { stroke: #ef4444; stroke-width: 0.8; }
+.evidence-line-overlay line { stroke: var(--danger); stroke-width: 0.8; }
 .evidence-dots { display: flex; justify-content: center; gap: 8px; padding: 14px; }
 .evidence-dot { width: 8px; height: 8px; border-radius: 999px; background: rgba(255,255,255,0.3); cursor: pointer; }
-.evidence-dot.active { background: #ea580c; }
+.evidence-dot.active { background: var(--accent); }
 
-/* ---- teknisk panel (inspektionsvy, medvetet skild från säljarvyn ovanför) ---- */
+/* ==========================================================================
+   Teknisk panel (inspektionsvy, medvetet skild från säljarvyn ovanför)
+   ========================================================================== */
 .tech-panel { margin-top: 10px; }
 .tech-body { margin-top: 12px; font-size: 13px; }
 .tech-loading { padding: 8px 4px; }
 .tech-section { margin-bottom: 18px; }
-.tech-section h4 { font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: #78716c; margin: 0 0 8px; }
+.tech-section h4 {
+  font-size: 11px; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700;
+  color: var(--muted-soft); margin: 0 0 8px;
+}
 .tech-kv { display: grid; grid-template-columns: minmax(120px, auto) 1fr; gap: 4px 12px; margin: 0; }
-.tech-kv dt { color: #78716c; }
+.tech-kv dt { color: var(--muted); }
 .tech-kv dd { margin: 0; }
-.tech-flag { color: #9a3412; font-weight: 700; }
+.tech-flag { color: var(--danger-dark); font-weight: 700; }
 .tech-table { width: 100%; border-collapse: collapse; }
-.tech-table th { text-align: left; font-weight: 600; color: #78716c; font-size: 11px; padding: 4px 8px 4px 0; }
-.tech-table td { padding: 4px 8px 4px 0; border-top: 1px solid #f5f5f4; font-variant-numeric: tabular-nums; }
+.tech-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; padding: 4px 8px 4px 0; }
+.tech-table td { padding: 5px 8px 5px 0; border-top: 1px solid var(--hairline); font-variant-numeric: tabular-nums; }
 .tech-note { margin: 8px 0 0; font-size: 12px; }
-.tech-list { margin: 0; padding-left: 18px; color: #57534e; }
+.tech-list { margin: 0; padding-left: 18px; color: var(--ink-soft); }
 .tech-list li { margin-bottom: 3px; }
 .tech-frames { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; }
 .tech-frames figure { margin: 0; }
-.tech-frames img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: 8px; background: #f5f5f4; }
+.tech-frames img { width: 100%; aspect-ratio: 4/3; object-fit: cover; border-radius: var(--r-sm); background: var(--field); }
 .tech-frames figcaption { display: flex; flex-direction: column; font-size: 11px; margin-top: 4px; line-height: 1.35; }
 .tech-findings { display: flex; flex-direction: column; gap: 10px; }
-.tech-finding { display: flex; gap: 10px; padding: 10px; border-radius: 10px; background: #fafaf9; border-left: 3px solid #d6d3d1; }
-.tech-finding-CONFIRMED { border-left-color: #16a34a; }
-.tech-finding-REJECTED { border-left-color: #dc2626; opacity: 0.65; }
-.tech-finding-UNCERTAIN { border-left-color: #d97706; }
-.tech-crop { width: 82px; height: 82px; object-fit: cover; border-radius: 8px; flex-shrink: 0; background: #f5f5f4; }
-.tech-crop-empty { display: flex; align-items: center; justify-content: center; color: #a8a29e; }
+.tech-finding { display: flex; gap: 10px; padding: 10px; border-radius: var(--r-sm); background: hsl(220 13% 97%); border-left: 3px solid var(--border); }
+.tech-finding-CONFIRMED { border-left-color: var(--green); }
+.tech-finding-REJECTED { border-left-color: var(--danger); opacity: 0.65; }
+.tech-finding-UNCERTAIN { border-left-color: var(--amber); }
+.tech-crop { width: 82px; height: 82px; object-fit: cover; border-radius: var(--r-sm); flex-shrink: 0; background: var(--field); }
+.tech-crop-empty { display: flex; align-items: center; justify-content: center; color: var(--muted-soft); }
 .tech-finding-body { min-width: 0; }
 .tech-finding-title { display: flex; flex-direction: column; margin-bottom: 6px; }
 .tech-badges { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-.chip-neutral { background: #f5f5f4; color: #57534e; }
-.chip-verify-CONFIRMED { background: #dcfce7; color: #166534; }
-.chip-verify-REJECTED { background: #fecaca; color: #991b1b; }
-.chip-verify-UNCERTAIN { background: #fef3c7; color: #92400e; }
 .tech-finding-desc { margin: 0; }
 .tech-finding-reason { margin: 4px 0 0; font-size: 12px; }
-.tech-part-clean td { color: #a8a29e; }
-
-/* ---- bestridande: närbild in, dom ut ---- */
-.dispute-verdict { position: fixed; left: 16px; right: 16px; bottom: 20px; padding: 14px 16px; border-radius: 14px;
-  box-shadow: 0 6px 24px rgba(0,0,0,0.18); cursor: pointer; z-index: 50; }
-.dispute-good { background: #dcfce7; color: #14532d; }
-.dispute-warn { background: #fef3c7; color: #78350f; }
-.dispute-verdict p { margin: 4px 0 6px; font-size: 14px; }
-.dispute-verdict .small { font-size: 11px; }
-.choose-card-unavailable { opacity: 0.5; }
-.camera-error-overlay { position: absolute; left: 16px; right: 16px; bottom: 90px; background: rgba(0,0,0,0.75);
-  color: #fff; padding: 12px 14px; border-radius: 12px; font-size: 13px; line-height: 1.4; }
-
-/* ---- varvring för rotationsspårningen ---- */
-.lap-ring { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-  display: flex; align-items: center; justify-content: center; pointer-events: none; }
-.lap-ring-track { fill: none; stroke: rgba(255,255,255,0.25); stroke-width: 5; }
-.lap-ring-fill { fill: none; stroke: #22c55e; stroke-width: 5; stroke-linecap: round; transition: stroke-dasharray 0.15s linear; }
-.lap-tick { fill: rgba(255,255,255,0.45); }
-.lap-tick-done { fill: #22c55e; }
-.lap-ring-label { position: absolute; color: #fff; font-size: 15px; font-weight: 700;
-  text-shadow: 0 1px 3px rgba(0,0,0,0.6); }
-.add-damage-actions { display: flex; flex-direction: column; gap: 2px; }
-.lap-ring-fill-fast { stroke: #f59e0b; }
-
-/* ---- identitet: märke + modell före skanningen ---- */
-.capture-identity { text-align: center; margin: -4px 0 4px; font-weight: 700; color: #57534e; }
-.analysis-identity { font-size: 15px; font-weight: 700; margin-bottom: 12px; text-align: center; }
-.result-identity { margin: 0; font-size: 21px; font-weight: 800; letter-spacing: -0.02em; }
-
-/* ---- skick + pris sida vid sida ---- */
-.report-hero { display: flex; flex-direction: column; gap: 8px; }
-
-.price-panel {
-  background: #fff; border-radius: 24px; padding: 20px; text-align: center;
-  box-shadow: var(--brand-lift); display: flex; flex-direction: column; gap: 8px;
-}
-.price-panel-head {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--brand-muted-soft);
-}
-.price-main {
-  font-size: 36px; font-weight: 800; line-height: 1.05; letter-spacing: -0.03em;
-  color: var(--brand-ink-strong);
-}
-.price-range { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
-.price-range-end { display: flex; flex-direction: column; gap: 1px; min-width: 84px; }
-.price-range-end em { font-style: normal; font-weight: 700; font-size: 15px; }
-.price-range-end-high { align-items: flex-end; }
-.price-range-end:first-of-type { align-items: flex-start; }
-.price-range-bar {
-  flex: 1; height: 6px; border-radius: 999px;
-  background: linear-gradient(90deg, #7BB661, #E8C55B 55%, var(--brand-accent));
-  /* Ändpunkterna markeras med en ljus ring i vardera änden, så stapeln läser som en
-     skala med två avläsningspunkter och inte som en förloppsindikator. */
-  box-shadow: inset 3px 0 0 rgba(255,255,255,0.55), inset -3px 0 0 rgba(255,255,255,0.55);
-}
-.price-deduction {
-  margin: 6px 0 0; font-size: 14px; font-weight: 600; color: #9A4E12;
-  background: #FBEFE2; border-radius: 12px; padding: 9px 12px;
-}
-.price-basis { margin: 0; }
-.price-panel-empty { text-align: left; }
-.price-empty-title { margin: 0; font-weight: 700; }
+.tech-part-clean td { color: var(--muted-soft); }
 
 /* ==========================================================================
-   Märke & pris — typografi, grupperade fält och bottensheet
-   ==========================================================================
-   Tokens som variabler i stället för inklistrade hex-värden, eftersom de kom från
-   designen och inte från den här filen: appen runt omkring kör på närliggande men
-   inte identiska toner (#f4efe9 mot #F3EAE0, #ea580c mot #F2801F). Samlade så här
-   går de att jämka ihop på ett ställe den dagen paletterna ska bli en enda.       */
-:root {
-  --brand-surface: #FFFFFF;
-  --brand-field-bg: #FBF6EF;
-  --brand-border: #E9DCC9;
-  --brand-accent: #F2801F;
-  --brand-ink: #1B1613;
-  --brand-ink-strong: #2A1B12;
-  --brand-muted: #8D8680;
-  --brand-muted-soft: #9C948B;
-  --brand-label: #4A3F37;
-  --brand-cta: #F0A489;
+   Bestridande: närbild in, dom ut
+   ========================================================================== */
+.dispute-verdict {
+  position: fixed; left: 16px; right: 16px; bottom: 20px; padding: 14px 16px; border-radius: var(--r);
+  box-shadow: 0 6px 24px hsl(220 13% 13% / 0.18); cursor: pointer; z-index: 50;
+}
+.dispute-good { background: var(--green-light); color: var(--green-dark); }
+.dispute-warn { background: var(--amber-light); color: var(--amber-ink); }
+.dispute-verdict p { margin: 4px 0 6px; font-size: 14px; }
+.dispute-verdict .small { font-size: 11px; }
 
-  /* Hårstreck, inte kanter. En separator ska avgränsa två rader utan att rita en
-     ram runt någon av dem — 1 px i full styrka gör det senare. */
-  --hairline: rgba(42, 27, 18, 0.09);
-  /* Två skuggor: en tät nära kanten som ger formen avgränsning, en vid och svag som
-     lyfter den. En ensam stor skugga blir grumlig i stället för upphöjd. */
-  --lift: 0 1px 2px rgba(42, 27, 18, 0.05), 0 10px 30px rgba(42, 27, 18, 0.06);
-  --focus: 0 0 0 3.5px rgba(242, 128, 31, 0.2);
-  /* iOS bottensheet-kurva: snabb start, lång mjuk inbromsning. En ren ease-out
-     stannar för tvärt och får arket att kännas lätt i stället för fysiskt. */
-  --ease-sheet: cubic-bezier(0.32, 0.72, 0, 1);
-  --ease-ui: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-
-/* Siffror som inte hoppar i bredd när de uppdateras. */
-.price-main, .price-range-end em, .saved-item .small { font-variant-numeric: tabular-nums; }
-
-/* ---- startsidan ---- */
-.home { gap: 0; }
-.home-header { margin-bottom: 26px; }
-.home-title {
-  font-size: 34px; font-weight: 800; line-height: 1.08; margin: 0;
-  /* Stor text behöver dras ihop. Utan negativ spärr ser en 34-punkters rubrik gles
-     och luddig ut — det är den enskilt tydligaste skillnaden mot systemtypografi. */
-  letter-spacing: -0.033em; color: var(--brand-ink);
-}
-.home-lede {
-  margin: 12px 0 0; font-size: 15px; line-height: 1.5; color: var(--brand-muted);
-  max-width: 33ch;
-}
-
-/* grupperad lista, iOS-stil */
-.form-group {
-  background: var(--brand-surface); border-radius: 16px; overflow: hidden;
-  box-shadow: var(--lift);
-}
-.form-row {
-  display: flex; align-items: center; gap: 12px; width: 100%;
-  min-height: 56px; padding: 0 16px; background: none; border: none;
-  font-family: inherit; font-size: 17px; text-align: left;
-}
-/* Strecket dras från etikettens vänsterkant, inte från kortets. En separator som går
-   ut i kanten delar kortet i två kort; en indragen håller ihop dem som en lista.
-   Ritas som ett absolut placerat pseudoelement PÅ raden — den tidigare varianten
-   maskerade en genomgående inner-shadow med en vit ruta, och eftersom raden saknade
-   `position: relative` hamnade rutan mot sidan i stället för mot kortet och stack ut
-   som ett vitt streck till vänster om formuläret. */
-.form-row { position: relative; }
-.form-row + .form-row::before {
-  content: ""; position: absolute; top: 0; left: 16px; right: 0; height: 1px; background: var(--hairline);
-}
-.form-row-tappable { cursor: pointer; transition: background 140ms var(--ease-ui); }
-.form-row-tappable:active { background: var(--brand-field-bg); }
-.form-row-tappable:focus-visible { outline: none; box-shadow: var(--focus); }
-.form-row-label {
-  flex-shrink: 0; font-size: 17px; font-weight: 500; color: var(--brand-ink);
-  letter-spacing: -0.01em;
-}
-.form-row-value {
-  flex: 1; display: flex; align-items: center; justify-content: flex-end; gap: 9px;
-  min-width: 0; overflow: hidden;
-}
-.form-row-text {
-  font-size: 17px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.form-row-placeholder { font-size: 17px; color: var(--brand-muted-soft); }
-.form-row-chevron { display: flex; color: #C6BDB2; flex-shrink: 0; margin-right: -3px; }
-.form-row-input {
-  flex: 1; min-width: 0; border: none; background: none; padding: 0;
-  font-family: inherit; font-size: 17px; color: var(--brand-ink-strong); font-weight: 600;
-  text-align: right; letter-spacing: -0.01em;
-}
-.form-row-input::placeholder { color: var(--brand-muted-soft); font-weight: 400; }
-.form-row-input:focus { outline: none; }
-
-.home-cta { margin-top: 22px; margin-bottom: 28px; }
-.home-cta .btn-primary {
-  min-height: 52px; border-radius: 15px; font-size: 17px; font-weight: 700; letter-spacing: -0.01em;
-  transition: filter 140ms var(--ease-ui), transform 120ms var(--ease-ui);
-}
-.home-cta .btn-primary:not(:disabled):active { transform: scale(0.985); filter: brightness(0.95); }
-.form-hint {
-  margin: 10px 4px 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted); text-align: center;
-}
-/* Ett inaktivt CTA måste SE inaktivt ut. Med enbart .btn-primary bakom sig renderades
-   knappen i en dämpad orange som läser som fullt klickbar, och enda återkopplingen på
-   ett tryck var att ingenting hände. */
-.btn:disabled { background: #E8DDCE; color: #9A8E80; cursor: default; box-shadow: none; }
-.btn-text:disabled { background: none; }
-
-/* ---- monogram ---- */
-.brand-avatar {
-  display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
-  border-radius: 999px; font-weight: 700; letter-spacing: 0.01em;
-  /* Inre ring i stället för yttre kant: håller cirkelns diameter exakt och ger tonen
-     en kontur även mot en yta i nästan samma färg. */
-  box-shadow: inset 0 0 0 1px rgba(42, 27, 18, 0.05);
-}
-
-/* ---- bottensheet ---- */
-.sheet-root { position: fixed; inset: 0; z-index: 60; }
-.sheet-overlay {
-  position: absolute; inset: 0; background: rgba(24, 18, 14, 0.42);
-  -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
-  opacity: 0; transition: opacity 320ms var(--ease-ui);
-}
-.sheet-overlay-shown { opacity: 1; }
-.sheet {
-  position: absolute; left: 0; right: 0; bottom: 0; height: 78vh;
-  display: flex; flex-direction: column; overflow: hidden;
-  background: var(--brand-surface); border-radius: 22px 22px 0 0;
-  box-shadow: 0 -0.5px 0 rgba(42, 27, 18, 0.08), 0 -20px 60px rgba(24, 18, 14, 0.26);
-  transform: translateY(100%); transition: transform 420ms var(--ease-sheet);
-  max-width: 480px; margin: 0 auto; will-change: transform;
-}
-.sheet-shown { transform: translateY(0); }
-/* Under dragningen får inget tweenas — arket ska sitta fast i fingret. */
-.sheet-dragging { transition: none; }
-
-.sheet-grip { flex-shrink: 0; touch-action: none; cursor: grab; }
-.sheet-grip:active { cursor: grabbing; }
-.sheet-handle {
-  width: 36px; height: 5px; border-radius: 999px; background: #DCD2C4;
-  margin: 8px auto 0;
-}
-.sheet-header {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  padding: 14px 16px 12px;
-}
-.sheet-header h2 {
-  margin: 0; font-size: 22px; font-weight: 800; color: var(--brand-ink); letter-spacing: -0.025em;
-}
-.sheet-close {
-  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-  border: none; background: rgba(42, 27, 18, 0.06); color: #7C736B;
-  width: 30px; height: 30px; border-radius: 999px; cursor: pointer;
-  transition: background 140ms var(--ease-ui), color 140ms var(--ease-ui);
-}
-.sheet-close:hover { background: rgba(42, 27, 18, 0.11); color: var(--brand-ink); }
-.sheet-close:focus-visible { outline: none; box-shadow: var(--focus); }
-
-.sheet-search { position: relative; padding: 0 16px 10px; flex-shrink: 0; }
-.sheet-search-icon {
-  position: absolute; left: 27px; top: 50%; transform: translateY(-55%);
-  display: flex; color: #A79D93; pointer-events: none;
-}
-.sheet-search input {
-  width: 100%; border: none; border-radius: 11px; height: 40px;
-  padding: 0 34px 0 34px; font-size: 16px; font-family: inherit;
-  background: rgba(42, 27, 18, 0.055); color: var(--brand-ink);
-  transition: background 160ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
-}
-.sheet-search input::placeholder { color: #A79D93; }
-.sheet-search input:focus { outline: none; background: #fff; box-shadow: var(--focus); }
-.sheet-search-clear {
-  position: absolute; right: 25px; top: 50%; transform: translateY(-55%);
-  display: flex; align-items: center; justify-content: center;
-  width: 19px; height: 19px; border-radius: 999px; border: none; cursor: pointer;
-  background: #BDB3A8; color: #fff; padding: 0;
-}
-
-.sheet-body {
-  flex: 1; overflow-y: auto; padding: 0 16px calc(20px + env(safe-area-inset-bottom));
-  -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
-}
-.sheet-section-title {
-  position: sticky; top: 0; z-index: 1;
-  font-size: 13px; font-weight: 600; color: var(--brand-muted-soft); letter-spacing: -0.005em;
-  padding: 8px 4px 8px; background: var(--brand-surface);
-}
-
-.sheet-empty {
-  display: flex; flex-direction: column; align-items: center; justify-content: center;
-  min-height: 62%; padding: 24px 16px; text-align: center;
-}
-.sheet-empty-mark {
-  display: inline-flex; align-items: center; justify-content: center;
-  width: 54px; height: 54px; border-radius: 999px;
-  background: rgba(42, 27, 18, 0.055); color: #A79D93; margin-bottom: 15px;
-}
-.sheet-empty-title {
-  margin: 0 0 5px; font-size: 17px; font-weight: 700; color: var(--brand-ink-strong);
-  letter-spacing: -0.015em;
-}
-.sheet-empty-hint { margin: 0 0 20px; font-size: 14px; line-height: 1.45; color: var(--brand-muted); max-width: 28ch; }
-.brand-use-typed {
-  display: inline-flex; align-items: center; gap: 7px; max-width: 100%;
-  border: none; border-radius: 14px; background: var(--brand-cta); color: #fff;
-  padding: 13px 20px; font-family: inherit; font-size: 16px; font-weight: 700;
-  letter-spacing: -0.01em; cursor: pointer;
-  transition: filter 140ms var(--ease-ui), transform 120ms var(--ease-ui);
-}
-.brand-use-typed:active { transform: scale(0.98); filter: brightness(0.95); }
-.brand-use-typed:focus-visible { outline: none; box-shadow: var(--focus); }
-
-.brand-rows { list-style: none; margin: 0; padding: 0; }
-.brand-row {
-  position: relative; display: flex; align-items: center; gap: 12px; width: 100%;
-  border: none; background: none; padding: 9px 4px; min-height: 52px;
-  font-family: inherit; font-size: 17px; text-align: left; cursor: pointer;
-  transition: background 120ms var(--ease-ui);
-  border-radius: 10px;
-}
-/* Hårstrecket börjar där texten börjar, inte där raden gör. Fullbredds-streck läser som
-   en tabell; indragna läser som en lista av namn. */
-.brand-rows li + li .brand-row::before {
-  content: ""; position: absolute; top: 0; left: 50px; right: 0; height: 1px; background: var(--hairline);
-}
-.brand-row:active { background: rgba(42, 27, 18, 0.05); }
-.brand-row:active::before, .brand-row-selected::before { opacity: 0; }
-.brand-row:focus-visible { outline: none; box-shadow: var(--focus); }
-.brand-row-selected { background: rgba(242, 128, 31, 0.075); }
-.brand-row-name {
-  flex: 1; font-weight: 500; color: var(--brand-ink-strong); letter-spacing: -0.015em;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.brand-row-check { display: flex; color: var(--brand-accent); flex-shrink: 0; }
-
-/* ---- sparade möbler ---- */
-.collapsible-card { border-radius: 16px; box-shadow: var(--lift); }
-.collapsible-title { font-size: 16px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
-.collapsible-meta { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-muted); font-size: 15px; }
-.collapsible-chevron { display: flex; color: #C6BDB2; transition: transform 220ms var(--ease-ui); }
-.collapsible-chevron-open { transform: rotate(90deg); }
-.saved-item-title { font-size: 15px; font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em; }
-
-/* Respektera systemets rörelseinställning. Arket ska fortfarande dyka upp, bara utan resa. */
-@media (prefers-reduced-motion: reduce) {
-  .sheet, .sheet-overlay, .collapsible-chevron, .btn-primary, .brand-use-typed { transition-duration: 1ms; }
-}
-
-/* ---- misslyckad analys ---- */
+/* ==========================================================================
+   Misslyckad analys
+   ========================================================================== */
 .failure-card {
   display: flex; flex-direction: column; align-items: center; gap: 12px;
   max-width: 340px; width: 100%; text-align: center;
@@ -604,127 +869,134 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .failure-mark {
   display: flex; align-items: center; justify-content: center;
   width: 52px; height: 52px; border-radius: 999px;
-  background: rgba(242, 128, 31, 0.16); color: var(--brand-accent);
-  font-size: 26px; font-weight: 800; margin-bottom: 2px;
+  background: hsl(24 95% 53% / 0.16); color: var(--accent);
+  font-size: 26px; font-weight: 700; margin-bottom: 2px;
 }
-.failure-title { margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.025em; }
-.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: #C3BBB2; }
-.failure-card .btn-primary { min-height: 50px; border-radius: 15px; font-size: 17px; }
-.failure-secondary { color: #C3BBB2; }
+.failure-title { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.025em; }
+.failure-body { margin: 0 0 8px; font-size: 15px; line-height: 1.5; color: hsl(220 9% 70%); }
+.failure-card .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
+.failure-secondary { color: hsl(220 9% 70%); }
 .failure-details { margin-top: 8px; width: 100%; }
-.failure-details summary { font-size: 12px; color: #8A837C; cursor: pointer; }
+.failure-details summary { font-size: 12px; color: var(--muted); cursor: pointer; }
 .failure-details code {
-  display: block; margin-top: 8px; padding: 10px; border-radius: 10px;
-  background: rgba(255,255,255,0.05); color: #A8A29E; font-size: 11px;
+  display: block; margin-top: 8px; padding: 10px; border-radius: var(--r-sm);
+  background: rgba(255,255,255,0.06); color: hsl(220 9% 72%); font-size: 11px;
   text-align: left; word-break: break-word;
 }
 
-/* ---- prisvyn ---- */
+/* ==========================================================================
+   Priset
+   ========================================================================== */
 .price-hero-head { margin-bottom: 18px; }
 .price-identity {
   display: flex; align-items: center; gap: 10px; margin-top: 6px;
-  font-size: 22px; font-weight: 800; letter-spacing: -0.025em; color: var(--brand-ink);
+  font-size: 22px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+}
+.price-panel {
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 20px; text-align: center; box-shadow: var(--shadow-card);
+  display: flex; flex-direction: column; gap: 8px;
 }
 .price-big-card {
-  background: var(--brand-surface); border-radius: 22px; padding: 26px 20px 22px; text-align: center;
-  box-shadow: var(--lift); display: flex; flex-direction: column; gap: 9px;
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 26px 20px 22px; text-align: center; box-shadow: var(--lift);
+  display: flex; flex-direction: column; gap: 9px;
 }
+.price-panel-head {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted-soft);
+}
+.price-main { font-size: 36px; font-weight: 700; line-height: 1.05; letter-spacing: -0.03em; color: var(--ink); }
 .price-main-xl { font-size: 46px; letter-spacing: -0.04em; }
+.price-range { display: flex; align-items: center; gap: 10px; margin-top: 2px; }
+.price-range-end { display: flex; flex-direction: column; gap: 1px; min-width: 84px; }
+.price-range-end em { font-style: normal; font-weight: 700; font-size: 15px; }
+.price-range-end-high { align-items: flex-end; }
+.price-range-end:first-of-type { align-items: flex-start; }
+.price-range-bar {
+  flex: 1; height: 6px; border-radius: 999px;
+  background: linear-gradient(90deg, var(--green), hsl(45 93% 55%) 55%, var(--accent));
+  /* Ändpunkterna markeras med en ljus ring i vardera änden, så stapeln läser som en
+     skala med två avläsningspunkter och inte som en förloppsindikator. */
+  box-shadow: inset 3px 0 0 rgba(255,255,255,0.6), inset -3px 0 0 rgba(255,255,255,0.6);
+}
+.price-deduction {
+  margin: 6px 0 0; font-size: 14px; font-weight: 600; color: var(--accent-ink);
+  background: var(--accent-light); border-radius: var(--r-sm); padding: 9px 12px;
+}
+.price-basis { margin: 0; }
+.price-panel-empty { text-align: left; }
+.price-empty-title { margin: 0; font-weight: 700; }
 .price-caveat {
-  margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted);
+  margin: 10px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted);
   border-top: 1px solid var(--hairline); padding-top: 12px;
 }
 /* Platshållare i sifferns egen storlek, så kortet inte hoppar i höjd när priset landar. */
 .price-skeleton {
-  height: 50px; width: 62%; margin: 4px auto 2px; border-radius: 12px;
-  background: linear-gradient(90deg, #F3EDE4 25%, #FAF6F0 50%, #F3EDE4 75%);
+  height: 50px; width: 62%; margin: 4px auto 2px; border-radius: var(--r-sm);
+  background: linear-gradient(90deg, hsl(220 13% 94%) 25%, hsl(220 13% 98%) 50%, hsl(220 13% 94%) 75%);
   background-size: 240% 100%; animation: price-shimmer 1.3s var(--ease-ui) infinite;
 }
 @keyframes price-shimmer { from { background-position: 120% 0; } to { background-position: -120% 0; } }
 
-.next-step {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  margin-top: 22px; min-height: 54px; border-radius: 15px; font-size: 17px; letter-spacing: -0.01em;
-}
-.next-step-meta { display: inline-flex; align-items: center; gap: 6px; font-size: 14px; opacity: 0.85; font-weight: 600; }
-
-/* ---- delresultat ---- */
-.review-banner {
-  display: flex; align-items: center; gap: 10px;
-  background: #FBF0E2; color: #8A5A16; border-radius: 14px; padding: 11px 14px;
-  font-size: 13.5px; line-height: 1.4;
-}
-.review-spinner {
-  width: 14px; height: 14px; flex-shrink: 0; border-radius: 999px;
-  border: 2px solid rgba(138, 90, 22, 0.25); border-top-color: #8A5A16;
-  animation: review-spin 0.8s linear infinite;
-}
-@keyframes review-spin { to { transform: rotate(360deg); } }
-
-@media (prefers-reduced-motion: reduce) {
-  .price-skeleton, .review-spinner { animation-duration: 3s; }
-}
-
-/* ---- truth-card ---- */
-.btn-back { align-self: flex-start; padding-left: 0; }
+/* ==========================================================================
+   Truth-cardet
+   ========================================================================== */
 .truth-card {
-  background: var(--brand-surface); border-radius: 22px; padding: 22px 20px;
-  box-shadow: var(--lift); display: flex; flex-direction: column; gap: 7px;
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 22px 20px; box-shadow: var(--lift); display: flex; flex-direction: column; gap: 7px;
 }
 .truth-kicker {
-  font-size: 11px; font-weight: 800; letter-spacing: 0.09em; text-transform: uppercase;
-  color: var(--brand-muted-soft);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent);
 }
-.truth-title { margin: 0; font-size: 26px; font-weight: 800; letter-spacing: -0.03em; color: var(--brand-ink); }
-.truth-sub { font-size: 15px; color: var(--brand-muted); }
+.truth-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.truth-sub { font-size: 15px; color: var(--muted); }
 /* Hur mycket generatorn kunde belägga står på kortet, inte i en fotnot: en annons där måtten är
    gissade ska inte se likadan ut som en där de har en källa. */
 .truth-confidence {
   align-self: flex-start; margin-top: 6px; font-size: 12px; font-weight: 700;
   border-radius: 999px; padding: 5px 11px;
 }
-.truth-confidence-full { background: #E3F0E4; color: #2F6B3A; }
-.truth-confidence-partial { background: #FBF0E2; color: #8A5A16; }
-.truth-confidence-fallback { background: #F5E9E7; color: #8A3A2C; }
-.truth-caveat { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--brand-muted); }
+.truth-confidence-full { background: var(--green-light); color: var(--green-dark); }
+.truth-confidence-partial { background: var(--amber-light); color: var(--amber-ink); }
+.truth-confidence-fallback { background: var(--danger-light); color: var(--danger-dark); }
+.truth-caveat { margin: 6px 0 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
 
 .truth-block {
-  background: var(--brand-surface); border-radius: 18px; padding: 16px 18px;
-  box-shadow: var(--lift);
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 16px 18px; box-shadow: var(--shadow-card);
 }
 .truth-block h3 {
-  margin: 0 0 12px; font-size: 12px; font-weight: 800; letter-spacing: 0.08em;
-  text-transform: uppercase; color: var(--brand-muted-soft);
+  margin: 0 0 12px; font-size: 11px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-soft);
 }
 .truth-verdict { display: flex; align-items: center; gap: 12px; }
-.truth-verdict-label { font-size: 16px; font-weight: 700; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
+.truth-verdict-label { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
 .truth-price {
-  margin-left: auto; font-size: 22px; font-weight: 800; letter-spacing: -0.025em;
-  color: var(--brand-ink-strong); font-variant-numeric: tabular-nums; text-align: right;
+  margin-left: auto; font-size: 22px; font-weight: 700; letter-spacing: -0.025em;
+  color: var(--ink); text-align: right;
 }
-.truth-price .small { display: block; font-weight: 500; letter-spacing: 0; }
-
+.truth-price .small { display: block; font-weight: 500; letter-spacing: 0; color: var(--muted); }
 .truth-specs { margin: 0; display: flex; flex-direction: column; }
 .truth-spec { display: flex; gap: 14px; padding: 9px 0; align-items: baseline; }
 .truth-spec + .truth-spec { border-top: 1px solid var(--hairline); }
-.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: 14px; color: var(--brand-muted); }
-.truth-spec dd { margin: 0; flex: 1; font-size: 15px; font-weight: 600; color: var(--brand-ink-strong); }
-.truth-src { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--brand-accent); }
-
-.truth-listing-title { font-size: 17px; font-weight: 700; color: var(--brand-ink-strong); letter-spacing: -0.015em; }
-.truth-listing-body { margin: 8px 0 0; font-size: 15px; line-height: 1.55; color: #4A4139; white-space: pre-wrap; }
-.truth-listing-condition { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--brand-muted); }
-.truth-retail { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: var(--brand-ink-strong); }
+.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: 14px; color: var(--muted); }
+.truth-spec dd { margin: 0; flex: 1; font-size: 15px; font-weight: 600; color: var(--ink); }
+.truth-src { margin-left: 8px; font-size: 12px; font-weight: 500; color: var(--accent); }
+.truth-listing-title { font-size: 17px; font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.truth-listing-body { margin: 8px 0 0; font-size: 15px; line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
+.truth-listing-condition { margin: 10px 0 0; font-size: 14px; line-height: 1.5; color: var(--muted); }
+.truth-retail { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .truth-sources { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
-.truth-sources a { font-size: 14px; color: var(--brand-accent); word-break: break-word; }
-.truth-missing ul { margin: 0; padding-left: 18px; color: var(--brand-muted); font-size: 14px; line-height: 1.5; }
+.truth-sources a { font-size: 14px; color: var(--accent); word-break: break-word; }
+.truth-missing ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; line-height: 1.5; }
+.truth-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: 17px; }
+.provenance { margin: 0; font-size: 12.5px; color: var(--muted-soft); letter-spacing: 0.01em; }
 
-.result-footer .btn { white-space: nowrap; }
-.truth-done { margin-top: 4px; min-height: 52px; border-radius: 15px; font-size: 17px; }
-
-/* ---- publicera på Tradera ---- */
+/* ==========================================================================
+   Publicera på Tradera
+   ========================================================================== */
 .tradera-block { display: flex; flex-direction: column; gap: 10px; }
-.tradera-block .btn-primary { min-height: 50px; border-radius: 15px; font-size: 17px; }
+.tradera-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: 17px; }
 .tradera-block p { margin: 0; }
 .tradera-waiting { display: flex; align-items: center; gap: 12px; }
 .tradera-plan { margin: 2px 0 0; }
@@ -732,48 +1004,95 @@ body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; 
 .tradera-confirm-actions .btn-text { flex: 1; }
 .tradera-confirm-actions .btn-primary { flex: 2; }
 .tradera-error {
-  padding: 10px 12px; border-radius: 12px; background: #F5E9E7; color: #8A3A2C;
+  padding: 10px 12px; border-radius: var(--r-sm); background: var(--danger-light); color: var(--danger-dark);
   font-size: 14px; line-height: 1.45;
 }
 /* Publicerad: samma gröna kvitto som resten av appen ger för ett avslutat steg. */
-.tradera-done h3 { color: #2F6B3A; }
-.tradera-link { display: flex; align-items: center; justify-content: center; text-decoration: none; background: #16a34a; }
+.tradera-done h3 { color: var(--green-dark); }
+.tradera-link {
+  display: flex; align-items: center; justify-content: center; text-decoration: none;
+  background: var(--green); color: #fff; box-shadow: 0 4px 14px hsl(142 71% 45% / 0.28);
+}
 
-.provenance { margin: 0; font-size: 12.5px; color: var(--brand-muted-soft); letter-spacing: 0.01em; }
-
-/* ---- modellval ---- */
+/* ==========================================================================
+   Modellval och specifikationer
+   ========================================================================== */
 .candidate-list { display: flex; flex-direction: column; gap: 10px; }
 .candidate {
-  display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
-  background: var(--brand-surface); border: none; border-radius: 18px; padding: 16px 14px 16px 18px;
-  box-shadow: var(--lift); cursor: pointer; font-family: inherit;
-  transition: transform 120ms var(--ease-ui), box-shadow 160ms var(--ease-ui);
+  display: flex; align-items: center; gap: 14px; width: 100%; text-align: left;
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 12px 14px 12px 12px; box-shadow: var(--shadow-card); cursor: pointer; font-family: inherit;
+  transition: background 120ms var(--ease-ui);
 }
-.candidate:active { transform: scale(0.99); }
+.candidate:active { background: hsl(220 16% 97%); }
 .candidate:focus-visible { outline: none; box-shadow: var(--focus); }
 .candidate-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.candidate-name { font-size: 19px; font-weight: 800; letter-spacing: -0.025em; color: var(--brand-ink); }
-.candidate-variant { font-size: 15px; color: var(--brand-ink-strong); }
+.candidate-name { flex: 1; font-size: 18px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
+.candidate-variant { font-size: 15px; color: var(--ink-soft); }
 /* Det som skiljer kandidaterna åt får mest visuell vikt efter namnet — det är det man väljer PÅ. */
-.candidate-detail { font-size: 14px; line-height: 1.4; color: var(--brand-muted); margin-top: 2px; }
+.candidate-detail { font-size: 14px; line-height: 1.4; color: var(--muted); margin-top: 2px; }
 .candidate-confidence {
   align-self: flex-start; margin-top: 8px; font-size: 11.5px; font-weight: 700;
   border-radius: 999px; padding: 4px 10px;
 }
-.candidate-confidence-strong { background: #E3F0E4; color: #2F6B3A; }
-.candidate-confidence-likely { background: #FBF0E2; color: #8A5A16; }
-.candidate-confidence-possible { background: rgba(42,27,18,0.06); color: var(--brand-muted); }
-.candidate-chevron { display: flex; color: #C6BDB2; flex-shrink: 0; }
+.candidate-confidence-strong { background: var(--green-light); color: var(--green-dark); }
+.candidate-confidence-likely { background: var(--amber-light); color: var(--amber-ink); }
+.candidate-confidence-possible { background: var(--field); color: var(--muted); }
+.candidate-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; }
+.candidate-photo {
+  flex-shrink: 0; width: 72px; height: 72px; border-radius: var(--r); overflow: hidden;
+  background: var(--field); display: flex; align-items: center; justify-content: center;
+  box-shadow: inset 0 0 0 1px hsl(220 13% 13% / 0.05);
+}
+.candidate-photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
+/* Platshållare i bildens storlek, så listan inte hoppar när bilderna tonar in. */
+.candidate-photo-empty {
+  width: 100%; height: 100%;
+  background: linear-gradient(90deg, hsl(220 13% 94%) 25%, hsl(220 13% 98%) 50%, hsl(220 13% 94%) 75%);
+  background-size: 240% 100%; animation: price-shimmer 1.4s var(--ease-ui) infinite;
+}
 .manual-model-link { align-self: center; margin-top: 4px; }
 .manual-model { margin-top: 4px; }
 .specs-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
 .specs-head .truth-confidence { margin-top: 2px; }
-
 .identify-fallback-note {
-  margin: 0; padding: 11px 14px; border-radius: 14px;
-  background: #FBF0E2; color: #8A5A16; font-size: 13.5px; line-height: 1.4;
+  margin: 0; padding: 11px 14px; border-radius: var(--r);
+  background: var(--amber-light); color: var(--amber-ink); font-size: 13.5px; line-height: 1.4;
 }
 .identify-fallback-floating {
   max-width: 480px; margin: 16px auto -8px; position: relative; z-index: 1;
   width: calc(100% - 32px);
 }
+
+/* Respektera systemets rörelseinställning. Arket ska fortfarande dyka upp, bara utan resa. */
+@media (prefers-reduced-motion: reduce) {
+  .sheet, .sheet-overlay, .collapsible-chevron, .btn, .brand-use-typed, .auth-tabs-thumb {
+    transition-duration: 1ms;
+  }
+  .price-skeleton, .review-spinner, .candidate-photo-empty { animation-duration: 3s; }
+}
+
+
+/* ==========================================================================
+   Detaljer som tillkom i genomgången
+   ========================================================================== */
+
+/* Textknapp med ikon: symbolen ligger på textens optiska mitt, inte på baslinjen. */
+.icon-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
+.icon-btn svg, .btn-back svg { flex-shrink: 0; }
+
+/* Rubrik med ikon i ett fällbart kort. */
+.collapsible-title-icon { display: inline-flex; align-items: center; gap: 8px; }
+.collapsible-title-icon svg { color: var(--muted); flex-shrink: 0; }
+
+/* Hairline mellan kortets rubrik och listan under, aldrig runt kortet. */
+.saved-list { border-top: 1px solid var(--hairline); padding-top: 10px; }
+
+/* Rubriker i grupperade kort följer iOS: versaler, grå, tunn spärr — etiketten
+   över en lista, inte en rubrik som konkurrerar med innehållet under sig. */
+.truth-block h3, .profile-section-title, .tech-section h4, .sheet-section-title, .price-panel-head {
+  font-weight: 600; letter-spacing: 0.05em;
+}
+
+/* Fokus syns lika tydligt på mörk botten som på ljus. */
+.screen-dark .btn:focus-visible { box-shadow: 0 0 0 3.5px hsl(24 95% 53% / 0.45); }

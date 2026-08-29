@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { ArrowLeftIcon, MinusIcon, PlusIcon } from "./icons";
 import { imageUrl } from "../api";
 import type { CapturedImage, Damage } from "../types";
 import { TYPE_LABELS } from "../lib/labels";
@@ -68,16 +69,20 @@ export default function EvidenceViewer({
     <div className="evidence-viewer">
       <div className="evidence-viewer-top">
         <button className="btn btn-ghost" onClick={onClose}>
-          ← Tillbaka
+          <ArrowLeftIcon /> Tillbaka
         </button>
         <div className="evidence-viewer-title">
           {TYPE_LABELS[damage.type] ?? damage.type}
           {imgMeta?.viewLabel ? ` · ${imgMeta.viewLabel}` : ""}
         </div>
         <div className="zoom-controls">
-          <button onClick={zoomOut}>−</button>
+          <button onClick={zoomOut} aria-label="Zooma ut">
+            <MinusIcon size={15} />
+          </button>
           <span>{zoom}%</span>
-          <button onClick={zoomIn}>+</button>
+          <button onClick={zoomIn} aria-label="Zooma in">
+            <PlusIcon size={15} />
+          </button>
         </div>
       </div>
 

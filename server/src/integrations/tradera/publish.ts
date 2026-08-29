@@ -10,6 +10,7 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { getJob, jobDir, persist } from "../../jobStore.js";
+import { presentableImages, resolveCoverImageId } from "../../pipeline/cover.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, Severity, TraderaPublication } from "../../types.js";
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
 import {
@@ -89,7 +90,7 @@ const SEVERITY_LABELS: Record<Severity, string> = {
  * Tre saker måste finnas: en annonstext, ett pris och minst en bild. Saknas något sägs det rakt ut i
  * stället för att annonsen skickas iväg och avvisas av Tradera med ett engelskt valideringsfel.
  */
-export function planTraderaPublish(job: ConditionJob): PublishReadiness {
+export async function planTraderaPublish(job: ConditionJob): Promise<PublishReadiness> {
   const result = job.result;
   const card = result?.listing?.result ?? null;
   if (!result) return { ok: false, reason: "Analysen är inte klar än." };
@@ -101,7 +102,7 @@ export function planTraderaPublish(job: ConditionJob): PublishReadiness {
   const price = resolvePrice(job);
   if (!price) return { ok: false, reason: "Det finns inget pris att sätta som utropspris." };
 
-  const images = listingImages(job);
+  const images = await listingImages(job);
   if (images.length === 0) return { ok: false, reason: "Jobbet har inga bilder kvar på disk." };
 
   const category = traderaCategoryFor({
@@ -139,9 +140,21 @@ function resolvePrice(job: ConditionJob): { value: number; source: "condition" |
   return null;
 }
 
-function listingImages(job: ConditionJob): CapturedImage[] {
+/**
+ * Bilderna till annonsen: omslaget först, obrukbara bildrutor bortsorterade.
+ *
+ * Tradera gör den FÖRSTA uppladdade bilden till annonsens omslag, så ordningen är inte kosmetisk —
+ * den är det köparen ser i sökresultatet. `coverImageId` sätts av pipelinen; saknas den (jobb från
+ * före omslagsvalet) räknas den fram av resolveCoverImageId innan det här anropas.
+ */
+async function listingImages(job: ConditionJob): Promise<CapturedImage[]> {
   const images = job.result?.images ?? job.images ?? [];
-  return images.slice(0, MAX_TRADERA_IMAGES);
+  const presentable = await presentableImages(
+    images,
+    path.join(jobDir(job.id), "originals"),
+    job.result?.coverImageId ?? null,
+  );
+  return presentable.slice(0, MAX_TRADERA_IMAGES);
 }
 
 // ---------- Publicering ----------
@@ -157,7 +170,11 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
   if (!job) return;
 
   try {
-    const readiness = planTraderaPublish(job);
+    // Äldre jobb saknar omslagsvalet helt och skulle annars lägga sin första bildruta överst — den
+    // som ofta är svart. Räknas fram och sparas här, en gång, innan annonsen byggs.
+    await resolveCoverImageId(job);
+
+    const readiness = await planTraderaPublish(job);
     if (!readiness.ok) throw new Error(readiness.reason);
     const { plan } = readiness;
 
@@ -250,7 +267,7 @@ async function update(
 async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
   const dir = path.join(jobDir(job.id), "originals");
   const images: TraderaImage[] = [];
-  for (const image of listingImages(job)) {
+  for (const image of await listingImages(job)) {
     try {
       const data = await readFile(path.join(dir, image.path));
       images.push({ data, mime: image.path.toLowerCase().endsWith(".png") ? "image/png" : "image/jpeg" });

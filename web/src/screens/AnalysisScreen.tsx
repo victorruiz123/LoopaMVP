@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { CheckCircleIcon } from "../components/icons";
 import { getJob, retryJob } from "../api";
 import { explainError } from "../lib/errors";
 import type { CapturedShot } from "../api";
@@ -128,7 +129,11 @@ export default function AnalysisScreen({
             const state = rank < stageRank ? "done" : rank === stageRank ? "active" : "pending";
             return (
               <li key={c.stage} className={`checklist-item checklist-${state}`}>
-                <span className="checklist-marker">{state === "done" ? "✓" : state === "active" ? "●" : "○"}</span>
+                {/* Bocken är en ikon, de två andra lägena rena cirklar i CSS. Som tecken satt de
+                    på textens baslinje och hoppade i storlek mellan raderna. */}
+                <span className="checklist-marker">
+                  {state === "done" ? <CheckCircleIcon size={17} /> : <span className="checklist-dot" />}
+                </span>
                 {c.label}
               </li>
             );

@@ -10,6 +10,7 @@ import { DAMAGE_TYPES, inspectFurniture } from "./inspect.js";
 import { needsVerification, verifyFindings } from "./verify.js";
 import { dedupeDamages } from "./dedup.js";
 import { gradeCondition } from "./grade.js";
+import { coverFirst, pickCoverImageId } from "./cover.js";
 
 /**
  * Runs the full ConditionInput -> ConditionResult pipeline. AT MOST 2 Gemini calls: one main inspection
@@ -66,6 +67,14 @@ export async function runConditionGrading(
     track(inspection.callMeta);
     timer.lap("inspect");
 
+    // Omslaget avgörs här, medan inspektionens vy-val fortfarande finns i handen. Duglighetsspärren
+    // kör över det om bildrutan är svart eller utbränd — se cover.ts.
+    const coverImageId = await pickCoverImageId(
+      images,
+      path.join(dir, "originals"),
+      inspection.coverImageIndex,
+    );
+
     /**
      * Andrabesiktningen är urkopplad (VERIFY_ENABLED, default av). Med flaggan AV går fynden rakt
      * från inspektionen till dedup, grade och pris, och kortet publiceras EN gång — det finns inget
@@ -100,7 +109,8 @@ export async function runConditionGrading(
         buildResult({
           jobId, inspection, damages: provisionalDamages, images, calls, tokensUsed,
           grade: provisionalGrade,
-          identity, price: null, reviewPending: true, reviewed: false, listing: null, startedAt,
+          identity, price: null, reviewPending: true, reviewed: false, listing: null,
+          coverImageId, startedAt,
         }),
       );
       timer.lap("publish_provisional");
@@ -114,7 +124,7 @@ export async function runConditionGrading(
         ? (() => {
             const abort = new AbortController();
             const signature = pricingSignature(provisionalDamages, provisionalGrade.canonicalCondition);
-            const promise = coverImage(dir, images)
+            const promise = coverImage(dir, images, coverImageId)
               .then((cover) =>
                 estimatePrice(identity, provisionalDamages, provisionalGrade.canonicalCondition, cover, abort.signal),
               )
@@ -172,7 +182,8 @@ export async function runConditionGrading(
 
     const result = buildResult({
       jobId, inspection, damages, images, calls, tokensUsed, grade,
-      identity, price: null, reviewPending: false, reviewed: VERIFY_ENABLED, listing: null, startedAt,
+      identity, price: null, reviewPending: false, reviewed: VERIFY_ENABLED, listing: null,
+      coverImageId, startedAt,
     });
     // Publiceras UTAN att vänta in annonsen. Skicket och priset är färdiga; att hålla dem inne tills
     // truth-cardet är klart hade gjort den långsammaste av tre parallella grenar till allas tempo.
@@ -235,6 +246,7 @@ function buildResult(a: {
   reviewPending: boolean;
   reviewed: boolean;
   listing: ListingResult | null;
+  coverImageId: string | null;
   startedAt: number;
 }): ConditionResult {
   return {
@@ -251,6 +263,7 @@ function buildResult(a: {
     damages: a.damages,
     overallCondition: a.inspection.overallCondition,
     images: a.images,
+    coverImageId: a.coverImageId,
     modelUsed: summarizeModelUsage(a.calls),
     tokensUsed: a.tokensUsed,
     costUsd: estimateCostUsd(a.tokensUsed),
@@ -263,8 +276,8 @@ function buildResult(a: {
  * One frame for the price engine to read the furniture TYPE out of — "Landskrona" alone spans sofa,
  * corner sofa, armchair and footstool. Best-effort: a missing file must not cost the whole price step.
  */
-async function coverImage(dir: string, images: CapturedImage[]): Promise<string | null> {
-  const first = images[0];
+async function coverImage(dir: string, images: CapturedImage[], coverImageId: string | null = null): Promise<string | null> {
+  const first = coverFirst(images, coverImageId)[0];
   if (!first) return null;
   try {
     const part = await loadImageAsBase64(path.join(dir, "originals", first.path));

@@ -86,7 +86,7 @@ export default function PriceScreen({
             <p className="muted small">
               {job?.result?.reviewPending ? "Väger in skadorna…" : "Bedömer skicket…"}
             </p>
-            <p className="muted small">Priset beror på skicket, så det räknas när besiktningen är klar.</p>
+            <p className="muted small">Priset räknas när besiktningen är klar — skadorna påverkar det.</p>
           </>
         ) : price.status === "no_data" ? (
           <>
@@ -131,7 +131,7 @@ export default function PriceScreen({
       </button>
       <p className="form-hint">
         {conditionReady
-          ? "Skadelistan och truth-cardet väntar på dig."
+          ? "Skadelistan och truth-cardet är klara."
           : conditionFailed
             ? "Besiktningen stötte på ett problem."
             : "Besiktning, prissättning och annons kör parallellt."}

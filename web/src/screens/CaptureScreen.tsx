@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { ArrowLeftIcon, CameraIcon, FolderIcon, PhotosIcon, VideoIcon } from "../components/icons";
 import { createJob, type CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
 import { extractBestFrames, EXTRACTION_TARGET_MS, type ExtractionReport } from "../lib/videoFrames";
@@ -289,13 +290,15 @@ export default function CaptureScreen({
   if (mode === "choose") {
     return (
       <div className="screen screen-light">
-        <button className="btn btn-ghost btn-back" onClick={onBack}>
-          ← Tillbaka
+        <button className="btn btn-text btn-back" onClick={onBack}>
+          <ArrowLeftIcon /> Tillbaka
         </button>
         <h2 className="choose-title">Hur vill du visa möbeln?</h2>
         <p className="capture-identity">{[identity.brand, identity.model].filter(Boolean).join(" ")}</p>
         <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("video")}>
-          <span className="choose-icon">🎥</span>
+          <span className="choose-icon">
+            <VideoIcon />
+          </span>
           <div>
             <strong>Spela in en snabb video</strong>
             <p className="muted">
@@ -304,7 +307,9 @@ export default function CaptureScreen({
           </div>
         </button>
         <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("photo")}>
-          <span className="choose-icon">📷</span>
+          <span className="choose-icon">
+            <CameraIcon />
+          </span>
           <div>
             <strong>Ta bilder manuellt</strong>
             <p className="muted">
@@ -313,14 +318,18 @@ export default function CaptureScreen({
           </div>
         </button>
         <button className="choose-card" onClick={() => videoFileInputRef.current?.click()}>
-          <span className="choose-icon">📁</span>
+          <span className="choose-icon">
+            <FolderIcon />
+          </span>
           <div>
             <strong>Ladda upp en videofil</strong>
             <p className="muted">Välj en färdig film — vi extraherar bildrutorna åt dig.</p>
           </div>
         </button>
         <button className="choose-card" onClick={() => fileInputRef.current?.click()}>
-          <span className="choose-icon">🖼️</span>
+          <span className="choose-icon">
+            <PhotosIcon />
+          </span>
           <div>
             <strong>Ladda upp bilder</strong>
             <p className="muted">Har du redan foton? Välj upp till {MAX_IMAGES} — ingen film behövs.</p>
@@ -342,13 +351,13 @@ export default function CaptureScreen({
         {!cameraStarted && (
           <div className="camera-placeholder">
             <button className="btn btn-ghost" onClick={() => setMode("choose")}>
-              ← Tillbaka
+              <ArrowLeftIcon /> Tillbaka
             </button>
           </div>
         )}
         <div className="capture-overlay-frame" />
         <button className="btn btn-ghost capture-mode-back" onClick={() => setMode("choose")}>
-          ← Tillbaka
+          <ArrowLeftIcon /> Tillbaka
         </button>
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
         {shots.length > 0 && (
@@ -377,7 +386,7 @@ export default function CaptureScreen({
         <div className="capture-overlay-frame" />
         {!recording && (
           <button className="btn btn-ghost capture-mode-back" onClick={() => setMode("choose")}>
-            ← Tillbaka
+            <ArrowLeftIcon /> Tillbaka
           </button>
         )}
         {recording && (
@@ -390,7 +399,7 @@ export default function CaptureScreen({
           {!recording
             ? "Tryck för att börja spela in och gå långsamt runt möbeln"
             : tooFast
-              ? "🐌 Gå långsammare — annars blir bilderna suddiga"
+              ? "Gå långsammare — annars blir bilderna suddiga"
               : hasRotation === false
                 ? `${GUIDANCE_STEPS[stepIndex]} — tryck för att avsluta när du gått runt`
                 : rotationDeg < 20

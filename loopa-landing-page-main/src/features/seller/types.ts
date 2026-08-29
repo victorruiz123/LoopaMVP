@@ -71,6 +71,14 @@ export interface SellerProductCandidate {
   confidence: SellerCandidateConfidence
   /** Short seller-facing hint that tells the candidates apart (e.g. "hög rygg, teakstomme"). */
   distinguishingDetail: string | null
+  /**
+   * Product page the model claims to have seen for THIS candidate, or null.
+   *
+   * Never trusted as fact — this file's own history is a model that populated `sourceUrl` fields with
+   * URLs it had never seen. The caller fetches it and checks the page title names the model before
+   * using anything from it, so an invented address yields nothing rather than a wrong picture.
+   */
+  sourceUrl?: string | null
 }
 
 /** Hard product cap on how many candidates the seller is ever shown. */

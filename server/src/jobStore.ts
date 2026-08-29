@@ -15,11 +15,13 @@ export function jobDir(id: string): string {
 export async function createJob(
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
+  ownerId: string | null = null,
 ): Promise<ConditionJob> {
   const id = randomUUID();
   const job: ConditionJob = {
     id,
     createdAt: new Date().toISOString(),
+    ownerId,
     progress: { stage: "queued", message: "I kö…" },
     result: null,
     error: null,
