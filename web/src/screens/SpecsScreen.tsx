@@ -9,12 +9,16 @@ import { usePageTitle } from "../lib/pageTitle";
 
 /** Måttraderna i den ordning en möbel mäts, inte i den ordning källan råkade lista dem. */
 const DIM_ROWS: [RegExp, string][] = [
+  // Längden står först och i måttblocket, inte nere bland specifikationerna: för ett bord är den
+  // det längsta måttet och det modellen ritas på. Den låg tidigare utanför DIM_LABEL och hamnade
+  // därför under "Specifikationer", bredvid material och färg.
+  [/^(längd|langd|length)/i, "Längd"],
   [/^(bredd|width)/i, "Bredd"],
   [/^(djup|depth)/i, "Djup"],
   [/^(höjd|hojd|height)$|^(total)?höjd/i, "Höjd"],
   [/(sitthöjd|sitshöjd|seat height)/i, "Sitthöjd"],
 ];
-const DIM_LABEL = /^(bredd|djup|höjd|hojd|sitthöjd|sitshöjd|width|depth|height|seat height)/i;
+const DIM_LABEL = /^(längd|langd|length|bredd|djup|höjd|hojd|sitthöjd|sitshöjd|width|depth|height|seat height)/i;
 
 const STATUS_LABELS: Record<string, string> = {
   full: "Allt belagt med källa",

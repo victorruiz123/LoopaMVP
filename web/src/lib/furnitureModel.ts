@@ -160,6 +160,24 @@ export function parseDimensions(attributes: ListingAttribute[], archetype: Arche
     depth ??= combined[1];
     height ??= combined[2];
   }
+  /**
+   * Bord och sängar mäts längd × bredd. Allt annat mäts bredd × djup.
+   *
+   * IKEA skriver ett matbord som "Längd 210 cm | Bredd 105 cm | Höjd 75 cm" — där ÄR bredden det
+   * korta måttet, alltså djupet framifrån sett. Läses etiketterna rakt av blir bredden 105, längden
+   * kastas, och djupet fylls i från TYPICAL: ett 210 × 105-bord ritades ut som 105 × 60. Båda talen
+   * fel, och det enda riktiga måttet i underlaget outnyttjat.
+   *
+   * Bara när djupet saknas — står "Djup" utskrivet är det redan svaret — och bara när längden är det
+   * längre av de två. Är den kortare är etiketterna inte de vi tror, och då är det bättre att låta
+   * dem stå. Soffor, stolar och skåp rörs inte: en soffa mäts redan på längden i bredd-fältet, och en
+   * stol med "Bredd 40" och "Längd 90" är 40 bred — de 90 är kartongen.
+   */
+  if ((archetype === "table" || archetype === "bed") && depth === null && length !== null && width !== null && length >= width) {
+    depth = width;
+    width = length;
+  }
+
   // Längden är bredden bara när ingen bredd står någonstans. En soffa mäts på längden, men en stol
   // med både "Bredd 40 cm" och "Längd 90 cm" är 40 cm bred — de 90 är kartongen den kom i.
   width ??= length;
