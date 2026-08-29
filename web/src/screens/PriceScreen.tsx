@@ -4,6 +4,8 @@ import { getJob } from "../api";
 import { formatSek, variantLabel } from "../lib/price";
 import { ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
+import PriceLadderPicker from "../components/PriceLadderPicker";
+import { usePageTitle } from "../lib/pageTitle";
 
 /**
  * Priset först, skicket sedan.
@@ -23,6 +25,7 @@ export default function PriceScreen({
   onSeeCondition: () => void;
 }) {
   const [job, setJob] = useState<ConditionJob | null>(null);
+  usePageTitle("Prisförslag");
 
   /**
    * Priset visas först — men räknas SIST.
@@ -61,7 +64,7 @@ export default function PriceScreen({
   const conditionFailed = failed;
 
   return (
-    <div className="screen screen-light">
+    <div className="screen screen-light price-screen">
       <header className="price-hero-head">
         <span className="brand-pill">
           <span className="brand-dot" /> PRISFÖRSLAG
@@ -121,6 +124,10 @@ export default function PriceScreen({
           </>
         )}
       </section>
+
+      {price?.status === "ok" && price.default !== null && (
+        <PriceLadderPicker jobId={jobId} price={price} initial={job?.priceLadder ?? null} />
+      )}
 
       <button className="btn btn-primary next-step" onClick={onSeeCondition}>
         <span>{conditionFailed ? "Se vad som hände" : "Se skickbedömningen"}</span>

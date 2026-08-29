@@ -100,6 +100,18 @@ export function UserIcon({ size = 18 }: { size?: number }) {
   );
 }
 
+/** Två personer: adminpanelen, som handlar om konton och inte om ett konto. */
+export function UsersIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <circle cx="9" cy="8" r="3.2" />
+      <path d="M2.8 19.5a6.4 6.4 0 0 1 12.4 0" />
+      <path d="M16.2 5.2a3.2 3.2 0 0 1 0 5.6" />
+      <path d="M17.6 14.2a6.4 6.4 0 0 1 3.6 5.3" />
+    </svg>
+  );
+}
+
 export function ArrowLeftIcon({ size = 17 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base} strokeWidth={2.2}>
@@ -113,6 +125,34 @@ export function CardIcon({ size = 18 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
       <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
       <path d="M3 9.5h18M7 14h5" />
+    </svg>
+  );
+}
+
+/**
+ * Kortet med luppen: sök upp ett truth-card på dess Loopa-ID.
+ *
+ * Skild från den vanliga luppen med flit. De två söker olika saker på samma skärm — märken i listan,
+ * och ett enskilt publikt kort någon annanstans i Loopa — och en lupp som betyder två saker är ingen
+ * ikon utan en gissning.
+ */
+export function CardSearchIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M21 11.5v-6A2 2 0 0 0 19 3.5H5a2 2 0 0 0-2 2v11a2 2 0 0 0 2 2h6" />
+      <path d="M3 8.5h18" />
+      <circle cx="16.5" cy="16.5" r="3.5" />
+      <path d="m19.4 19.4 1.9 1.9" />
+    </svg>
+  );
+}
+
+/** Kopiera. Två ark, det främre förskjutet — samma bild som i alla system den här appen körs i. */
+export function CopyIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <rect x="9" y="9" width="11" height="11" rx="2.2" />
+      <path d="M15 5.5A2.5 2.5 0 0 0 12.5 3H6a3 3 0 0 0-3 3v6.5A2.5 2.5 0 0 0 5.5 15" />
     </svg>
   );
 }
@@ -186,6 +226,52 @@ export function MinusIcon({ size = 16 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base} strokeWidth={2.2}>
       <path d="M5 12h14" />
+    </svg>
+  );
+}
+
+export function SofaIcon({ size = 22 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M20 9.5v-3A2.5 2.5 0 0 0 17.5 4h-11A2.5 2.5 0 0 0 4 6.5v3" />
+      <path d="M2 11.5v5A1.5 1.5 0 0 0 3.5 18h17a1.5 1.5 0 0 0 1.5-1.5v-5a2 2 0 0 0-4 0V13H6v-1.5a2 2 0 0 0-4 0Z" />
+      <path d="M5 18v2M19 18v2" />
+    </svg>
+  );
+}
+
+export function MobileIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <rect x="7" y="2.5" width="10" height="19" rx="2.5" />
+      <path d="M10.75 18.5h2.5" />
+    </svg>
+  );
+}
+
+export function DesktopIcon({ size = 15 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <rect x="2.5" y="4" width="19" height="12.5" rx="2" />
+      <path d="M9 20.5h6M12 16.5v4" />
+    </svg>
+  );
+}
+
+export function SparkIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M12 3.2 13.7 9l5.8 1.7-5.8 1.7L12 18.2 10.3 12.4 4.5 10.7 10.3 9z" />
+      <path d="M18.6 3.4 19.2 5.4l2 .6-2 .6-.6 2-.6-2-2-.6 2-.6z" />
+    </svg>
+  );
+}
+
+export function SendIcon({ size = 17 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M4.2 11.9 19.5 4.7 12.9 20l-2-6.2z" />
+      <path d="m10.9 13.8 3.6-3.6" />
     </svg>
   );
 }

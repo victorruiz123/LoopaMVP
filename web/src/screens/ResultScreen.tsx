@@ -5,8 +5,7 @@ import GradeBadge from "../components/GradeBadge";
 import DamageCard from "../components/DamageCard";
 import EvidenceViewer from "../components/EvidenceViewer";
 import TechnicalPanel from "../components/TechnicalPanel";
-import PricePanel from "../components/PricePanel";
-import { AlertIcon, CameraIcon, ChevronRight, PhotosIcon, PlusIcon } from "../components/icons";
+import { AlertIcon, ArrowLeftIcon, CameraIcon, ChevronRight, PhotosIcon, PlusIcon } from "../components/icons";
 import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
@@ -15,19 +14,30 @@ import {
   SEVERITY_LABELS,
   IMPACT_LABELS,
 } from "../lib/labels";
+import { usePageTitle } from "../lib/pageTitle";
 
+/**
+ * Skicket och skadorna — och EN väg vidare.
+ *
+ * Truth-cardet var förut en knapp bland tre: "se truth-card", "startsidan", "skanna en möbel till".
+ * Tre knappar sida vid sida gör kortet till ett val, och ett val går att välja bort — säljaren kunde
+ * skanna färdigt utan att någonsin se det kort som är hela produkten. Kortet är inte ett tillval till
+ * besiktningen, det ÄR vad besiktningen blir, så det är det enda steget härifrån.
+ *
+ * Vägen ut finns kvar överst, som på varje annan skärm i flödet. Att backa är inte ett nästa steg.
+ */
 export default function ResultScreen({
   jobId,
-  onRestart,
   onHome,
-  onSeeTruthCard,
+  onContinue,
 }: {
   jobId: string;
-  onRestart: () => void;
   onHome: () => void;
-  onSeeTruthCard?: () => void;
+  /** Vidare till truth-cardet. Får resultatet med sig, så steget aldrig kan falla på en hämtning. */
+  onContinue: (result: ConditionResult) => void;
 }) {
   const [result, setResult] = useState<ConditionResult | null>(null);
+  usePageTitle("Skickbedömning");
   const [imagesExpanded, setImagesExpanded] = useState(false);
   const [viewer, setViewer] = useState<{ damage: Damage; index: number } | null>(null);
   const [addingDamage, setAddingDamage] = useState(false);
@@ -133,12 +143,21 @@ export default function ResultScreen({
   }
 
   return (
-    <div className="screen screen-light">
+    <div className="screen screen-light result-screen">
+      <button className="btn btn-text btn-back" onClick={onHome}>
+        <ArrowLeftIcon /> Startsidan
+      </button>
+
       {result.identity && (
         <h2 className="result-identity">{[result.identity.brand, result.identity.model].filter(Boolean).join(" ")}</h2>
       )}
 
-      <div className="report-hero">
+      {/* Domen och det den vilar på: betyg, granskningens status, underlaget. I datorvyn blir det
+          här en fäst vänsterspalt som står kvar medan fynden rullar förbi — på telefonen är
+          omslaget genomskinligt och raderna ligger kvar precis där de låg. */}
+      <div className="result-rail">
+        {/* Bara betyget här. Priset stod i steget före och är samma siffra — upprepat på skadesidan
+            läser det som ett nytt besked, och skadelistan under det som en andra nedräkning. */}
         {result.grade && (
           <section className="grade-hero">
             <GradeBadge grade={result.grade.grade} size={72} />
@@ -146,104 +165,98 @@ export default function ResultScreen({
             <p className="grade-hero-rationale">{result.grade.rationale}</p>
           </section>
         )}
-        {result.price && <PricePanel price={result.price} />}
-      </div>
 
-      {result.reviewPending && (
-        <div className="review-banner">
-          <span className="review-spinner" aria-hidden="true" />
-          Andrabesiktningen pågår — listan kan ändras när den är klar.
-        </div>
-      )}
-
-      {/* Kortet är ett attest. Det ska säga vad det bygger på — antal vyer, hur många besiktningar,
-          när — i stället för att låta läsaren anta det starkare alternativet. */}
-      <p className="provenance">
-        {result.images.length} {result.images.length === 1 ? "vy" : "vyer"} ·{" "}
-        {result.reviewed ? "två besiktningar" : "en besiktning"} ·{" "}
-        {new Date(result.createdAt).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
-      </p>
-
-      <h3 className="damage-summary-line">
-        {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}
-      </h3>
-
-      <div className="damage-groups">
-        {groupByType(visible).map(({ type, items }) => (
-          <div key={type} className="damage-group">
-            <div className="damage-group-header">
-              {TYPE_LABELS[type]} — {items.filter((d) => d.sellerAction !== "rejected").length}
-            </div>
-            <div className="damage-list">
-              {items.map((d) => (
-                <DamageCard
-                  key={d.id}
-                  jobId={jobId}
-                  damage={d}
-                  images={result.images}
-                  hideType
-                  onDispute={() => openDispute(d.id)}
-                  disputing={disputing === d.id}
-                  onAction={(action, patch) => handleDamageAction(d, action, patch)}
-                  onOpenEvidence={(index) => setViewer({ damage: d, index })}
-                />
-              ))}
-            </div>
+        {result.reviewPending && (
+          <div className="review-banner">
+            <span className="review-spinner" aria-hidden="true" />
+            Andrabesiktningen pågår — listan kan ändras när den är klar.
           </div>
-        ))}
+        )}
+
+        {/* Kortet är ett attest. Det ska säga vad det bygger på — antal vyer, hur många besiktningar,
+            när — i stället för att låta läsaren anta det starkare alternativet. */}
+        <p className="provenance">
+          {result.images.length} {result.images.length === 1 ? "vy" : "vyer"} ·{" "}
+          {result.reviewed ? "två besiktningar" : "en besiktning"} ·{" "}
+          {new Date(result.createdAt).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
+        </p>
       </div>
 
-      {!addingDamage ? (
-        <div className="add-damage-actions">
-          <button className="btn btn-text icon-btn" onClick={() => addPhotoInputRef.current?.click()} disabled={addingFromPhoto}>
-            <CameraIcon size={17} />
-            {addingFromPhoto ? "Bedömer närbilden…" : "Lägg till skada med närbild"}
-          </button>
-          <button className="btn btn-text icon-btn" onClick={() => setAddingDamage(true)}>
-            <PlusIcon size={16} />
-            Lägg till för hand
-          </button>
-        </div>
-      ) : (
-        <AddDamageForm
-          onCancel={() => setAddingDamage(false)}
-          onSave={async (damage) => {
-            const updated = await addDamage(jobId, damage);
-            setResult(updated);
-            setAddingDamage(false);
-          }}
-        />
-      )}
+      {/* Fynden och vad man gör med dem. Datorvyns högerspalt. */}
+      <div className="result-main">
+        <h3 className="damage-summary-line">
+          {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}
+        </h3>
 
-      {result.coverage === "NOT_SUFFICIENTLY_VISIBLE" && (
-        <div className="coverage-warning">
-          <span className="coverage-warning-mark" aria-hidden="true">
-            <AlertIcon size={17} />
-          </span>
-          <span>
-            Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
-            {result.coverageNote ? ` ${result.coverageNote}` : ""}
-          </span>
+        <div className="damage-groups">
+          {groupByType(visible).map(({ type, items }) => (
+            <div key={type} className="damage-group">
+              <div className="damage-group-header">
+                {TYPE_LABELS[type]} — {items.filter((d) => d.sellerAction !== "rejected").length}
+              </div>
+              <div className="damage-list">
+                {items.map((d) => (
+                  <DamageCard
+                    key={d.id}
+                    jobId={jobId}
+                    damage={d}
+                    images={result.images}
+                    hideType
+                    onDispute={() => openDispute(d.id)}
+                    disputing={disputing === d.id}
+                    onAction={(action, patch) => handleDamageAction(d, action, patch)}
+                    onOpenEvidence={(index) => setViewer({ damage: d, index })}
+                  />
+                ))}
+              </div>
+            </div>
+          ))}
         </div>
-      )}
 
-      {onSeeTruthCard && (
-        <button className="btn btn-primary next-step" onClick={onSeeTruthCard}>
-          <span>Se truth-card</span>
+        {!addingDamage ? (
+          <div className="add-damage-actions">
+            <button className="btn btn-text icon-btn" onClick={() => addPhotoInputRef.current?.click()} disabled={addingFromPhoto}>
+              <CameraIcon size={17} />
+              {addingFromPhoto ? "Bedömer närbilden…" : "Lägg till skada med närbild"}
+            </button>
+            <button className="btn btn-text icon-btn" onClick={() => setAddingDamage(true)}>
+              <PlusIcon size={16} />
+              Lägg till för hand
+            </button>
+          </div>
+        ) : (
+          <AddDamageForm
+            onCancel={() => setAddingDamage(false)}
+            onSave={async (damage) => {
+              const updated = await addDamage(jobId, damage);
+              setResult(updated);
+              setAddingDamage(false);
+            }}
+          />
+        )}
+
+        {result.coverage === "NOT_SUFFICIENTLY_VISIBLE" && (
+          <div className="coverage-warning">
+            <span className="coverage-warning-mark" aria-hidden="true">
+              <AlertIcon size={17} />
+            </span>
+            <span>
+              Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
+              {result.coverageNote ? ` ${result.coverageNote}` : ""}
+            </span>
+          </div>
+        )}
+
+        <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
+          <span>Se truth-cardet</span>
           <span className="next-step-meta">
             {result.listing?.status === "pending" ? "skapas…" : result.listing?.status === "ok" ? "klart" : ""}
             <ChevronRight size={18} />
           </span>
         </button>
-      )}
-
-      <div className="result-footer">
-        <button className="btn btn-text" onClick={onHome}>
-          Startsidan
-        </button>
-        <button className="btn btn-primary" onClick={onRestart}>
-          Skanna en möbel till
-        </button>
+        <p className="form-hint">
+          Sista steget. Kortet är det köparen ser — skadorna du rättat här följer med dit.
+        </p>
       </div>
 
       <section className="collapsible-card">

@@ -59,7 +59,9 @@ export default function EvidenceViewer({
           top: `${mark.y * 100}%`,
           width: `${(mark.w ?? 0.1) * 100}%`,
           height: `${(mark.h ?? 0.1) * 100}%`,
-          border: "2px solid #ef4444",
+          // Samma röd som miniatyrens ruta (--danger). Här stod en Tailwind-röd, så EN skada
+          // ritades i två olika röda beroende på om man tittade på den i listan eller i stort.
+          border: "2px solid var(--danger)",
           borderRadius: 4,
           boxShadow: "0 0 0 9999px rgba(0,0,0,0.15)",
         }
@@ -105,7 +107,7 @@ export default function EvidenceViewer({
                 y1={mark.y * 100}
                 x2={(mark.x2 ?? mark.x) * 100}
                 y2={(mark.y2 ?? mark.y) * 100}
-                stroke="#ef4444"
+                stroke="var(--danger)"
                 strokeWidth={0.8}
                 vectorEffect="non-scaling-stroke"
               />

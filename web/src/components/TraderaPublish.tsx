@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getTraderaState, publishToTradera } from "../api";
 import { formatSek } from "../lib/price";
-import type { TraderaState } from "../types";
+import { formatDropDate, ladderRungs } from "../lib/priceLadder";
+import type { PriceLadder, TraderaState } from "../types";
 
 /**
  * "Publicera på Tradera" — sista steget i truth-cardet.
@@ -69,6 +70,7 @@ export default function TraderaPublish({ jobId }: { jobId: string }) {
       <section className="truth-block tradera-block tradera-done">
         <h3>Publicerad på Tradera</h3>
         <p className="muted small">Annonsen ligger uppe som auktion på Loopas konto.</p>
+        {state.ladder && <LadderStatus ladder={state.ladder} shippingSek={plan?.shippingSek ?? 0} />}
         <a className="btn btn-primary tradera-link" href={publication.url} target="_blank" rel="noreferrer">
           Öppna annonsen på Tradera
         </a>
@@ -112,6 +114,14 @@ export default function TraderaPublish({ jobId }: { jobId: string }) {
               ? "Lägger upp annonsen till fast pris — Köp Nu — på Loopas Tradera-konto, med bilderna från skanningen och skicket från besiktningen."
               : `Lägger upp annonsen som en ${plan!.durationDays}-dagars auktion på Loopas Tradera-konto, med bilderna från skanningen och skicket från besiktningen.`}
           </p>
+          {ladderDrops(state.ladder) > 0 && (
+            <p className="muted small">
+              Annonspriset börjar på {formatSek(state.ladder!.startPrice + plan!.shippingSek)} och sänks{" "}
+              {Math.round(state.ladder!.weeklyDropPct * 100)} % i veckan ner till{" "}
+              {formatSek(state.ladder!.floorPrice + plan!.shippingSek)}, där det stannar. De{" "}
+              {formatSek(plan!.shippingSek)} för hemleveransen ligger kvar oförändrade hela vägen.
+            </p>
+          )}
           <button className="btn btn-primary" onClick={() => setConfirming(true)}>
             {publication?.status === "error" ? "Försök igen" : "Publicera på Tradera"}
           </button>
@@ -131,11 +141,31 @@ export default function TraderaPublish({ jobId }: { jobId: string }) {
               <dt>{plan!.mode === "fixed" ? "Pris (Köp Nu)" : "Utropspris"}</dt>
               <dd>
                 {formatSek(plan!.price)}
-                {plan!.priceSource === "listing" && (
-                  <span className="muted small"> — annonsgeneratorns förslag, utan skadeavdrag</span>
-                )}
+                {/* Delarna utskrivna: säljaren satte ett pris på MÖBELN och ska inte behöva räkna ut
+                    varför annonsen står på ett annat tal. */}
+                <span className="muted small">
+                  {" "}
+                  — {formatSek(plan!.itemPrice)} för möbeln + {formatSek(plan!.shippingSek)} hemleverans
+                  {plan!.priceSource === "seller" && " (ditt startpris)"}
+                  {plan!.priceSource === "listing" && " (annonsgeneratorns förslag, utan skadeavdrag)"}
+                </span>
               </dd>
             </div>
+            {ladderDrops(state.ladder) > 0 && (
+              <div className="truth-spec">
+                <dt>Prisplan</dt>
+                <dd>
+                  −{Math.round(state.ladder!.weeklyDropPct * 100)} % i veckan ner till{" "}
+                  {formatSek(state.ladder!.floorPrice + plan!.shippingSek)}
+                  <span className="muted small">
+                    {" "}
+                    — golvet nås efter {ladderDrops(state.ladder)}{" "}
+                    {ladderDrops(state.ladder) === 1 ? "vecka" : "veckor"}. Sänkningen tar bara av
+                    möbelns pris, aldrig av frakten.
+                  </span>
+                </dd>
+              </div>
+            )}
             <div className="truth-spec">
               <dt>Annonstyp</dt>
               <dd>
@@ -154,9 +184,23 @@ export default function TraderaPublish({ jobId }: { jobId: string }) {
               <dt>Bilder</dt>
               <dd>{plan!.imageCount} st</dd>
             </div>
+            {/* Står i annonstexten, alltså i bekräftelsen: annonsen berättar att den är skapad av
+                Loopa och pekar ut kortet där skicket går att kontrollera. */}
+            <div className="truth-spec">
+              <dt>Loopa-ID</dt>
+              <dd>
+                {plan!.loopaId}
+                <span className="muted small"> — annonstexten hänvisar till det publika kortet</span>
+              </dd>
+            </div>
+            {/* Fast pris, samma på varje annons — men det ingår i priset ovan, och det är den
+                halvan säljaren behöver se innan de trycker. */}
             <div className="truth-spec">
               <dt>Leverans</dt>
-              <dd>Avhämtning</dd>
+              <dd>
+                Hemleverans ingår
+                <span className="muted small"> — budfirma bokas efter köpet, ingen extra kostnad för köparen</span>
+              </dd>
             </div>
           </dl>
           <p className="muted small">
@@ -173,5 +217,48 @@ export default function TraderaPublish({ jobId }: { jobId: string }) {
         </>
       )}
     </section>
+  );
+}
+
+/** Hur många veckor det är kvar ner till golvet. 0 = spannet är redan i botten, eller saknas. */
+function ladderDrops(ladder: PriceLadder | null): number {
+  if (!ladder || ladder.floorPrice >= ladder.currentPrice) return 0;
+  return ladderRungs(ladder.currentPrice, ladder.floorPrice, ladder.weeklyDropPct).length - 1;
+}
+
+/**
+ * Var prisstegen står på en annons som redan ligger uppe.
+ *
+ * Sänkningen sker på servern, veckor efter att den här fliken stängts, så vyn är säljarens enda kvitto
+ * på att den faktiskt löper. Därför står nästa datum och nästa pris utskrivna, och ett avvisat
+ * prisbyte syns — ett pris som står stilla ska aldrig behöva gissas.
+ */
+function LadderStatus({ ladder, shippingSek }: { ladder: PriceLadder; shippingSek: number }) {
+  const rungs = ladderRungs(ladder.currentPrice, ladder.floorPrice, ladder.weeklyDropPct);
+  const next = rungs.length > 1 ? rungs[1] : null;
+  // Allt här är ANNONSPRISER — vad som står på Tradera just nu. Stegen räknar i möbelkronor, men det
+  // säljaren jämför med är annonsen, och två olika tal för samma annons vore en gåta att lösa.
+  const ad = (itemPrice: number) => formatSek(itemPrice + shippingSek);
+
+  return (
+    <div className="tradera-ladder">
+      <div className="tradera-ladder-now">
+        <span className="ladder-row-label">Ligger på</span>
+        <strong>{ad(ladder.currentPrice)}</strong>
+        <span className="muted small">frakt inräknad</span>
+      </div>
+      <p className="muted small">
+        {ladder.floorReachedAt || next === null
+          ? `Lägsta priset är nått. Annonsen ligger kvar på ${ad(ladder.floorPrice)}.`
+          : `Nästa sänkning ${formatDropDate(ladder.nextDropAt)} till ${ad(next)}. Golvet är ${ad(ladder.floorPrice)}.`}
+        {ladder.drops.length > 0 &&
+          ` ${ladder.drops.length} ${ladder.drops.length === 1 ? "sänkning" : "sänkningar"} hittills, från ${ad(ladder.startPrice)}.`}
+      </p>
+      {ladder.lastError && (
+        <p className="tradera-error">
+          Senaste sänkningen gick inte igenom: {ladder.lastError} Vi försöker igen.
+        </p>
+      )}
+    </div>
   );
 }

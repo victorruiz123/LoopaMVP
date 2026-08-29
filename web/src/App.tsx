@@ -9,9 +9,14 @@ import ResultScreen from "./screens/ResultScreen";
 import TruthCardScreen from "./screens/TruthCardScreen";
 import AuthScreen from "./screens/AuthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import AdminScreen from "./screens/AdminScreen";
+import AdminUserScreen from "./screens/AdminUserScreen";
+import PublicCardScreen from "./screens/PublicCardScreen";
+import { loopaIdFromPath } from "./lib/loopaId";
 import { useAuth } from "./auth/AuthProvider";
-import { getJob, selectModel, type CapturedShot } from "./api";
-import type { ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
+import ModelSearchLoader from "./components/ModelSearchLoader";
+import { getJob, selectModel, type CapturedShot, ensureMediaSession } from "./api";
+import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
 
 type Screen =
   | { name: "home" }
@@ -21,11 +26,19 @@ type Screen =
   | { name: "price"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
   | { name: "analysis"; jobId: string; previewShots: CapturedShot[]; identity: FurnitureIdentity }
   | { name: "result"; jobId: string }
-  | { name: "truthcard"; jobId: string; result: ConditionResult }
-  | { name: "profile" };
+  // `back` finns för att kortet numera nås från två håll: säljarens egen profil och adminpanelen.
+  // Utan det landade en admin på skickvyn för någon annans möbel när de backade ur kortet.
+  | { name: "truthcard"; jobId: string; result: ConditionResult; loopaId?: string; back?: Screen }
+  | { name: "lookup" }
+  | { name: "profile" }
+  | { name: "admin" }
+  | { name: "adminUser"; user: AdminUser };
 
 /**
  * Flödet: märke -> bilder -> VÄLJ MODELL -> specifikationer -> pris -> skick -> truth-card.
+ *
+ * Truth-cardet är inte ett tillval sist i kedjan utan det enda steget efter skicket: skickvyn har en
+ * väg vidare och den leder hit. Se ResultScreen.
  *
  * Modellvalet ligger först av allt som händer efter bilderna, för att allt därefter hänger på det:
  * prismotorn söker på modellnamnet, och annonsen byggs runt den. Tidigare låg identifieringen sist,
@@ -33,6 +46,17 @@ type Screen =
  */
 export default function App() {
   const { user, loading } = useAuth();
+
+  /**
+   * /c/LP-XXXX-XXXX — det publika kortet, FÖRE inloggningen.
+   *
+   * Den som kommer hit har läst ett Loopa-ID i en Tradera-annons och har inget konto. Att först visa
+   * en inloggningsruta vore att stänga det enda som gör annonsens skickpåstående kontrollerbart.
+   * Läses ur adressen en gång: appen har ingen router, och den här vägen har ingen väg vidare in i
+   * flödet.
+   */
+  const publicId = loopaIdFromPath(window.location.pathname);
+  if (publicId) return <PublicCardScreen initialId={publicId} />;
 
   // Inloggningen ligger FÖRE flödet, inte inuti det. Ett truth-card som skapas utan konto har ingen
   // profil att hamna i, och att fråga efter inloggning först när kortet är klart hade betytt att
@@ -49,7 +73,28 @@ export default function App() {
   return <SignedInApp />;
 }
 
+/**
+ * Bildkakan hämtas innan något som visar bilder ritas.
+ *
+ * Misslyckas den blockeras inte flödet — besiktningen fungerar ändå, det är bara bildrutorna som
+ * uteblir, och att fälla hela appen för det vore fel avvägning.
+ */
+function useMediaSession(userId: string | undefined): boolean {
+  // Samma svar bär adminrollen. Den avgörs av servern på adressen Supabase bekräftat — klienten
+  // ritar bara ingången efter beskedet, och varje adminväg prövar rollen igen på sin egen sida.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    if (!userId) return;
+    void ensureMediaSession()
+      .then((session) => setIsAdmin(session.isAdmin))
+      .catch((err) => console.warn("[loopa] bildsession:", err));
+  }, [userId]);
+  return isAdmin;
+}
+
 function SignedInApp() {
+  const { user } = useAuth();
+  const isAdmin = useMediaSession(user?.id);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
   const homeKey = useRef(0);
 
@@ -66,6 +111,7 @@ function SignedInApp() {
           onStartScan={(identity) => setScreen({ name: "capture", identity })}
           onOpenJob={(jobId) => setScreen({ name: "result", jobId })}
           onOpenProfile={() => setScreen({ name: "profile" })}
+          onOpenLookup={() => setScreen({ name: "lookup" })}
         />
       );
     case "capture":
@@ -125,35 +171,65 @@ function SignedInApp() {
       return (
         <ResultScreen
           jobId={screen.jobId}
-          onRestart={goHome}
           onHome={goHome}
-          onSeeTruthCard={async () => {
-            const job = await getJob(screen.jobId);
-            if (job.result) setScreen({ name: "truthcard", jobId: screen.jobId, result: job.result });
+          // Resultatet kommer från skärmen själv, som redan har det. ID:t bor på jobbet och hämtas
+          // här — men faller den hämtningen går kortet ändå fram: det som saknas då är chatten, inte
+          // kortet, och steget efter skicket får aldrig sluta i ett tryck som inte gör något.
+          onContinue={async (result) => {
+            const loopaId = await getJob(screen.jobId)
+              .then((job) => job.loopaId)
+              .catch(() => undefined);
+            setScreen({ name: "truthcard", jobId: screen.jobId, result, loopaId });
           }}
         />
       );
-    case "truthcard":
+    case "truthcard": {
+      const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
       return (
         <TruthCardScreen
           result={screen.result}
-          onBack={() => setScreen({ name: "result", jobId: screen.jobId })}
+          loopaId={screen.loopaId}
+          onBack={() => setScreen(back)}
           onHome={goHome}
         />
       );
+    }
+    case "lookup":
+      // Uppslaget på ett Loopa-ID, samma skärm som den publika sidan — inifrån appen med en väg
+      // tillbaka. Kortet som visas kan vara vems som helst; det är vad publikt betyder.
+      return <PublicCardScreen onBack={goHome} />;
     case "profile":
       return (
         <ProfileScreen
           onBack={goHome}
+          isAdmin={isAdmin}
+          onOpenAdmin={() => setScreen({ name: "admin" })}
           // Profilen öppnar kortet, inte fyndlistan: det är truth-cardet som sparats, och vägen
           // tillbaka till skicket finns kvar inifrån det.
           onOpenJob={async (jobId) => {
             const job = await getJob(jobId);
-            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result });
+            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result, loopaId: job.loopaId });
             else setScreen({ name: "result", jobId });
           }}
         />
       );
+    case "admin":
+      return <AdminScreen onBack={() => setScreen({ name: "profile" })} onOpenUser={(u) => setScreen({ name: "adminUser", user: u })} />;
+    case "adminUser": {
+      const from = screen;
+      return (
+        <AdminUserScreen
+          user={screen.user}
+          onBack={() => setScreen({ name: "admin" })}
+          // Kortet och inte skickvyn: adminvägarna är läsande, och skickvyn är den som har knappar
+          // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
+          onOpenJob={async (jobId) => {
+            const job = await getJob(jobId);
+            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result, loopaId: job.loopaId, back: from });
+          }}
+        />
+      );
+    }
   }
 }
 
@@ -166,7 +242,7 @@ function SignedInApp() {
  */
 const CLIENT_GIVE_UP_MS = 300_000;
 
-function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean) {
+function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean, intervalMs = 1200) {
   const [job, setJob] = useState<ConditionJob | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
@@ -180,7 +256,7 @@ function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean) {
         setJob(j);
         // Ett fällt jobb är ett svar. Att fortsätta polla på det är att snurra på ett dött jobb.
         if (j.progress.stage === "error" || done(j)) return;
-        setTimeout(poll, 1200);
+        setTimeout(poll, intervalMs);
       } catch {
         if (!cancelled) setTimeout(poll, 2000);
       }
@@ -213,6 +289,10 @@ function IdentifyGate({
       j.identityStatus === "unavailable" ||
       j.identityStatus === "resolved" ||
       (j.identityStatus === "needs_selection" && (j.candidates ?? []).every((c) => c.imageUrl !== undefined)),
+    // Tätare än standardintervallet. Det här är den enda skärm där pollningen ÄR väntan: kandidaterna
+    // ligger färdiga på servern och syns först vid nästa hämtning, så halva intervallet är halva den
+    // sista fördröjningen. Ett jobb som identifieras är kortlivat, så det blir ett fåtal extra GET.
+    600,
   );
 
   async function choose(choice: { candidate?: ModelCandidate; manualModel?: string }) {
@@ -239,8 +319,8 @@ function IdentifyGate({
   if (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus)) {
     return (
       <div className="screen screen-light center-column">
-        <div className="spinner" />
-        <p>Letar upp modellen…</p>
+        <ModelSearchLoader />
+        <p className="identify-waiting-title">Letar upp modellen…</p>
         <p className="muted small">Söker efter {identity.brand}-modeller som stämmer med bilderna</p>
       </div>
     );
@@ -270,7 +350,10 @@ function IdentifyGate({
 function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => void; onBack: () => void }) {
   const { job, gaveUp, failed } = useJobPoll(jobId, (j) => {
     const l = j.result?.listing ?? j.pendingListing;
-    return !!l && l.status !== "pending";
+    // `improving` betyder att fas 2 fortfarande söker vidare på egen hand. Skärmen visar det den har
+    // med en gång — säljaren ska aldrig vänta på ett omförsök — men pollningen får inte sluta här,
+    // för då fryser kortet på det första svaret och ett bättre landar osett i jobbet.
+    return !!l && l.status !== "pending" && !l.improving;
   });
 
   // `pendingListing` finns för att annonsen kan bli klar innan skickresultatet — och när skicket FALLER

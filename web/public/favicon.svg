@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Loopa">
+  <!-- Loopas ordmärke är för långt för 16 px. Kvar blir det som ordet är byggt på: loopen.
+       Tegelorange platta, vit ring — samma accent som --accent i styles.css (#e4572e), så
+       fliken och appen är samma orange. -->
+  <rect width="64" height="64" rx="15" fill="#e4572e"/>
+  <circle cx="32" cy="32" r="14.5" fill="none" stroke="#fff" stroke-width="8"/>
+</svg>

@@ -5,7 +5,7 @@ export interface ExtractedFrame {
   dataUrl: string;
   bucketIndex: number;
   blurScore: number;
-  exposureOk: boolean;
+  usable: boolean;
   hash: number[]; // 8x8 average-hash bits, for cheap perceptual similarity
 }
 
@@ -55,6 +55,31 @@ const SIMILARITY_HAMMING_THRESHOLD = 6; // out of 64 bits — below this, treat 
 const MIN_FRAMES = 4; // never hand back fewer than this, even if the source barely changes
 
 /**
+ * Vad som räknas som en bildruta värd att lämna ifrån sig.
+ *
+ * DET HÄR ÄR FELET de fångar: den första bildrutan ur en inspelning är ofta kameran innan den
+ * exponerat — HELT svart. Mätt över alla 152 sparade jobb var första bildrutan svart i 45 av dem
+ * (30 %), och i 4 fall gällde det även den andra. Från och med den tredje: aldrig. Den bildrutan gick
+ * vidare som en av sex vyer till besiktningen, låg först i filmningsordningen överallt där bilderna
+ * visas, och blev annonsens omslag tills servern började välja bort den.
+ *
+ * Nedviktningen i `score` räckte inte som spärr: en svart bildruta får 0 i poäng och blir ändå bäst i
+ * sin vy när ingen annan bildruta i den vyn är bättre än 0 — och i vy noll, den första sjättedelen av
+ * filmen, är det precis vad som händer.
+ *
+ * Samma tre tal som duglighetsspärren i server/src/pipeline/cover.ts, medvetet: den mäter samma sak
+ * (medelluminans och spridning i gråskala) på samma bild, och två olika svar på "duger den här?" hade
+ * betytt att telefonen laddar upp bildrutor som servern sedan vägrar visa.
+ *
+ * Gränserna kan inte slå fel på verklig film i det underlaget: ingen enda sparad bildruta ligger
+ * mellan dem och det uppenbart dugliga — allt är antingen exakt mean 0,00 / stdev 0,00 eller över
+ * mean 60 / stdev 25.
+ */
+const MIN_MEAN_LUMINANCE = 25;
+const MAX_MEAN_LUMINANCE = 235;
+const MIN_STDEV = 8;
+
+/**
  * Fast-forward multiplier for the playback pass. Browsers clamp silently, so the value we set is a
  * request, not a promise — the effective rate is read back and decides whether this path is worth
  * taking at all.
@@ -79,19 +104,28 @@ const PLAYBACK_STALL_MS = 2500;
 const OPEN_TIMEOUT_MS = 8000;
 /** A seek that never fires `seeked` used to hang the whole extraction forever. */
 const SEEK_TIMEOUT_MS = 2500;
+/**
+ * Långt bortom vilken film som helst, men inom det en video-tagg tar emot. Att söka hit är det som
+ * tvingar fram längden ur en fil som inte har den skriven i huvudet. Se usableDuration.
+ */
+const SEEK_PAST_END = 1e7;
+/** Längdsonderingen får inte bli en ny obegränsad väntan. */
+const DURATION_PROBE_MS = 3000;
 
 /** A scored candidate. `frame` holds the full-res pixels ONLY while it leads its bucket. */
 interface Candidate {
   index: number;
   bucketIndex: number;
   blurScore: number;
-  exposureOk: boolean;
+  usable: boolean;
   hash: number[];
   frame: HTMLCanvasElement;
 }
 
-function score(c: { blurScore: number; exposureOk: boolean }): number {
-  return c.blurScore * (c.exposureOk ? 1 : 0.3);
+/** Skärpa, nedviktad när bildrutan inte duger att visa. Se MIN_MEAN_LUMINANCE för varför det bara är
+ * en viktning och inte spärren. */
+function score(c: { blurScore: number; usable: boolean }): number {
+  return c.blurScore * (c.usable ? 1 : 0.3);
 }
 
 interface PlaybackOutcome {
@@ -124,7 +158,12 @@ interface PlaybackOutcome {
  * decoded, and handed the job to a full 40-seek pass. A decoder that is merely slower than the guess
  * is still making progress, and progress is the only thing worth interrupting for.
  */
-async function extractByPlayback(url: string, sink: HTMLVideoElement[], deadline: number): Promise<PlaybackOutcome> {
+async function extractByPlayback(
+  url: string,
+  sink: HTMLVideoElement[],
+  deadline: number,
+  hintMs?: number,
+): Promise<PlaybackOutcome> {
   const empty: PlaybackOutcome = { buckets: [], framesSeen: 0, effectiveRate: null };
   if (typeof HTMLVideoElement === "undefined" || !("requestVideoFrameCallback" in HTMLVideoElement.prototype)) {
     return empty;
@@ -136,8 +175,8 @@ async function extractByPlayback(url: string, sink: HTMLVideoElement[], deadline
     return empty; // sökvägen får sin egen chans att öppna filen
   }
   sink.push(video);
-  const duration = video.duration;
-  if (!duration || !isFinite(duration)) return empty;
+  const duration = await usableDuration(video, hintMs);
+  if (!duration) return empty;
 
   video.playbackRate = PLAYBACK_RATE;
   const effectiveRate = video.playbackRate;
@@ -171,15 +210,15 @@ async function extractByPlayback(url: string, sink: HTMLVideoElement[], deadline
       if (settled) return;
       framesSeen++;
       lastFrameAt = Date.now();
-      const { blurScore, exposureOk, hash } = analyzeFrame(video, scoreCanvas, scoreCtx);
+      const { blurScore, usable, hash } = analyzeFrame(video, scoreCanvas, scoreCtx);
       const bucketIndex = Math.min(NUM_BUCKETS - 1, Math.floor((meta.mediaTime / duration) * NUM_BUCKETS));
       const current = best.get(bucketIndex);
-      if (!current || score({ blurScore, exposureOk }) > score(current)) {
+      if (!current || score({ blurScore, usable }) > score(current)) {
         best.set(bucketIndex, {
           index: index++,
           bucketIndex,
           blurScore,
-          exposureOk,
+          usable,
           hash,
           // The element keeps playing, so the pixels have to be taken inside this callback — the
           // frame it is showing now is the one that was just scored.
@@ -199,7 +238,10 @@ async function extractByPlayback(url: string, sink: HTMLVideoElement[], deadline
 export interface ExtractionReport {
   method: "playback" | "playback+seek" | "seek";
   ms: number;
+  /** Vyer som faktiskt lämnas ifrån sig — efter att odugliga bildrutor sorterats bort. */
   buckets: number;
+  /** Hur många vyer som föll på duglighetsspärren. Nästan alltid den svarta första. */
+  dropped: number;
   framesSeen: number;
   effectiveRate: number | null;
 }
@@ -227,6 +269,8 @@ function deterministicRequested(): boolean {
 export async function extractBestFrames(
   videoBlob: Blob,
   onReport?: (report: ExtractionReport) => void,
+  /** Hur länge inspelningen pågick, när den som anropar vet det. Se usableDuration. */
+  hintMs?: number,
 ): Promise<{ dataUrl: string; viewLabel: string | null }[]> {
   const url = URL.createObjectURL(videoBlob);
   const videosToClose: HTMLVideoElement[] = [];
@@ -235,24 +279,40 @@ export async function extractBestFrames(
   try {
     const playback = deterministicRequested()
       ? { buckets: [], framesSeen: 0, effectiveRate: null }
-      : await extractByPlayback(url, videosToClose, deadline);
+      : await extractByPlayback(url, videosToClose, deadline, hintMs);
     const found = new Map(playback.buckets.map((c) => [c.bucketIndex, c]));
 
     // Sökning fyller bara HÅL, den gör inte om jobbet. Uppspelningens bildrutor är redan avkodade
     // och betalda; att kasta dem för att börja om var hela felet.
+    //
+    // En vy vars bästa bildruta är svart räknas som ett HÅL, inte som fylld: där finns inget att
+    // bevara, och resten av vyn är filmad efter att kameran hunnit exponera. Sökningen träffar vy noll
+    // först en bit in i den (offsets nedan börjar på 0,5), vilket är precis förbi det svarta.
     let method: ExtractionReport["method"] = "playback";
-    if (found.size < NUM_BUCKETS && Date.now() < deadline) {
-      method = found.size === 0 ? "seek" : "playback+seek";
-      await fillGapsBySeeking(url, videosToClose, found, deadline, startedAt + EXTRACTION_TARGET_MS);
+    const filled = () => [...found.values()].filter((c) => c.usable).length;
+    if (filled() < NUM_BUCKETS && Date.now() < deadline) {
+      method = filled() === 0 ? "seek" : "playback+seek";
+      await fillGapsBySeeking(url, videosToClose, found, deadline, startedAt + EXTRACTION_TARGET_MS, hintMs);
     }
 
     const perBucket = Array.from({ length: NUM_BUCKETS }, (_, b) => found.get(b)).filter(
       (c): c is Candidate => c !== undefined,
     );
+
+    // Odugliga bildrutor stannar HÄR, på telefonen. Fem vyer är bättre än sex där en är svart: den
+    // svarta visar ingenting för besiktningen, kostar ändå sin plats i inspektionsanropet, och är det
+    // första en köpare ser i annonsen.
+    //
+    // Duger ingen enda behålls listan orörd — en analys på dåliga bildrutor är fortfarande bättre än
+    // "kunde inte läsa någon bildruta ur videon" för någon som redan filmat klart.
+    const presentable = perBucket.filter((c) => c.usable);
+    const views = presentable.length > 0 ? presentable : perBucket;
+
     const report: ExtractionReport = {
       method,
       ms: Date.now() - startedAt,
-      buckets: perBucket.length,
+      buckets: views.length,
+      dropped: perBucket.length - views.length,
       framesSeen: playback.framesSeen,
       effectiveRate: playback.effectiveRate,
     };
@@ -260,10 +320,11 @@ export async function extractBestFrames(
     // som togs, och den ska gå att läsa av utan att bygga om något.
     console.info(
       `[videoFrames] ${report.method} · ${(report.ms / 1000).toFixed(1)}s · ${report.buckets}/${NUM_BUCKETS} vyer · ` +
-        `${report.framesSeen} bildrutor sedda · fart ${report.effectiveRate ?? "–"}x`,
+        `${report.framesSeen} bildrutor sedda · fart ${report.effectiveRate ?? "–"}x` +
+        (report.dropped > 0 ? ` · ${report.dropped} oduglig(a) bortsorterad(e)` : ""),
     );
     onReport?.(report);
-    return encodeSelection(perBucket);
+    return encodeSelection(views);
   } finally {
     for (const v of videosToClose) {
       v.removeAttribute("src");
@@ -273,16 +334,21 @@ export async function extractBestFrames(
   }
 }
 
-/** Dedup by perceptual hash, then encode — the only JPEG work in the module, and only for what survives. */
-function encodeSelection(perBucket: Candidate[]): { dataUrl: string; viewLabel: string | null }[] {
+/**
+ * Dedup by perceptual hash, then encode — the only JPEG work in the module, and only for what survives.
+ *
+ * Tar emot vyer som redan passerat duglighetsspärren, så MIN_FRAMES-reserven nedan kan inte plocka
+ * tillbaka en svart bildruta som just sorterats bort.
+ */
+function encodeSelection(views: Candidate[]): { dataUrl: string; viewLabel: string | null }[] {
   let selected: Candidate[] = [];
-  for (const frame of perBucket) {
+  for (const frame of views) {
     const isDuplicate = selected.some((s) => hammingDistance(s.hash, frame.hash) < SIMILARITY_HAMMING_THRESHOLD);
     if (!isDuplicate) selected.push(frame);
   }
   // Similarity dedup collapsing to almost nothing means the source had very little visible change
   // (e.g. the seller paused mid-scan) — better to keep temporal spread than to hand back one photo.
-  if (selected.length < MIN_FRAMES) selected = perBucket;
+  if (selected.length < MIN_FRAMES) selected = views;
   if (selected.length === 0) throw new Error("Kunde inte läsa någon bildruta ur videon.");
 
   // No view label. The old code spread eight compass names ("Framifrån", "Bak-höger", ...) across the
@@ -310,14 +376,16 @@ async function fillGapsBySeeking(
   found: Map<number, Candidate>,
   deadline: number,
   qualityDeadline: number,
+  hintMs?: number,
 ): Promise<void> {
-  const missing = Array.from({ length: NUM_BUCKETS }, (_, b) => b).filter((b) => !found.has(b));
+  // Oduglig räknas som saknad: en svart bildruta har 0 i poäng, så vad sökningen än hittar slår den.
+  const missing = Array.from({ length: NUM_BUCKETS }, (_, b) => b).filter((b) => !found.get(b)?.usable);
   if (missing.length === 0) return;
 
   const video = await openVideo(url);
   videos.push(video);
-  const duration = video.duration;
-  if (!duration || !isFinite(duration)) return;
+  const duration = await usableDuration(video, hintMs);
+  if (!duration) return;
   const scoreCanvas = document.createElement("canvas");
   const scoreCtx = scoreCanvas.getContext("2d", { willReadFrequently: true })!;
 
@@ -339,19 +407,76 @@ async function fillGapsBySeeking(
       } catch {
         continue; // one unreachable timestamp must not cost the whole walkaround
       }
-      const { blurScore, exposureOk, hash } = analyzeFrame(video, scoreCanvas, scoreCtx);
+      const { blurScore, usable, hash } = analyzeFrame(video, scoreCanvas, scoreCtx);
       const current = found.get(bucket);
-      if (current && score(current) >= score({ blurScore, exposureOk })) continue;
+      if (current && score(current) >= score({ blurScore, usable })) continue;
       found.set(bucket, {
         index: index++,
         bucketIndex: bucket,
         blurScore,
-        exposureOk,
+        usable,
         hash,
         frame: grabFrame(video, current?.frame),
       });
     }
   }
+}
+
+/**
+ * Filmens längd, även när filen inte påstår någon.
+ *
+ * DET HÄR VAR FELET som gjorde att varje inspelning i appen slutade med "kunde inte läsa någon
+ * bildruta ur videon": MediaRecorder skriver ingen längd i webm-huvudet — den vet ju inte hur lång
+ * filmen blir när den börjar — så `video.duration` är Infinity. Båda uttagsvägarna började med att
+ * bomma ut på just det: uppspelningen behöver längden för att fördela bildrutorna i vyer, sökningen
+ * för att veta vart den ska söka. Noll vyer, varje gång, för varje film som spelats in i appen.
+ * Uppladdade filmer från kamerarullen har längden skriven och gick igenom, vilket är därför felet
+ * kunde ligga och gömma sig ända tills inspelning blev enda vägen in.
+ *
+ * Att söka bortom slutet tvingar webbläsaren att läsa igenom filen och räkna ut längden. Sedan MÅSTE
+ * uppspelningen ställas tillbaka till noll — annars står den vid filmens slut och `play()` avslutas
+ * direkt, med noll bildrutor sedda.
+ *
+ * `hintMs` är sista utvägen: den som spelade in filmen vet hur länge den höll på, och en längd på en
+ * halv sekund fel är oändligt mycket bättre än ingen längd alls.
+ */
+async function usableDuration(video: HTMLVideoElement, hintMs?: number): Promise<number> {
+  if (video.duration > 0 && isFinite(video.duration)) return video.duration;
+  const probed = await probeDuration(video);
+  if (probed > 0) return probed;
+  return hintMs && hintMs > 0 ? hintMs / 1000 : 0;
+}
+
+function probeDuration(video: HTMLVideoElement): Promise<number> {
+  return new Promise((resolve) => {
+    let settled = false;
+    const finish = async (value: number) => {
+      if (settled) return;
+      settled = true;
+      window.clearTimeout(timer);
+      video.removeEventListener("durationchange", onChange);
+      video.removeEventListener("timeupdate", onChange);
+      try {
+        await seekTo(video, 0);
+      } catch {
+        // Går den inte att spola tillbaka är den inte heller värd att spela upp; nollan säger det.
+        resolve(0);
+        return;
+      }
+      resolve(value);
+    };
+    const onChange = () => {
+      if (video.duration > 0 && isFinite(video.duration)) void finish(video.duration);
+    };
+    const timer = window.setTimeout(() => void finish(0), DURATION_PROBE_MS);
+    video.addEventListener("durationchange", onChange);
+    video.addEventListener("timeupdate", onChange);
+    try {
+      video.currentTime = SEEK_PAST_END;
+    } catch {
+      void finish(0);
+    }
+  });
 }
 
 /**
@@ -421,12 +546,20 @@ function grabFrame(video: HTMLVideoElement, reuse?: HTMLCanvasElement): HTMLCanv
   return canvas;
 }
 
-/** One pass: downscaled sharpness (gradient magnitude), exposure (mean luminance), and an 8x8 average-hash. */
+/**
+ * One pass: downscaled sharpness (gradient magnitude), usability (mean luminance and spread), and an
+ * 8x8 average-hash.
+ *
+ * Mätt på 48x48-nedskalningen, inte på originalet: blockmedelvärdena jämnar ut fina detaljer och drar
+ * ner spridningen något. Marginalen tål det med råge — samma aritmetik körd på 307 sparade bildrutor
+ * lägger de svarta på mean 0,00 / stdev 0,00 och den SVAGASTE verkliga bildrutan på 105,5 / 30,9, mot
+ * gränserna 25 / 8. Ingen verklig bildruta i underlaget hamnar ens i närheten av spärren.
+ */
 function analyzeFrame(
   video: HTMLVideoElement,
   canvas: HTMLCanvasElement,
   ctx: CanvasRenderingContext2D,
-): { blurScore: number; exposureOk: boolean; hash: number[] } {
+): { blurScore: number; usable: boolean; hash: number[] } {
   const w = 48;
   const h = 48;
   canvas.width = w;
@@ -436,12 +569,17 @@ function analyzeFrame(
 
   const lum = new Float32Array(w * h);
   let sum = 0;
+  let sumSq = 0;
   for (let i = 0; i < w * h; i++) {
     const l = 0.299 * data[i * 4] + 0.587 * data[i * 4 + 1] + 0.114 * data[i * 4 + 2];
     lum[i] = l;
     sum += l;
+    sumSq += l * l;
   }
   const mean = sum / (w * h);
+  // Spridningen, ur samma svep: en bildruta kan ligga mitt i exponeringsspannet och ändå visa en
+  // enfärgad yta. Kostar en multiplikation per pixel på 48x48.
+  const stdev = Math.sqrt(Math.max(0, sumSq / (w * h) - mean * mean));
 
   let gradSum = 0;
   for (let y = 0; y < h - 1; y++) {
@@ -451,7 +589,7 @@ function analyzeFrame(
     }
   }
   const blurScore = gradSum / (w * h);
-  const exposureOk = mean > 20 && mean < 235;
+  const usable = mean >= MIN_MEAN_LUMINANCE && mean <= MAX_MEAN_LUMINANCE && stdev >= MIN_STDEV;
 
   // Downsample the same 48x48 buffer to HASH_SIZE x HASH_SIZE by block-averaging, then threshold vs mean.
   const block = w / HASH_SIZE;
@@ -472,7 +610,7 @@ function analyzeFrame(
   const smallMean = small.reduce((a, b) => a + b, 0) / small.length;
   const hash = Array.from(small, (v) => (v > smallMean ? 1 : 0));
 
-  return { blurScore, exposureOk, hash };
+  return { blurScore, usable, hash };
 }
 
 function hammingDistance(a: number[], b: number[]): number {

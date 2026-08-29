@@ -5,14 +5,42 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <!-- Poppins till Loopa-ordmärket, Roboto till löptext. 600/700 för logotypen: Poppins är en
-         geometrisk sans och blir tunn och bred i normalvikt — en logotyp behöver den tätare vikten. -->
+    <!-- Inter, samma snitt och samma vikter som loopa.se. 800 finns med för ordmärket: det
+         sätts i tyngsta vikten och skulle annars syntetiseras fram ur 700 av webbläsaren.
+
+         Poppins BARA i 800, och bara till ordmärket. Snittet är geometriskt — dess gemena "a" är
+         enkelvånings, en cirkel med en stapel — och det är hela skälet att det står här: "Loopa" får
+         sitt runda a ur bokstavsformen, inte ur en effekt. Ett snitt som används på ett enda ord ska
+         inte dra in fem vikter det aldrig sätter, därför en enda.
+
+         Ett anrop, inte två: css2 tar flera family-parametrar i samma förfrågan. -->
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600;700&family=Roboto:wght@400;500;600;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Poppins:wght@800&display=swap"
     />
-    <meta name="theme-color" content="#f97316" />
+    <meta name="theme-color" content="#faf7f1" />
+
+    <!-- Ordmärket går inte att läsa i 16 px, så fliken bär loopen ur det i samma
+         tegelorange som appen. SVG:n skalar till varje storlek utan en egen fil per mått. -->
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+
     <title>Loopa – Skickbedömning</title>
+    <meta
+      name="description"
+      content="Filma ett varv runt möbeln. Loopa bedömer skicket, sätter pris och skriver annonsen — och varje bedömning får ett publikt truth-card som köparen kan kontrollera."
+    />
+
+    <!-- Delas appen som länk är det de här taggarna som blir kortet. Utan dem visar
+         LinkedIn en naken URL. Ingen og:image än — lägg en 1200×630 på /og.png och
+         peka hit, så får kortet en miniatyr också. -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Loopa" />
+    <meta property="og:title" content="Loopa – skickbedömning av begagnade möbler" />
+    <meta
+      property="og:description"
+      content="Filma ett varv runt möbeln. Du får skick, pris och en färdig annons — med ett publikt truth-card som visar vad bedömningen bygger på."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
     <div id="root"></div>

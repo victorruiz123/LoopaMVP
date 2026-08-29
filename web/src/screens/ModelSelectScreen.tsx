@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { ModelCandidate } from "../types";
 import { ChevronRight } from "../components/icons";
+import { usePageTitle } from "../lib/pageTitle";
 
 /**
  * Vilken modell är det?
@@ -21,6 +22,7 @@ export default function ModelSelectScreen({
   onManual: (model: string) => void;
 }) {
   const [manual, setManual] = useState("");
+  usePageTitle("Välj modell");
   const [manualOpen, setManualOpen] = useState(false);
 
   return (

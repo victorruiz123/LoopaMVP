@@ -9,6 +9,8 @@ import {
   IMPACT_OPTIONS,
 } from "../lib/labels";
 import MarkedThumb from "./MarkedThumb";
+import { PhotosIcon } from "./icons";
+import { useViewMode } from "../lib/viewMode";
 
 export default function DamageCard({
   onDispute,
@@ -36,6 +38,10 @@ export default function DamageCard({
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(damage);
+  /* På telefonen är kortet text, inte foto: en lista där varje fynd bär ett stort bevisfoto blir en
+     bildremsa man skrollar förbi i stället för en lista man läser. Bilden ligger ett tryck bort.
+     Datorvyn har bredden att visa den direkt, och gör det. */
+  const mobile = useViewMode() === "mobile";
 
   const rejected = damage.sellerAction === "rejected";
   const imageById = new Map(images.map((img) => [img.id, img]));
@@ -108,33 +114,58 @@ export default function DamageCard({
     );
   }
 
+  // Samma rubrik och text i båda lägena — på telefonen ligger de i själva tryckytan, på datorn
+  // ovanför och under bilden. Span, inte div/p: det som står inuti en knapp måste vara inline.
+  const header = (
+    <span className="damage-card-header-row">
+      <span className="damage-card-title">
+        {!hideType && <strong>{TYPE_LABELS[damage.type]}</strong>}
+        <span className="muted">
+          {damage.part}
+          {damage.semanticLocation ? ` · ${damage.semanticLocation}` : ""}
+        </span>
+      </span>
+      <span className={`chip chip-${damage.severity}`}>{SEVERITY_LABELS[damage.severity]}</span>
+    </span>
+  );
+  const description = <span className="damage-desc">{damage.description}</span>;
+
   return (
     <div className={`damage-card ${rejected ? "damage-card-rejected" : ""}`}>
-      <div className="damage-card-header-row">
-        <div className="damage-card-title">
-          {!hideType && <strong>{TYPE_LABELS[damage.type]}</strong>}
-          <span className="muted">
-            {damage.part}
-            {damage.semanticLocation ? ` · ${damage.semanticLocation}` : ""}
-          </span>
-        </div>
-        <span className={`chip chip-${damage.severity}`}>{SEVERITY_LABELS[damage.severity]}</span>
-      </div>
-
-      {primaryEvidence && (
-        <button className="damage-evidence-main" onClick={() => onOpenEvidence(0)}>
-          <MarkedThumb jobId={jobId} evidence={primaryEvidence} image={imageById.get(primaryEvidence.imageId)} size="lg" />
+      {mobile ? (
+        <button
+          type="button"
+          className="damage-card-open"
+          onClick={() => onOpenEvidence(0)}
+          disabled={damage.evidence.length === 0}
+        >
+          {header}
+          {description}
+          {damage.evidence.length > 0 && (
+            <span className="damage-evidence-hint">
+              <PhotosIcon size={15} />
+              {damage.evidence.length === 1 ? "Visa bilden" : `Visa ${damage.evidence.length} bilder`}
+            </span>
+          )}
         </button>
+      ) : (
+        <>
+          {header}
+          {primaryEvidence && (
+            <button className="damage-evidence-main" onClick={() => onOpenEvidence(0)}>
+              <MarkedThumb jobId={jobId} evidence={primaryEvidence} image={imageById.get(primaryEvidence.imageId)} size="lg" />
+            </button>
+          )}
+          {restEvidence.length > 0 && (
+            <div className="evidence-mini-rail">
+              {restEvidence.map((ev, i) => (
+                <MarkedThumb key={i} jobId={jobId} evidence={ev} image={imageById.get(ev.imageId)} onClick={() => onOpenEvidence(i + 1)} />
+              ))}
+            </div>
+          )}
+          {description}
+        </>
       )}
-      {restEvidence.length > 0 && (
-        <div className="evidence-mini-rail">
-          {restEvidence.map((ev, i) => (
-            <MarkedThumb key={i} jobId={jobId} evidence={ev} image={imageById.get(ev.imageId)} onClick={() => onOpenEvidence(i + 1)} />
-          ))}
-        </div>
-      )}
-
-      <p className="damage-desc">{damage.description}</p>
       {damage.recaptureRequested && <p className="warning-text">Osäkert fynd — en ny, skarpare bild skulle ge en säkrare bedömning.</p>}
 
       <div className="damage-card-actions">

@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, CameraIcon, FolderIcon, PhotosIcon, VideoIcon } from "../components/icons";
+import { ArrowLeftIcon, CameraIcon, FolderIcon, PhotosIcon, SofaIcon, VideoIcon } from "../components/icons";
 import { createJob, type CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
 import { extractBestFrames, EXTRACTION_TARGET_MS, type ExtractionReport } from "../lib/videoFrames";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
+import { useViewMode } from "../lib/viewMode";
+import WalkaroundGuide from "../components/WalkaroundGuide";
+import { usePageTitle } from "../lib/pageTitle";
 
 const MAX_UPLOAD_WIDTH = 1280;
 /**
@@ -24,6 +27,18 @@ const SENSOR_GRACE_MS = 2500;
  * frames came back soft, which is what makes small marks on light paint invisible.
  */
 const TOO_FAST_DEG_PER_S = 18;
+/**
+ * Varvet får inte ta slut innan filmen hunnit bli en film.
+ *
+ * Sensorn kan spreta — en glapp kompass, en telefon som vrids i handen — och utan golv räckte det för
+ * att avsluta inspelningen efter ett par sekunder. Det som blev kvar var en snutt som varken gick att
+ * välja bildrutor ur eller att förstå: "kunde inte läsa någon bildruta ur videon", varje gång. Ett
+ * varv runt en soffa går inte att gå på under tio sekunder, så under det är det inte ett varv.
+ */
+const MIN_LAP_MS = 10000;
+/** Under det här är inspelningen inte en film utan en tom ström eller ett feltryck. */
+const MIN_CLIP_MS = 2500;
+const MIN_CLIP_BYTES = 15000;
 const GUIDANCE_STEPS = [
   "Stå framför möbeln",
   "Rör dig sakta mot höger sida",
@@ -46,7 +61,17 @@ export default function CaptureScreen({
   onBack: () => void;
   onCaptured: (jobId: string, previewShots: CapturedShot[]) => void;
 }) {
-  const [mode, setMode] = useState<Mode>("choose");
+  /**
+   * Mobilvyn har en enda väg in: filma ett varv.
+   *
+   * Att välja märke ÄR att börja filma — valskärmen hoppas över helt, och de tre vägar som bygger på
+   * filer (ladda upp video, ladda upp bilder, ta bilder för hand) finns inte alls. På en telefon står
+   * möbeln framför säljaren; en filväljare leder till kamerarullen, inte till möbeln.
+   */
+  const videoOnly = useViewMode() === "mobile";
+  usePageTitle("Filma möbeln");
+  const [pickedMode, setMode] = useState<Mode>("choose");
+  const mode: Mode = videoOnly && pickedMode === "choose" ? "video" : pickedMode;
   const [shots, setShots] = useState<Shot[]>([]);
   const [cameraError, setCameraError] = useState<string | null>(null);
   /**
@@ -56,7 +81,12 @@ export default function CaptureScreen({
    */
   const cameraAvailable =
     typeof window !== "undefined" && window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
-  const [cameraStarted, setCameraStarted] = useState(false);
+  /**
+   * Räknare, inte flagga. En ny ström måste fästas på <video> igen, och med en flagga som redan stod
+   * på `true` hoppade fästningen över omtaget — bilden frös på den döda strömmen.
+   */
+  const [streamEpoch, setStreamEpoch] = useState(0);
+  const cameraStarted = streamEpoch > 0;
   const [recording, setRecording] = useState(false);
   const [recordMs, setRecordMs] = useState(0);
   const [rotationDeg, setRotationDeg] = useState(0);
@@ -94,10 +124,18 @@ export default function CaptureScreen({
     setCameraError(null);
     try {
       streamRef.current = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 1280 } },
+        video: {
+          facingMode: "environment",
+          // 4:3 är hela sensorn på i stort sett varje telefon. Begäran var tidigare kvadratisk
+          // (1280×1280), och eftersom ingen sensor är kvadratisk löste webbläsaren det genom att
+          // beskära — bildvinkeln krympte, och säljaren fick backa flera meter för att få in soffan.
+          width: { ideal: 1280 },
+          height: { ideal: 960 },
+        },
         audio: false,
       });
-      setCameraStarted(true);
+      await widenFieldOfView(streamRef.current);
+      setStreamEpoch((n) => n + 1);
     } catch (err) {
       setCameraError(err instanceof Error ? err.message : "Kunde inte starta kameran.");
     }
@@ -113,18 +151,49 @@ export default function CaptureScreen({
     el.play().catch((err) => {
       setCameraError(err instanceof Error ? err.message : "Kameran kunde inte spelas upp.");
     });
-  }, [mode, cameraStarted]);
+  }, [mode, streamEpoch]);
+
+  /**
+   * En ström vars spår har stannat är lika död som ingen ström alls — men den ser ut att finnas.
+   *
+   * iOS stänger kamerans spår när appen går i bakgrunden, och webbläsaren gör det när fliken tappar
+   * enheten till något annat. Kollas bara `streamRef.current` startar MediaRecorder på ett stoppat
+   * spår, spelar in noll bytes, och felet dyker upp först i bildruteuttaget — långt från orsaken.
+   */
+  function hasLiveCamera() {
+    return streamRef.current?.getVideoTracks().some((t) => t.readyState === "live") ?? false;
+  }
 
   async function enterMode(next: "photo" | "video") {
     if (!cameraAvailable) {
       setCameraError(
         "Kameran kan bara användas över HTTPS eller på localhost. Den här sidan körs över vanlig http, " +
-          "så webbläsaren blockerar den. Filma med telefonens kameraapp och välj \"Ladda upp en videofil\" i stället.",
+          "så webbläsaren blockerar den. " +
+          (videoOnly
+            ? "Öppna sidan över https för att kunna filma."
+            : "Filma med telefonens kameraapp och välj \"Ladda upp en videofil\" i stället."),
       );
       return;
     }
-    if (!streamRef.current) await startCamera();
+    if (!hasLiveCamera()) await startCamera();
     setMode(next);
+  }
+
+  /**
+   * Mobilvyn startar kameran själv — där finns inget kort att trycka på, och inspelningsskärmen ritas
+   * direkt efter märkesvalet. Bara när strömmen saknas, så ett omtag efter en misslyckad film inte
+   * startar om kameran i onödan.
+   */
+  useEffect(() => {
+    if (!videoOnly || mode !== "video" || hasLiveCamera()) return;
+    void enterMode("video");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [videoOnly, mode]);
+
+  /** I mobilvyn finns ingen valskärm bakom kameran — vägen bakåt går hela vägen ut. */
+  function leaveCamera() {
+    if (videoOnly) onBack();
+    else setMode("choose");
   }
 
   function addShot(dataUrl: string, source: Shot["source"], viewLabel: string | null = null) {
@@ -191,6 +260,12 @@ export default function CaptureScreen({
   async function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
+    if (!hasLiveCamera()) {
+      setProcessingError("Kameran hade stängts av. Startar om den — tryck igen när bilden är tillbaka.");
+      await startCamera();
+      return;
+    }
+    setProcessingError(null);
 
     // iOS only honours requestPermission() inside the tap that triggered it, so this happens here and
     // not behind any earlier await.
@@ -207,10 +282,13 @@ export default function CaptureScreen({
         // Sampled over ~1s windows: instantaneous rate is far too jumpy to show a seller.
         if (!prev) paceRef.current = { deg, at: now };
         else if (now - prev.at >= 900) {
-          setTooFast(((deg - prev.deg) / ((now - prev.at) / 1000)) > TOO_FAST_DEG_PER_S);
+          // Farten är hur fort man vrider sig, åt vilket håll som helst — därför beloppet här, till
+          // skillnad från varvet som räknas med tecken.
+          setTooFast(Math.abs(deg - prev.deg) / ((now - prev.at) / 1000) > TOO_FAST_DEG_PER_S);
           paceRef.current = { deg, at: now };
         }
-        if (deg >= FULL_LAP_DEG) stopRecording();
+        // Ett helt varv åt endera hållet, och aldrig snabbare än MIN_LAP_MS.
+        if (Math.abs(deg) >= FULL_LAP_DEG && Date.now() - recordStartRef.current >= MIN_LAP_MS) stopRecording();
       });
       // No events at all within the grace period means the sensor is not reporting: stop promising an
       // automatic finish and let the seller end it by hand.
@@ -226,9 +304,24 @@ export default function CaptureScreen({
     recorder.onstop = async () => {
       setRecording(false);
       const blob = new Blob(chunksRef.current, { type: recorder.mimeType });
+      const recordedMs = Date.now() - recordStartRef.current;
+      // Felet ska sägas där det uppstod. En tom eller en sekund lång ström tog sig annars ända in i
+      // bildruteuttaget och kom ut som "kunde inte läsa någon bildruta ur videon" — sant, men det
+      // pekar på uttaget i stället för på inspelningen.
+      if (blob.size < MIN_CLIP_BYTES || recordedMs < MIN_CLIP_MS) {
+        setProcessingError(
+          blob.size < MIN_CLIP_BYTES
+            ? "Inspelningen blev tom — kameran verkar ha stängts av. Försök igen."
+            : "Filmen blev för kort för att läsa bildrutor ur. Gå ett helt varv och låt den spela klart.",
+        );
+        setMode("video");
+        return;
+      }
       setMode("processing");
       try {
-        const frames = await extractBestFrames(blob, setExtraction);
+        // Inspelningens egen längd följer med: en webm från MediaRecorder har ingen längd skriven i
+        // huvudet, och klockan här är det närmaste ett facit som finns om filen inte vill säga något.
+        const frames = await extractBestFrames(blob, setExtraction, recordedMs);
         frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
         await startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
       } catch (err) {
@@ -350,13 +443,12 @@ export default function CaptureScreen({
         <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
         {!cameraStarted && (
           <div className="camera-placeholder">
-            <button className="btn btn-ghost" onClick={() => setMode("choose")}>
+            <button className="btn btn-ghost" onClick={leaveCamera}>
               <ArrowLeftIcon /> Tillbaka
             </button>
           </div>
         )}
-        <div className="capture-overlay-frame" />
-        <button className="btn btn-ghost capture-mode-back" onClick={() => setMode("choose")}>
+        <button className="btn btn-ghost capture-mode-back" onClick={leaveCamera}>
           <ArrowLeftIcon /> Tillbaka
         </button>
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
@@ -383,9 +475,11 @@ export default function CaptureScreen({
     return (
       <div className="screen screen-camera">
         <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
-        <div className="capture-overlay-frame" />
+        {/* Ingen beskärningsram här: filmen tar hela bildrutan, och en ram som antyder något annat
+            hade fått säljaren att rama in möbeln i fel yta. */}
+        {!recording && <WalkaroundGuide subject={[identity.brand, identity.model].filter(Boolean).join(" ")} />}
         {!recording && (
-          <button className="btn btn-ghost capture-mode-back" onClick={() => setMode("choose")}>
+          <button className="btn btn-ghost capture-mode-back" onClick={leaveCamera}>
             <ArrowLeftIcon /> Tillbaka
           </button>
         )}
@@ -395,22 +489,25 @@ export default function CaptureScreen({
           </div>
         )}
         {recording && hasRotation !== false && <LapRing degrees={rotationDeg} tooFast={tooFast} />}
-        <div className="capture-guidance">
-          {!recording
-            ? "Tryck för att börja spela in och gå långsamt runt möbeln"
-            : tooFast
+        {/* Utan sensor finns ingen ring att läsa riktningen ur, och riktningen är det enda säljaren
+            behöver hålla i huvudet medan hen går. */}
+        {recording && hasRotation === false && <DirectionPill />}
+        {recording && (
+          <div className="capture-guidance">
+            {tooFast
               ? "Gå långsammare — annars blir bilderna suddiga"
               : hasRotation === false
                 ? `${GUIDANCE_STEPS[stepIndex]} — tryck för att avsluta när du gått runt`
-                : rotationDeg < 20
-                  ? "Börja gå — långsamt, ett varv på ungefär 40 sekunder"
+                : Math.abs(rotationDeg) < 20
+                  ? "Börja gå — långsamt medsols, ett varv på ungefär 40 sekunder"
                   : GUIDANCE_STEPS[stepIndex]}
-        </div>
+          </div>
+        )}
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
         {processingError && <p className="error-text video-error">{processingError}</p>}
         <div className="video-controls">
           {!recording ? (
-            <button className="record-btn" onClick={startRecording} aria-label="Starta inspelning" />
+            <button className="record-btn record-btn-hint" onClick={startRecording} aria-label="Starta inspelning" />
           ) : (
             <button className="record-btn record-btn-stop" onClick={stopRecording} aria-label="Stoppa inspelning" />
           )}
@@ -450,12 +547,13 @@ export default function CaptureScreen({
       <h2>Dessa vyer kommer att inspekteras</h2>
       <p className="muted">
         {shots.length} av högst {MAX_IMAGES} bilder valda.
-        {shots.length < MAX_IMAGES ? " Ser något håll ut att saknas? Lägg till fler nedan." : ""}
+        {!videoOnly && shots.length < MAX_IMAGES ? " Ser något håll ut att saknas? Lägg till fler nedan." : ""}
       </p>
       {extraction && (
         <p className="muted small">
           Uttaget: {extraction.method} · {(extraction.ms / 1000).toFixed(1)} s · {extraction.buckets} vyer ·{" "}
           {extraction.framesSeen} bildrutor granskade
+          {extraction.dropped > 0 ? ` · ${extraction.dropped} oduglig bortsorterad` : ""}
         </p>
       )}
       <div className="review-grid">
@@ -470,15 +568,18 @@ export default function CaptureScreen({
         ))}
       </div>
       {processingError && <p className="error-text">{processingError}</p>}
-      <div className="review-add-actions">
-        <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
-          + Ta fler bilder
-        </button>
-        <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
-          + Ladda upp
-        </button>
-        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
-      </div>
+      {/* Samma regel som på vägen in: i mobilvyn finns ingen väg att lägga till bilder ur filsystemet. */}
+      {!videoOnly && (
+        <div className="review-add-actions">
+          <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
+            + Ta fler bilder
+          </button>
+          <button className="btn btn-text" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
+            + Ladda upp
+          </button>
+          <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
+        </div>
+      )}
       <button className="btn btn-primary" disabled={shots.length === 0} onClick={() => startAnalysis()}>
         Starta AI-analys
       </button>
@@ -486,34 +587,110 @@ export default function CaptureScreen({
   );
 }
 
-/** Fills as the seller turns; ticks at 90/180/270 mark the four sides. */
-function LapRing({ degrees, tooFast }: { degrees: number; tooFast: boolean }) {
-  const pct = Math.min(1, degrees / FULL_LAP_DEG);
-  const r = 34;
-  const c = 2 * Math.PI * r;
+/** En pil pekar medsols runt en cirkel, för lägen där varvringen inte kan ritas. */
+function DirectionPill() {
   return (
-    <div className="lap-ring">
-      <svg viewBox="0 0 80 80" width="80" height="80">
-        <circle cx="40" cy="40" r={r} className="lap-ring-track" />
-        <circle
-          cx="40" cy="40" r={r}
-          className={`lap-ring-fill ${tooFast ? "lap-ring-fill-fast" : ""}`}
-          strokeDasharray={`${c * pct} ${c}`}
-          transform="rotate(-90 40 40)"
+    <div className="capture-direction">
+      <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+        <path
+          className="capture-direction-arc"
+          d="M12 4.5a7.5 7.5 0 1 1-7.06 4.96"
         />
-        {[90, 180, 270].map((deg) => (
-          <circle
-            key={deg}
-            className={degrees >= deg ? "lap-tick lap-tick-done" : "lap-tick"}
-            cx={40 + r * Math.cos(((deg - 90) * Math.PI) / 180)}
-            cy={40 + r * Math.sin(((deg - 90) * Math.PI) / 180)}
-            r="3"
-          />
-        ))}
+        <path className="capture-direction-head" d="M8.5 2.6 L12 4.5 L10.2 8" />
       </svg>
-      <span className="lap-ring-label">{Math.round(degrees)}°</span>
+      Gå medsols runt möbeln
     </div>
   );
+}
+
+const RING_R = 48;
+const RING_C = 64;
+
+/** Punkt på varvringen. 0° är rakt upp, positiv riktning medsols — samma räkning som säljaren går. */
+function ringPoint(deg: number) {
+  const rad = ((deg - 90) * Math.PI) / 180;
+  return { x: RING_C + RING_R * Math.cos(rad), y: RING_C + RING_R * Math.sin(rad) };
+}
+
+/**
+ * Varvet, ritat som det ska gås.
+ *
+ * `degrees` är NETTOvridningen med tecken: ringen visar hur långt runt möbeln säljaren faktiskt har
+ * kommit, inte hur mycket telefonen har rört sig. Går man tillbaka backar den, för då är man ju också
+ * tillbaka. Tecknet ger dessutom hållet gratis — hela ringen speglas när någon går motsols, så pilarna
+ * pekar dit personen är på väg i stället för dit vi hoppades. Möbelsymbolen i mitten är det man går runt.
+ */
+function LapRing({ degrees, tooFast }: { degrees: number; tooFast: boolean }) {
+  const turned = Math.abs(degrees);
+  const pct = Math.min(1, turned / FULL_LAP_DEG);
+  const c = 2 * Math.PI * RING_R;
+  const head = pct * FULL_LAP_DEG;
+  const headAt = ringPoint(head);
+  return (
+    <div className="lap-ring">
+      <svg viewBox="0 0 128 128" width="128" height="128">
+        <g transform={degrees < 0 ? "translate(128 0) scale(-1 1)" : undefined}>
+          <circle cx={RING_C} cy={RING_C} r={RING_R} className="lap-ring-track" />
+          <circle
+            cx={RING_C} cy={RING_C} r={RING_R}
+            className={`lap-ring-fill ${tooFast ? "lap-ring-fill-fast" : ""}`}
+            strokeDasharray={`${c * pct} ${c}`}
+            transform={`rotate(-90 ${RING_C} ${RING_C})`}
+          />
+          {[90, 180, 270].map((deg) => {
+            const p = ringPoint(deg);
+            return (
+              <circle key={deg} className={turned >= deg ? "lap-tick lap-tick-done" : "lap-tick"} cx={p.x} cy={p.y} r="3.4" />
+            );
+          })}
+          {/* Vart nästa steg går. Pilarna ligger framför huvudet och tänds i tur och ordning. */}
+          {[24, 46].map((ahead, i) => {
+            const p = ringPoint(head + ahead);
+            return (
+              <path
+                key={ahead}
+                className="lap-ring-lead"
+                style={{ animationDelay: `${i * 0.32}s` }}
+                transform={`translate(${p.x} ${p.y}) rotate(${head + ahead})`}
+                d="M-3 -4.5 L1.5 0 L-3 4.5"
+              />
+            );
+          })}
+          <g transform={`translate(${headAt.x} ${headAt.y}) rotate(${head})`}>
+            <circle r="10" className={`lap-ring-head ${tooFast ? "lap-ring-head-fast" : ""}`} />
+            <path className="lap-ring-head-arrow" d="M-2.5 -4 L1.5 0 L-2.5 4" />
+          </g>
+        </g>
+      </svg>
+      <span className="lap-ring-center">
+        <SofaIcon size={28} />
+        <span className="lap-ring-label">{Math.round(turned)}°</span>
+      </span>
+    </div>
+  );
+}
+
+/**
+ * Vidast möjliga bild.
+ *
+ * Många telefoner öppnar bakkameran med en optisk zoom över minimum, och i en trång vardagsrumsvinkel
+ * är varje snäpp zoom ett steg bakåt säljaren måste ta. Där zoomen går att styra (Chrome på Android)
+ * skruvas den ner till minimum. iOS redovisar ingen zoom i getCapabilities och lämnas som den är —
+ * ett saknat reglage är inget fel, så tystnaden här är avsiktlig.
+ */
+async function widenFieldOfView(stream: MediaStream) {
+  const track = stream.getVideoTracks()[0];
+  if (!track?.getCapabilities) return;
+  try {
+    const caps = track.getCapabilities() as MediaTrackCapabilities & { zoom?: { min: number } };
+    const current = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
+    if (!caps.zoom || typeof caps.zoom.min !== "number") return;
+    if (current !== undefined && current <= caps.zoom.min) return;
+    const widest: MediaTrackConstraintSet & { zoom?: number } = { zoom: caps.zoom.min };
+    await track.applyConstraints({ advanced: [widest] });
+  } catch {
+    /* Zoom är frivillig; att den inte gick att sätta ska inte fälla kameran. */
+  }
 }
 
 function pickMimeType(): string {

@@ -1,6 +1,19 @@
+import { useMemo } from "react";
 import type { GeneratedListing } from "../types";
 import { ArrowLeftIcon, ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
+import FurnitureRender from "../components/FurnitureRender";
+import { archetypeFor, buildModel, parseDimensions } from "../lib/furnitureModel";
+import { usePageTitle } from "../lib/pageTitle";
+
+/** Måttraderna i den ordning en möbel mäts, inte i den ordning källan råkade lista dem. */
+const DIM_ROWS: [RegExp, string][] = [
+  [/^(bredd|width)/i, "Bredd"],
+  [/^(djup|depth)/i, "Djup"],
+  [/^(höjd|hojd|height)$|^(total)?höjd/i, "Höjd"],
+  [/(sitthöjd|sitshöjd|seat height)/i, "Sitthöjd"],
+];
+const DIM_LABEL = /^(bredd|djup|höjd|hojd|sitthöjd|sitshöjd|width|depth|height|seat height)/i;
 
 const STATUS_LABELS: Record<string, string> = {
   full: "Allt belagt med källa",
@@ -25,8 +38,35 @@ export default function SpecsScreen({
   onBack: () => void;
 }) {
   const name = card.identity.exactProduct ?? card.identity.variant ?? "Möbel";
+  usePageTitle("Mått och specifikationer");
+  // Raderna visar attributets EGEN text ("80–82 cm"), inte ett avrundat tal: det säljaren ska
+  // kontrollera mot sin tumstock är det källan påstod.
+  const dimRows = DIM_ROWS.map(([re, label]) => ({ label, attr: card.attributes.find((a) => re.test(a.label)) })).filter(
+    (r) => r.attr,
+  );
+  /**
+   * Samma modell och samma vy som truth-cardet ritar möbeln i.
+   *
+   * Måttsteget hade förut en egen, enklare figur. Två figurer av samma möbel i samma flöde är en för
+   * mycket: säljaren ska känna igen bilden när den kommer tillbaka på kortet, och det gör hen bara
+   * om det är samma bild.
+   */
+  const model = useMemo(() => {
+    const archetype = archetypeFor(card.identity.category, card.listing.title);
+    const dims = parseDimensions(card.attributes, archetype);
+    return dims
+      ? buildModel(archetype, dims, card.attributes, {
+          category: card.identity.category,
+          title: card.listing.title,
+          variant: card.identity.variant,
+        })
+      : null;
+  }, [card]);
+  const hasDims = dimRows.length > 0 || !!model;
+  // Måtten bor i sitt eget segment — de ska inte stå två gånger på samma skärm.
+  const other = card.attributes.filter((a) => !DIM_LABEL.test(a.label));
   return (
-    <div className="screen screen-light">
+    <div className="screen screen-light specs-screen">
       <button className="btn btn-text btn-back" onClick={onBack}>
         <ArrowLeftIcon /> Byt modell
       </button>
@@ -44,31 +84,57 @@ export default function SpecsScreen({
         </div>
       </header>
 
-      {card.attributes.length > 0 ? (
-        <section className="truth-block">
-          <h3>Specifikationer</h3>
-          <dl className="truth-specs">
-            {card.attributes.map((a) => (
-              <div key={a.key + a.label} className="truth-spec">
-                <dt>{a.label}</dt>
-                <dd>
-                  {a.value}
-                  {a.sourceUrl && (
-                    <a className="truth-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
-                      källa
-                    </a>
-                  )}
-                </dd>
+      {/* Måtten och specifikationerna svarar på samma fråga från två håll, så i datorvyn ligger de
+          bredvid varandra. Omslaget är genomskinligt på telefonen — se .specs-grid i styles.css. */}
+      <div className="specs-grid">
+        {/* Måtten får ett eget segment. De är det säljaren lättast kan kontrollera mot verkligheten —
+            en tumstock räcker — och därför också det enda vi frågar rakt ut om. */}
+        {hasDims && (
+          <section className="truth-block dim-block">
+            <h3>Måtten</h3>
+            <p className="dim-question">Såhär blev måtten. Kan det stämma?</p>
+            {model && (
+              <div className="dim-render">
+                <FurnitureRender model={model} />
               </div>
-            ))}
-          </dl>
-        </section>
-      ) : (
-        <section className="truth-block">
-          <h3>Specifikationer</h3>
-          <p className="muted small">Inga specifikationer kunde beläggas mot en källa.</p>
-        </section>
-      )}
+            )}
+            <dl className="dim-list">
+              {dimRows.map(({ label, attr }) => (
+                <div key={label} className="dim-row">
+                  <dt>{label}</dt>
+                  <dd>{attr!.value}</dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        )}
+
+        {other.length > 0 ? (
+          <section className="truth-block">
+            <h3>Specifikationer</h3>
+            <dl className="truth-specs">
+              {other.map((a) => (
+                <div key={a.key + a.label} className="truth-spec">
+                  <dt>{a.label}</dt>
+                  <dd>
+                    {a.value}
+                    {a.sourceUrl && (
+                      <a className="truth-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
+                        källa
+                      </a>
+                    )}
+                  </dd>
+                </div>
+              ))}
+            </dl>
+          </section>
+        ) : (
+          <section className="truth-block">
+            <h3>Specifikationer</h3>
+            <p className="muted small">Inga specifikationer kunde beläggas mot en källa.</p>
+          </section>
+        )}
+      </div>
 
       <section className="truth-block">
         <h3>Annonstext</h3>

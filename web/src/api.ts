@@ -1,5 +1,5 @@
 import { supabase } from "./lib/supabase";
-import type { ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, TraderaState } from "./types";
+import type { AdminUsers, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -83,6 +83,26 @@ export async function retryJob(jobId: string): Promise<{ jobId: string; imageCou
 }
 
 /**
+ * Säljarens prisspann: startpriset annonsen läggs upp med, och golvet den veckovisa sänkningen
+ * stannar på.
+ *
+ * Sparas på jobbet, inte i webbläsaren: det är servern som sänker priset varje vecka, långt efter att
+ * den här fliken är stängd.
+ */
+export async function savePricePlan(
+  jobId: string,
+  plan: { startPrice: number; floorPrice: number; weeklyDropPct?: number },
+): Promise<PriceLadder> {
+  const res = await authFetch(`/api/jobs/${jobId}/price-plan`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(plan),
+  });
+  const body = await json<{ ladder: PriceLadder }>(res);
+  return body.ladder;
+}
+
+/**
  * Var Tradera-publiceringen står, och vad som skulle publiceras.
  *
  * Pollas medan status är "publishing": Tradera köar annonsen och kön tar 10-60 s, så servern svarar
@@ -96,6 +116,38 @@ export async function getTraderaState(jobId: string): Promise<TraderaState> {
 /** Publicerar truth-cardet som en riktig annons på Loopas Tradera-konto. Svarar innan den är uppe. */
 export async function publishToTradera(jobId: string): Promise<TraderaState> {
   const res = await authFetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
+  return json(res);
+}
+
+/**
+ * Det publika truth-cardet bakom ett Loopa-ID.
+ *
+ * ENDA anropet i klienten som går utan Authorization-huvud, och det är avsiktligt: sidan öppnas av
+ * någon som läst ett ID i en Tradera-annons och inte har något konto hos oss. Ett authFetch här hade
+ * gjort ett publikt kort inloggningspliktigt i det ögonblick en session råkade finnas.
+ */
+export async function fetchPublicCard(loopaId: string): Promise<PublicCard> {
+  const res = await fetch(`/api/cards/${encodeURIComponent(loopaId)}`);
+  return json(res);
+}
+
+/**
+ * En fråga om möbeln på ett truth-card.
+ *
+ * Går utan Authorization-huvud av samma skäl som kortet själv: chatten sitter på kortet, och kortet
+ * läses av någon som kom från en annons. Servern bygger sitt underlag ur det publika kortet, så
+ * frågan bär ingen kontext — bara ID:t avgör vad boten kan se.
+ */
+export async function askTruthCard(
+  loopaId: string,
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<CardAnswer> {
+  const res = await fetch(`/api/cards/${encodeURIComponent(loopaId)}/chat`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, history }),
+  });
   return json(res);
 }
 
@@ -115,6 +167,36 @@ export async function getJob(id: string): Promise<ConditionJob> {
 
 export async function listJobs(): Promise<JobSummary[]> {
   const res = await authFetch("/api/jobs");
+  return json(res);
+}
+
+/**
+ * Hämtar bildkakan.
+ *
+ * Bild-URL:erna nedan sätts som `src` på `<img>` och kan inte bära något Authorization-huvud. Servern
+ * utfärdar i stället en signerad HttpOnly-kaka mot säljarens token, som webbläsaren skickar med av
+ * sig själv på samma ursprung. Utan det här anropet svarar bildvägarna 401.
+ *
+ * Körs en gång per inloggning; kakan lever ett dygn.
+ */
+export async function ensureMediaSession(): Promise<{ isAdmin: boolean }> {
+  const res = await authFetch("/api/session", { method: "POST" });
+  if (!res.ok) throw new Error(`Kunde inte upprätta bildsession: ${res.status}`);
+  // Svaret säger också om kontot är admin. Rollen avgörs på servern — det här är bara beskedet om
+  // huruvida adminingången ska ritas, och den som fejkar flaggan i klienten får 404 på varje väg.
+  const body = (await res.json().catch(() => ({}))) as { isAdmin?: boolean };
+  return { isAdmin: !!body.isAdmin };
+}
+
+/** Alla konton, för adminpanelen. Svarar 404 för alla andra än adresserna i serverns admin.ts. */
+export async function listUsers(): Promise<AdminUsers> {
+  const res = await authFetch("/api/admin/users");
+  return json(res);
+}
+
+/** Ett kontos jobb, i samma form som profilens egen lista. */
+export async function listUserJobs(userId: string): Promise<JobSummary[]> {
+  const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}/jobs`);
   return json(res);
 }
 

@@ -4,6 +4,7 @@ import { getJob, retryJob } from "../api";
 import { explainError } from "../lib/errors";
 import type { CapturedShot } from "../api";
 import type { AnalysisStage, ConditionJob, FurnitureIdentity } from "../types";
+import { usePageTitle } from "../lib/pageTitle";
 
 const CHECKLIST: { stage: AnalysisStage; label: string }[] = [
   { stage: "preparing", label: "Bilder förberedda" },
@@ -30,6 +31,7 @@ export default function AnalysisScreen({
   onAbort: () => void;
 }) {
   const [job, setJob] = useState<ConditionJob | null>(null);
+  usePageTitle("Analyserar möbeln");
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
   /** Bumpas av ett omtag: pollningen stannar vid "error", så den måste startas om explicit. */

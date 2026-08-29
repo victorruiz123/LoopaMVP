@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useAuth } from "../auth/AuthProvider";
 import { EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "../components/icons";
+import { usePageTitle } from "../lib/pageTitle";
 
 /**
  * Inloggningen: ordmärket, två fält, en knapp.
@@ -17,6 +18,7 @@ export default function AuthScreen() {
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
 
   const isSignup = tab === "signup";
+  usePageTitle(isSignup ? "Skapa konto" : "Logga in");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();

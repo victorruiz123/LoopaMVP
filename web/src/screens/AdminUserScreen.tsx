@@ -1,65 +1,62 @@
 import { useEffect, useState } from "react";
-import { imageUrl, listJobs } from "../api";
-import { useAuth } from "../auth/AuthProvider";
+import { imageUrl, listUserJobs } from "../api";
 import GradeBadge from "../components/GradeBadge";
-import { ArrowLeftIcon, CardIcon, ChevronRight, UsersIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChevronRight } from "../components/icons";
 import { formatSek } from "../lib/price";
-import type { JobSummary } from "../types";
+import { displayName, formatDate, initials } from "./AdminScreen";
+import type { AdminUser, JobSummary } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
 
 /**
- * Profilen: varje truth-card säljaren har skapat, samlat på ett ställe.
+ * En användares truth-cards, sedda av en admin.
  *
- * Listan kommer från GET /api/jobs, som bara svarar med jobb som hör till den inloggade — kortet
- * knyts till kontot i samma ögonblick som filmningen laddas upp, inte efteråt.
+ * Samma rader som säljaren själv ser i sin profil, ur samma uträkning på servern — panelen ska visa
+ * kortet som det ÄR, inte en andra tolkning av det. Läsning och ingenting annat: adminvägarna svarar
+ * bara på GET, så det finns ingen knapp här som kan ändra i någon annans besiktning.
  */
-export default function ProfileScreen({
+export default function AdminUserScreen({
+  user,
   onBack,
   onOpenJob,
-  isAdmin = false,
-  onOpenAdmin,
 }: {
+  user: AdminUser;
   onBack: () => void;
   onOpenJob: (jobId: string) => void;
-  /** Serverns besked ur inloggningen. Ingången ritas bara då — och prövas igen bakom varje adminväg. */
-  isAdmin?: boolean;
-  onOpenAdmin?: () => void;
 }) {
-  const { user, profile, signOut } = useAuth();
-  usePageTitle("Din profil");
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  usePageTitle(displayName(user));
 
   useEffect(() => {
-    listJobs()
+    listUserJobs(user.id)
       .then(setJobs)
       .catch(() => setJobs([]));
-  }, []);
+  }, [user.id]);
 
   const cards = (jobs ?? []).filter((j) => j.hasTruthCard);
+  const rest = (jobs ?? []).filter((j) => !j.hasTruthCard);
   const valued = cards.filter((j) => j.price?.status === "ok" && j.price.default !== null);
   const totalValue = valued.reduce((sum, j) => sum + (j.price?.default ?? 0), 0);
-
-  const displayName = profile?.full_name || profile?.username || user?.email?.split("@")[0] || "Säljare";
+  const name = displayName(user);
 
   return (
-    <div className="screen screen-light profile">
+    <div className="screen screen-light profile admin">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> Tillbaka
+        <ArrowLeftIcon /> Alla användare
       </button>
 
       <section className="profile-head">
         <div className="profile-avatar" aria-hidden>
-          {initials(displayName)}
+          {user.avatarUrl ? <img className="admin-avatar-img" src={user.avatarUrl} alt="" /> : initials(name)}
         </div>
         <div className="profile-identity">
-          <h1 className="profile-name">{displayName}</h1>
-          <p className="profile-email">{user?.email}</p>
+          <h1 className="profile-name">{name}</h1>
+          <p className="profile-email">{user.email ?? user.id}</p>
         </div>
       </section>
 
       <section className="profile-stats">
         <div className="profile-stat">
-          <div className="profile-stat-value">{cards.length}</div>
+          <div className="profile-stat-value">{jobs === null ? "—" : cards.length}</div>
           <div className="profile-stat-label">Truth-cards</div>
         </div>
         <div className="profile-stat">
@@ -68,7 +65,7 @@ export default function ProfileScreen({
         </div>
       </section>
 
-      <h2 className="profile-section-title">Sparade truth-cards</h2>
+      <h2 className="profile-section-title">Truth-cards</h2>
 
       {jobs === null ? (
         <div className="profile-loading">
@@ -79,10 +76,8 @@ export default function ProfileScreen({
           <span className="profile-empty-mark">
             <CardIcon size={22} />
           </span>
-          <p className="profile-empty-title">Inga truth-cards än</p>
-          <p className="profile-empty-hint">
-            Varje möbel du filmar sparas här med skick, pris och färdig annons.
-          </p>
+          <p className="profile-empty-title">Inga truth-cards</p>
+          <p className="profile-empty-hint">Kontot har inte fått någon besiktning hela vägen till ett kort.</p>
         </div>
       ) : (
         <ul className="card-list">
@@ -97,7 +92,7 @@ export default function ProfileScreen({
                 <span className="card-row-body">
                   <span className="card-row-title">{describe(j)}</span>
                   <span className="card-row-meta">
-                    {formatDate(j.createdAt)}
+                    {j.loopaId} · {formatDate(j.createdAt)}
                     {j.price?.status === "ok" ? ` · ${formatSek(j.price.default)}` : ""}
                   </span>
                 </span>
@@ -111,15 +106,23 @@ export default function ProfileScreen({
         </ul>
       )}
 
-      {isAdmin && onOpenAdmin && (
-        <button className="btn profile-admin-link" onClick={onOpenAdmin}>
-          <UsersIcon /> Adminpanel
-        </button>
+      {/* Jobb som aldrig blev kort står med, men som text och utan väg vidare: det finns inget kort
+          att öppna, och varför det saknas är det enda intressanta med raden. */}
+      {rest.length > 0 && (
+        <>
+          <h2 className="profile-section-title">Utan truth-card</h2>
+          <ul className="admin-stub-list">
+            {rest.map((j) => (
+              <li key={j.id} className="admin-stub">
+                <span className="admin-stub-title">{describe(j)}</span>
+                <span className="admin-stub-meta">
+                  {formatDate(j.createdAt)} · {j.error ?? j.progress.message}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
-
-      <button className="btn btn-text profile-signout" onClick={() => void signOut()}>
-        Logga ut
-      </button>
     </div>
   );
 }
@@ -127,16 +130,4 @@ export default function ProfileScreen({
 function describe(job: JobSummary): string {
   const name = [job.identity?.brand, job.identity?.model].filter(Boolean).join(" ");
   return job.listingTitle || name || "Möbel";
-}
-
-function initials(name: string): string {
-  return name
-    .split(/\s+/)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? "")
-    .join("");
-}
-
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
 }

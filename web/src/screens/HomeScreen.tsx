@@ -1,30 +1,50 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { imageUrl, listJobs } from "../api";
 import type { FurnitureIdentity, JobSummary } from "../types";
 import GradeBadge from "../components/GradeBadge";
-import BrandSheet from "../components/BrandSheet";
-import BrandAvatar from "../components/BrandAvatar";
-import { ChevronRight, UserIcon } from "../components/icons";
+import { CardSearchIcon, ChevronRight, SearchIcon, CloseIcon, UserIcon } from "../components/icons";
 import { useAuth } from "../auth/AuthProvider";
 import { formatPriceRange } from "../lib/price";
+import { KNOWN_BRANDS } from "../lib/brands";
+import { POPULAR_BRANDS } from "../lib/brandSeed";
+import { brandTheme } from "../lib/brandTheme";
+import { usePageTitle } from "../lib/pageTitle";
 
+function fold(s: string): string {
+  return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+}
+
+const POPULAR_SET = new Set(POPULAR_BRANDS.map(fold));
+/** Startlistans stavning vinner, resten av korpusen följer efter — samma union som sökarket hade. */
+const ALL_BRANDS = [
+  ...POPULAR_BRANDS,
+  ...KNOWN_BRANDS.map((b) => b.name).filter((n) => !POPULAR_SET.has(fold(n))),
+];
+
+/**
+ * Märket väljs direkt ur listan — inget ark, ingen bekräftelseknapp.
+ *
+ * Att välja märke ÄR att börja: det finns inget andra beslut på den här skärmen att vänta in, så en
+ * "fortsätt"-knapp hade bara varit ett extra tryck för att bekräfta något som redan var sagt. Vägen
+ * tillbaka finns på nästa skärm.
+ */
 export default function HomeScreen({
   onStartScan,
   onOpenJob,
   onOpenProfile,
+  onOpenLookup,
 }: {
   onStartScan: (identity: FurnitureIdentity) => void;
   onOpenJob: (jobId: string) => void;
   onOpenProfile: () => void;
+  /** Slå upp ett publikt truth-card på dess Loopa-ID — ikonen i topplisten. */
+  onOpenLookup: () => void;
 }) {
   const { profile, user } = useAuth();
+  usePageTitle(null);
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
-  const [brand, setBrand] = useState("");
-  // Collapsed by default: the saved list used to render ABOVE the scan card, so once a few furniture
-  // pieces had piled up the primary action was several screens down. History is something you look up
-  // occasionally; starting a scan is why you opened the page.
+  const [query, setQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [sheetOpen, setSheetOpen] = useState(false);
 
   useEffect(() => {
     listJobs()
@@ -33,90 +53,107 @@ export default function HomeScreen({
   }, []);
 
   const finished = jobs?.filter((j) => j.progress.stage === "done") ?? [];
-  // The model name is what the price engine searches the ad corpus on; without it there is nothing to
-  // price. The brand narrows that search but is not required — not every piece carries one.
-  // Bara märket krävs. Modellen letar systemet upp ur bilderna och säljaren bekräftar den efteråt —
-  // ett fält färre att fylla i, och identifieringen sker på bilderna i stället för på minnet.
-  const canStart = brand.trim().length > 0;
 
-  function start() {
-    if (!canStart) return;
-    onStartScan({ brand: brand.trim(), model: "" });
-  }
+  const shown = useMemo(() => {
+    const q = fold(query);
+    if (!q) return ALL_BRANDS;
+    const hits = ALL_BRANDS.filter((n) => fold(n).includes(q));
+    hits.sort((a, b) => Number(!fold(a).startsWith(q)) - Number(!fold(b).startsWith(q)));
+    return hits;
+  }, [query]);
+
+  const typed = query.trim();
+  const exact = shown.some((n) => fold(n) === fold(typed));
 
   return (
     <div className="screen screen-light home">
-      {/* Loopa-ordmärket i vänsterkant, profilen i höger — samma placering som i Vips egna app,
-          så samma gest hittar rätt på båda hållen. */}
+      {/* Loopa-ordmärket i vänsterkant, uppslaget och profilen i höger. */}
       <div className="app-bar">
         <span className="app-wordmark">Loopa</span>
-        <button className="app-bar-profile" onClick={onOpenProfile} aria-label="Din profil">
-          <UserIcon size={17} />
-          <span className="app-bar-profile-name">{shortName(profile?.full_name ?? profile?.username, user?.email)}</span>
-        </button>
+        <div className="app-bar-actions">
+          {/* Loopa-ID:t ur en annons slås upp här. Varje truth-card är publikt, så knappen leder inte
+              in i det egna kontot utan till vilket kort som helst. */}
+          <button className="app-bar-icon" onClick={onOpenLookup} aria-label="Sök truth-card på Loopa-ID">
+            <CardSearchIcon size={18} />
+          </button>
+          <button className="app-bar-profile" onClick={onOpenProfile} aria-label="Din profil">
+            <UserIcon size={17} />
+            <span className="app-bar-profile-name">{shortName(profile?.full_name ?? profile?.username, user?.email)}</span>
+          </button>
+        </div>
       </div>
 
       <header className="home-header">
         <span className="brand-pill">
-          <span className="brand-dot" /> SKICK &amp; PRIS
+          <span className="brand-dot" /> AI-GRANSKNING
         </span>
         <h1 className="home-title">
-          Vilken möbel
+          Vilket märke
           <br />
-          <span className="accent">säljer du?</span>
+          <span className="accent">är möbeln?</span>
         </h1>
-        <p className="home-lede">
-          Välj märke och filma ett varv runt möbeln. Du får modellen, specifikationerna, priset och
-          skicket.
+        {/* Vänsterspalten i datorvyn har plats att säga vad appen gör innan man klickar.
+            Telefonen har det inte — där är listan hela skärmen — så texten finns bara i
+            datorläget, utelämnad och inte gömd. */}
+        <p className="home-lede desktop-only">
+          Filma ett varv runt möbeln. Du får skick, pris och en färdig annons.
         </p>
+        <ol className="home-steps desktop-only">
+          <li>Välj märket</li>
+          <li>Filma ett varv</li>
+          <li>Få ditt truth-card</li>
+        </ol>
       </header>
 
-      {/* Grupperad lista i stället för två inramade fält. Två rader som delar en yta och skiljs av
-          ett hårstreck läser som ETT formulär; två boxar med var sin kant läser som två beslut. */}
-      <div className="form-group">
-        <button
-          type="button"
-          className="form-row form-row-tappable"
-          onClick={() => setSheetOpen(true)}
-        >
-          <span className="form-row-label">Märke</span>
-          <span className="form-row-value">
-            {brand ? (
-              <>
-                <BrandAvatar name={brand} size={26} />
-                <span className="form-row-text">{brand}</span>
-              </>
-            ) : (
-              <span className="form-row-placeholder">Välj märke</span>
-            )}
-          </span>
-          <span className="form-row-chevron">
-            <ChevronRight size={17} />
-          </span>
-        </button>
-
+      <div className="brand-search">
+        <span className="brand-search-icon">
+          <SearchIcon />
+        </span>
+        <input
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Sök märke"
+          autoComplete="off"
+          autoCorrect="off"
+          spellCheck={false}
+          aria-label="Sök märke"
+        />
+        {query && (
+          <button type="button" className="brand-search-clear" onClick={() => setQuery("")} aria-label="Rensa">
+            <CloseIcon size={12} />
+          </button>
+        )}
       </div>
 
-      <div className="home-cta">
-        <button className="btn btn-primary" disabled={!canStart} onClick={start}>
-          Fortsätt till filmning
-        </button>
-        <p className="form-hint">
-          {canStart
-            ? "Du får upp till fyra modellförslag när bilderna är inne."
-            : "Märket behövs för att hitta modellen."}
-        </p>
-      </div>
+      {/* Rullande lista, inte ett ark. Märkena är många nog att man bläddrar, få nog att man hittar. */}
+      <div className="brand-scroll">
+        {shown.map((name) => {
+          const t = brandTheme(name);
+          return (
+            <button
+              key={name}
+              className={`brand-tile brand-font-${t.font}`}
+              style={{ background: t.bg, color: t.ink }}
+              onClick={() => onStartScan({ brand: name, model: "" })}
+            >
+              <span className="brand-tile-name">{name}</span>
+              <span className="brand-tile-go" style={{ color: t.accent }}>
+                <ChevronRight size={18} />
+              </span>
+            </button>
+          );
+        })}
 
-      <BrandSheet
-        open={sheetOpen}
-        selected={brand || null}
-        onSelect={(picked) => {
-          setBrand(picked);
-          setSheetOpen(false);
-        }}
-        onClose={() => setSheetOpen(false)}
-      />
+        {typed && !exact && (
+          <button className="brand-tile brand-tile-custom" onClick={() => onStartScan({ brand: typed, model: "" })}>
+            <span className="brand-tile-name">Använd ”{typed}”</span>
+            <span className="brand-tile-go">
+              <ChevronRight size={18} />
+            </span>
+          </button>
+        )}
+        {shown.length === 0 && !typed && <p className="muted small">Inga märken.</p>}
+      </div>
 
       {finished.length > 0 && (
         <section className="collapsible-card">
@@ -133,9 +170,11 @@ export default function HomeScreen({
             <div className="saved-list">
               {finished.map((j) => (
                 <button key={j.id} className="saved-item" onClick={() => onOpenJob(j.id)}>
+                  {/* Samma omslag som ligger överst på kortet. Säljarens egen bildruta är reserven —
+                      den finns alltid, medan produktbilden bara finns när en källa gick att belägga. */}
                   <img
                     className="saved-thumb"
-                    src={j.thumbnailImageId ? imageUrl(j.id, j.thumbnailImageId) : undefined}
+                    src={j.coverImageUrl ?? (j.thumbnailImageId ? imageUrl(j.id, j.thumbnailImageId) : undefined)}
                     alt=""
                   />
                   <div className="saved-item-body">
