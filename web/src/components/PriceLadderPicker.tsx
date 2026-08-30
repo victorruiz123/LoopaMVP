@@ -3,6 +3,7 @@ import type { PriceEstimate, PriceLadder } from "../types";
 import { savePricePlan } from "../api";
 import { formatSek } from "../lib/price";
 import { WEEKLY_DROP, ladderBounds, ladderRungs, roundToRung } from "../lib/priceLadder";
+import { useLang, useT } from "../lib/i18n";
 
 /**
  * Säljarens prisspann.
@@ -26,6 +27,8 @@ export default function PriceLadderPicker({
   price: PriceEstimate;
   initial: PriceLadder | null;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const bounds = useMemo(() => ladderBounds(price), [price]);
 
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
@@ -82,19 +85,21 @@ export default function PriceLadderPicker({
 
   return (
     <section className="ladder-card">
-      <div className="price-panel-head">Ditt prisspann</div>
+      <div className="price-panel-head">{t("Ditt prisspann")}</div>
       {/* Spannet är priset på MÖBELN. Hemleveransen läggs på först när annonsen går upp — beloppet
-          står i publiceringssteget, där det kommer från servern. Att upprepa det här skulle betyda
+          står i säljsteget, där det kommer från servern. Att upprepa det här skulle betyda
           två kopior av samma pris i två olika lager. */}
       <p className="muted small ladder-intro">
-        Annonsen startar på ditt pris och sänks {Math.round(WEEKLY_DROP * 100)} % i veckan tills den når
-        ditt lägsta pris. Där stannar den. Hemleveransen läggs ovanpå i annonsen och sänks aldrig.
+        {t(
+          "Annonsen startar på ditt pris och sänks {andel} % i veckan tills den når ditt lägsta pris. Där stannar den. Hemleveransen läggs ovanpå i annonsen och sänks aldrig.",
+          { andel: Math.round(WEEKLY_DROP * 100) },
+        )}
       </p>
 
       <div className="ladder-row">
         <div className="ladder-row-head">
-          <span className="ladder-row-label">Startpris</span>
-          <PriceField label="Startpris" value={start} onCommit={setStartPrice} />
+          <span className="ladder-row-label">{t("Startpris")}</span>
+          <PriceField label={t("Startpris")} value={start} onCommit={setStartPrice} />
         </div>
         <input
           className="ladder-slider ladder-slider-start"
@@ -103,16 +108,16 @@ export default function PriceLadderPicker({
           max={bounds.max}
           step={bounds.step}
           value={start}
-          aria-label="Startpris"
+          aria-label={t("Startpris")}
           onChange={(e) => setStartPrice(Number(e.target.value))}
         />
-        <p className="ladder-hint">Prismotorns förslag: {formatSek(suggested)}</p>
+        <p className="ladder-hint">{t("Prismotorns förslag: {pris}", { pris: formatSek(suggested) })}</p>
       </div>
 
       <div className="ladder-row">
         <div className="ladder-row-head">
-          <span className="ladder-row-label">Lägsta pris</span>
-          <PriceField label="Lägsta pris" value={floor} onCommit={setFloorPrice} />
+          <span className="ladder-row-label">{t("Lägsta pris")}</span>
+          <PriceField label={t("Lägsta pris")} value={floor} onCommit={setFloorPrice} />
         </div>
         <input
           className="ladder-slider ladder-slider-floor"
@@ -121,10 +126,10 @@ export default function PriceLadderPicker({
           max={bounds.max}
           step={bounds.step}
           value={floor}
-          aria-label="Lägsta pris"
+          aria-label={t("Lägsta pris")}
           onChange={(e) => setFloorPrice(Number(e.target.value))}
         />
-        <p className="ladder-hint">Säljs snabbt vid {formatSek(fastSale)}</p>
+        <p className="ladder-hint">{t("Säljs snabbt vid {pris}", { pris: formatSek(fastSale) })}</p>
       </div>
 
       <ol className="ladder-steps">
@@ -138,7 +143,9 @@ export default function PriceLadderPicker({
               key={rung.week}
               className={`ladder-step${rung.week === weeks && weeks > 0 ? " ladder-step-floor" : ""}`}
             >
-              <span className="ladder-step-week">{rung.week === 0 ? "Nu" : `v. ${rung.week}`}</span>
+              <span className="ladder-step-week">
+                {rung.week === 0 ? t("Nu") : t("v. {vecka}", { vecka: rung.week })}
+              </span>
               <span className="ladder-step-price">{formatSek(rung.price)}</span>
             </li>
           ),
@@ -147,17 +154,22 @@ export default function PriceLadderPicker({
 
       <p className="ladder-summary">
         {weeks === 0
-          ? "Startpriset är redan ditt lägsta — annonsen sänks inte."
-          : `Golvet nås efter ${weeks} ${weeks === 1 ? "vecka" : "veckor"}, omkring ${floorDate.toLocaleDateString("sv-SE", { day: "numeric", month: "long" })}. Sedan ligger priset kvar.`}
+          ? t("Startpriset är redan ditt lägsta — annonsen sänks inte.")
+          : t(
+              weeks === 1
+                ? "Golvet nås efter {antal} vecka, omkring {datum}. Sedan ligger priset kvar."
+                : "Golvet nås efter {antal} veckor, omkring {datum}. Sedan ligger priset kvar.",
+              { antal: weeks, datum: floorDate.toLocaleDateString(lang, { day: "numeric", month: "long" }) },
+            )}
       </p>
 
       <p className={`ladder-status${status === "error" ? " ladder-status-error" : ""}`}>
         {status === "saving"
-          ? "Sparar…"
+          ? t("Sparar…")
           : status === "error"
-            ? `Prisspannet kunde inte sparas: ${error}`
+            ? t("Prisspannet kunde inte sparas: {fel}", { fel: error ?? "" })
             : status === "saved"
-              ? "Prisspannet är sparat och används när annonsen läggs upp."
+              ? t("Prisspannet är sparat och används när annonsen läggs upp.")
               : " "}
       </p>
     </section>

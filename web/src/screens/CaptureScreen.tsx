@@ -1,12 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowLeftIcon, CameraIcon, CloseIcon, FolderIcon, PhotosIcon, PlusIcon, SofaIcon, VideoIcon } from "../components/icons";
-import { createJob, type CapturedShot } from "../api";
+import type { CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
 import { extractBestFrames, EXTRACTION_TARGET_MS } from "../lib/videoFrames";
+import { PHOTO_STATIONS } from "../lib/photoStations";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 import { useViewMode } from "../lib/viewMode";
 import WalkaroundGuide from "../components/WalkaroundGuide";
+import PhotoGuide from "../components/PhotoGuide";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 const MAX_UPLOAD_WIDTH = 1280;
 /**
@@ -47,32 +50,98 @@ const GUIDANCE_STEPS = [
   "Kom tillbaka mot framsidan",
 ];
 
-type Shot = { id: string; dataUrl: string; viewLabel: string | null; source: "video" | "manual" };
-type Mode = "choose" | "photo" | "video" | "processing" | "review" | "creating";
+/**
+ * `stationId` binder bilden till en vinkel i fotoguiden.
+ *
+ * Den är satt för guidade bilder och odefinierad för alla andra. Det är den som gör att en omtagning
+ * ERSÄTTER bilden i stället för att lägga en till — och den som gör `viewLabel` sann: vinkeln är
+ * efterfrågad, inte gissad. Bildrutor ur en film får medvetet ingen etikett alls (se encodeSelection
+ * i videoFrames), eftersom vinkeln aldrig mäts där.
+ */
+type Shot = {
+  id: string;
+  dataUrl: string;
+  viewLabel: string | null;
+  source: "video" | "manual";
+  stationId?: string;
+};
+type Mode = "choose" | "photo" | "guided" | "video" | "processing" | "review";
+
+/** Lägena där <video> finns i DOM:en och strömmen alltså ska fästas på den. */
+const CAMERA_MODES: Mode[] = ["photo", "guided", "video"];
+
+/**
+ * Bilderna i vinkelordning: fotoguidens stationer först, i den ordning guiden går dem.
+ *
+ * Ordningen är inte kosmetisk. Den blir "Bild 0, Bild 1 …" i besiktningsprompten, och bild noll är
+ * dessutom det omslagsvalet faller tillbaka på — så framifrån ska ligga först, oavsett i vilken
+ * ordning säljaren råkade fylla vinklarna. Lösa bilder utan station behåller sin inbördes ordning och
+ * läggs sist; en lista helt utan stationer rörs inte alls, vilket är videovägens fall.
+ */
+function inStationOrder(shots: Shot[]): Shot[] {
+  const staged = shots.filter((s) => s.stationId !== undefined);
+  if (staged.length === 0) return shots;
+  const rank = new Map(PHOTO_STATIONS.map((st, i) => [st.id, i]));
+  staged.sort((a, b) => (rank.get(a.stationId!) ?? 0) - (rank.get(b.stationId!) ?? 0));
+  return [...staged, ...shots.filter((s) => s.stationId === undefined)];
+}
+
+/** Vinklarna som redan har en bild. */
+function stationsDone(shots: Shot[]): Set<string> {
+  return new Set(shots.flatMap((s) => (s.stationId ? [s.stationId] : [])));
+}
+
+/** Första vinkeln efter `after` som ingen bild fyller ännu. null när det inte finns någon kvar. */
+function nextOpenStation(done: Set<string>, after: number): string | null {
+  return PHOTO_STATIONS.slice(after + 1).find((s) => !done.has(s.id))?.id ?? null;
+}
 
 let shotCounter = 0;
 
 export default function CaptureScreen({
   identity,
+  initialShots,
   onBack,
   onCaptured,
 }: {
   identity: FurnitureIdentity;
+  /**
+   * Bildrutorna från ett varv som redan är filmat.
+   *
+   * Finns när säljaren backat ur inloggningen efter varvet: skärmen öppnar då i granskningsläget med
+   * bilderna kvar. Att komma tillbaka hit och mötas av en tom kamera hade betytt att steget mellan
+   * filmningen och kontot kostar ett varv till att ångra sig.
+   */
+  initialShots?: CapturedShot[];
   onBack: () => void;
-  onCaptured: (jobId: string, previewShots: CapturedShot[]) => void;
+  /** Bilderna är klara. Jobbet skapas av flödet, som vet om det behöver ett konto först. */
+  onCaptured: (shots: CapturedShot[]) => void;
 }) {
   /**
-   * Mobilvyn har en enda väg in: filma ett varv.
+   * Mobilvyn har en enda väg in — vilken den är står i `mobileEntry` nedan.
    *
-   * Att välja märke ÄR att börja filma — valskärmen hoppas över helt, och de tre vägar som bygger på
-   * filer (ladda upp video, ladda upp bilder, ta bilder för hand) finns inte alls. På en telefon står
-   * möbeln framför säljaren; en filväljare leder till kamerarullen, inte till möbeln.
+   * Att välja märke ÄR att börja fånga möbeln: valskärmen hoppas över helt, och de tre vägar som
+   * bygger på filer (ladda upp video, ladda upp bilder, ta bilder för hand) finns inte alls. På en
+   * telefon står möbeln framför säljaren; en filväljare leder till kamerarullen, inte till möbeln.
    */
   const videoOnly = useViewMode() === "mobile";
-  usePageTitle("Filma möbeln");
-  const [pickedMode, setMode] = useState<Mode>("choose");
+  const [pickedMode, setMode] = useState<Mode>(initialShots?.length ? "review" : "choose");
+  const t = useT();
+  /**
+   * Mobilvyn öppnar i filmningen.
+   *
+   * Varvet är det underlag appen är byggd för: bildrutorna väljs ur rörelsen, täckningen blir hela
+   * möbeln, och säljaren behöver inte hålla sex vinklar i huvudet. Fotoguiden finns kvar som utväg
+   * för den som inte kommer runt möbeln — dörren dit står i filmguidens överlägg, se WalkaroundGuide
+   * — men den är en utväg och inte vägen in.
+   */
   const mode: Mode = videoOnly && pickedMode === "choose" ? "video" : pickedMode;
-  const [shots, setShots] = useState<Shot[]>([]);
+  usePageTitle(mode === "guided" ? "Fotografera möbeln" : "Filma möbeln");
+  /** Vilken vinkel fotoguiden står på just nu. Bara meningsfull i läget "guided". */
+  const [activeStation, setActiveStation] = useState(PHOTO_STATIONS[0].id);
+  const [shots, setShots] = useState<Shot[]>(() =>
+    (initialShots ?? []).map((s) => ({ id: `s${shotCounter++}`, ...s })),
+  );
   const [cameraError, setCameraError] = useState<string | null>(null);
   /**
    * getUserMedia is blocked outside a secure context, so over plain http on a LAN address the two
@@ -102,6 +171,8 @@ export default function CaptureScreen({
   const streamRef = useRef<MediaStream | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoFileInputRef = useRef<HTMLInputElement>(null);
+  /** Egen väljare: fotoguiden tar EN bild åt gången, till den vinkel som står på tur. */
+  const stationFileInputRef = useRef<HTMLInputElement>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const recordStartRef = useRef(0);
@@ -132,22 +203,22 @@ export default function CaptureScreen({
         },
         audio: false,
       });
-      await widenFieldOfView(streamRef.current);
+      await useMainLens(streamRef.current);
       setStreamEpoch((n) => n + 1);
     } catch (err) {
-      setCameraError(err instanceof Error ? err.message : "Kunde inte starta kameran.");
+      setCameraError(err instanceof Error ? err.message : t("Kunde inte starta kameran."));
     }
   }
 
   // Attach the stream once the <video> for this mode is actually in the DOM.
   useEffect(() => {
-    if (mode !== "photo" && mode !== "video") return;
+    if (!CAMERA_MODES.includes(mode)) return;
     const el = videoRef.current;
     const stream = streamRef.current;
     if (!el || !stream || el.srcObject === stream) return;
     el.srcObject = stream;
     el.play().catch((err) => {
-      setCameraError(err instanceof Error ? err.message : "Kameran kunde inte spelas upp.");
+      setCameraError(err instanceof Error ? err.message : t("Kameran kunde inte spelas upp."));
     });
   }, [mode, streamEpoch]);
 
@@ -165,11 +236,13 @@ export default function CaptureScreen({
   async function enterMode(next: "photo" | "video") {
     if (!cameraAvailable) {
       setCameraError(
-        "Kameran kan bara användas över HTTPS eller på localhost. Den här sidan körs över vanlig http, " +
-          "så webbläsaren blockerar den. " +
+        t(
+          "Kameran kan bara användas över HTTPS eller på localhost. Den här sidan körs över vanlig http, så webbläsaren blockerar den.",
+        ) +
+          " " +
           (videoOnly
-            ? "Öppna sidan över https för att kunna filma."
-            : "Filma med telefonens kameraapp och välj \"Ladda upp en videofil\" i stället."),
+            ? t("Öppna sidan över https för att kunna filma.")
+            : t("Filma med telefonens kameraapp och välj ”Ladda upp en videofil” i stället.")),
       );
       return;
     }
@@ -183,10 +256,29 @@ export default function CaptureScreen({
    * startar om kameran i onödan.
    */
   useEffect(() => {
-    if (!videoOnly || mode !== "video" || hasLiveCamera()) return;
-    void enterMode("video");
+    if (!videoOnly || hasLiveCamera()) return;
+    if (mode === "video") void enterMode("video");
+    // Fotoguiden ritas på samma sätt utan att någon tryckt på ett kort, så strömmen måste hämtas här.
+    // enterGuided() går inte att använda: den sätter läget, och läget är redan satt. Utan kamera —
+    // vanlig http — hämtas ingen ström alls, och guiden står kvar med "Välj bild" som väg framåt.
+    else if (mode === "guided" && cameraAvailable) void startCamera();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [videoOnly, mode]);
+
+  /**
+   * Fotoguiden, till skillnad från kameralägena ovan, kräver INGEN kamera.
+   *
+   * Varje vinkel går att fylla med en bild som redan finns, så guiden är den enda vägen framåt över
+   * vanlig http där getUserMedia är blockerad — och att avvisa den med samma HTTPS-text som filmningen
+   * hade stängt just den dörr som fortfarande står öppen. Läget sätts först, så att <video> hinner
+   * ritas innan strömmen ska fästas på den.
+   */
+  async function enterGuided() {
+    setProcessingError(null);
+    setActiveStation(nextOpenStation(stationsDone(shots), -1) ?? PHOTO_STATIONS[0].id);
+    setMode("guided");
+    if (cameraAvailable && !hasLiveCamera()) await startCamera();
+  }
 
   /** I mobilvyn finns ingen valskärm bakom kameran — vägen bakåt går hela vägen ut. */
   function leaveCamera() {
@@ -194,21 +286,98 @@ export default function CaptureScreen({
     else setMode("choose");
   }
 
+  /**
+   * Vägen bakåt ur fotoguiden.
+   *
+   * Skild från leaveCamera, eftersom guiden nås från filmskärmen och inte från en valskärm: på
+   * telefonen finns ingen valskärm att hoppa till, och knappen hade aldrig gjort något. Finns det
+   * redan bilder är det granskningen som ligger bakom — den som gått in i guiden och tagit ett par
+   * vinklar ska inte kastas ut ur flödet med bilderna i handen.
+   */
+  function leaveGuided() {
+    if (!videoOnly) setMode("choose");
+    else if (shots.length > 0) setMode("review");
+    else leaveCamera();
+  }
+
   function addShot(dataUrl: string, source: Shot["source"], viewLabel: string | null = null) {
     setShots((prev) => [...prev, { id: `s${shotCounter++}`, dataUrl, viewLabel, source }]);
   }
 
-  function capturePhoto() {
+  /** Bildrutan som visas just nu, nedskalad — eller null när kameran ännu inte har någon att ge. */
+  function grabFrame(): string | null {
     const video = videoRef.current;
-    if (!video || video.readyState < 2) return;
+    if (!video || video.readyState < 2) return null;
     const scale = Math.min(1, MAX_UPLOAD_WIDTH / video.videoWidth);
     const canvas = document.createElement("canvas");
     canvas.width = Math.round(video.videoWidth * scale);
     canvas.height = Math.round(video.videoHeight * scale);
     const ctx = canvas.getContext("2d");
-    if (!ctx) return;
+    if (!ctx) return null;
     ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    addShot(canvas.toDataURL("image/jpeg", 0.9), "manual");
+    return canvas.toDataURL("image/jpeg", 0.9);
+  }
+
+  function capturePhoto() {
+    const dataUrl = grabFrame();
+    if (dataUrl) addShot(dataUrl, "manual");
+  }
+
+  // ---- fotoguiden: en bild per vinkel -------------------------------------
+
+  /**
+   * Lägger bilden på sin vinkel och går vidare.
+   *
+   * Ersätter, aldrig lägger till: en omtagning av samma vinkel ska inte kosta en av de sex platserna.
+   * Etiketten kommer från stationen och inte från säljaren — det är guiden som bestämt vad bilden
+   * visar, genom att be om just den vinkeln.
+   */
+  function fillStation(stationId: string, dataUrl: string, source: Shot["source"]) {
+    const station = PHOTO_STATIONS.find((s) => s.id === stationId);
+    if (!station) return;
+    const others = shots.filter((s) => s.stationId !== stationId);
+    if (others.length >= MAX_IMAGES) {
+      setProcessingError(t("Högst {max} bilder bedöms — ta bort någon i granskningen först.", { max: MAX_IMAGES }));
+      return;
+    }
+    setProcessingError(null);
+    setShots(
+      inStationOrder([
+        ...others,
+        { id: `s${shotCounter++}`, dataUrl, viewLabel: station.label, source, stationId },
+      ]),
+    );
+    advanceFrom(stationId, true);
+  }
+
+  function captureStation() {
+    const dataUrl = grabFrame();
+    if (dataUrl) fillStation(activeStation, dataUrl, "manual");
+  }
+
+  /** En bild som redan finns, in på den vinkel guiden står på. */
+  async function handleStationFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // så samma fil kan väljas igen efter ett misslyckat försök
+    if (!file) return;
+    fillStation(activeStation, await fileToResizedDataUrl(file), "manual");
+  }
+
+  /**
+   * Vidare till nästa vinkel som saknar bild.
+   *
+   * `justFilled` finns för att bilden som nyss lades ännu inte hunnit synas i `shots` — utan den hade
+   * vinkeln räknats som tom och guiden blivit stående på den.
+   */
+  function advanceFrom(stationId: string, justFilled: boolean) {
+    const done = stationsDone(shots);
+    if (justFilled) done.add(stationId);
+    const next = nextOpenStation(done, PHOTO_STATIONS.findIndex((s) => s.id === stationId));
+    if (next) setActiveStation(next);
+    // Sista vinkeln passerad: granskningen tar vid, utan ett extra tryck efter den sista bilden. Har
+    // säljaren hoppat över precis allt finns inget att granska, och guiden börjar om från början.
+    else if (done.size > 0) setMode("review");
+    else setActiveStation(PHOTO_STATIONS[0].id);
   }
 
   /**
@@ -226,11 +395,11 @@ export default function CaptureScreen({
       frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
       // Straight into the analysis. The frames were picked by the selector, not by the seller, so
       // there is nothing for them to approve — and being asked to sign off on someone else's choice
-      // is friction without a decision behind it. The shots are still in state, so a failed start
-      // lands on the review screen where they can retry or adjust.
-      await startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
+      // is friction without a decision behind it. Bildrutorna följer med vidare, så ett försök som
+      // faller på uppladdningen kan tas om utan att något filmas nytt.
+      startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
     } catch (err) {
-      setProcessingError(err instanceof Error ? err.message : "Kunde inte bearbeta videon.");
+      setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
       setMode("choose");
     }
   }
@@ -240,12 +409,12 @@ export default function CaptureScreen({
     e.target.value = ""; // så samma filer kan väljas igen efter ett misslyckat försök
     const room = MAX_IMAGES - shots.length;
     if (room <= 0) {
-      setProcessingError(`Redan ${MAX_IMAGES} bilder valda — ta bort någon först.`);
+      setProcessingError(t("Redan {max} bilder valda — ta bort någon först.", { max: MAX_IMAGES }));
       return;
     }
     setProcessingError(
       picked.length > room
-        ? `Tog de ${room} första — högst ${MAX_IMAGES} bilder bedöms.`
+        ? t("Tog de {antal} första — högst {max} bilder bedöms.", { antal: room, max: MAX_IMAGES })
         : null,
     );
     for (const file of picked.slice(0, room)) {
@@ -259,7 +428,7 @@ export default function CaptureScreen({
     const stream = streamRef.current;
     if (!stream) return;
     if (!hasLiveCamera()) {
-      setProcessingError("Kameran hade stängts av. Startar om den — tryck igen när bilden är tillbaka.");
+      setProcessingError(t("Kameran hade stängts av. Startar om den — tryck igen när bilden är tillbaka."));
       await startCamera();
       return;
     }
@@ -309,8 +478,8 @@ export default function CaptureScreen({
       if (blob.size < MIN_CLIP_BYTES || recordedMs < MIN_CLIP_MS) {
         setProcessingError(
           blob.size < MIN_CLIP_BYTES
-            ? "Inspelningen blev tom — kameran verkar ha stängts av. Försök igen."
-            : "Filmen blev för kort för att läsa bildrutor ur. Gå ett helt varv och låt den spela klart.",
+            ? t("Inspelningen blev tom — kameran verkar ha stängts av. Försök igen.")
+            : t("Filmen blev för kort för att läsa bildrutor ur. Gå ett helt varv och låt den spela klart."),
         );
         setMode("video");
         return;
@@ -321,9 +490,9 @@ export default function CaptureScreen({
         // huvudet, och klockan här är det närmaste ett facit som finns om filen inte vill säga något.
         const frames = await extractBestFrames(blob, undefined, recordedMs);
         frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
-        await startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
+        startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
       } catch (err) {
-        setProcessingError(err instanceof Error ? err.message : "Kunde inte bearbeta videon.");
+        setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
         setMode("video");
       }
     };
@@ -363,18 +532,14 @@ export default function CaptureScreen({
    * `payloadOverride` exists because the video paths start the analysis in the same tick as they add
    * their shots: `shots` has not re-rendered yet, so reading it here would send an empty list.
    */
-  async function startAnalysis(payloadOverride?: CapturedShot[]) {
-    setMode("creating");
+  function startAnalysis(payloadOverride?: CapturedShot[]) {
     const payload: CapturedShot[] =
       payloadOverride ?? shots.map((s) => ({ dataUrl: s.dataUrl, viewLabel: s.viewLabel, source: s.source }));
-    try {
-      const { jobId } = await createJob(payload, identity);
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      onCaptured(jobId, payload);
-    } catch (err) {
-      setProcessingError(err instanceof Error ? err.message : "Kunde inte starta analysen.");
-      setMode("review");
-    }
+    // Kameran släpps här och inte först vid avmonteringen: det som följer är uppladdningen och, för
+    // den som inte har konto, inloggningen. Ingen av dem behöver sensorn, och en kamera som ligger
+    // kvar och lyser under dem säger att skärmen fortfarande spelar in.
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    onCaptured(payload);
   }
 
   // ---- choose ----
@@ -382,18 +547,35 @@ export default function CaptureScreen({
     return (
       <div className="screen screen-light">
         <button className="btn btn-text btn-back" onClick={onBack}>
-          <ArrowLeftIcon /> Tillbaka
+          <ArrowLeftIcon /> {t("Tillbaka")}
         </button>
-        <h2 className="choose-title">Hur vill du visa möbeln?</h2>
+        <h2 className="choose-title">{t("Hur vill du visa möbeln?")}</h2>
         <p className="capture-identity">{[identity.brand, identity.model].filter(Boolean).join(" ")}</p>
         <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("video")}>
           <span className="choose-icon">
             <VideoIcon />
           </span>
           <div>
-            <strong>Spela in en snabb video</strong>
+            <strong>{t("Spela in en snabb video")}</strong>
             <p className="muted">
-              {cameraAvailable ? "Gå runt möbeln — vi väljer de bästa vyerna automatiskt." : "Kräver HTTPS — inte tillgängligt här."}
+              {cameraAvailable
+                ? t("Gå runt möbeln — vi väljer de bästa vyerna automatiskt.")
+                : t("Kräver HTTPS — inte tillgängligt här.")}
+            </p>
+          </div>
+        </button>
+        {/* Guiden kräver ingen kamera och gråas därför aldrig ut: varje vinkel går att fylla med en
+            bild ur mappen, vilket är hela vägen framåt när getUserMedia är blockerad. */}
+        <button className="choose-card" onClick={() => void enterGuided()}>
+          <span className="choose-icon">
+            <SofaIcon />
+          </span>
+          <div>
+            <strong>{t("Följ fotoguiden")}</strong>
+            <p className="muted">
+              {t(
+                "Sex vinklar, en i taget — guiden visar var du ska stå. Går lika bra att fylla med bilder du redan har.",
+              )}
             </p>
           </div>
         </button>
@@ -402,9 +584,11 @@ export default function CaptureScreen({
             <CameraIcon />
           </span>
           <div>
-            <strong>Ta bilder manuellt</strong>
+            <strong>{t("Ta bilder manuellt")}</strong>
             <p className="muted">
-              {cameraAvailable ? "Ta foton själv, gärna med närbilder på slitage." : "Kräver HTTPS — inte tillgängligt här."}
+              {cameraAvailable
+                ? t("Ta foton själv, gärna med närbilder på skador och slitage.")
+                : t("Kräver HTTPS — inte tillgängligt här.")}
             </p>
           </div>
         </button>
@@ -413,8 +597,8 @@ export default function CaptureScreen({
             <FolderIcon />
           </span>
           <div>
-            <strong>Ladda upp en videofil</strong>
-            <p className="muted">Välj en färdig film — vi extraherar bildrutorna åt dig.</p>
+            <strong>{t("Ladda upp en videofil")}</strong>
+            <p className="muted">{t("Välj en färdig film — vi extraherar bildrutorna åt dig.")}</p>
           </div>
         </button>
         <button className="choose-card" onClick={() => fileInputRef.current?.click()}>
@@ -422,8 +606,13 @@ export default function CaptureScreen({
             <PhotosIcon />
           </span>
           <div>
-            <strong>Ladda upp bilder</strong>
-            <p className="muted">Har du redan foton? Välj upp till {MAX_IMAGES} — ingen film behövs.</p>
+            <strong>{t("Ladda upp bilder")}</strong>
+            <p className="muted">
+              {t(
+                "Har du redan foton? Välj upp till {max} — ingen film behövs. Ta gärna med närbilder på eventuella skador.",
+                { max: MAX_IMAGES },
+              )}
+            </p>
           </div>
         </button>
         <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
@@ -442,7 +631,7 @@ export default function CaptureScreen({
         {!cameraStarted && (
           <div className="camera-placeholder">
             <button className="btn btn-ghost" onClick={leaveCamera}>
-              <ArrowLeftIcon /> Tillbaka
+              <ArrowLeftIcon /> {t("Tillbaka")}
             </button>
           </div>
         )}
@@ -458,11 +647,67 @@ export default function CaptureScreen({
           </div>
         )}
         <div className="photo-controls">
-          <button className="shutter-btn" onClick={capturePhoto} aria-label="Ta bild" />
+          <button className="shutter-btn" onClick={capturePhoto} aria-label={t("Ta bild")} />
           <button className="btn btn-primary btn-green btn-done" disabled={shots.length === 0} onClick={() => setMode("review")}>
-            Klar ({shots.length})
+            {t("Klar ({antal})", { antal: shots.length })}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // ---- fotoguiden ----
+  if (mode === "guided") {
+    const station = PHOTO_STATIONS.find((s) => s.id === activeStation) ?? PHOTO_STATIONS[0];
+    const taken = Object.fromEntries(shots.flatMap((s) => (s.stationId ? [[s.stationId, s.dataUrl]] : [])));
+    const count = Object.keys(taken).length;
+    /** Sant när det inte finns någon tom vinkel kvar efter den här: nästa tryck lämnar guiden. */
+    const lastLeg =
+      count > 0 &&
+      nextOpenStation(new Set(Object.keys(taken)), PHOTO_STATIONS.findIndex((s) => s.id === station.id)) === null;
+    return (
+      <div className="screen screen-camera">
+        <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
+        <button className="btn btn-ghost capture-mode-back" onClick={leaveGuided}>
+          <ArrowLeftIcon /> Tillbaka
+        </button>
+        {/* Vägen ur guiden i förtid. Fyra vinklar räcker för en besiktning; att tvinga fram sex innan
+            något får hända hade gjort guiden till ett formulär. På sista sträckan står den vägen redan
+            i knapparna nedanför, och två "Klar" på samma skärm är en fråga om vilken som gäller. */}
+        {count > 0 && !lastLeg && (
+          <button className="btn btn-ghost capture-done-top" onClick={() => setMode("review")}>
+            {t("Klar ({antal})", { antal: count })}
+          </button>
+        )}
+        <PhotoGuide stations={PHOTO_STATIONS} activeId={station.id} taken={taken} onJump={setActiveStation} />
+        {(cameraError ?? processingError) && (
+          <p className="error-text camera-error-overlay">{cameraError ?? processingError}</p>
+        )}
+        <div className="guided-controls">
+          <button className="btn btn-ghost guided-side" onClick={() => stationFileInputRef.current?.click()}>
+            <PhotosIcon size={18} />
+            {t("Välj bild")}
+          </button>
+          {cameraAvailable ? (
+            <button
+              className="shutter-btn"
+              onClick={captureStation}
+              aria-label={t("Ta bild: {vy}", { vy: t(station.label) })}
+            />
+          ) : (
+            <span className="guided-shutter-gap" />
+          )}
+          <button className="btn btn-ghost guided-side" onClick={() => advanceFrom(station.id, false)}>
+            {lastLeg ? t("Klar ({antal})", { antal: count }) : taken[station.id] ? t("Nästa") : t("Hoppa över")}
+          </button>
+        </div>
+        <input
+          ref={stationFileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={handleStationFileUpload}
+        />
       </div>
     );
   }
@@ -475,7 +720,12 @@ export default function CaptureScreen({
         <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
         {/* Ingen beskärningsram här: filmen tar hela bildrutan, och en ram som antyder något annat
             hade fått säljaren att rama in möbeln i fel yta. */}
-        {!recording && <WalkaroundGuide subject={[identity.brand, identity.model].filter(Boolean).join(" ")} />}
+        {!recording && (
+          <WalkaroundGuide
+            subject={[identity.brand, identity.model].filter(Boolean).join(" ")}
+            onSwitch={() => void enterGuided()}
+          />
+        )}
         {!recording && (
           <button className="btn btn-ghost capture-mode-back" onClick={leaveCamera}>
             <ArrowLeftIcon /> Tillbaka
@@ -483,7 +733,7 @@ export default function CaptureScreen({
         )}
         {recording && (
           <div className="capture-top-bar">
-            <span className="rec-dot" /> SPELAR IN {(recordMs / 1000).toFixed(0)}s
+            <span className="rec-dot" /> {t("SPELAR IN {sek}s", { sek: (recordMs / 1000).toFixed(0) })}
           </div>
         )}
         {recording && hasRotation !== false && <LapRing degrees={rotationDeg} tooFast={tooFast} />}
@@ -493,21 +743,21 @@ export default function CaptureScreen({
         {recording && (
           <div className="capture-guidance">
             {tooFast
-              ? "Gå långsammare — annars blir bilderna suddiga"
+              ? t("Gå långsammare — annars blir bilderna suddiga")
               : hasRotation === false
-                ? `${GUIDANCE_STEPS[stepIndex]} — tryck för att avsluta när du gått runt`
+                ? t("{steg} — tryck för att avsluta när du gått runt", { steg: t(GUIDANCE_STEPS[stepIndex]) })
                 : Math.abs(rotationDeg) < 20
-                  ? "Börja gå — långsamt medsols, ett varv på ungefär 40 sekunder"
-                  : GUIDANCE_STEPS[stepIndex]}
+                  ? t("Börja gå — långsamt medsols, ett varv på ungefär 40 sekunder")
+                  : t(GUIDANCE_STEPS[stepIndex])}
           </div>
         )}
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
         {processingError && <p className="error-text video-error">{processingError}</p>}
         <div className="video-controls">
           {!recording ? (
-            <button className="record-btn record-btn-hint" onClick={startRecording} aria-label="Starta inspelning" />
+            <button className="record-btn record-btn-hint" onClick={startRecording} aria-label={t("Starta inspelning")} />
           ) : (
-            <button className="record-btn record-btn-stop" onClick={stopRecording} aria-label="Stoppa inspelning" />
+            <button className="record-btn record-btn-stop" onClick={stopRecording} aria-label={t("Stoppa inspelning")} />
           )}
         </div>
       </div>
@@ -520,59 +770,76 @@ export default function CaptureScreen({
     return (
       <div className="screen screen-light center-column">
         <div className="spinner" />
-        <p>Bearbetar video…</p>
+        <p>{t("Bearbetar video…")}</p>
         <p className="muted small">
-          Väljer de bästa vyerna{processingMs > 1200 ? ` · ${(processingMs / 1000).toFixed(0)} s` : ""}
+          {t("Väljer de bästa vyerna")}
+          {processingMs > 1200 ? ` · ${(processingMs / 1000).toFixed(0)} s` : ""}
         </p>
-        {slow && <p className="muted small">Lång film eller långsam avkodning — det tar aldrig mer än 20 sekunder.</p>}
-      </div>
-    );
-  }
-
-  // ---- creating job ----
-  if (mode === "creating") {
-    return (
-      <div className="screen screen-light center-column">
-        <div className="spinner" />
-        <p>Laddar upp bilder…</p>
+        {slow && (
+          <p className="muted small">
+            {t("Lång film eller långsam avkodning — det tar aldrig mer än 20 sekunder.")}
+          </p>
+        )}
       </div>
     );
   }
 
   // ---- review ----
+  /**
+   * Vinklar guiden bad om och inte fick.
+   *
+   * Räknas bara när guiden faktiskt användes — annars hade varje filmat varv fått en anklagelse om
+   * fyra saknade bilder det aldrig var meningen att ta. Att säga vilka som saknas är detsamma som att
+   * säga vad besiktningen inte kommer att kunna uttala sig om, och det är säljarens beslut att ta.
+   */
+  const missing = stationsDone(shots).size > 0
+    ? PHOTO_STATIONS.filter((st) => st.required && !stationsDone(shots).has(st.id))
+    : [];
   return (
     <div className="screen screen-light">
-      <h2 className="screen-title">Dessa vyer kommer att inspekteras</h2>
+      <h2 className="screen-title">{t("Dessa vyer kommer att inspekteras")}</h2>
       <p className="muted">
-        {shots.length} av högst {MAX_IMAGES} bilder valda.
-        {!videoOnly && shots.length < MAX_IMAGES ? " Ser något håll ut att saknas? Lägg till fler nedan." : ""}
+        {t("{antal} av högst {max} bilder valda.", { antal: shots.length, max: MAX_IMAGES })}
+        {!videoOnly && shots.length < MAX_IMAGES
+          ? " " + t("Ser något håll ut att saknas? Lägg till fler nedan.")
+          : ""}
       </p>
       <div className="review-grid">
         {shots.map((s) => (
           <div key={s.id} className="review-thumb">
             <img src={s.dataUrl} alt="" />
-            {s.viewLabel && <span className="review-thumb-label">{s.viewLabel}</span>}
-            <button className="review-thumb-remove" onClick={() => setShots((prev) => prev.filter((x) => x.id !== s.id))} aria-label="Ta bort">
+            {s.viewLabel && <span className="review-thumb-label">{t(s.viewLabel)}</span>}
+            <button className="review-thumb-remove" onClick={() => setShots((prev) => prev.filter((x) => x.id !== s.id))} aria-label={t("Ta bort")}>
               <CloseIcon size={12} />
             </button>
           </div>
         ))}
       </div>
+      {missing.length > 0 && (
+        <p className="review-missing">
+          {t("Saknas: {vyer}. Besiktningen kan inte säga något om de sidorna.", {
+            vyer: missing.map((st) => t(st.label).toLowerCase()).join(", "),
+          })}{" "}
+          <button className="btn btn-text btn-inline" onClick={() => void enterGuided()}>
+            {t("Ta dem nu")}
+          </button>
+        </p>
+      )}
       {processingError && <p className="error-text">{processingError}</p>}
       {/* Samma regel som på vägen in: i mobilvyn finns ingen väg att lägga till bilder ur filsystemet. */}
       {!videoOnly && (
         <div className="review-add-actions">
           <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
-            <PlusIcon size={15} /> Ta fler bilder
+            <PlusIcon size={15} /> {t("Ta fler bilder")}
           </button>
           <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
-            <PlusIcon size={15} /> Ladda upp
+            <PlusIcon size={15} /> {t("Ladda upp")}
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
         </div>
       )}
       <button className="btn btn-primary" disabled={shots.length === 0} onClick={() => startAnalysis()}>
-        Starta AI-analys
+        {t("Starta AI-analys")}
       </button>
     </div>
   );
@@ -580,6 +847,7 @@ export default function CaptureScreen({
 
 /** En pil pekar medsols runt en cirkel, för lägen där varvringen inte kan ritas. */
 function DirectionPill() {
+  const t = useT();
   return (
     <div className="capture-direction">
       <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
@@ -589,7 +857,7 @@ function DirectionPill() {
         />
         <path className="capture-direction-head" d="M8.5 2.6 L12 4.5 L10.2 8" />
       </svg>
-      Gå medsols runt möbeln
+      {t("Gå medsols runt möbeln")}
     </div>
   );
 }
@@ -662,23 +930,27 @@ function LapRing({ degrees, tooFast }: { degrees: number; tooFast: boolean }) {
 }
 
 /**
- * Vidast möjliga bild.
+ * Huvudkameran, inte vidvinkeln.
  *
- * Många telefoner öppnar bakkameran med en optisk zoom över minimum, och i en trång vardagsrumsvinkel
- * är varje snäpp zoom ett steg bakåt säljaren måste ta. Där zoomen går att styra (Chrome på Android)
- * skruvas den ner till minimum. iOS redovisar ingen zoom i getCapabilities och lämnas som den är —
- * ett saknat reglage är inget fel, så tystnaden här är avsiktlig.
+ * Zoomen skruvades förut ner till minimum, och det var ett snäpp för långt: där minimum är
+ * ultravidvinkeln hamnar soffan långt bort i en böjd rumsbild, och slitaget — det bilderna ska visa —
+ * blir några suddiga bildpunkter. 1× är huvudkamerans neutralläge, och det vidaste läge som ändå är
+ * rätt objektiv: optisk zoom däröver skruvas ner dit, en vidvinkel därunder upp dit. Enheter som
+ * redovisar zoomen i egna steg (100–400 i stället för 1–4) har inget 1× att sikta på och lämnas vid
+ * sitt minimum. iOS redovisar ingen zoom alls i getCapabilities och lämnas som den är — ett saknat
+ * reglage är inget fel, så tystnaden här är avsiktlig.
  */
-async function widenFieldOfView(stream: MediaStream) {
+async function useMainLens(stream: MediaStream) {
   const track = stream.getVideoTracks()[0];
   if (!track?.getCapabilities) return;
   try {
-    const caps = track.getCapabilities() as MediaTrackCapabilities & { zoom?: { min: number } };
+    const caps = track.getCapabilities() as MediaTrackCapabilities & { zoom?: { min: number; max: number } };
     const current = (track.getSettings() as MediaTrackSettings & { zoom?: number }).zoom;
     if (!caps.zoom || typeof caps.zoom.min !== "number") return;
-    if (current !== undefined && current <= caps.zoom.min) return;
-    const widest: MediaTrackConstraintSet & { zoom?: number } = { zoom: caps.zoom.min };
-    await track.applyConstraints({ advanced: [widest] });
+    const neutral = caps.zoom.min <= 1 && (caps.zoom.max ?? 1) >= 1 ? 1 : caps.zoom.min;
+    if (current !== undefined && Math.abs(current - neutral) < 0.01) return;
+    const mainLens: MediaTrackConstraintSet & { zoom?: number } = { zoom: neutral };
+    await track.applyConstraints({ advanced: [mainLens] });
   } catch {
     /* Zoom är frivillig; att den inte gick att sätta ska inte fälla kameran. */
   }

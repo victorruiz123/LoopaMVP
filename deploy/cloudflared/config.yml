@@ -1,0 +1,20 @@
+# Cloudflare-tunnel för app.loopa.nu
+#
+# Tunneln kopplar upp sig UTIFRÅN den här datorn mot Cloudflare. Ingen port öppnas i routern, ingen
+# fast IP behövs, och certifikatet sköts av Cloudflare — vilket också är det som ger kameran en säker
+# kontext utan självsignerat strul.
+#
+# Node-servern serverar både UI:t och /api, så det finns bara ett ursprung att peka på. Prismotorn på
+# :8000 nämns medvetet INTE här: den ska aldrig gå att nå utifrån, bara från Node-servern på samma
+# maskin.
+#
+# Skapas av deploy/tunnel-setup.sh, som fyller i tunnel-id:t.
+
+tunnel: TUNNEL_ID
+credentials-file: HOME/.cloudflared/TUNNEL_ID.json
+
+ingress:
+  - hostname: app.loopa.nu
+    service: http://127.0.0.1:8799
+  # Allt annat avvisas. Utan en catch-all vägrar cloudflared starta.
+  - service: http_status:404

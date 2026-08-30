@@ -1,16 +1,34 @@
 import type { PriceEstimate } from "../types";
+import { currentLang, t } from "./i18n";
 
-const SEK = new Intl.NumberFormat("sv-SE", { maximumFractionDigits: 0 });
+/**
+ * Talet skrivs på skärmens språk, valutan gör det inte.
+ *
+ * "1 600" på svenska och franska, "1,600" på engelska — tusenavskiljaren hör till läsaren. Men
+ * enheten är kronor oavsett vem som läser: möbeln säljs i Sverige, och "SEK 1,600" hade varit ett
+ * annat påstående än det som står i annonsen. En formaterare per språk, byggd en gång.
+ */
+const FORMATTERS = new Map<string, Intl.NumberFormat>();
+
+function formatter(): Intl.NumberFormat {
+  const lang = currentLang();
+  let found = FORMATTERS.get(lang);
+  if (!found) {
+    found = new Intl.NumberFormat(lang, { maximumFractionDigits: 0 });
+    FORMATTERS.set(lang, found);
+  }
+  return found;
+}
 
 export function formatSek(value: number | null | undefined): string {
-  return value === null || value === undefined ? "–" : `${SEK.format(value)} kr`;
+  return value === null || value === undefined ? "–" : `${formatter().format(value)} kr`;
 }
 
 /** "1 500 – 3 000 kr" for the compact places; the result screen shows the three points separately. */
 export function formatPriceRange(price: PriceEstimate): string {
-  if (price.status !== "ok") return "Inget prisförslag";
+  if (price.status !== "ok") return t("Inget prisförslag");
   if (price.low === null || price.high === null) return formatSek(price.default);
-  return `${SEK.format(price.low)} – ${SEK.format(price.high)} kr`;
+  return `${formatter().format(price.low)} – ${formatter().format(price.high)} kr`;
 }
 
 export const CONFIDENCE_LABELS: Record<string, string> = {

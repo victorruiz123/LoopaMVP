@@ -130,7 +130,7 @@ import {
   type UploadedImage,
 } from '../../../src/features/generator/schema'
 import type { SellerResolution } from '../../../src/features/seller/types'
-import { callGeminiModel, extractText, type GeminiEnv } from '../_shared/gemini'
+import { callGeminiModel, extractText, modelUnavailable, type GeminiEnv } from '../_shared/gemini'
 import {
   extractSources,
   isPlausibleRetailPriceSek,
@@ -140,6 +140,8 @@ import {
   slugify,
 } from '../_shared/listing-guards'
 import { parseCandidates, pickAutoCandidate } from '../_shared/seller-candidates'
+import { ensureDimensions, mergeDimensionRows, parseDimensionRows } from '../_shared/seller-specs'
+import { estimatedDimensionsNote, typicalDimensions } from '../_shared/seller-typical-dimensions'
 
 /**
  * Identity the downstream stages treat as SETTLED. Once this exists, no stage
@@ -215,6 +217,25 @@ const MAX_BODY_BYTES = 26 * 1024 * 1024
 /** Both calls. NOT the professional pipeline's research model — see the benchmark table in the file header. */
 const SELLER_MODEL = 'gemini-3.5-flash-lite'
 
+/**
+ * Utvägen när SELLER_MODEL svarar 503 "The model is overloaded" eller 429.
+ *
+ * Överbelastning och kvot är PER MODELL hos Google — samma slutsats som skickmotorn drog av mätning
+ * (se RETRY_MODEL i server/src/gemini.ts: gemini-3.6-flash svarade medan gemini-3.5-flash returnerade
+ * 429 på samma nyckel i samma ögonblick). Att göra om anropet mot SAMMA modell är därför garanterat
+ * bortkastat, och att inte göra om det alls kostade säljaren hela modellsökningen: en överbelastning
+ * fäller båda anropen, båda kandidatförsöken och landar säljaren på en tom valskärm som påstår att
+ * inga modeller fanns — när sanningen är att ingen sökning gjordes.
+ *
+ * Priset är litet: en överbelastning svarar på ett par hundra millisekunder, så utvägen betalas av
+ * budgeten som just INTE gick åt. Den är långsammare än flash-lite och skulle vara fel val som
+ * förstahandsmodell — men den svarar, och det är hela skillnaden här.
+ */
+const SELLER_OVERLOAD_MODEL = 'gemini-3.6-flash'
+
+/** Under så här lite tid kvar är utvägen ett löfte som inte går att hålla — då är felet ärligare. */
+const MIN_OVERLOAD_FALLBACK_MS = 4_000
+
 function json(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
     status,
@@ -248,11 +269,23 @@ const SEARCH_FIRST_RULE = `SÖK FÖRST. Du MÅSTE göra minst två Google-sökni
  */
 const SPEC_HUNT_RULES = `Bästa källa, i denna ordning: 1) tillverkarens egen produktsida 2) tillverkarens PDF/specifikationsblad/katalog 3) officiellt arkiv 4) auktoriserad återförsäljare 5) trovärdig återförsäljare. För möbler har tillverkarens produktsida oftast allt som behövs — leta aktivt upp den.
 EXTRAHERA den faktiska informationen — rapportera aldrig bara att du hittat produktsidan. Redovisa: bredd/djup/höjd/sitthöjd i cm (det som är relevant för produkttypen), stommens material, klädsel/materialsammansättning, exakt modellnamn och variant, NYPRIS i SEK (aktuellt eller ursprungligt), samt andra användbara tillverkarspecifikationer.
+Skriv måtten i ett EGET avsnitt med rubriken "MÅTT:", ett värde per rad, exakt så här:
+MÅTT: bredd | 81 cm
+MÅTT: djup | 92 cm
+MÅTT: höjd | 82 cm
+MÅTT: sitthöjd | 44 cm
+Bara mått du faktiskt sett i en källa. Måtten begravda i löptext är den vanligaste orsaken till att de aldrig når annonsen — därför den här rubriken.
+Hittar du INGA mått alls för just den här produkten skriver du först MÅTT: INGA — och därefter en uppskattning utifrån närmaste jämförbara modell, i samma format men med rubriken "LIKNANDE:":
+LIKNANDE: bredd | 45 cm
+LIKNANDE: djup | 52 cm
+LIKNANDE: höjd | 88 cm
+LIKNANDE-GRUND: en matstol i massivt trä av samma typ, jämförd med [märke + modell du faktiskt sett mått för]
+Uppskattningen ska bygga på mått du SETT för en liknande produkt, aldrig på minnet, och den ersätter aldrig ett riktigt mått. Skriv LIKNANDE-rader ENDAST när MÅTT: INGA gäller — annonsen ska aldrig gå ut helt utan mått, men ett uppskattat mått som utges för belagt är värre än inget alls.
 Innan du avslutar, kontrollera: Hittade jag MÅTT? Hittade jag MATERIAL? Hittade jag NYPRIS? Saknas något av dessa: gör EN riktad extra sökning efter exakt det fältet (t.ex. "[märke] [modell] dimensions" eller "[märke] [modell] specification PDF") — sedan avslutar du, inga fler försök.`
 
 const SECONDHAND_RULE = `Sök också på modellnamnet + "begagnad"/"blocket"/"tradera" och redovisa faktiska BEGAGNATPRISER i Sverige i ett eget avsnitt med rubriken "ANDRAHANDSPRISER:". Dessa källor gäller ENDAST andrahandsvärde — använd dem aldrig som belägg för nypris.`
 
-const HONESTY_RULE = `Svara kort på svenska i löptext. Ange källans URL direkt efter varje faktauppgift, t.ex. "(källa: https://…)". Skriv endast URL:er du faktiskt sett i sökresultaten. Hitta ALDRIG på modellnamn, mått eller priser — skriv hellre "kunde inte bekräftas"; ofullständig research är INTE ett fel.`
+const HONESTY_RULE = `Svara kort på svenska i löptext. Ange källans URL direkt efter varje faktauppgift, t.ex. "(källa: https://…)". Skriv endast URL:er du faktiskt sett i sökresultaten. Hitta ALDRIG på modellnamn, mått eller priser — skriv hellre "kunde inte bekräftas"; ofullständig research är INTE ett fel. Undantaget är LIKNANDE-raderna ovan, som ÄR märkta som uppskattningar och därför inte påstår något om just den här produkten.`
 
 /**
  * Phase 1: candidate identification + spec research in ONE grounded call.
@@ -261,7 +294,36 @@ const HONESTY_RULE = `Svara kort på svenska i löptext. Ange källans URL direk
  * extraction for the top candidate is framed as the main job so the dominant-
  * candidate case gets its specs from this same call, with no extra latency.
  */
-function buildIdentifyResearchPrompt(brand: string, sellerNote: string): string {
+function buildIdentifyResearchPrompt(brand: string, sellerNote: string, excluded: string[] = [], listed: string[] = []): string {
+  /**
+   * Säljaren har sett förslagen och sagt nej till allihop.
+   *
+   * Blocket ligger FÖRE del 1 och är skarpt formulerat med flit: en modell som just fått fyra namn i
+   * sitt eget svar föreslår gärna samma fyra igen, och ett omval som ger samma lista är ingen ny
+   * chans utan en återvändsgränd. Tillsägelsen är ändå bara halva löftet — den andra halvan sållar
+   * `parseCandidates` fram i kod (se `excluded` där), för det här är en bedömning modellen kan
+   * missa och det andra kan den inte.
+   */
+  const rejectedBlock = excluded.length
+    ? `SÄLJAREN HAR REDAN SETT OCH AVFÄRDAT: ${excluded.join(', ')}.
+Ingen av dem är rätt möbel. Föreslå ALDRIG någon av dem igen — inte heller som variant, stavningsvariant eller undermodell av dem. Sök i varumärkets ÖVRIGA sortiment i samma produktkategori och kom tillbaka med fyra ANDRA modeller. Att de tidigare var fel är information: leta efter det som skiljer bilderna från dem.
+
+`
+    : ''
+  /**
+   * Namn som redan står i listan säljaren håller på att få — men som ingen sagt nej till.
+   *
+   * Ett omval söker om tills fyra NYA namn står på skärmen (se `collectNewCandidates` i
+   * server/src/pipeline/identify.ts), och varje ny sökning måste veta vilka platser som redan är
+   * tagna. De namnen hör INTE hemma i blocket ovan: att säga "säljaren avfärdade den" om ett förslag
+   * de ännu inte sett är en osanning som styr modellen bort från rätt möbelfamilj.
+   */
+  const listedBlock = listed.length
+    ? `REDAN FÖRESLAGNA I DEN HÄR OMGÅNGEN: ${listed.join(', ')}.
+De står redan i listan säljaren ska välja ur — de är alltså inte avfärdade, bara redan räknade. Ta inte upp dem igen; platserna som är kvar ska fyllas med ANDRA modeller.
+
+`
+    : ''
   return `${SEARCH_FIRST_RULE}
 
 Säljaren är en privatperson som säljer en begagnad produkt. Bilderna är säljarens egna.
@@ -270,7 +332,7 @@ ${sellerNote ? `- Säljaren berättar: "${sellerNote}"` : '- (inget mer angivet)
 
 Ingen kategori och ingen modell är angiven. Avgör själv från bilderna vad det är för produkt.
 
-DEL 1 — KANDIDATER (snabbt):
+${rejectedBlock}${listedBlock}DEL 1 — KANDIDATER (snabbt):
 Avgör vilka VERKLIGA produkter/modeller från varumärket bilderna troligen visar. Sök på varumärket + det du ser i bilderna. Fastna ALDRIG i att välja mellan snarlika modeller — är flera rimliga listar du dem och går vidare; säljaren väljer sedan själv.
 Skriv varje kandidat EXAKT så här, en per rad (sikta på 3-4, max 4):
 KANDIDAT: märke | modellnamn | variant eller - | produkttyp | STARK eller TROLIG eller MÖJLIG | kort synlig detalj som skiljer den från de andra | produktsidans URL
@@ -296,6 +358,19 @@ ${HONESTY_RULE}`
  * the model, that is said outright so the model does not spend grounded
  * latency doubting a human decision.
  */
+/**
+ * Fas 2:s specsökning. Skickas UTAN bildrutor — se `researchImages` i handlern.
+ *
+ * Modellen är redan avgjord här; måtten slås upp på namnet, inte på fotot. Bildrutorna tillförde
+ * alltså ingenting till sökningen men gjorde nyttolasten tung, och tung nyttolast är mätt känt för att
+ * få den grundade sökningen att falla tillbaka till ett ogrundat svar (se `MAX_LISTING_IMAGES` i
+ * server/src/listing.ts: taket 6 gav kandidater i 2 fall av 10 där taket 3 gav 8 av 10).
+ *
+ * Den bildjämförelse som stod här förut — "VARNING: bilderna motsäger modellen" — togs bort med
+ * bilderna. Kontrollen finns kvar där bilderna finns: `buildResolvedBlock` säger åt struktureringen
+ * att sätta identity.uncertain när bilderna uppenbart visar en annan produkt, och det anropet behåller
+ * sina sex bildrutor.
+ */
 function buildSpecResearchPrompt(brand: string, sellerNote: string, resolved: ResolvedProduct): string {
   const confirmedLine =
     resolved.source === 'seller_selected'
@@ -303,10 +378,25 @@ function buildSpecResearchPrompt(brand: string, sellerNote: string, resolved: Re
       : resolved.source === 'manual'
         ? 'SÄLJAREN HAR SJÄLV UPPGETT MODELLEN — säljarens egen uppgift är sanning.'
         : 'Modellen är identifierad med hög sannolikhet.'
+  /**
+   * En variant tas bara med om den är en VARIANTBETECKNING, inte en färgbeskrivning.
+   *
+   * Kandidatsteget skriver fritext i variantfältet — "beige / rörformat stål / svart-grå", "barstol,
+   * svart" — och den texten hamnade här som ett faktum att söka utifrån. Mätt över 48 körningar fick
+   * kandidatvägen källor i 33 % av fallen mot 67 % för den väg som INTE skickar variant, med samma
+   * modellnamn och samma söksträngar. Sökningen kom tillbaka tom, inte långsam: extra "fakta" om en
+   * färgställning som saknar egen produktsida smalnar av sökningen till ingenting.
+   *
+   * Kommatecken och snedstreck är signalen — en äkta variant heter "3-sits" eller "höger schäslong",
+   * inte "beige / rörformat stål".
+   */
+  const usableVariant =
+    resolved.variant && resolved.variant.length <= 24 && !/[,/]/.test(resolved.variant) ? resolved.variant : null
+
   const facts = [
     `- Varumärke: "${brand}"`,
     `- Modell: "${resolved.model}"`,
-    resolved.variant ? `- Variant: "${resolved.variant}"` : null,
+    usableVariant ? `- Variant: "${usableVariant}"` : null,
     resolved.productType ? `- Produkttyp: ${resolved.productType}` : null,
     sellerNote ? `- Säljaren berättar: "${sellerNote}"` : null,
   ].filter(Boolean)
@@ -320,8 +410,6 @@ Sök t.ex.: "${brand} ${resolved.model}", "${brand} ${resolved.model} mått", "$
 ${SPEC_HUNT_RULES}
 
 ${SECONDHAND_RULE}
-
-Jämför till sist mot bilderna: om bilderna UPPENBART visar en helt annan produkt än modellen ovan, skriv "VARNING: bilderna motsäger modellen" och förklara kort varför. Annars utgår du från att modellen stämmer.
 
 ${HONESTY_RULE}`
 }
@@ -399,7 +487,7 @@ SÄLJARENS EGNA BILDER är bifogade. Använd ENDAST bilderna — aldrig research
 
 identity (om inget annat anges under PRODUKTIDENTITET ovan): sätt confidence "high" endast om både bilder och research tydligt pekar på en specifik produkt, "medium" om produkttypen är säker men exakt modell är en rimlig men inte helt säker läsning, "low" om ingen specifik produkt kan bekräftas. Sätt exactProduct till null hellre än att gissa en modell. Sätt uncertain=true med en kort, konkret uncertaintyNote när identiteten är osäker.
 
-attributes: fyll med de specifikationer som FAKTISKT stöds av researchen eller är direkt synliga på bilderna — anpassa efter produkttypen (möbel: mått/material; plagg: storlek/material; elektronik: modellnummer/lagring). Varje attribut har en kort "key", en läsbar svensk "label" och ett "value". Sätt "sourceUrl" ENDAST till en URL som ordagrant står i researchen ovan, annars null. Hoppa över ett attribut helt hellre än att gissa dess värde.
+attributes: står det "MÅTT:"-rader i researchen MÅSTE varje sådant mått bli ett eget attribut (label "Bredd", "Djup", "Höjd", "Sitthöjd", value med enhet) — de raderna är redan verifierade och får aldrig utelämnas. Fyll därutöver med de specifikationer som FAKTISKT stöds av researchen eller är direkt synliga på bilderna — anpassa efter produkttypen (möbel: mått/material; plagg: storlek/material; elektronik: modellnummer/lagring). Varje attribut har en kort "key", en läsbar svensk "label" och ett "value". Sätt "sourceUrl" ENDAST till en URL som ordagrant står i researchen ovan, annars null. Hoppa över ett attribut helt hellre än att gissa dess värde. "LIKNANDE:"-rader ska du däremot INTE göra attribut av — de är uppskattningar och läggs in i kod, märkta som sådana.
 
 pricing.suggestedPriceSek: du MÅSTE föreslå ett pris så snart du kan avgöra vad för slags produkt det är. Ett prisförslag är det viktigaste säljaren får av oss — en annons utan pris är nästan värdelös. Utgå i denna ordning:
 1. researchens "ANDRAHANDSPRISER:" (faktiskt observerade begagnatpriser)
@@ -569,8 +657,16 @@ function normalizePricing(parsed: any, sources: SourceRef[], researchOk: boolean
 const DIMENSION_HINT = /(mått|bredd|djup|höjd|längd|diameter|dimension|width|depth|height|storlek|size)/i
 const MATERIAL_HINT = /(material|tyg|klädsel|träslag|läder|metall|fabric|ytbehandling)/i
 
+/**
+ * Uppskattade attribut räknas INTE.
+ *
+ * Annonsen bär numera alltid mått — finns inga belagda fylls de på med typiska mått för möbeltypen,
+ * märkta `estimated` (se seller-typical-dimensions.ts). Räknades de här hade en annons vars mått är
+ * gissade kallat sig "allt belagt med källa". Måtten står kvar i listan över det som saknas, och
+ * statusen stannar på "delvis belagt" — det säljaren ser är ett tal, inte ett löfte.
+ */
 function hasAttributeMatching(attributes: ProductAttribute[], re: RegExp): boolean {
-  return attributes.some((a) => re.test(a.key) || re.test(a.label))
+  return attributes.some((a) => !a.estimated && (re.test(a.key) || re.test(a.label)))
 }
 
 /**
@@ -619,6 +715,16 @@ function buildEmergencyResult(
   productHint: string | null,
   resolvedModel: string | null,
   warnings: string[],
+  /**
+   * Hur den grundade sökningen FAKTISKT gick.
+   *
+   * Tidigare satte den här funktionen `researchUnavailable: true` och `status: 'fallback'` hårdkodat,
+   * oavsett vad som hänt. Två helt olika fel kollapsade då till samma mening i gränssnittet — "Kunde
+   * inte beläggas mot källor" — och det var fel i det vanligaste av dem: mätt på ett skarpt jobb hade
+   * sökningen fyra grundade källor när struktureringen dog, och kortet påstod ändå att det inte fanns
+   * några. Säljaren fick leta efter ett källfel som inte fanns.
+   */
+  research: { sources: SourceRef[]; ok: boolean },
 ): GeneratedListingResult {
   const title = [brand, resolvedModel ?? productHint].filter(Boolean).join(' ') || brand
   const description = [
@@ -631,6 +737,16 @@ function buildEmergencyResult(
 
   const listing = { title, description, conditionText: 'Begagnat skick. Se bilder för detaljer.' }
 
+  // Även nödutgången bär mått. Struktureringen föll, men möbeltypen står i namnet säljaren själv
+  // skrev — och en uppskattning märkt som uppskattning är mer än den tomma listan som stod här förut.
+  const typical = typicalDimensions([productHint, resolvedModel, sellerNote, brand])
+
+  const missingFields: SellerMissingField[] = [
+    'dimensions', 'material', 'newPrice',
+    ...(resolvedModel ? [] : (['model'] as SellerMissingField[])),
+    'variant', 'price',
+  ]
+
   return {
     mode: 'seller',
     identity: {
@@ -642,9 +758,13 @@ function buildEmergencyResult(
       category: productHint,
       confidence: resolvedModel ? 'medium' : 'low',
       uncertain: true,
-      uncertaintyNote: 'Produkten kunde inte verifieras automatiskt just nu.',
+      // Vilket av de två felen det var, med rätt namn. Sökningen och struktureringen faller var för
+      // sig, och den som ska felsöka behöver veta vilken av dem det gäller.
+      uncertaintyNote: research.ok
+        ? 'Uppgifterna kunde inte sammanställas den här gången. Sökningen hittade källor — försök igen.'
+        : 'Produkten kunde inte verifieras automatiskt just nu.',
     },
-    attributes: [],
+    attributes: typical.attributes,
     condition: {
       grade: null,
       label: 'Begagnat skick',
@@ -664,12 +784,19 @@ function buildEmergencyResult(
     },
     listing,
     seo: { metaTitle: listing.title, metaDescription: listing.description.slice(0, 155), imageAlt: listing.title },
-    sources: [],
-    missingNotes: [],
-    status: 'fallback',
-    missingFields: ['dimensions', 'material', 'newPrice', ...(resolvedModel ? [] : (['model'] as SellerMissingField[])), 'variant', 'price'],
+    // Källorna som FANNS redovisas, även när sammanställningen föll. De är hämtade och grundade, och
+    // att dölja dem för att nästa steg kraschade är att slänga det enda belägg kortet faktiskt har.
+    sources: research.ok ? research.sources : [],
+    missingNotes: [
+      research.ok
+        ? 'Annonsgeneratorn kunde inte sammanställa uppgifterna. Det är ett tillfälligt fel i vårt led — källorna nedan hämtades utan problem.'
+        : 'Den grundade sökningen gav inga källor, så ingenting kunde beläggas.',
+      estimatedDimensionsNote(typical.basis),
+    ],
+    status: deriveStatus(research.ok, missingFields),
+    missingFields,
     warnings,
-    researchUnavailable: true,
+    researchUnavailable: !research.ok,
     slug: slugify(title),
     jsonLd: null,
     websiteAdaptation: null,
@@ -680,7 +807,7 @@ function buildEmergencyResult(
 
 function assembleResult(
   parsed: any,
-  research: { text: string; sources: SourceRef[]; ok: boolean },
+  research: { text: string; sources: SourceRef[]; ok: boolean; own: boolean },
   brand: string,
   sellerNote: string,
   productHint: string | null,
@@ -689,7 +816,35 @@ function assembleResult(
 ): GeneratedListingResult {
   const guardNotes: string[] = []
   const identity = normalizeIdentity(parsed, brand, resolved)
-  const attributes = normalizeAttributes(parsed, research.text)
+  /**
+   * The research call's own "MÅTT:" rows are merged in deterministically.
+   *
+   * Only when the search was THIS phase's own: reused identification research describes the top
+   * candidate from phase 1, which is not necessarily the model the seller then picked, and a
+   * dimension from the wrong chair is worse than an empty field. When it IS our own search, those
+   * rows were written about exactly this product, and dropping them is pure loss — measured over 78
+   * real listings, six of the 52 that had sources still arrived without a single dimension.
+   */
+  const merged = mergeDimensionRows(
+    normalizeAttributes(parsed, research.text),
+    research.own ? parseDimensionRows(research.text) : [],
+  )
+  /**
+   * Och kom det ändå inga mått: typiska mått för möbeltypen, märkta som uppskattade.
+   *
+   * Det är sista ledet i en kedja som börjar med tillverkarens produktsida och slutar här. Varje led
+   * före det här är belagt; det här är det inte, och det säger det själv — värdena skrivs med "ca",
+   * bär `estimated`, står kvar under "kunde inte bekräftas" och håller statusen på "delvis belagt".
+   * En annons utan ett enda mått lämnar köparen med en fråga som bara säljaren kan svara på.
+   */
+  const { attributes, basis: estimatedFrom } = ensureDimensions(merged, [
+    identity.category,
+    identity.exactProduct,
+    identity.variant,
+    productHint,
+    str(parsed?.listing?.title),
+    sellerNote,
+  ])
   let condition = normalizeCondition(parsed)
   const pricing = normalizePricing(parsed, research.sources, research.ok, research.text, guardNotes)
 
@@ -715,6 +870,7 @@ function assembleResult(
   const missingNotes = [
     ...(Array.isArray(parsed?.missingNotes) ? parsed.missingNotes.filter((m: unknown) => typeof m === 'string' && m.trim()) : []),
     ...guardNotes,
+    ...(estimatedFrom ? [estimatedDimensionsNote(estimatedFrom)] : []),
   ]
 
   return {
@@ -799,7 +955,20 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
   const contentLength = Number(request.headers.get('content-length') || 0)
   if (contentLength > MAX_BODY_BYTES) return json({ ok: false, error: 'Requesten är för stor.' }, 413)
 
-  let body: { brand?: string; sellerNote?: string; productHint?: string; images?: unknown; resolution?: unknown }
+  let body: {
+    brand?: string
+    sellerNote?: string
+    productHint?: string
+    images?: unknown
+    resolution?: unknown
+    /** Grundat underlag från identifieringen, återanvänt när fas 2:s egen sökning kommer tillbaka tom. */
+    priorResearch?: unknown
+    priorSources?: unknown
+    /** Förslag säljaren redan sett och avfärdat — ett uttryckligt "hitta nya". Se `refreshing` nedan. */
+    excludeModels?: unknown
+    /** Namn som redan står i den lista omgången bygger. Sållas som `excludeModels`, sägs annorlunda. */
+    alreadySuggested?: unknown
+  }
   try {
     body = await request.json()
   } catch {
@@ -814,8 +983,45 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
   const sellerNote = (body.sellerNote || '').trim().slice(0, 500)
   const productHint = (body.productHint || '').trim().slice(0, 80) || null
 
+  // Fas 2 börjar i PLAIN form (bara märke + modell). Se researchPrompt nedan.
+  let researchForm: 'full' | 'plain' = 'full'
+  let researchFormHit: 'full' | 'plain' | 'none' = 'none'
+  let reusedPrior = false
+  const priorResearch = typeof body.priorResearch === 'string' ? body.priorResearch.slice(0, 20_000) : ''
+  const priorSources: SourceRef[] = Array.isArray(body.priorSources)
+    ? (body.priorSources as SourceRef[])
+        .filter((x) => x && typeof (x as SourceRef).url === 'string')
+        .slice(0, 8)
+    : []
+
   const resolution = validateResolution(body.resolution)
   if (resolution === 'invalid') return json({ ok: false, error: 'invalid resolution' }, 400)
+
+  /**
+   * "Hitta nya": säljaren har sett förslagen, avfärdat allihop och ber om fyra andra.
+   *
+   * Ett omval är fas 1 en gång till, med två skillnader: de avfärdade namnen går in i prompten och
+   * sållas bort i `parseCandidates`, och svaret blir ALLTID `needs_selection` — se `refreshing` vid
+   * kandidatbeslutet. Anroparen bad om förslag att välja mellan, inte om en annons.
+   */
+  //
+  // Taket rymmer flera omval. Anroparen fyller listan med både det säljaren avfärdat och det den
+  // pågående omgångens tidigare sökningar redan lämnat (se `collectNewCandidates` i
+  // server/src/pipeline/identify.ts), så den växer med fyra namn per omval plus omgångens egna. Ett
+  // för snålt tak hade tyst tappat de äldsta förbuden — och då är just de namnen fria att komma
+  // tillbaka som "nya" förslag.
+  const names = (raw: unknown): string[] =>
+    Array.isArray(raw)
+      ? (raw as unknown[])
+          .filter((x): x is string => typeof x === 'string' && x.trim().length > 0)
+          .map((x) => x.trim().slice(0, 120))
+          .slice(0, 32)
+      : []
+  const excludeModels = names(body.excludeModels)
+  const alreadySuggested = names(body.alreadySuggested)
+  /** Allt som inte får komma tillbaka som kandidat, oavsett vilket av de två skälen det har. */
+  const blocked = [...excludeModels, ...alreadySuggested]
+  const refreshing = !resolution && blocked.length > 0
 
   if (!env.GEMINI_API_KEY) return json({ ok: false, error: 'AI-tjänsten är inte konfigurerad. Kontakta Loopa.' }, 503)
 
@@ -835,6 +1041,31 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
   const remainingMs = () => OVERALL_DEADLINE_MS - (Date.now() - startedAt)
 
+  /**
+   * Ett anrop till säljarmodellen, med EN utväg när det är just den modellen som inte svarar.
+   *
+   * Bara vid snabba fel som gäller modellen — 429, 5xx, nätverksfel (se `modelUnavailable`). En
+   * timeout går ALDRIG vidare hit: den har redan använt tiden ett andra försök skulle behöva, och
+   * SELLER_OVERLOAD_MODEL är den långsammare av de två. Utvägen tas inte heller när det som är kvar
+   * av deadlinen inte räcker till ett anrop.
+   */
+  const callSeller = async (stage: 'research' | 'structure', body: unknown, budgetMs: number): Promise<any> => {
+    try {
+      return await callGeminiModel(env, SELLER_MODEL, body, budgetMs, deadline.signal)
+    } catch (err) {
+      const left = Math.min(budgetMs, remainingMs() - 500)
+      if (!modelUnavailable(err) || left < MIN_OVERLOAD_FALLBACK_MS) throw err
+      geminiCalls++
+      if (stage === 'research') groundedCalls++
+      if (!warnings.includes('model_overloaded')) warnings.push('model_overloaded')
+      console.error(
+        `[seller/generate] stage=${stage} outcome=model_unavailable model=${SELLER_MODEL} fallback=${SELLER_OVERLOAD_MODEL}` +
+          ` left_ms=${left} error=${err instanceof Error ? err.message.slice(0, 160) : String(err)}`,
+      )
+      return await callGeminiModel(env, SELLER_OVERLOAD_MODEL, body, left, deadline.signal)
+    }
+  }
+
   // ── Identity resolution state ──
   // Phase 2 (resolution present): settled up front from the seller's choice.
   // Phase 1: may become settled by a dominant candidate after research.
@@ -850,35 +1081,68 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
   // queries use it; the seller's typed brand remains truth in the result.
   const researchBrand = (resolution?.kind === 'seller_selected' && resolution.selected.brand) || brand
 
-  const researchPrompt = resolved
-    ? buildSpecResearchPrompt(researchBrand, sellerNote, resolved)
+  /**
+   * Fas 2 söker i PLAIN form först: bara märke och modell, utan variant och produkttyp.
+   *
+   * Ordningen var tvärtom, och det var fel väg. Mätt över 48 körningar får den väg som INTE skickar
+   * variant och produkttyp källor i 67 % av fallen mot 33 % för den som gör det — samma modellnamn,
+   * samma söksträngar. Extra "fakta" om en färgställning eller en produkttyp som saknar egen
+   * produktsida smalnar av sökningen till ingenting.
+   *
+   * Den rika formen låg som tredje försök, efter två misslyckanden med den sämre formen, OCH bakom en
+   * spärr som kräver 24 s kvar av deadline — så när de två första bränt sina budgetar kördes den inte
+   * alls. Den bästa formen provades alltså bara när de sämre råkade svara snabbt. Nu är det omvänt:
+   * plain får förstahandsförsöket och det inre omförsöket, rik form är reserven.
+   */
+  const plainResolved: ResolvedProduct | null = resolved ? { ...resolved, variant: null, productType: null } : null
+  /** Den rika formen, sparad för reservförsöket längre ned. */
+  const richPrompt = resolved ? buildSpecResearchPrompt(researchBrand, sellerNote, resolved) : ''
+  const researchPrompt = plainResolved
+    ? buildSpecResearchPrompt(researchBrand, sellerNote, plainResolved)
     : explicitUnknown
       ? buildUnknownResearchPrompt(brand, sellerNote, productHint)
-      : buildIdentifyResearchPrompt(brand, sellerNote)
+      : buildIdentifyResearchPrompt(brand, sellerNote, excludeModels, alreadySuggested)
+  if (plainResolved) researchForm = 'plain'
+
+  /**
+   * Bildrutor till SÖKNINGEN — bara när det är modellen som ska identifieras.
+   *
+   * Fas 1 och den okända vägen behöver dem: det är ur bilderna modellen ska kännas igen. Fas 2 vet
+   * redan vilken modell det är och letar publicerade specifikationer på ett namn — där är bildrutorna
+   * ren vikt på en sökning som är känslig för just det. Struktureringen behåller sina sex.
+   */
+  const researchImages = plainResolved ? [] : images.slice(0, RESEARCH_IMAGE_CAP)
 
   let result: GeneratedListingResult
+  // Deklarerad UTANFÖR try: nödresultatet byggs från båda grenarna, och catch-grenen måste kunna
+  // svara på om sökningen gick bra. Låg den kvar innanför blev "vet inte" till "fanns inga källor".
+  // `own` skiljer den EGNA sökningen från identifieringens återanvända underlag — se assembleResult.
+  const research = { text: '', sources: [] as SourceRef[], ok: false, own: false }
   try {
     // ── Stage 1: grounded research. BEST EFFORT — never fatal.
-    const research = { text: '', sources: [] as SourceRef[], ok: false }
     const researchStart = Date.now()
 
     const runResearch = async (budgetMs: number): Promise<{ text: string; sources: SourceRef[] } | null> => {
       geminiCalls++
       groundedCalls++
       try {
-        const res = await callGeminiModel(
-          env,
-          SELLER_MODEL,
-          buildResearchBody(researchPrompt, images.slice(0, RESEARCH_IMAGE_CAP)),
-          budgetMs,
-          deadline.signal,
-        )
+        const res = await callSeller('research', buildResearchBody(researchPrompt, researchImages), budgetMs)
         return { text: extractText(res), sources: extractSources(res) }
       } catch (err) {
         console.error(`[seller/generate] stage=research outcome=failed error=${err instanceof Error ? err.message.slice(0, 200) : String(err)}`)
         return null
       }
     }
+
+    /**
+     * Den ogrundade textens ENDA tillåtna användning: kandidatnamn.
+     *
+     * Sparad för att en fallen grundning annars kostar säljaren hela valskärmen — mätt på samma
+     * Mio-matgrupp, sex körningar: fyra research-anrop kom tillbaka ogrundade, och alla fyra bar
+     * ändå fyra KANDIDAT-rader med samma toppkandidat som de grundade körningarna gav. Texten når
+     * ALDRIG specifikationerna eller fas 2 — se kandidatbeslutet nedan.
+     */
+    let ungroundedText = ''
 
     const applyResearch = (out: { text: string; sources: SourceRef[] } | null): boolean => {
       // Grounding chunks are the only proof a search actually happened — every
@@ -892,13 +1156,16 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
         research.text = out.text
         research.sources = out.sources
         research.ok = true
+        research.own = true
         return true
       }
+      if (out.text.length > 0) ungroundedText = out.text
       return false
     }
 
     const first = await runResearch(RESEARCH_BUDGET_MS)
-    if (!applyResearch(first)) {
+    if (applyResearch(first)) researchFormHit = researchForm
+    else {
       if (!first) warnings.push('research_failed')
       else warnings.push('research_ungrounded')
 
@@ -919,9 +1186,54 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       if (canRetry) {
         researchRetried = true
         warnings.push('research_retried')
-        applyResearch(await runResearch(RESEARCH_RETRY_BUDGET_MS))
+        if (applyResearch(await runResearch(RESEARCH_RETRY_BUDGET_MS))) researchFormHit = researchForm
       }
     }
+    /**
+     * AB: samma fråga, RIKARE form — reserven, inte förstahandsvalet.
+     *
+     * Riktningen är omvänd sedan plain form flyttades först. Plain (bara märke + modell) får källor i
+     * 67 % av fallen mot 33 % för den form som skickar med variant och produkttyp, så den sämre formen
+     * ska bara komma fram när den bättre redan gått bet. Variant och produkttyp kan ändå vara det som
+     * skiljer två modeller åt, så den finns kvar — sist.
+     *
+     * Villkoret jämför de FÄRDIGA prompterna i stället för att fråga om `variant`/`productType` finns.
+     * `usableVariant` sållar bort varianter som bara är färgbeskrivningar, så en satt variant betyder
+     * inte att prompten faktiskt blir en annan — och ett omförsök med identisk prompt är en bränd
+     * budget utan chans att ge något nytt.
+     *
+     * Ett omförsök, inte en loop, och bara när det ryms i vad som är kvar av deadline.
+     */
+    if (!research.ok && resolved && richPrompt && richPrompt !== researchPrompt) {
+      if (remainingMs() > RESEARCH_RETRY_BUDGET_MS + STRUCTURE_RESERVE_MS) {
+        researchForm = 'full'
+        geminiCalls++
+        groundedCalls++
+        const out = await callSeller('research', buildResearchBody(richPrompt, researchImages), RESEARCH_RETRY_BUDGET_MS)
+          .then((res: any) => ({ text: extractText(res), sources: extractSources(res) }))
+          .catch(() => null)
+        if (applyResearch(out)) researchFormHit = 'full'
+      }
+    }
+
+    /**
+     * AA: identifieringens källor som underlag när fas 2:s egen sökning gav noll.
+     *
+     * De hämtades redan, de är grundade, och de innehåller ofta produktsidan — att kasta dem och
+     * sedan rapportera "kunde inte beläggas" är att slänga bort det enda belägg som fanns. De
+     * ERSÄTTER aldrig en egen sökning som lyckats; de träder in först när den inte gjorde det.
+     */
+    if (!research.ok && priorResearch && priorSources.length > 0) {
+      research.text = `UNDERLAG FRÅN IDENTIFIERINGEN (grundad sökning i föregående steg):\n${priorResearch}`
+      research.sources = priorSources
+      research.ok = true
+      reusedPrior = true
+    } else if (research.ok && priorSources.length > 0) {
+      // Egen sökning lyckades — komplettera bara källistan, texten rörs inte.
+      const seen = new Set(research.sources.map((x) => x.url))
+      research.sources = [...research.sources, ...priorSources.filter((x) => !seen.has(x.url))].slice(0, 8)
+    }
+
     researchMs = Date.now() - researchStart
 
     // ── Phase 1 only: candidate decision, in plain code. ──
@@ -929,12 +1241,29 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     // call already hunted (no extra latency, no interrupt). REAL ambiguity
     // (2-4 plausible products) or an explicit "no credible candidate" returns
     // to the seller IMMEDIATELY — no structure call, so this answer costs one
-    // grounded call (~6-9s). Candidates are only ever read from GROUNDED text
-    // (applyResearch discards ungrounded output), so an invented, search-free
-    // model name cannot become a candidate. Failures never interrupt: a failed
-    // or format-noncompliant research run just continues as before.
-    if (!resolution && research.ok) {
-      const { candidates, explicitNone } = parseCandidates(research.text, brand)
+    // grounded call (~6-9s). Failures never interrupt: a failed or
+    // format-noncompliant research run just continues as before.
+    //
+    // FÖRSLAG får läsas ur ogrundad text, FAKTA aldrig.
+    //
+    // Grundningen tänder som en FREKVENS, inte en garanti, och när den uteblev stod säljaren förut
+    // inför en tom valskärm: "Vi kunde inte peka ut någon modell." Skillnaden mot specifikationerna
+    // är vem som kontrollerar påståendet. Ett mått ingen källa stöder går rakt in i annonsen som
+    // sanning — därför kastas ogrundad text ur allt som rör specar. En kandidat är motsatsen: ett
+    // förslag säljaren tittar på med sin egen möbel framför sig och avfärdar på en sekund. Och det
+    // enda alternativet till ett ogrundat förslag är inget förslag alls.
+    //
+    // Tre spärrar gör det ofarligt: den ogrundade texten följer ALDRIG med som `researchText` eller
+    // `sources` (fas 2 får alltså inget ogrundat underlag att bygga mått på), en ogrundad kandidat
+    // får ALDRIG auto-fortsätta som fastställd modell, och kandidatens `sourceUrl` kontrolleras
+    // redan av anroparen — sidan måste nämna modellen innan bilden används.
+    //
+    // Ett OMVAL (`refreshing`) går in här på samma villkor som första gången, men lämnar aldrig
+    // blocket åt struktureringen: säljaren bad om nya förslag, och svaret på "hitta nya" är förslag
+    // — även när de blev noll. En annons byggd på en modell de nyss avfärdat vore fel svar på frågan.
+    if (!resolution && (refreshing || research.ok || ungroundedText.length > 0)) {
+      const grounded = research.ok
+      const { candidates, explicitNone } = parseCandidates(grounded ? research.text : ungroundedText, brand, blocked)
       // SELLER_ALWAYS_ASK: fråga säljaren även när en kandidat dominerar.
       //
       // Standardregeln hoppar över valet när toppkandidaten är STARK och konkurrenterna bara
@@ -943,22 +1272,32 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       // förslag och känner igen sin möbel kostar två sekunder. Med flaggan på räcker en kandidat för
       // att fråga; utan den krävs som förut två.
       const alwaysAsk = (env as { SELLER_ALWAYS_ASK?: string }).SELLER_ALWAYS_ASK === '1'
-      const auto = alwaysAsk ? null : pickAutoCandidate(candidates)
+      // En ogrundad kandidat är ett förslag, aldrig ett avgörande — den får inte hoppa över valet.
+      const auto = alwaysAsk || refreshing || !grounded ? null : pickAutoCandidate(candidates)
       if (auto) {
         resolved = { model: auto.model, variant: auto.variant, productType: auto.productType, source: 'auto' }
-      } else if (candidates.length >= (alwaysAsk ? 1 : 2) || explicitNone) {
+      // "KANDIDAT: INGEN" räknas bara ur grundad text. Ur en sökningslös körning är det inte ett
+      // belagt "finns inte" utan bara tystnad, och då är strukturanropets gissning bättre än en
+      // tom skärm.
+      } else if (refreshing || candidates.length >= (alwaysAsk ? 1 : 2) || (grounded && explicitNone)) {
         const totalServerMs = Date.now() - startedAt
         console.log(
-          `[seller/generate] phase=identify outcome=needs_selection candidates=${candidates.length} research_ms=${researchMs} research_retry=${researchRetried} gemini_calls=${geminiCalls} total_ms=${totalServerMs}`,
+          `[seller/generate] phase=${refreshing ? 'refresh' : 'identify'} outcome=needs_selection candidates=${candidates.length} excluded=${excludeModels.length} listed=${alreadySuggested.length} grounded=${grounded} research_ms=${researchMs} research_retry=${researchRetried} gemini_calls=${geminiCalls} total_ms=${totalServerMs}`,
         )
         return json(
           {
             ok: true,
             kind: 'needs_selection',
             candidates,
-            // Källorna följer med: anroparen kan slå upp hur varje kandidat SER UT innan säljaren
-            // väljer. Rent additivt — inget anrop till, ingen fas ändrad, ingen latens.
-            sources: research.sources,
+            // GRUNDADE källor och text följer med. Anroparen kan dels slå upp hur varje kandidat
+            // ser ut, dels skicka tillbaka underlaget i fas 2 — den sökningen kommer tillbaka tom i
+            // två fall av tre på kandidatvägen, och då är det här det enda belagda som finns.
+            //
+            // Ogrundat underlag stannar HÄR, och skickas som tomt. Följde det med hade fas 2 byggt
+            // mått och nypris på en sökning som aldrig gjordes — precis det applyResearch finns för
+            // att förhindra. Kandidatnamnen ovan är allt en ogrundad körning får bidra med.
+            sources: grounded ? research.sources : [],
+            researchText: grounded ? research.text : '',
             timings: { researchMs, structureMs: 0, researchRetried, structureRetried: false, geminiCalls, groundedCalls, totalServerMs },
           },
           200,
@@ -973,12 +1312,10 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     const runStructure = async (imageCap: number, budgetMs: number): Promise<any | null> => {
       geminiCalls++
       try {
-        const res = await callGeminiModel(
-          env,
-          SELLER_MODEL,
+        const res = await callSeller(
+          'structure',
           buildStructureBody(buildStructurePrompt(brand, sellerNote, research.text, resolvedBlock), images.slice(0, imageCap)),
           budgetMs,
-          deadline.signal,
         )
         return parseJsonLoose(extractText(res))
       } catch (err) {
@@ -1001,12 +1338,12 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
     result = parsed
       ? assembleResult(parsed, research, brand, sellerNote, productHint, resolved, warnings)
-      : buildEmergencyResult(brand, sellerNote, productHint, resolved?.model ?? null, [...warnings, 'structure_failed'])
+      : buildEmergencyResult(brand, sellerNote, productHint, resolved?.model ?? null, [...warnings, 'structure_failed'], research)
   } catch (err) {
     // Belt and braces: assembly itself must never turn into a 500 for a valid
     // submission. Any unexpected throw still yields a usable seller result.
     console.error('[seller/generate] stage=assemble outcome=failed error=', err)
-    result = buildEmergencyResult(brand, sellerNote, productHint, resolved?.model ?? null, [...warnings, 'assembly_failed'])
+    result = buildEmergencyResult(brand, sellerNote, productHint, resolved?.model ?? null, [...warnings, 'assembly_failed'], research)
   } finally {
     clearTimeout(deadlineTimer)
   }
@@ -1014,12 +1351,13 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
   const totalServerMs = Date.now() - startedAt
   const phase = resolution ? `resolve_${resolution.kind}` : resolved ? 'identify_auto' : 'identify'
   console.log(
-    `[seller/generate] phase=${phase} status=${result.status} model=${result.identity.exactProduct ?? '-'} research_ms=${researchMs} structure_ms=${structureMs} research_retry=${researchRetried} structure_retry=${structureRetried} gemini_calls=${geminiCalls} images=${images.length} sources=${result.sources.length} missing=${(result.missingFields ?? []).join('|')} total_ms=${totalServerMs}`,
+    `[seller/generate] phase=${phase} status=${result.status} model=${result.identity.exactProduct ?? '-'} research_ms=${researchMs} structure_ms=${structureMs} research_retry=${researchRetried} structure_retry=${structureRetried} gemini_calls=${geminiCalls} images=${images.length} sources=${result.sources.length} missing=${(result.missingFields ?? []).join('|')} research_form=${researchForm} form_hit=${researchFormHit} reused_prior=${reusedPrior} prior_sources=${priorSources.length} total_ms=${totalServerMs}`,
   )
 
   // ALWAYS 200 / ok:true for a valid submission — partial success IS success.
   return json(
-    { ok: true, kind: 'result', result, timings: { researchMs, structureMs, researchRetried, structureRetried, geminiCalls, groundedCalls, totalServerMs } },
+    { ok: true, kind: 'result', result, timings: { researchMs, structureMs, researchRetried, structureRetried, geminiCalls, groundedCalls, totalServerMs },
+      provenance: { researchForm, researchFormHit, reusedPrior, priorSources: priorSources.length, sources: result.sources.length } },
     200,
   )
 }

@@ -3,7 +3,7 @@
  *
  * Publicerar en färdig Loopa-annons på Loopas eget Tradera-konto. Fyra miljövariabler krävs
  * (se .env.example); saknas någon är hela integrationen frånkopplad i stället för att fela —
- * `traderaConfigured()` är det knappen i truth-cardet frågar innan den visar sig.
+ * `traderaConfigured()` är det knappen i annonsen frågar innan den visar sig.
  *
  * Ingen npm-beroende. Node 18+ (inbyggd fetch).
  */
@@ -71,7 +71,7 @@ export interface TraderaImage {
   mime: "image/jpeg" | "image/png";
 }
 
-/** Det Loopa skickar in. Byggs i publish.ts ur ett färdigt truth-card. */
+/** Det Loopa skickar in. Byggs i publish.ts ur en färdig annons. */
 export interface TraderaListingInput {
   /** Loopas jobb-id. Sparas som ownReference hos Tradera och är det vi hittar tillbaka på. */
   ownReference: string;

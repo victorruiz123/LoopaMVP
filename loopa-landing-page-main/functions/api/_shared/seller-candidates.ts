@@ -84,14 +84,49 @@ function cleanDetail(raw: string | undefined): string | null {
 }
 
 /**
+ * Namnet, i den form två körningar går att jämföra i: gemener, och allt som inte är bokstav eller
+ * siffra blir mellanslag. "SÖDERHAMN 3-sits" och "Söderhamn 3 sits" är samma förslag.
+ */
+const key = (v: string) => v.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim()
+
+/**
+ * Samma förslag, eller det ena en precisering av det andra?
+ *
+ * Prefixregeln finns för att modellen sällan skriver namnet likadant två gånger: den som avfärdades
+ * som "SÖDERHAMN" kommer tillbaka som "SÖDERHAMN 3-sits" i nästa körning, och det är fortfarande
+ * samma möbel säljaren just sagt nej till. Två VERKLIGT olika produkter i samma familj —
+ * "Söderhamn 3-sits" mot "Söderhamn 4-sits" — delar däremot inget prefix och överlever.
+ */
+const samish = (a: string, b: string) => !!a && !!b && (a === b || a.startsWith(`${b} `) || b.startsWith(`${a} `))
+
+/**
+ * Har säljaren redan sett och tackat nej till den här?
+ *
+ * Jämför både "märke modell" och modellnamnet ensamt: den avfärdade listan kommer in som hela namn
+ * ("IKEA SÖDERHAMN"), medan en ny körning gärna stavar märket annorlunda eller utelämnar det.
+ */
+function alreadyRejected(candidate: SellerProductCandidate, excluded: string[]): boolean {
+  const forms = [key(`${candidate.brand} ${candidate.model}`), key(candidate.model)]
+  return excluded.some((raw) => {
+    const e = key(raw)
+    return forms.some((f) => samish(f, e))
+  })
+}
+
+/**
  * Parses "KANDIDAT: märke | modell | variant | produkttyp | STARK/TROLIG/MÖJLIG | detalj"
  * lines out of the grounded research prose. Tolerant about everything except
  * what matters: a candidate without a model name is dropped, duplicates
  * (same brand+model) are collapsed, and the result is capped at
  * MAX_SELLER_CANDIDATES, best confidence first (stable within a tier, so the
  * model's own ordering is preserved as the tiebreak).
+ *
+ * `excluded` är de förslag säljaren redan avfärdat. De sållas bort HÄR, i kod, före taket på fyra —
+ * prompten blir tillsagd samma sak, men en tillsägelse är modellens bedömning och det här är ett
+ * löfte. Att sålla efter taket hade dessutom kunnat ge noll nya förslag ur en körning som lämnade
+ * fyra rader varav två var nya.
  */
-export function parseCandidates(text: string, fallbackBrand: string): ParsedCandidates {
+export function parseCandidates(text: string, fallbackBrand: string, excluded: string[] = []): ParsedCandidates {
   const out: SellerProductCandidate[] = []
   let explicitNone = false
   let sawMarker = false
@@ -121,8 +156,9 @@ export function parseCandidates(text: string, fallbackBrand: string): ParsedCand
       // anroparen hämtar den och kontrollerar att sidans titel nämner modellen innan den används.
       sourceUrl: extractSourceUrl(parts),
     }
-    const key = `${candidate.brand} ${candidate.model}`.toLowerCase()
-    if (out.some((c) => `${c.brand} ${c.model}`.toLowerCase() === key)) continue
+    if (excluded.length > 0 && alreadyRejected(candidate, excluded)) continue
+    const dupKey = `${candidate.brand} ${candidate.model}`.toLowerCase()
+    if (out.some((c) => `${c.brand} ${c.model}`.toLowerCase() === dupKey)) continue
     out.push(candidate)
   }
 

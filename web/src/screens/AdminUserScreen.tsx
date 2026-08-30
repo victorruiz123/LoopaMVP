@@ -6,9 +6,10 @@ import { formatSek } from "../lib/price";
 import { displayName, formatDate, initials } from "./AdminScreen";
 import type { AdminUser, JobSummary } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 /**
- * En användares truth-cards, sedda av en admin.
+ * En användares annonser, sedda av en admin.
  *
  * Samma rader som säljaren själv ser i sin profil, ur samma uträkning på servern — panelen ska visa
  * kortet som det ÄR, inte en andra tolkning av det. Läsning och ingenting annat: adminvägarna svarar
@@ -24,6 +25,7 @@ export default function AdminUserScreen({
   onOpenJob: (jobId: string) => void;
 }) {
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
+  const t = useT();
   usePageTitle(displayName(user));
 
   useEffect(() => {
@@ -32,8 +34,8 @@ export default function AdminUserScreen({
       .catch(() => setJobs([]));
   }, [user.id]);
 
-  const cards = (jobs ?? []).filter((j) => j.hasTruthCard);
-  const rest = (jobs ?? []).filter((j) => !j.hasTruthCard);
+  const cards = (jobs ?? []).filter((j) => j.hasListing);
+  const rest = (jobs ?? []).filter((j) => !j.hasListing);
   const valued = cards.filter((j) => j.price?.status === "ok" && j.price.default !== null);
   const totalValue = valued.reduce((sum, j) => sum + (j.price?.default ?? 0), 0);
   const name = displayName(user);
@@ -41,7 +43,7 @@ export default function AdminUserScreen({
   return (
     <div className="screen screen-light profile admin">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> Alla användare
+        <ArrowLeftIcon /> {t("Alla användare")}
       </button>
 
       <section className="profile-head">
@@ -57,15 +59,15 @@ export default function AdminUserScreen({
       <section className="profile-stats">
         <div className="profile-stat">
           <div className="profile-stat-value">{jobs === null ? "—" : cards.length}</div>
-          <div className="profile-stat-label">Truth-cards</div>
+          <div className="profile-stat-label">{t("Annonser")}</div>
         </div>
         <div className="profile-stat">
           <div className="profile-stat-value">{valued.length ? formatSek(totalValue) : "—"}</div>
-          <div className="profile-stat-label">Samlat värde</div>
+          <div className="profile-stat-label">{t("Samlat värde")}</div>
         </div>
       </section>
 
-      <h2 className="profile-section-title">Truth-cards</h2>
+      <h2 className="profile-section-title">{t("Annonser")}</h2>
 
       {jobs === null ? (
         <div className="profile-loading">
@@ -76,8 +78,10 @@ export default function AdminUserScreen({
           <span className="profile-empty-mark">
             <CardIcon size={22} />
           </span>
-          <p className="profile-empty-title">Inga truth-cards</p>
-          <p className="profile-empty-hint">Kontot har inte fått någon besiktning hela vägen till ett kort.</p>
+          <p className="profile-empty-title">{t("Inga annonser")}</p>
+          <p className="profile-empty-hint">
+            {t("Kontot har inte fått någon besiktning hela vägen till en annons.")}
+          </p>
         </div>
       ) : (
         <ul className="card-list">
@@ -110,7 +114,7 @@ export default function AdminUserScreen({
           att öppna, och varför det saknas är det enda intressanta med raden. */}
       {rest.length > 0 && (
         <>
-          <h2 className="profile-section-title">Utan truth-card</h2>
+          <h2 className="profile-section-title">{t("Utan annons")}</h2>
           <ul className="admin-stub-list">
             {rest.map((j) => (
               <li key={j.id} className="admin-stub">

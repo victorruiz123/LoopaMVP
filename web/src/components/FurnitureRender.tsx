@@ -2,6 +2,7 @@ import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { buildFaces, fitPoints, project, rotate, type Vec3, type View } from "../lib/render3d";
 import type { FurnitureModel } from "../lib/furnitureModel";
 import ShadedFaces from "./ShadedFaces";
+import { t as label } from "../lib/i18n";
 
 /**
  * Möbeln renderad i 3D, med måtten utsatta och varje skada som en numrerad punkt på den del den
@@ -15,6 +16,11 @@ import ShadedFaces from "./ShadedFaces";
  * samma golv under möbeln, samma långsamma rörelse. Det är avsiktligt: säljaren har redan sett sin
  * möbel stå i den bilden när hen filmade den, och kortet ska visa samma möbel i samma rum, inte en
  * ritning i en annan värld.
+ *
+ * Med `still` ritas samma scen som en stillbild: möbeln fryst i den vinkel rörelsen ändå vilar i,
+ * snett framifrån. Ingen insvängning, ingen vaggning, inget att dra i. Det är för lägen där bilden
+ * ska läsas och kvitteras direkt — där sekunderna innan den stod stilla var sekunder utan innehåll,
+ * och där det inte finns något på baksidan att vrida fram.
  */
 
 const VIEW_W = 760;
@@ -48,20 +54,26 @@ export default function FurnitureRender({
   pins = [],
   selectedId = null,
   onSelect = () => {},
+  still = false,
 }: {
   model: FurnitureModel;
   /** Skadorna som numrerade punkter. Utelämnas på måttsteget, där det inte finns några än. */
   pins?: RenderPin[];
   selectedId?: string | null;
   onSelect?: (id: string | null) => void;
+  /** Fryst bild snett framifrån i stället för en figur att vrida på. Se doc-blocket ovan. */
+  still?: boolean;
 }) {
   const uid = useId().replace(/:/g, "");
   const stage = useRef<HTMLDivElement>(null);
   const [yaw, setYaw] = useState(START_YAW);
   const [pitch, setPitch] = useState(START_PITCH);
   const [dragged, setDragged] = useState(false);
-  /** Rörelsen slutar för gott när säljaren tagit i figuren — då är det hens vridning som gäller. */
-  const [live, setLive] = useState(true);
+  /**
+   * Rörelsen slutar för gott när säljaren tagit i figuren — då är det hens vridning som gäller. I
+   * stillbilden startar den aldrig: vinkeln nedan ÄR bilden.
+   */
+  const [live, setLive] = useState(!still);
   /** Kortet är långt och figuren sitter överst. Rullas den ur bild finns ingen att röra sig för. */
   const [onScreen, setOnScreen] = useState(true);
   const drag = useRef<{ x: number; y: number } | null>(null);
@@ -70,11 +82,11 @@ export default function FurnitureRender({
 
   useEffect(() => {
     const el = stage.current;
-    if (!el || typeof IntersectionObserver === "undefined") return;
+    if (still || !el || typeof IntersectionObserver === "undefined") return;
     const io = new IntersectionObserver(([entry]) => setOnScreen(entry.isIntersecting));
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [still]);
 
   // Möbeln svänger in och vaggar sedan vidare, långsamt och med litet utslag. Det är samma sorts
   // rörelse som telefonen gör i varvguiden, och den säger vad bilden är: något man kan gå runt,
@@ -157,22 +169,25 @@ export default function FurnitureRender({
   function onPointerUp() {
     drag.current = null;
   }
+  function resetView() {
+    setYaw(START_YAW);
+    setPitch(START_PITCH);
+  }
 
   return (
     <div className="render-stage" ref={stage}>
       <svg
-        className="render-canvas"
+        className={still ? "render-canvas render-canvas-still" : "render-canvas"}
         viewBox={`0 0 ${VIEW_W} ${VIEW_H}`}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onDoubleClick={() => {
-          setYaw(START_YAW);
-          setPitch(START_PITCH);
-        }}
+        onPointerDown={still ? undefined : onPointerDown}
+        onPointerMove={still ? undefined : onPointerMove}
+        onPointerUp={still ? undefined : onPointerUp}
+        onPointerCancel={still ? undefined : onPointerUp}
+        onDoubleClick={still ? undefined : resetView}
         role="img"
-        aria-label={`3D-vy av möbeln, ${Math.round(w)} × ${Math.round(d)} × ${Math.round(h)} cm`}
+        aria-label={`${still ? "Måttskiss" : "3D-vy"} av möbeln, ${Math.round(w)} × ${Math.round(d)} × ${Math.round(
+          h,
+        )} cm`}
       >
         <defs>
           <filter id={`${uid}-blur`} x="-50%" y="-50%" width="200%" height="200%">
@@ -230,7 +245,7 @@ export default function FurnitureRender({
         })}
       </svg>
 
-      {!dragged && <span className="render-hint">Dra för att vrida</span>}
+      {!still && !dragged && <span className="render-hint">{label("Dra för att vrida")}</span>}
     </div>
   );
 }

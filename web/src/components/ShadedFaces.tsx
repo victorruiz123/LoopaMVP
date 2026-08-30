@@ -4,7 +4,7 @@ import { LIGHT_GRADIENT, type Face } from "../lib/render3d";
 /**
  * Ytorna ur render3d, utritade.
  *
- * Egen komponent för att BÅDA ställen som ritar möbler använder den — truth-cardets modell och
+ * Egen komponent för att BÅDA ställen som ritar möbler använder den — annonsens modell och
  * varvguiden på inspelningsskärmen. En toning som ritas på två håll blir förr eller senare två
  * utseenden, och då ritar appen möbler på två sätt igen.
  *

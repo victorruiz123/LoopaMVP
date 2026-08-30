@@ -6,8 +6,19 @@
 
 import type { ConditionGrade } from "../../types.js";
 
-/** "Avhämtning" — shippingTypes id 8. Möbler hämtas; frakt är inte vår affär. */
-export const TRADERA_SHIPPING_PICKUP_ID = 8;
+/**
+ * "Annat fraktsätt" — shippingTypes id 6.
+ *
+ * Loopa levererar själv: efter köpet bokas en budfirma som kör möbeln hem till köparens dörr, och
+ * tiden väljs i SMS. Ingen av Traderas integrerade bärare beskriver det flödet — PostNord (12), DHL
+ * (2) och Instabox (19) bokar sin EGEN frakt, och en soffa går ändå inte som paket. id 6 är det enda
+ * värdet som säger "frakt ingår, men den sköts vid sidan av Tradera". Vad som faktiskt händer står i
+ * annonstexten, och det är därför den texten inte får sluta säga det.
+ *
+ * Avhämtning (id 8) skickas INTE längre. En möbel som körs hem till dörren hämtas inte hos säljaren,
+ * och två fraktsätt där bara det ena stämmer är sämre än inget val alls.
+ */
+export const TRADERA_SHIPPING_OTHER_ID = 6;
 
 /**
  * "Skick"-attributet. Samma id (121) på alla möbelkategorier vi använder — kontrollerat mot Soffor,

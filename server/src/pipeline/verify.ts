@@ -1,84 +1,137 @@
 import path from "node:path";
 import { mkdir } from "node:fs/promises";
 import { callGeminiStructured, Type, type ImagePart } from "../gemini.js";
-import { cropEvidence, loadImageAsBase64 } from "../imageUtils.js";
-import { VERIFY_ALL_FINDINGS, VERIFY_CONFIDENCE_THRESHOLD, VERIFY_IMPACTS, VERIFY_SEVERITIES } from "../config.js";
-import { buildVerifyPayload, type CropAttempt } from "./verifyPayload.js";
-import { DEFECT_ITEM_SCHEMA, mapRawDefect, type RawDefect } from "./inspect.js";
-import type { CallMeta, CapturedImage, Damage } from "../types.js";
+import { cropEvidence, loadImageAsBase64, markFromCrop } from "../imageUtils.js";
+import {
+  EXTRA_MARKS_ENABLED,
+  MAX_ADDED_PER_CROP,
+  MAX_ADDED_TOTAL,
+  MIN_ADDED_CONFIDENCE,
+  VERIFY_ALL_FINDINGS,
+  VERIFY_CONFIDENCE_THRESHOLD,
+  VERIFY_IMPACTS,
+  VERIFY_SEVERITIES,
+} from "../config.js";
+import { buildVerifyPayload, mergeReviewedDuplicates, type NumberedCrop, type CropAttempt } from "./verifyPayload.js";
+import { DAMAGE_TYPES, mapRawDefect, type RawDefect } from "./inspect.js";
+import type { CallMeta, CapturedImage, Damage, Severity } from "../types.js";
 
+/**
+ * Granskningen utgår från det första besiktningen hittat, och tittar bara i UTSNITTEN.
+ *
+ * Den letade en gång efter missade skador i hela bilderna, och det var den halvan som kostade: den
+ * krävde att alla originalbilder skickades med (2,4-5,3 MB) och fördubblade svarets omfång. Den
+ * halvan är fortfarande borta — nyttolasten är utsnitten och ingenting annat.
+ *
+ * Kvar, och nytt, är den billiga delen av samma idé: när modellen ändå har ett ~5x förstorat utsnitt
+ * framför sig får den säga om det syns FLER märken i det. Skador sitter i kluster, och första
+ * besiktningen såg samma yta i en vidbild där ett märke är några pixlar — det är därför den hittar
+ * ett av tre skav på samma benkant. Att fråga om resten kostar inga bilder och inget anrop, bara
+ * några rader i svaret. Ramarna står i config.ts: högst två per utsnitt, högst fyra totalt, golv 70,
+ * och de kan inte bära ett värre betyg än S2/kosmetisk.
+ *
+ * En skada som varken syns i något utsnitt eller hittades av första besiktningen förblir missad.
+ */
 const RESPONSE_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     reviews: {
       type: Type.ARRAY,
-      description: "En rad per fynd från första besiktningen, i samma ordning som de listas.",
+      description: "En rad per utsnitt, i samma ordning som de visas.",
       items: {
         type: Type.OBJECT,
         properties: {
-          finding_index: { type: Type.INTEGER, description: "1-baserat, matchar numreringen i listan." },
+          finding_index: { type: Type.INTEGER, description: "1-baserat, matchar numreringen." },
           verdict: {
             type: Type.STRING,
             enum: ["KEEP", "REJECT"],
-            description: "KEEP är standard. REJECT bara när utsnittet uppenbart inte visar en skada — reflex, skugga, söm, träådring, designdetalj eller avtorkningsbar smuts.",
+            description:
+              "KEEP när du kan peka ut avvikelsen i utsnittet. REJECT när du inte kan det — reflex, skugga, söm, träådring, tygmönster, designdetalj, avtorkningsbar smuts, oskärpa, eller helt enkelt ett oskadat parti.",
           },
-          reason: { type: Type.STRING, description: "En kort mening på svenska." },
+          duplicate_of: {
+            type: Type.INTEGER,
+            description:
+              "Numret på det FÖRSTA utsnitt som visar samma fysiska skada som detta, när skadan är fotad ur flera håll. 0 när fyndet är ensamt om sin skada. Två likadana skador på olika ställen är inte dubbletter, inte heller när de sitter på samma del — är du osäker, sätt 0.",
+          },
+          reason: { type: Type.STRING, description: "Högst åtta ord." },
+          // MEDVETET utanför required: ett obligatoriskt fält vill fyllas i, och det är precis vad
+          // ett tillagt märke inte ska göra. Utelämnat betyder tom lista, och tom lista är normalen.
+          // Fältet finns bara när frågan ställs — ett schema som beskriver något prompten inte ber om
+          // kostar tokens och inbjuder till gissningar.
+          ...(EXTRA_MARKS_ENABLED ? { extra_marks: {
+            type: Type.ARRAY,
+            description:
+              "FLER märken som syns i JUST DET HÄR utsnittet, utöver det i mitten. Gå igenom hela utsnittet kant till kant. Ta med sådant du kan peka ut lika tydligt som ett fynd du godkänner — aldrig reflex, skugga, söm, träådring, tygmönster, designdetalj eller smuts. Högst två.",
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                type: { type: Type.STRING, enum: DAMAGE_TYPES },
+                semantic_location: { type: Type.STRING, description: "Läge inom delen, på svenska: 'strax ovanför', 'längre ned på kanten'." },
+                severity: { type: Type.STRING, enum: ["S1", "S2", "S3", "S4"] },
+                description: { type: Type.STRING, description: "Kort, konkret visuellt bevis på svenska. Vad ser du, och hur skiljer det sig från ytan omkring?" },
+                confidence: { type: Type.NUMBER, description: "0-100. Under 70 tas märket inte med alls — är du inte så säker, utelämna det." },
+                x: { type: Type.NUMBER, description: "Rutan i UTSNITTETS koordinater: 0-1 från utsnittets vänsterkant." },
+                y: { type: Type.NUMBER, description: "0-1 från utsnittets överkant." },
+                w: { type: Type.NUMBER, description: "0-1, rutans bredd i utsnittet." },
+                h: { type: Type.NUMBER, description: "0-1, rutans höjd i utsnittet." },
+              },
+              required: ["type", "semantic_location", "severity", "description", "confidence", "x", "y", "w", "h"],
+            },
+          } } : {}),
         },
-        required: ["finding_index", "verdict", "reason"],
+        required: ["finding_index", "verdict", "duplicate_of", "reason"],
       },
     },
-    additional_defects: {
-      type: Type.ARRAY,
-      description:
-        "Skador som första besiktningen MISSADE. Titta särskilt efter nedsuttenhet, missfärgning, blankslitning och slitage på ben, kanter och ändar. Tom lista om du inte hittar något nytt — hitta aldrig på för att fylla listan.",
-      items: DEFECT_ITEM_SCHEMA,
-    },
   },
-  required: ["reviews", "additional_defects"],
+  required: ["reviews"],
 };
+
+interface RawExtraMark {
+  type: RawDefect["type"];
+  semantic_location: string;
+  severity: Severity;
+  description: string;
+  confidence: number;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
 
 interface RawReview {
   finding_index: number;
   verdict: "KEEP" | "REJECT";
+  duplicate_of?: number;
   reason: string;
+  extra_marks?: RawExtraMark[];
 }
 
 interface RawResponse {
   reviews: RawReview[];
-  additional_defects: RawDefect[];
 }
 
-const SYSTEM_PROMPT = `Du är ANDRA BESIKTAREN. Du får alla bilder av möbeln, en lista över vad första
-besiktningen hittade, och ett förstorat utsnitt per fynd.
+const EXTRA_MARKS_BLOCK = `
+3) FLER MÄRKEN I SAMMA UTSNITT. Gå igenom HELA utsnittet, kant till kant, inte bara märket i mitten. Utsnittet är kraftigt förstorat mot vad första besiktningen såg av samma yta, och där det sitter ett märke sitter det oftast fler: samma kant har stött emot samma sak många gånger. Första besiktningen såg den här ytan i en vidbild och rapporterade det tydligaste märket — de andra är kvar åt dig.
 
-Du har två uppgifter, och den andra är minst lika viktig som den första.
+Varje ytterligare märke du kan peka ut lägger du i extra_marks, med en ruta i UTSNITTETS egna koordinater (0-1 från utsnittets vänster- och överkant). Kravet är detsamma som för KEEP: du ska kunna säga vad du ser och hur det skiljer sig från ytan omkring, och samma sak gäller det som ALDRIG är en skada — reflex, skugga, söm, ådring, mönster, designdetalj, smuts, oskärpa. Ta inte med märket i mitten en gång till. Högst två per utsnitt, och ser du inget mer är tom lista rätt svar.
+`;
 
-1. GRANSKA det som hittats. Utgå från att första besiktningen hade rätt — de allra flesta fynd ska
-   behållas. Sätt REJECT bara när utsnittet UPPENBART inte visar en skada: en reflex eller glansdager,
-   en skugga, en söm, träets naturliga ådring, en avsiktlig designdetalj, eller smuts som torkas bort.
-   Är du tveksam: behåll fyndet. Ett felaktigt borttaget fynd är värre än ett tveksamt som står kvar.
-   Kräv INTE att skadan syns i flera bilder — många skador syns bara från ett håll.
+const SYSTEM_PROMPT = `Du är ANDRA BESIKTAREN. Du får ett förstorat utsnitt per fynd som första besiktningen rapporterat, numrerade i ordning, med typ och läge angivet. Fyndet som ska bedömas ligger MITT I utsnittet — ytan runt omkring är med som sammanhang.
 
-   MÖRKA BLANKA YTOR — svart trä, lack, metall, läder — är det vanligaste stället att bli lurad. Där
-   ser en glansdager ut precis som en ljus repa. Skilj dem så här:
-   - En REFLEX följer föremålets form: den ligger längs en kant, en rundning eller en fasett, löper
-     jämnt med den, och tonar mjukt ut i ändarna. Den finns bara för att ljuset råkar falla så.
-   - En REPA struntar i föremålets form: den korsar ytan i sin egen riktning, har hårda oregelbundna
-     kanter, och slutar tvärt. Under den syns blottat underlag i annan kulör, inte bara ljusare svart.
-   Formuleringen "syns i ljusvinkel", "framträder i visst ljus" eller liknande är i sig ett skäl att
-   AVFÄRDA: en verklig skada syns oavsett hur ljuset faller. Är märket bara där för ljusets skull är
-   det inte en skada, hur tydligt det än ser ut.
+Du svarar på ${EXTRA_MARKS_ENABLED ? "TRE" : "TVÅ"} frågor per utsnitt.
 
-2. HITTA DET SOM MISSATES. Gå igenom hela möbeln i bilderna på nytt, oberoende av listan. Första
-   besiktningen missar systematiskt vissa saker — titta särskilt efter:
-   - NEDSUTTEN STOPPNING: tyget är inte slätt och rakt utan veckat, en sits som buktar nedåt, en dyna
-     utan fyllighet. Jämför sitsens mitt mot kanterna och den använda sitsen mot ytor ingen suttit på.
-   - MISSFÄRGNING och fläckar: ojämn färg där ytan borde vara enfärgad, mörkare där kroppen tagit i.
-   - BLANKSLITNING: nedtryckta glansiga fibrer i stället för uppresta matta.
-   - Slitage på BEN, KANTER och ÄNDAR, som är små i bild och lätt förbises.
-   Lägg bara till sådant du faktiskt kan peka ut i en bild. Hittar du inget nytt är tom lista rätt svar.
+1) VERDIKT. Frågan är inte "kan det sitta en skada här?" utan "SER JAG den?". Svara KEEP när du kan peka ut avvikelsen och säga hur den skiljer sig från ytan omkring: en linje, ett märke, en fläck, ett parti där ytskiktet är borta. Kan du inte det, svara REJECT.
 
-Svara koncist, inget resonemang i klartext.`;
+REJECT gäller särskilt: reflexer och glansdagrar · skuggor · sömmar, stickningar och paspoal · träets ådring och kvistar · tygets mönster, bindning och lugg · avsiktliga designdetaljer och skarvar · damm, ludd, smulor, hårstrån och annat som torkas bort · oskärpa och komprimeringsbrus i förstoringen · ett parti som helt enkelt är oskadat.
+
+Normalt bruksslitage ÄR en skada och ska behållas när det SYNS: nötta kanter, blankslitna ytor, missfärgning, nedsutten stoppning. Det är påståenden utan synligt stöd i utsnittet som ska bort — aldrig små skador för att de är små.
+
+Du dömer utsnittet, inte möbeln. Att en begagnad möbel "säkert" har slitage är inget skäl att behålla ett fynd du inte kan se, och att första besiktningen skrev en övertygande beskrivning är inte heller ett bevis.
+
+2) DUBBLETT. Flera utsnitt kan visa SAMMA fysiska skada, tagna ur olika bildrutor — samma märke, samma ställe på möbeln, samma form. Sätt då duplicate_of till numret på det FÖRSTA utsnittet som visar den skadan, så att skadan kan märkas ut i alla bildrutor den syns i i stället för att räknas flera gånger. Två skador av samma sort på olika ställen är INTE dubbletter — varken ett skav på vartdera benet eller två skav på SAMMA ben. Två utsnitt av samma del visar samma skada bara när märket sitter på samma ställe på delen: samma avstånd från kant och ände, samma form och riktning. Sätt 0 när fyndet är ensamt om sin skada, och 0 när du är osäker.
+
+${EXTRA_MARKS_ENABLED ? EXTRA_MARKS_BLOCK : ""}
+Håll varje motivering under åtta ord.`;
 
 /** Which candidates are ambiguous/high-stakes enough to justify the one optional verification call. */
 export function needsVerification(d: Damage): boolean {
@@ -118,12 +171,6 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
   const cropsDir = path.join(jobDir, "crops");
   await mkdir(cropsDir, { recursive: true });
 
-  // ALL images: the second inspector has to be able to find what the first one missed, which it cannot
-  // do from crops alone. Labelled by index so evidence coordinates refer to something identifiable.
-  const referenceParts: ImagePart[] = await Promise.all(
-    images.map(async (img, i) => ({ ...(await loadImageAsBase64(path.join(jobDir, "originals", img.path))), label: `Bild ${i}` })),
-  );
-
   // Crop FIRST, number after: the numbering has to come from the crops that actually exist.
   // Parallellt, men med ordningen bevarad genom Promise.all: varje beskärning är ett eget
   // sharp-anrop, och tio fynd betydde tio sharp-anrop efter varandra innan granskningen kunde börja.
@@ -131,14 +178,14 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
     toVerify.map(async (d): Promise<CropAttempt> => {
       const primary = d.evidence[0];
       const image = primary ? imageById.get(primary.imageId) : undefined;
-      if (!primary || !image) return { damage: d, cropRelPath: null };
+      if (!primary || !image) return { damage: d, cropRelPath: null, rect: null };
       const originalAbs = path.join(jobDir, "originals", image.path);
       const cropRelPath = path.join("crops", `${d.id}.jpg`).replace(/\\/g, "/");
       try {
-        await cropEvidence(originalAbs, primary.mark, path.join(jobDir, cropRelPath));
-        return { damage: d, cropRelPath };
+        const rect = await cropEvidence(originalAbs, primary.mark, path.join(jobDir, cropRelPath));
+        return { damage: d, cropRelPath, rect };
       } catch {
-        return { damage: d, cropRelPath: null };
+        return { damage: d, cropRelPath: null, rect: null };
       }
     }),
   );
@@ -159,17 +206,20 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
   const findingList = numbered
     .map((c, i) => `Fynd ${i + 1}: ${c.damage.type} på ${c.damage.part} (${c.damage.semanticLocation}). ${c.damage.description}`)
     .join("\n");
-  const userPrompt = `Först ${images.length} hela bilder av möbeln, märkta Bild 0-${images.length - 1}. Därefter ${numbered.length} förstorade utsnitt, ett per fynd.\n\nFörsta besiktningen hittade:\n${findingList}\n\nGranska dessa enligt schemat, och gå sedan igenom hela möbeln på nytt efter det som missats.`;
+  const userPrompt = `${numbered.length} förstorade utsnitt, ett per fynd, i nummerordning.\n\nFörsta besiktningen rapporterade:\n${findingList}\n\nSäg för varje utsnitt om det visar en verklig skada, och om det visar samma skada som ett tidigare utsnitt.`;
 
   const { data, tokensUsed, cached, modelUsed, latencyMs } = await callGeminiStructured<RawResponse>({
     purpose: "verify_findings",
     systemPrompt: SYSTEM_PROMPT,
     userPrompt,
-    images: [...referenceParts, ...cropParts],
+    // BARA utsnitten. Originalbilderna behövdes för att leta missade skador — den uppgiften är borta,
+    // och med den den största posten i nyttolasten.
+    images: cropParts,
     responseSchema: RESPONSE_SCHEMA,
     resolution: "high",
-    primaryTimeoutMs: 45_000,
-    fallbackTimeoutMs: 20_000,
+    // Snävare än förut: anropet är en bråkdel så stort, och steget ska alltid hinna köra.
+    primaryTimeoutMs: 20_000,
+    fallbackTimeoutMs: 12_000,
   });
 
   const verdictByIndex = new Map((data.reviews ?? []).map((r) => [r.finding_index, r]));
@@ -186,17 +236,85 @@ export async function verifyFindings(defects: Damage[], images: CapturedImage[],
     };
   });
 
-  // Defects the first pass missed, in the same shape as any other finding.
-  const added: Damage[] = (data.additional_defects ?? []).map((raw, i) => ({
-    ...mapRawDefect(raw, images, `add_${i}`),
-    verification: "CONFIRMED" as const,
-    verificationReason: "Hittad av andra besiktaren.",
-  }));
+  // Dubbletterna slås ihop FÖRE returen, så att resten av kedjan ser en skada med bevis i flera
+  // bildrutor i stället för flera skador. Både betyget och priset räknar poster.
+  const links = new Map<number, number>();
+  for (const r of data.reviews ?? []) {
+    const target = r.duplicate_of ?? 0;
+    if (target > 0 && target !== r.finding_index) links.set(r.finding_index, target);
+  }
+  const deduped = mergeReviewedDuplicates(reviewed, links);
+  if (deduped.length < reviewed.length) {
+    console.info(`[verify] granskningen kände igen ${reviewed.length - deduped.length} dubblett(er) — samma skada ur flera bildrutor.`);
+  }
+
+  const added = EXTRA_MARKS_ENABLED ? collectExtraMarks(numbered, verdictByIndex, images) : [];
+  if (added.length > 0) {
+    console.info(`[verify] ${added.length} extra märke(n) utpekade i utsnitt granskningen ändå såg.`);
+  }
 
   return {
-    verified: [...confirmedDirectly, ...reviewed, ...added, ...uncroppable.map(markUncroppable)],
+    verified: [...confirmedDirectly, ...deduped, ...added, ...uncroppable.map(markUncroppable)],
     callMeta: { purpose: "verify_findings", tokensUsed, cached, modelUsed, latencyMs },
   };
+}
+
+/**
+ * De extra märkena, omräknade till fynd i originalbildens koordinater.
+ *
+ * Fyra spärrar, alla av samma skäl: de här fynden kommer ur sista steget och granskas därför aldrig
+ * i sin tur.
+ *   - bara från utsnitt som SJÄLVA godkänts. Kunde modellen inte se skadan den skulle döma, är den
+ *     inte den som ska peka ut ytterligare märken i samma utsnitt.
+ *   - golv på confidence, högre än första besiktningens (70 mot 45).
+ *   - tak på antal, per utsnitt och totalt, så ett enda utsnitt aldrig kan svämma över kortet.
+ *   - S2/kosmetisk som tak. Ett förstorat utsnitt räcker för att se ATT ytan är märkt, inte för att
+ *     avgöra att möbeln är trasig — den bedömningen hör till första besiktningen, som ser hela delen.
+ *
+ * Rutan räknas om från utsnittets koordinater till bildens, så märket kan visas i samma bildruta som
+ * fyndet det hittades bredvid. Överlappar det fyndets ruta fångas det som dubblett i dedup.ts pass 1.
+ */
+function collectExtraMarks(
+  numbered: NumberedCrop[],
+  verdictByIndex: ReadonlyMap<number, RawReview>,
+  images: CapturedImage[],
+): Damage[] {
+  const added: Damage[] = [];
+
+  for (const { damage: parent, rect, index } of numbered) {
+    if (added.length >= MAX_ADDED_TOTAL) break;
+    const review = verdictByIndex.get(index);
+    if (!review || review.verdict !== "KEEP" || !rect) continue;
+    const imageId = parent.evidence[0]?.imageId;
+    const imageIndex = images.findIndex((im) => im.id === imageId);
+    if (imageIndex < 0) continue;
+
+    for (const m of (review.extra_marks ?? []).slice(0, MAX_ADDED_PER_CROP)) {
+      if (added.length >= MAX_ADDED_TOTAL) break;
+      if (!Number.isFinite(m.confidence) || m.confidence < MIN_ADDED_CONFIDENCE) continue;
+      if (![m.x, m.y, m.w, m.h].every((v) => Number.isFinite(v))) continue;
+
+      const box = markFromCrop(rect, { x: m.x, y: m.y, w: m.w, h: m.h });
+      const raw: RawDefect = {
+        type: m.type,
+        // Delen ärvs: utsnittet är taget ur fyndets ruta, så märket sitter på samma möbeldel.
+        part: parent.part,
+        semantic_location: m.semantic_location || parent.semanticLocation,
+        severity: m.severity === "S1" ? "S1" : "S2",
+        impact: "cosmetic",
+        description: m.description,
+        confidence: m.confidence,
+        evidence: [{ image_index: imageIndex, mark_kind: "box", x: box.x, y: box.y, w: box.w, h: box.h }],
+      };
+      added.push({
+        ...mapRawDefect(raw, images, `add_${index}`),
+        verification: "CONFIRMED",
+        verificationReason: "Hittad av andra besiktaren.",
+      });
+    }
+  }
+
+  return added;
 }
 
 /**

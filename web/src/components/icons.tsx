@@ -130,7 +130,7 @@ export function CardIcon({ size = 18 }: { size?: number }) {
 }
 
 /**
- * Kortet med luppen: sök upp ett truth-card på dess Loopa-ID.
+ * Kortet med luppen: sök upp en annons på dess Loopa-ID.
  *
  * Skild från den vanliga luppen med flit. De två söker olika saker på samma skärm — märken i listan,
  * och ett enskilt publikt kort någon annanstans i Loopa — och en lupp som betyder två saker är ingen
@@ -272,6 +272,39 @@ export function SendIcon({ size = 17 }: { size?: number }) {
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
       <path d="M4.2 11.9 19.5 4.7 12.9 20l-2-6.2z" />
       <path d="m10.9 13.8 3.6-3.6" />
+    </svg>
+  );
+}
+
+/** Jordklotet: språkväljaren. Meridianer och en breddgrad — en glob läses inte som en boll utan dem. */
+export function GlobeIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round">
+      <circle cx="12" cy="12" r="9" />
+      <path d="M3 12h18" />
+      <path d="M12 3a14 14 0 0 1 0 18a14 14 0 0 1 0-18z" />
+    </svg>
+  );
+}
+
+/** Skölden: det som är försäkrat och spårat. Används i prototypen på låsskärmen. */
+export function ShieldIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M12 3 5 6v5.5c0 4.3 2.9 8.1 7 9.5 4.1-1.4 7-5.2 7-9.5V6z" />
+      <path d="m9 12 2.2 2.2L15.5 10" />
+    </svg>
+  );
+}
+
+/** Budbilen. Ritad i profil och åt höger, eftersom den rör sig åt höger längs fraktsträckan. */
+export function TruckIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M2.5 6.5h11v9h-11z" />
+      <path d="M13.5 10h3.6l3.4 3.2v2.3h-7z" />
+      <circle cx="7" cy="17.5" r="2" />
+      <circle cx="17" cy="17.5" r="2" />
     </svg>
   );
 }

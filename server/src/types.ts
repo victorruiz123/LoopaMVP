@@ -163,6 +163,15 @@ export interface ModelCandidate {
   imageUrl?: string | null;
   /** Sidan bilden kom från, så påståendet går att kontrollera. */
   imageSource?: string | null;
+  /**
+   * Måtten och materialet som stod på den sidan, lästa ur dess HTML.
+   *
+   * Hämtningen är redan gjord för bildens skull och sidan är redan kontrollerad mot modellnamnet, så
+   * de här värdena kostar varken ett anrop eller en sekund. De fyller annonsens luckor när den
+   * grundade sökningen kom tillbaka utan källor — mätt på 78 skarpa annonser hade 26 noll källor, och
+   * 25 av dem saknade mått helt. Se specHarvest.ts.
+   */
+  pageSpecs?: ListingAttribute[] | null;
 }
 
 /**
@@ -223,6 +232,16 @@ export interface ListingAttribute {
   label: string;
   value: string;
   sourceUrl?: string | null;
+  /**
+   * Sant när värdet är UPPSKATTAT och inte en uppgift om just den här möbeln.
+   *
+   * Sätts bara för mått, och bara när ingen källa gav några: annonsgeneratorn fyller på med typiska
+   * mått för möbeltypen hellre än att lämna annonsen utan ett enda tal (se
+   * loopa-landing-page-main/functions/api/_shared/seller-typical-dimensions.ts). Ett uppskattat mått
+   * räknas aldrig som belagt — det skrivs med "ca", håller statusen kvar på "delvis belagt" och
+   * ersätts av det första riktiga måttet som dyker upp, till exempel ur sidskörden.
+   */
+  estimated?: boolean;
 }
 
 export interface ListingSource {
@@ -232,7 +251,7 @@ export interface ListingSource {
 }
 
 /**
- * Annonsgeneratorns svar, som det kommer ur loopa-landing-page-main. Bara de fält truth-cardet visar
+ * Annonsgeneratorns svar, som det kommer ur loopa-landing-page-main. Bara de fält annonsen visar
  * är typade här — resten följer med orört i `raw` för den som vill gräva.
  */
 export interface GeneratedListing {
@@ -259,15 +278,95 @@ export interface GeneratedListing {
   status?: string;
   missingFields?: string[];
   missingNotes?: string[];
+  /**
+   * Generatorns egna markeringar för steg som föll: "research_failed", "structure_failed",
+   * "model_overloaded", "research_ungrounded". Inte till för säljaren att läsa — de är skillnaden
+   * mellan "vi sökte och hittade inget" och "ingen sökning blev av", och det är en skillnad säljaren
+   * måste få veta. Se runIdentify i pipeline/identify.ts.
+   */
+  warnings?: string[];
 }
 
-/** Truth-cardets halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
+/** Annonsens halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
 export interface ListingResult {
   /** "pending" medan generatorn fortfarande kör — den startar samtidigt som besiktningen. */
   status: "pending" | "ok" | "unavailable";
   unavailableReason: string | null;
   result: GeneratedListing | null;
+  /**
+   * Generatorns egen stegtidtagning, vidarebefordrad i stället för slängd.
+   *
+   * `generate.ts` räknar redan ut det här och returnerar det; bryggan läste bara `result` och
+   * `provenance`, så den enda siffra som gick att se utifrån var hela anropets längd. Med research och
+   * strukturering isärhållna går det att säga VILKET steg som drog tiden i en enskild körning i stället
+   * för att gissa ur budgetarna.
+   */
+  timings?: {
+    researchMs: number;
+    structureMs: number;
+    researchRetried: boolean;
+    structureRetried: boolean;
+    /** Alla Gemini-anrop i körningen; `groundedCalls` är de som bar googleSearch. */
+    geminiCalls: number;
+    groundedCalls: number;
+    totalServerMs: number;
+  };
+  /**
+   * Fler försök kan ännu förbättra den här annonsen.
+   *
+   * Fas 2 publicerar FÖRSTA svaret direkt och fortsätter söka i bakgrunden — utan det här fältet vet
+   * klienten inte skillnad på "det här är svaret" och "det här är svaret så här långt", och slutar
+   * därför polla på det första. Mätt på ett skarpt jobb: säljaren fick "Kunde inte beläggas mot
+   * källor" på skärmen medan servern en stund senare hade fem källor och alla fyra måtten sparade i
+   * jobbet. Rätt svar fanns, det nådde bara aldrig fram.
+   */
+  improving?: boolean;
+  /**
+   * Var specifikationernas underlag kom ifrån.
+   *
+   * `reusedPrior` betyder att fas 2:s egen sökning gav noll och att identifieringens källor trädde in
+   * i stället. Utan det här går det inte att skilja "hittade själv" från "ärvde", och då går det
+   * heller inte att mäta om återanvändningen hjälper.
+   */
+  provenance?: {
+    researchForm: "full" | "plain";
+    researchFormHit: "full" | "plain" | "none";
+    reusedPrior: boolean;
+    priorSources: number;
+    sources: number;
+  } | null;
   latencyMs: number;
+}
+
+/**
+ * Tillverkarens produktbild av modellen — annonsens omslag.
+ *
+ * Hämtas ur samma källor som kandidatbilderna (se candidateImages.ts): en produktsida vars titel
+ * eller adress nämner modellen, och dess og:image. Sådana bilder är nästan undantagslöst möbeln
+ * framifrån mot vit bakgrund, vilket är precis vad ett omslag ska vara.
+ *
+ * Den visar en NY exemplar av modellen, inte den som säljs — därför står den som omslag och aldrig
+ * som underlag för skicket. Skadorna sitter kvar på renderingen i skickrapporten, där de hör hemma.
+ */
+export interface ProductImage {
+  url: string;
+  /** Sidan bilden hämtades från, så påståendet går att kontrollera. */
+  sourceUrl: string | null;
+}
+
+/**
+ * Omslaget: säljarens egen bildruta, urklippt och lagd på vitt.
+ *
+ * Filen ligger som `cover/cover.jpg` i jobbmappen och serveras på /api/jobs/:id/cover — posten här
+ * säger bara ATT den finns, och ur vilken bildruta. Se pipeline/cutout.ts för hur den byggs och
+ * varför den hellre uteblir än blir halv.
+ */
+export interface CoverCutout {
+  /** Bildrutan urklippet är gjort ur — samma som `coverImageId` när det gick. */
+  sourceImageId: string;
+  /** Vad modellen kallade möbeln när den pekade ut den. Bara för loggen. */
+  label: string | null;
+  createdAt: string;
 }
 
 export interface ConditionResult {
@@ -301,11 +400,72 @@ export interface ConditionResult {
    * är ofta kameran innan den exponerat. Se pipeline/cover.ts.
    */
   coverImageId: string | null;
+  /**
+   * Omslaget: tillverkarens produktbild av modellen, mot vit bakgrund och framifrån.
+   *
+   * Skild från `coverImageId`, som pekar ut en av säljarens EGNA bildrutor. Den bilden är fortfarande
+   * det som representerar möbeln där skicket är poängen — miniatyr, Tradera, prismotorn. Omslaget är
+   * det som representerar MODELLEN, och är null när ingen källa gick att belägga.
+   */
+  productImage: ProductImage | null;
+  /**
+   * Säljarens egen möbel, urklippt mot vitt — kortets omslag när den finns.
+   *
+   * Går före `productImage`: katalogbilden visar en ny exemplar av modellen, den här visar möbeln
+   * som faktiskt säljs. Null betyder att urklippet inte gjordes eller inte dög, och då visar kortet
+   * bildrutan som den är.
+   */
+  coverCutout: CoverCutout | null;
   modelUsed: string;
   tokensUsed: number;
   costUsd: number;
   geminiCallCount: number;
   latencyMs: number;
+}
+
+/**
+ * En genomförd sänkning. `at` är när den faktiskt gick igenom hos Tradera, inte när den var planerad.
+ */
+export interface PriceDrop {
+  at: string;
+  from: number;
+  to: number;
+}
+
+/**
+ * Prisstegen: säljarens spann, och vandringen ner genom det.
+ *
+ * Prismotorn svarar med tre tal — säljs snabbt, förslag, säljs långsamt. Vilket av dem som är RÄTT
+ * beror på något motorn inte kan veta: hur bråttom säljaren har. Stegen låter dem svara på det i
+ * stället. De sätter ett startpris och ett golv, och annonsen går själv ner genom spannet med
+ * `weeklyDropPct` i veckan tills den når golvet, där den stannar.
+ *
+ * `currentPrice` är sanningen om vad som ligger uppe just nu, INTE en härledning ur startpris och
+ * antal veckor: en sänkning som Tradera avvisade får inte se ut som om den gick igenom.
+ */
+export interface PriceLadder {
+  /** Vad annonsen läggs upp med. */
+  startPrice: number;
+  /** Golvet. Sänkningen stannar här och går aldrig under. */
+  floorPrice: number;
+  /** Andel av priset som faller varje vecka. 0.15 = 15 %. */
+  weeklyDropPct: number;
+  /** Priset som ligger på Tradera nu. Före publiceringen är det startpriset. */
+  currentPrice: number;
+  /** När nästa sänkning ska ske. null innan annonsen är publicerad och när golvet är nått. */
+  nextDropAt: string | null;
+  drops: PriceDrop[];
+  /** Sätts när golvet nåtts. Då är stegen färdig och priset ligger kvar. */
+  floorReachedAt: string | null;
+  /** Senaste sänkningen Tradera avvisade — sparad för att kunna säga varför priset står stilla. */
+  lastError: string | null;
+  chosenAt: string;
+  /**
+   * Annonstypen sänkningen ska adressera: utropspris eller Köp Nu. Sätts vid publiceringen och läses
+   * inte ur miljön vid sänkningen — TRADERA_LISTING_MODE kan ha ändrats sedan annonsen lades upp, och
+   * då hade vi skrivit fel fält på en annons som redan ligger uppe.
+   */
+  listingMode: "auction" | "fixed" | null;
 }
 
 /**
@@ -327,7 +487,7 @@ export interface ConditionJob {
   id: string;
   createdAt: string;
   /**
-   * Supabase-användaren som skapade jobbet — profilen truth-cardet sparas i.
+   * Supabase-användaren som skapade jobbet — profilen annonsen sparas i.
    *
    * Sätts EN gång, när filmningen laddas upp, och läses bara av listningen. Pipelinen ser den aldrig.
    * Valfri: jobb från före inloggningen saknar den, och de ska fortsätta gå att öppna.
@@ -352,9 +512,31 @@ export interface ConditionJob {
   identityStatus?: IdentityStatus;
   /** Upp till fyra troliga modeller av märket, bäst först. */
   candidates?: ModelCandidate[];
+  /**
+   * Förslagen säljaren redan sett och tackat nej till.
+   *
+   * Sparas på jobbet och inte i webbläsaren av två skäl: det är den här listan sökningen får med sig
+   * som förbudslista vid nästa "hitta nya", och en säljare som laddar om sidan mitt i valet ska inte
+   * få tillbaka de fyra de nyss avfärdat.
+   */
+  rejectedCandidates?: ModelCandidate[];
+  /** Hur många gånger säljaren bett om nya förslag. 0 (eller osatt) = den första omgången. */
+  candidateRound?: number;
   /** Den säljaren valde, eller den identifieringen kunde avgöra själv. */
   selected?: ModelCandidate | null;
+  /**
+   * Omslagsbilden, buren på jobbet därför att den kan landa innan skickresultatet finns.
+   *
+   * Samma skäl som `pendingListing`: identifieringen och besiktningen kör parallellt, och den som
+   * blir klar först får inte tappa sitt arbete för att den andra inte är framme. completeJob flyttar
+   * in den i resultatet.
+   */
+  productImage?: ProductImage | null;
+  /** Urklippet, buret på jobbet av samma skäl: det blir klart medan säljaren väljer modell. */
+  coverCutout?: CoverCutout | null;
   identityError?: string | null;
+  /** Grundat underlag från identifieringen, återanvänt av specifikationssteget. */
+  identityResearch?: { researchText: string; sources: Array<{ title: string; url: string; qualityTier?: 1 | 2 | 3 }> } | null;
   /** När nuvarande fas började — för fasloggningen. */
   phaseStartedAt?: number;
   /** Annonsen när den blev klar före skickresultatet — flyttas in i resultatet när det finns. */
@@ -363,12 +545,17 @@ export interface ConditionJob {
    * Annonsen, när besiktningen föll men generatorn hann bli klar.
    *
    * De två grenarna är oberoende: annonsgeneratorn behöver bara bildrutorna och märket. Att låta ett
-   * Gemini-avbrott i besiktningen kasta ett färdigt truth-card vore att slänga arbete som redan är
+   * Gemini-avbrott i besiktningen kasta en färdig annons vore att slänga arbete som redan är
    * betalt och som säljaren fortfarande har nytta av.
    */
   listing?: ListingResult | null;
   /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
   tradera?: TraderaPublication | null;
+  /**
+   * Säljarens prisspann och den veckovisa sänkningen genom det. Saknas fältet är priset fast: ett
+   * jobb från före stegen ska inte börja sjunka av sig självt.
+   */
+  priceLadder?: PriceLadder | null;
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

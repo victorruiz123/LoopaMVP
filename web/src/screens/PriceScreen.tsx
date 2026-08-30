@@ -1,12 +1,12 @@
-import { useEffect, useState } from "react";
-import type { ConditionJob, FurnitureIdentity, PriceEstimate } from "../types";
-import { getJob } from "../api";
+import type { FurnitureIdentity, PriceEstimate } from "../types";
+import { useJobPoll } from "../lib/useJobPoll";
 import { formatSek, variantLabel } from "../lib/price";
 import { ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
 import FlowSteps from "../components/FlowSteps";
 import PriceLadderPicker from "../components/PriceLadderPicker";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 /**
  * Priset först, skicket sedan.
@@ -25,8 +25,26 @@ export default function PriceScreen({
   jobId: string;
   onSeeCondition: () => void;
 }) {
-  const [job, setJob] = useState<ConditionJob | null>(null);
+  const t = useT();
   usePageTitle("Prisförslag");
+
+  /**
+   * Pollningen slutar när PRISET landat — inte när skickbedömningen är klar.
+   *
+   * DET HÄR VAR FELET bakom "priset visas först på annonsen". Villkoret var "stage=done och inte
+   * reviewPending", och det inträffar innan prissättningen ens BÖRJAT: prismotorn väntar in
+   * skadelistan och tar sedan sina ~15 sekunder. Skärmen hämtade alltså sista gången i exakt det
+   * ögonblick priset fortfarande var null, slutade fråga, och stod kvar med skelettet — tills
+   * säljaren klickade sig vidare, där kortet hämtar jobbet på nytt och priset plötsligt fanns.
+   *
+   * Att det bara hände IBLAND är samma sak sett från andra hållet: den som dröjde på
+   * specifikationsskärmen kom hit efter att priset redan skrivits in, och fick det på första frågan.
+   *
+   * Samma pollning som resten av flödet använder (se lib/useJobPoll): ett jobb som fallit ger upp,
+   * och en server som dött mellan två frågor slutar snurra efter dess bortre gräns i stället för att
+   * hänga för evigt.
+   */
+  const { job, gaveUp, failed } = useJobPoll(jobId, (j) => !!j.result?.price);
 
   /**
    * Priset visas först — men räknas SIST.
@@ -37,29 +55,6 @@ export default function PriceScreen({
    */
   const graded = !!job?.result && !job.result.reviewPending;
   const price: PriceEstimate | null = graded ? job!.result!.price : null;
-  const failed = job?.progress.stage === "error";
-
-  useEffect(() => {
-    let cancelled = false;
-    const poll = async () => {
-      try {
-        const j = await getJob(jobId);
-        if (cancelled) return;
-        setJob(j);
-        // Fortsätt även efter "done": den slutliga prissättningen landar med granskningen, och
-        // truth-cardet en stund efter den.
-        if (j.progress.stage !== "error" && (j.progress.stage !== "done" || j.result?.reviewPending)) {
-          setTimeout(poll, 1200);
-        }
-      } catch {
-        if (!cancelled) setTimeout(poll, 2000);
-      }
-    };
-    poll();
-    return () => {
-      cancelled = true;
-    };
-  }, [jobId]);
 
   const conditionReady = graded;
   const conditionFailed = failed;
@@ -75,50 +70,61 @@ export default function PriceScreen({
       </header>
 
       <section className="price-big-card">
-        {failed || price?.status === "unavailable" ? (
+        {failed || gaveUp || price?.status === "unavailable" ? (
           <>
-            <div className="price-panel-head">Prisförslag</div>
-            <p className="price-empty-title">Priset kunde inte hämtas</p>
-            <p className="muted small">{price?.unavailableReason ?? "Prismotorn svarade inte."}</p>
+            <div className="price-panel-head">{t("Prisförslag")}</div>
+            <p className="price-empty-title">{t("Priset kunde inte hämtas")}</p>
+            <p className="muted small">
+              {price?.unavailableReason ??
+                (gaveUp ? t("Vi fick inget svar från servern.") : (job?.error ?? t("Prismotorn svarade inte.")))}
+            </p>
           </>
         ) : !price ? (
           <>
-            <div className="price-panel-head">Prisförslag</div>
-            <div className="price-skeleton" aria-label="Beräknar prisförslag" />
+            <div className="price-panel-head">{t("Prisförslag")}</div>
+            <div className="price-skeleton" aria-label={t("Beräknar prisförslag")} />
             <p className="muted small">
-              {job?.result?.reviewPending ? "Väger in skadorna…" : "Bedömer skicket…"}
+              {!job?.result
+                ? t("Bedömer skicket…")
+                : job.result.reviewPending
+                  ? t("Väger in skadorna…")
+                  : t("Räknar fram priset…")}
             </p>
-            <p className="muted small">Priset räknas när besiktningen är klar — skadorna påverkar det.</p>
+            <p className="muted small">{t("Priset räknas när besiktningen är klar — skadorna påverkar det.")}</p>
           </>
         ) : price.status === "no_data" ? (
           <>
-            <div className="price-panel-head">Prisförslag</div>
-            <p className="price-empty-title">Inget prisförslag den här gången</p>
-            <p className="muted small">Vi hittade inga tillräckligt lika annonser att jämföra med.</p>
+            <div className="price-panel-head">{t("Prisförslag")}</div>
+            <p className="price-empty-title">{t("Inget prisförslag den här gången")}</p>
+            <p className="muted small">{t("Vi hittade inga tillräckligt lika annonser att jämföra med.")}</p>
           </>
         ) : (
           <>
-            <div className="price-panel-head">Uppskattat värde</div>
+            <div className="price-panel-head">{t("Uppskattat värde")}</div>
             <div className="price-main price-main-xl">{formatSek(price.default)}</div>
             <div className="price-range">
               <span className="price-range-end">
                 <em>{formatSek(price.low)}</em>
-                <span className="muted small">säljs snabbt</span>
+                <span className="muted small">{t("säljs snabbt")}</span>
               </span>
               <span className="price-range-bar" aria-hidden="true" />
               <span className="price-range-end price-range-end-high">
                 <em>{formatSek(price.high)}</em>
-                <span className="muted small">säljs långsamt</span>
+                <span className="muted small">{t("säljs långsamt")}</span>
               </span>
             </div>
             <p className="muted small price-basis">
-              Bygger på {price.matchCount} liknande {price.matchCount === 1 ? "annons" : "annonser"}
-              {price.variant?.length ? ` (${price.variant.map(variantLabel).join(", ")})` : ""}.
+              {price.matchCount === 1
+                ? t("Bygger på {antal} liknande annons", { antal: price.matchCount })
+                : t("Bygger på {antal} liknande annonser", { antal: price.matchCount })}
+              {price.variant?.length ? ` (${price.variant.map((v) => t(variantLabel(v))).join(", ")})` : ""}.
             </p>
             <p className="price-caveat">
               {price.damageDeduction
-                ? `Skadorna vi hittade drar ner priset ${Math.round(price.damageDeduction * 100)} %.`
-                : "Inga skador som påverkar priset."}
+                ? t("Skadorna vi hittade drar ner priset {andel} %.", {
+                    andel: Math.round(price.damageDeduction * 100),
+                  })
+                : t("Inga skador som påverkar priset.")}
             </p>
           </>
         )}
@@ -129,18 +135,18 @@ export default function PriceScreen({
       )}
 
       <button className="btn btn-primary next-step" onClick={onSeeCondition}>
-        <span>{conditionFailed ? "Se vad som hände" : "Se skickbedömningen"}</span>
+        <span>{conditionFailed ? t("Se vad som hände") : t("Se skickbedömningen")}</span>
         <span className="next-step-meta">
-          {conditionReady ? "klar" : conditionFailed ? "" : "arbetar…"}
+          {conditionReady ? t("klar") : conditionFailed ? "" : t("arbetar…")}
           <ChevronRight size={18} />
         </span>
       </button>
       <p className="form-hint">
         {conditionReady
-          ? "Skadelistan och truth-cardet är klara."
+          ? t("Skadelistan och annonsen är klara.")
           : conditionFailed
-            ? "Besiktningen stötte på ett problem."
-            : "Besiktning, prissättning och annons kör parallellt."}
+            ? t("Besiktningen stötte på ett problem.")
+            : t("Besiktning, prissättning och annons kör parallellt.")}
       </p>
     </div>
   );

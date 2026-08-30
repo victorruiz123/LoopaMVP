@@ -1,3 +1,4 @@
+import { currentLang } from "./i18n";
 import type { PriceEstimate } from "../types";
 
 /**
@@ -66,11 +67,22 @@ export function ladderBounds(price: PriceEstimate): { min: number; max: number; 
   return { min, max, step: max > 6000 ? 50 : ROUNDING };
 }
 
-const DAY = new Intl.DateTimeFormat("sv-SE", { day: "numeric", month: "short" });
+/** Datumet skrivs på skärmens språk — "3 sep", "3 Sep", "3 sept.". En formaterare per språk. */
+const DAY_FORMATS = new Map<string, Intl.DateTimeFormat>();
+
+function day(): Intl.DateTimeFormat {
+  const lang = currentLang();
+  let found = DAY_FORMATS.get(lang);
+  if (!found) {
+    found = new Intl.DateTimeFormat(lang, { day: "numeric", month: "short" });
+    DAY_FORMATS.set(lang, found);
+  }
+  return found;
+}
 
 /** "12 sep". Kort form — datumet står bredvid ett pris och ska inte konkurrera med det. */
 export function formatDropDate(iso: string | null): string {
   if (!iso) return "–";
   const date = new Date(iso);
-  return Number.isNaN(date.getTime()) ? "–" : DAY.format(date);
+  return Number.isNaN(date.getTime()) ? "–" : day().format(date);
 }

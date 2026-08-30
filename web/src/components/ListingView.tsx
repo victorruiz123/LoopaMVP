@@ -1,21 +1,19 @@
-import { useMemo, useState } from "react";
-import type { CardDamage, TruthCardData } from "../types";
+import { useEffect, useMemo, useState } from "react";
+import type { CardDamage, ListingViewData } from "../types";
 import { formatSek } from "../lib/price";
-import { SEVERITY_LABELS, TYPE_LABELS } from "../lib/labels";
+import { severityLabel, typeLabel } from "../lib/labels";
 import { brandLook, brandTypeStyle } from "../lib/brandLook";
 import { archetypeFor, buildModel, parseDimensions, zoneForPart } from "../lib/furnitureModel";
 import GradeBadge from "./GradeBadge";
 import FurnitureRender, { type RenderPin } from "./FurnitureRender";
-import TruthCardChat from "./TruthCardChat";
+import ListingChat from "./ListingChat";
+import { useT } from "../lib/i18n";
 
-const STATUS_LABELS: Record<string, string> = {
-  full: "Allt belagt med källa",
-  partial: "Delvis belagt",
-  fallback: "Kunde inte beläggas mot källor",
-};
+/** Så länge omslaget får hänga innan tystnaden räknas som ett nej. */
+const COVER_TIMEOUT_MS = 12_000;
 
 /**
- * Truth-cardet som annons.
+ * Annonsen.
  *
  * Kortet såg tidigare ut som en rapport: rubrik, faktarutor, listor. Men det ÄR en annons — det är
  * vad säljaren publicerar — och en möbel säljs på att se ut som en produkt någon vill ha. Därför
@@ -31,7 +29,7 @@ const STATUS_LABELS: Record<string, string> = {
  * något konto hos oss. Det publika svaret bär mindre (se server/src/publicCard.ts) — men det ska vara
  * SAMMA kort, inte en förenklad kopia som kan börja säga något annat.
  */
-export default function TruthCardView({
+export default function ListingView({
   card,
   identity,
   grade,
@@ -40,8 +38,9 @@ export default function TruthCardView({
   imageCount,
   reviewed,
   productImage,
+  cover,
   loopaId,
-}: TruthCardData & {
+}: ListingViewData & {
   /**
    * Kortets publika ID. Enda extra propen, och den finns bara för chatten: den frågar servern på
    * ID:t, som är det enda boten behöver för att se exakt samma kort som läsaren.
@@ -52,12 +51,57 @@ export default function TruthCardView({
    */
   loopaId?: string;
 }) {
+  const t = useT();
   const [selected, setSelected] = useState<string | null>(null);
-  // Omslaget ligger på en annan sajt än vi, och den kan svara 404 eller neka hotlinking. Faller
-  // bilden är renderingen kvar — kortet ska aldrig ha ett tomt hål där bilden skulle stått.
-  const [coverBroken, setCoverBroken] = useState(false);
 
-  const name = card.identity.exactProduct ?? card.identity.variant ?? identity?.model ?? "Möbel";
+  /**
+   * Omslaget är MÖBELN SOM SÄLJS: säljarens egen bild framifrån, med rummet bortklippt och bakgrunden
+   * vit (server: pipeline/cutout.ts).
+   *
+   * Här stod förut tillverkarens katalogbild. Den svarade snabbt på "vad är det här?" — men den visade
+   * en NY exemplar av modellen ovanför ett pris som gäller en begagnad. På ett kort som annars räknar
+   * upp varje skråma var bilden det enda påståendet som var hämtat någon annanstans ifrån. Urklippet
+   * gör samma jobb utan att byta möbel: vit bakgrund, möbeln centrerad, ingenting av rummet kvar.
+   *
+   * Kandidaterna står i fallande sanning: urklippet, säljarens bildruta som den togs — den skickas bara
+   * till säljarens eget kort, se ListingScreen — och sist katalogbilden av modellen.
+   *
+   * RENDERINGEN STÅR INTE I LISTAN, och det är hela poängen med den. Omslaget är ett foto av möbeln
+   * som säljs, eller ingenting alls. En 3D-figur högst upp läser som en produktbild men visar en möbel
+   * som aldrig fotograferats: kortets första och största påstående blir då en ritning. Figuren har sin
+   * plats längre ned, i skickrapporten, där den är en karta över anmärkningarna och inte en bild av
+   * varan.
+   */
+  const candidates = useMemo(() => {
+    const list: Array<{ url: string; kind: "cutout" | "photo" | "product"; sourceUrl?: string | null }> = [];
+    if (cover) list.push(cover);
+    if (productImage) list.push({ ...productImage, kind: "product" });
+    return list;
+  }, [cover, productImage]);
+
+  /**
+   * Adresserna som visat sig inte bära en bild — de hoppas över, och nästa kandidat får försöka.
+   *
+   * En bild kan falla på två sätt. Den kan säga ifrån: katalogbilden ligger på en annan sajt än vi, och
+   * den kan svara 404 eller neka hotlinking. Värre är att den kan TIGA — en hängande hämtning mot ett
+   * långsamt CDN ger varken `onload` eller `onerror`, och webbläsaren väntar bara vidare, i minuter,
+   * utan tidsgräns att erbjuda. Därför tidsgränsen nedan: efter den räknas tystnaden som ett nej.
+   *
+   * Förut ledde båda fallen till renderingen. Nu leder de till nästa foto, och finns inget sådant blir
+   * det inget omslag — kortet börjar i stället på namnet.
+   */
+  const [dead, setDead] = useState<string[]>([]);
+  const [loadedUrl, setLoadedUrl] = useState<string | null>(null);
+  const shown = candidates.find((c) => !dead.includes(c.url)) ?? null;
+
+  useEffect(() => {
+    const url = shown?.url;
+    if (!url || loadedUrl === url) return;
+    const id = setTimeout(() => setDead((d) => (d.includes(url) ? d : [...d, url])), COVER_TIMEOUT_MS);
+    return () => clearTimeout(id);
+  }, [shown?.url, loadedUrl]);
+
+  const name = card.identity.exactProduct ?? card.identity.variant ?? identity?.model ?? t("Möbel");
   const brand = card.identity.brand ?? identity?.brand ?? null;
 
   // Modellen byggs bara när måtten finns. Se furnitureModel.ts: hellre ingen bild än en bild av en
@@ -82,47 +126,47 @@ export default function TruthCardView({
   const now = price?.status === "ok" ? price.default : null;
   const discount = retail && now && retail > now ? Math.round((1 - now / retail) * 100) : null;
 
-  /**
-   * Omslaget är tillverkarens produktbild: möbeln framifrån mot vit bakgrund.
-   *
-   * Det är så en möbel säljs. En köpare ska först se VAD det är — och en katalogbild svarar på den
-   * frågan på en tiondels sekund, vilket varken en ritning eller ett vardagsrumsfoto gör.
-   *
-   * Bilden visar en ny exemplar av modellen och säger därför ingenting om skicket. Det är avsiktligt
-   * åtskilt: renderingen med de numrerade anmärkningarna flyttar ned i skickrapporten, där skicket
-   * hör hemma, i stället för att försvinna. Saknas produktbilden tar renderingen omslagets plats.
-   */
-  const cover = coverBroken ? null : productImage;
-
   return (
     <article className="listing">
-      {(cover || model) && (
+      {shown && (
         /* Bilden och dess härkomst är EN sak, och hålls ihop av ett element: på datorvyn är
            kolumnen ett rutnät, och två syskon hade lagt bildtexten i en egen rad långt under. */
         <div className="listing-cover-block">
-          <div className={`listing-stage ${cover ? "listing-stage-photo" : ""}`}>
+          <div
+            className={`listing-stage listing-stage-photo ${
+              shown.kind === "cutout" ? "listing-stage-cutout" : ""
+            }`}
+          >
             {grade && (
               <span className="listing-stage-badge">
                 <GradeBadge grade={grade.grade} size={26} />
                 {grade.canonicalCondition}
               </span>
             )}
-            {cover ? (
-              <img className="listing-cover" src={cover.url} alt={name} onError={() => setCoverBroken(true)} />
-            ) : (
-              model && <FurnitureRender model={model} pins={pins} selectedId={selected} onSelect={setSelected} />
-            )}
+            <img
+              key={shown.url}
+              className="listing-cover"
+              src={shown.url}
+              alt={name}
+              onLoad={() => setLoadedUrl(shown.url)}
+              onError={() => setDead((d) => (d.includes(shown.url) ? d : [...d, shown.url]))}
+            />
           </div>
-          {/* Vems bild det är, sagt rakt ut. Omslaget är det enda på kortet som INTE visar möbeln som
-              säljs, och då ska det stå — inte antas. */}
-          {cover && (
+          {/* Vad bilden är, sagt rakt ut.
+              Urklippet: möbeln är säljarens egen, men den vita bakgrunden är VÅR redigering, och ett
+              kort som räknar upp varje skråma får inte tiga om att det rört bilden.
+              Katalogbilden: den visar inte ens möbeln som säljs, och då ska det stå — inte antas. */}
+          {shown.kind === "cutout" && (
+            <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, bakgrunden borttagen")}</p>
+          )}
+          {shown.kind === "product" && (
             <p className="listing-cover-note">
-              Produktbild av modellen
-              {cover.sourceUrl && (
+              {t("Produktbild av modellen — inte möbeln som säljs")}
+              {shown.sourceUrl && (
                 <>
                   {" · "}
-                  <a href={cover.sourceUrl} target="_blank" rel="noreferrer">
-                    källa
+                  <a href={shown.sourceUrl} target="_blank" rel="noreferrer">
+                    {t("källa")}
                   </a>
                 </>
               )}
@@ -163,25 +207,31 @@ export default function TruthCardView({
                 ? /* ANDEL, inte kronor. Prismotorn svarar med en kvot (0,22 = 22 %) och skalar hela
                      intervallet med den. formatSek på den kvoten gav "0 kr" — kortet påstod alltså
                      noll avdrag på just de möbler där avdraget var som störst. */
-                  `Marknadsvärde för skicket, efter ${Math.round(price.damageDeduction * 100)} % avdrag för skadorna.`
-                : "Marknadsvärde för skicket, från jämförbara annonser."
-              : (price?.unavailableReason ?? "Prismotorn kunde inte nås.")}
+                  t("Marknadsvärde för skicket, efter {andel} % avdrag för skadorna.", {
+                    andel: Math.round(price.damageDeduction * 100),
+                  })
+                : t("Marknadsvärde för skicket, från jämförbara annonser.")
+              : (price?.unavailableReason ?? t("Prismotorn kunde inte nås."))}
           </p>
         </div>
 
         {card.attributes.length > 0 && (
           <section className="listing-block">
-            <h3>Specifikationer</h3>
+            <h3>{t("Specifikationer")}</h3>
             <dl className="listing-specs">
               {card.attributes.map((a) => (
                 <div key={a.key + a.label} className="listing-spec">
                   <dt>{a.label}</dt>
                   <dd>
                     {a.value}
-                    {a.sourceUrl && (
-                      <a className="truth-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
-                        källa
+                    {a.sourceUrl ? (
+                      <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
+                        {t("källa")}
                       </a>
+                    ) : (
+                      // Uppskattningen står på källänkens plats, i grått och utan länk — det finns
+                      // ingen sida att gå till, och det är hela poängen med märkningen.
+                      a.estimated && <span className="card-est">{t("uppskattat")}</span>
                     )}
                   </dd>
                 </div>
@@ -191,27 +241,31 @@ export default function TruthCardView({
         )}
 
         <section className="listing-block">
-          <h3>Skickrapport</h3>
+          <h3>{t("Skickrapport")}</h3>
           <div className="listing-condition-head">
             {grade && <GradeBadge grade={grade.grade} size={44} />}
             <div>
-              <div className="truth-verdict-label">{grade?.label ?? "—"}</div>
+              <div className="card-verdict-label">{grade?.label ?? "—"}</div>
               <div className="muted small">
-                {damages.length} {damages.length === 1 ? "anmärkning" : "anmärkningar"} · {imageCount} vyer ·{" "}
-                {reviewed ? "två besiktningar" : "en besiktning"}
+                {damages.length === 1
+                  ? t("{antal} anmärkning", { antal: damages.length })
+                  : t("{antal} anmärkningar", { antal: damages.length })}{" "}
+                · {t("{antal} vyer", { antal: imageCount })} ·{" "}
+                {reviewed ? t("två besiktningar") : t("en besiktning")}
               </div>
             </div>
           </div>
-          {/* Renderingen sitter här när produktbilden tagit omslaget. Den är inte dekoration utan
+          {/* Renderingens enda plats på kortet. Den är inte dekoration och inte ett omslag, utan
               skickrapportens karta: varje anmärkning som en numrerad punkt på den del den gäller,
-              med samma nummer som raderna under. */}
-          {cover && model && (
+              med samma nummer som raderna under. Villkoret satt förut på att en bild tagit omslaget
+              — figuren fick annars flytta upp och bli kortets produktbild, vilket den aldrig var. */}
+          {model && (
             <div className="listing-damage-render">
               <FurnitureRender model={model} pins={pins} selectedId={selected} onSelect={setSelected} />
             </div>
           )}
           {damages.length === 0 ? (
-            <p className="muted small listing-no-damage">Inspektionen hittade inga synliga skador.</p>
+            <p className="muted small listing-no-damage">{t("Inspektionen hittade inga synliga skador.")}</p>
           ) : (
             <ol className="pin-list">
               {damages.map((d, i) => {
@@ -228,71 +282,34 @@ export default function TruthCardView({
                       <span className={`pin-num ${pin ? "" : "pin-num-unplaced"}`}>{pin ? pin.number : i + 1}</span>
                       <span className="pin-body">
                         <span className="pin-title">
-                          {TYPE_LABELS[d.type]}
+                          {typeLabel(d.type)}
                           <span className="pin-part">{d.part}</span>
                         </span>
                         <span className="pin-desc">{d.description}</span>
                       </span>
-                      <span className={`chip chip-${d.severity}`}>{SEVERITY_LABELS[d.severity]}</span>
+                      <span className={`chip chip-${d.severity}`}>{severityLabel(d.severity)}</span>
                     </button>
                   </li>
                 );
               })}
             </ol>
           )}
-          {model && pins.length > 0 && <p className="listing-pin-note">Punkterna i bilden har samma nummer som listan.</p>}
+          {model && pins.length > 0 && (
+            <p className="listing-pin-note">{t("Punkterna i bilden har samma nummer som listan.")}</p>
+          )}
         </section>
 
         <section className="listing-block">
-          <h3>Om möbeln</h3>
+          <h3>{t("Om möbeln")}</h3>
           <div className="listing-title-line">{card.listing.title}</div>
-          <p className="truth-listing-body">{card.listing.description}</p>
-          {card.listing.conditionText && <p className="truth-listing-condition">{card.listing.conditionText}</p>}
+          <p className="card-listing-body">{card.listing.description}</p>
+          {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
         </section>
 
-        <section className="listing-block listing-provenance">
-          <h3>Underlag</h3>
-          {/* Sagt rakt ut, inte begravt: en annons där måtten är gissade ska inte se likadan ut som
-              en där de har en källa. */}
-          <div className={`truth-confidence truth-confidence-${card.status ?? "partial"}`}>
-            {STATUS_LABELS[card.status ?? "partial"] ?? card.status}
-            {card.identity.confidence ? ` · träffsäkerhet ${card.identity.confidence}` : ""}
-          </div>
-          {card.identity.uncertain && card.identity.uncertaintyNote && (
-            <p className="truth-caveat">{card.identity.uncertaintyNote}</p>
-          )}
-          {model && model.dims.assumed.length > 0 && (
-            <p className="truth-caveat">
-              Måtten märkta ≈ i bilden stod inte i underlaget utan är typiska för kategorin.
-            </p>
-          )}
-          {card.sources.length > 0 && (
-            <ul className="truth-sources">
-              {card.sources.map((s) => (
-                <li key={s.url}>
-                  <a href={s.url} target="_blank" rel="noreferrer">
-                    {s.title || s.url}
-                  </a>
-                </li>
-              ))}
-            </ul>
-          )}
-          {card.missingNotes && card.missingNotes.length > 0 && (
-            <div className="truth-missing">
-              <p className="muted small">Kunde inte bekräftas:</p>
-              <ul>
-                {card.missingNotes.map((n, i) => (
-                  <li key={i}>{n}</li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </section>
-
-        {/* Sist, efter allt som går att läsa. Frågor uppstår när man läst skicket och underlaget —
+        {/* Sist, efter allt som går att läsa. Frågor uppstår när man läst skicket och beskrivningen —
             en chatt placerad före dem hade bjudit in till att fråga om det som stod två rader ned. */}
         {loopaId && (
-          <TruthCardChat
+          <ListingChat
             loopaId={loopaId}
             name={name}
             damageCount={damages.length}
@@ -341,7 +358,7 @@ function placeDamages(damages: CardDamage[], model: ReturnType<typeof buildModel
         z: anchor.point.z + spread.z,
       },
       normal: anchor.normal,
-      label: `${TYPE_LABELS[d.type]} — ${d.part}`,
+      label: `${typeLabel(d.type)} — ${d.part}`,
       severity: d.severity,
     });
   }

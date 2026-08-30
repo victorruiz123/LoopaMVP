@@ -6,9 +6,11 @@ import { CardSearchIcon, ChevronRight, SearchIcon, CloseIcon, UserIcon } from ".
 import { useAuth } from "../auth/AuthProvider";
 import { formatPriceRange } from "../lib/price";
 import { KNOWN_BRANDS } from "../lib/brands";
+import { LOOPA_PERCENT } from "../lib/fees";
 import { POPULAR_BRANDS } from "../lib/brandSeed";
 import { brandTheme } from "../lib/brandTheme";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 function fold(s: string): string {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -37,20 +39,30 @@ export default function HomeScreen({
   onStartScan: (identity: FurnitureIdentity) => void;
   onOpenJob: (jobId: string) => void;
   onOpenProfile: () => void;
-  /** Slå upp ett publikt truth-card på dess Loopa-ID — ikonen i topplisten. */
+  /** Slå upp en publik annons på dess Loopa-ID — ikonen i topplisten. */
   onOpenLookup: () => void;
 }) {
-  const { profile, user } = useAuth();
+  const t = useT();
+  const { profile, user, loading } = useAuth();
   usePageTitle(null);
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
 
+  /**
+   * Listan är säljarens egen och hämtas bara när det finns en säljare.
+   *
+   * Startsidan öppnas numera utan konto — där finns inga sparade annonser att visa, och ett anrop
+   * hade bara växlat ett 401 mot en tom lista. Väntar in `loading`, annars går frågan iväg utan
+   * token i den korta stund det tar att läsa sessionen ur webbläsaren.
+   */
   useEffect(() => {
+    if (loading) return;
+    if (!user) return setJobs([]);
     listJobs()
       .then(setJobs)
       .catch(() => setJobs([]));
-  }, []);
+  }, [loading, user?.id]);
 
   const finished = jobs?.filter((j) => j.progress.stage === "done") ?? [];
 
@@ -71,37 +83,50 @@ export default function HomeScreen({
       <div className="app-bar">
         <span className="app-wordmark">Loopa</span>
         <div className="app-bar-actions">
-          {/* Loopa-ID:t ur en annons slås upp här. Varje truth-card är publikt, så knappen leder inte
+          {/* Loopa-ID:t ur en annons slås upp här. Varje annons är publik, så knappen leder inte
               in i det egna kontot utan till vilket kort som helst. */}
-          <button className="app-bar-icon" onClick={onOpenLookup} aria-label="Sök truth-card på Loopa-ID">
+          <button className="app-bar-icon" onClick={onOpenLookup} aria-label={t("Sök annons på Loopa-ID")}>
             <CardSearchIcon size={18} />
           </button>
-          <button className="app-bar-profile" onClick={onOpenProfile} aria-label="Din profil">
-            <UserIcon size={17} />
-            <span className="app-bar-profile-name">{shortName(profile?.full_name ?? profile?.username, user?.email)}</span>
-          </button>
+          {/* Ingen knapp alls medan sessionen läses: valet står mellan ett namn och "Logga in", och
+              att gissa fel i en tiondels sekund byter ut texten framför ögonen på den som läser den. */}
+          {!loading && (
+            <button
+              className="app-bar-profile"
+              onClick={onOpenProfile}
+              aria-label={user ? t("Din profil") : t("Logga in")}
+            >
+              <UserIcon size={17} />
+              <span className="app-bar-profile-name">
+                {user ? shortName(profile?.full_name ?? profile?.username, user.email) : t("Logga in")}
+              </span>
+            </button>
+          )}
         </div>
       </div>
 
       <header className="home-header">
         <span className="brand-pill">
-          <span className="brand-dot" /> AI-GRANSKNING
+          <span className="brand-dot" /> {t("SÄLJ MED LOOPA")}
         </span>
+        {/* Rubriken bryts i två rader, och brytpunkten är olika på olika språk: "Vilket märke"
+            väger jämnt mot "är möbeln?", men "What brand" mot "is the furniture?" gör det inte.
+            Därför är raderna två egna meningar i ordlistan och inte en med ett radbrott i. */}
         <h1 className="home-title">
-          Vilket märke
+          {t("Vilket märke")}
           <br />
-          <span className="accent">är möbeln?</span>
+          <span className="accent">{t("är möbeln?")}</span>
         </h1>
-        {/* Vänsterspalten i datorvyn har plats att säga vad appen gör innan man klickar.
-            Telefonen har det inte — där är listan hela skärmen — så texten finns bara i
-            datorläget, utelämnad och inte gömd. */}
-        <p className="home-lede desktop-only">
-          Filma ett varv runt möbeln. Du får skick, pris och en färdig annons.
-        </p>
+        {/* Löftet står FÖRE första trycket, på varje skärmstorlek. Det som stod här hette
+            "AI-granskning" och lovade "en färdig annons" — och den som läste det trodde sig ha
+            beställt ett dokument. Erbjudandet är att möbeln blir såld; det får inte vara något
+            man upptäcker först på sista skärmen. Två rader räcker på telefonen, där listan är
+            resten av skärmen — stegen under är fortfarande datorvyns, som har plats för dem. */}
+        <p className="home-lede">{t("Vi gör annonsen, säljer möbeln och hör av oss när den är såld.")}</p>
         <ol className="home-steps desktop-only">
-          <li>Välj märket</li>
-          <li>Filma ett varv</li>
-          <li>Få ditt truth-card</li>
+          <li>{t("Välj märket")}</li>
+          <li>{t("Filma ett varv")}</li>
+          <li>{t("Vi säljer den åt dig")}</li>
         </ol>
       </header>
 
@@ -112,14 +137,14 @@ export default function HomeScreen({
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Sök märke"
+          placeholder={t("Sök märke")}
           autoComplete="off"
           autoCorrect="off"
           spellCheck={false}
-          aria-label="Sök märke"
+          aria-label={t("Sök märke")}
         />
         {query && (
-          <button type="button" className="brand-search-clear" onClick={() => setQuery("")} aria-label="Rensa">
+          <button type="button" className="brand-search-clear" onClick={() => setQuery("")} aria-label={t("Rensa")}>
             <CloseIcon size={12} />
           </button>
         )}
@@ -146,21 +171,21 @@ export default function HomeScreen({
 
         {typed && !exact && (
           <button className="brand-tile brand-tile-custom" onClick={() => onStartScan({ brand: typed, model: "" })}>
-            <span className="brand-tile-name">Använd ”{typed}”</span>
+            <span className="brand-tile-name">{t("Använd ”{namn}”", { namn: typed })}</span>
             <span className="brand-tile-go">
               <ChevronRight size={18} />
             </span>
           </button>
         )}
-        {shown.length === 0 && !typed && <p className="muted small">Inga märken.</p>}
+        {shown.length === 0 && !typed && <p className="muted small">{t("Inga märken.")}</p>}
       </div>
 
       {finished.length > 0 && (
         <section className="collapsible-card">
           <button className="collapsible-header" onClick={() => setHistoryOpen((v) => !v)}>
-            <span className="collapsible-title">Sparade truth-cards</span>
+            <span className="collapsible-title">{t("Sparade annonser")}</span>
             <span className="collapsible-meta">
-              {finished.length} st
+              {t("{antal} st", { antal: finished.length })}
               <span className={`collapsible-chevron ${historyOpen ? "collapsible-chevron-open" : ""}`}>
                 <ChevronRight size={16} />
               </span>
@@ -178,9 +203,9 @@ export default function HomeScreen({
                     alt=""
                   />
                   <div className="saved-item-body">
-                    <div className="saved-item-title">{describe(j)}</div>
+                    <div className="saved-item-title">{describe(j, t)}</div>
                     <div className="muted small">
-                      Betyg {j.grade?.grade ?? "?"}
+                      {t("Betyg {betyg}", { betyg: j.grade?.grade ?? "?" })}
                       {j.price?.status === "ok" ? ` · ${formatPriceRange(j.price)}` : ""}
                     </div>
                   </div>
@@ -191,6 +216,12 @@ export default function HomeScreen({
           )}
         </section>
       )}
+
+      {/* Vad det kostar, i en rad. Priset på tjänsten stod förut ingenstans i appen — säljaren
+          filmade, granskade och tryckte på "Sälj med Loopa" utan att ha fått veta vad Loopa tar för
+          det. Raden ligger sist på sidan, under de sparade annonserna, och står kvar även för den
+          som ännu inte har några. */}
+      <p className="home-fee-line">{t("Loopa tar {andel} % av försäljningspriset", { andel: LOOPA_PERCENT })}</p>
     </div>
   );
 }
@@ -201,7 +232,7 @@ function shortName(name: string | null | undefined, email: string | null | undef
   return source.split(/\s+/)[0];
 }
 
-function describe(job: JobSummary): string {
+function describe(job: JobSummary, t: (sv: string) => string): string {
   const name = [job.identity?.brand, job.identity?.model].filter(Boolean).join(" ");
-  return name || "Möbel";
+  return name || t("Möbel");
 }

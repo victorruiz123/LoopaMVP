@@ -1,3 +1,4 @@
+import { t } from "./i18n";
 import type { DamageType, Impact, Severity, WearLevel } from "../types";
 
 export const TYPE_LABELS: Record<DamageType, string> = {
@@ -53,3 +54,15 @@ export const WEAR_LEVEL_LABELS: Record<WearLevel, string> = {
 export const DAMAGE_TYPE_OPTIONS = Object.keys(TYPE_LABELS) as DamageType[];
 export const SEVERITY_OPTIONS = Object.keys(SEVERITY_LABELS) as Severity[];
 export const IMPACT_OPTIONS = Object.keys(IMPACT_LABELS) as Impact[];
+
+/**
+ * Etiketterna, översatta.
+ *
+ * Tabellerna ovan står kvar på svenska och är NYCKLARNA — de är också det enda stället där en
+ * skadetyp har ett namn, och det ska gå att läsa i koden. Funktionerna nedan är vägen dit texten
+ * ska visas; ordlistan (lib/translations) bär engelskan och franskan.
+ */
+export const typeLabel = (type: DamageType): string => t(TYPE_LABELS[type] ?? type);
+export const severityLabel = (severity: Severity): string => t(SEVERITY_LABELS[severity] ?? severity);
+export const impactLabel = (impact: Impact): string => t(IMPACT_LABELS[impact] ?? impact);
+export const wearLevelLabel = (level: WearLevel): string => t(WEAR_LEVEL_LABELS[level] ?? level);

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Condition grading: ConditionInput -> ConditionResult. Fristående besiktningsmotor för begagnade möbler.",
+  "description": "Condition grading: ConditionInput -> ConditionResult. Frist\u00e5ende besiktningsmotor f\u00f6r begagnade m\u00f6bler.",
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "baseline": "tsx tests/baseline.ts",
@@ -18,7 +18,8 @@
     "web:dev:http": "HTTPS=0 npm --prefix web run dev",
     "web:build": "npm --prefix web run build",
     "install:all": "npm install && npm --prefix server install && npm --prefix web install",
-    "tradera:lookup": "tsx server/src/integrations/tradera/reference-lookup.ts"
+    "tradera:lookup": "tsx server/src/integrations/tradera/reference-lookup.ts",
+    "candidate:path": "tsx tests/candidate-path.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

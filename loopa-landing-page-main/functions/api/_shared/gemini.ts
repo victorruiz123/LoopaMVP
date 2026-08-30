@@ -56,12 +56,41 @@ export const FAST_REVIEW_MODEL = 'gemini-3.5-flash-lite'
  */
 const SERVICE_TIER = 'priority'
 
+/**
+ * VAD som gick fel, inte bara om det får göras om.
+ *
+ * `retryable` slår ihop två fall som kräver motsatt beslut. En 503 "The model is overloaded" kommer
+ * tillbaka på ett par hundra millisekunder och gäller EN modell — där är ett omförsök på en annan
+ * modell nästan gratis och nästan alltid rätt. En timeout har tvärtom redan bränt hela budgeten, och
+ * att skicka om samma nyttolast till en LÅNGSAMMARE modell är att lova något tiden inte räcker till.
+ *
+ * Anroparen kan inte skilja dem åt på `retryable` — båda är sanna — så den får skilja dem åt här.
+ */
+export type GeminiFailureKind = 'http' | 'timeout' | 'deadline' | 'network'
+
 export class GeminiCallError extends Error {
   retryable: boolean
-  constructor(message: string, retryable: boolean) {
+  kind: GeminiFailureKind
+  /** HTTP-statusen, satt när kind === 'http'. 429 = kvot, 503 = överbelastad. */
+  status?: number
+  constructor(message: string, retryable: boolean, kind: GeminiFailureKind = 'http', status?: number) {
     super(message)
     this.retryable = retryable
+    this.kind = kind
+    this.status = status
   }
+}
+
+/**
+ * Föll anropet SNABBT på något som gäller just den här modellen?
+ *
+ * 429 (kvot per modell), 5xx (överbelastning) och nätverksfel svarar direkt och säger ingenting om
+ * huruvida en annan modell kan svara — Googles kvot är per modell, och överbelastningen likaså. Det
+ * är precis de fallen där ett omförsök på en ANNAN modell är värt sin sekund. Timeout och överskriden
+ * deadline är inte med: de har redan använt tiden som omförsöket skulle behöva.
+ */
+export function modelUnavailable(err: unknown): boolean {
+  return err instanceof GeminiCallError && err.retryable && (err.kind === 'http' || err.kind === 'network')
 }
 
 /** Recoverable-failure classification — the ONLY conditions that trigger a fallback attempt. A schema/application bug in a 200 response is never retryable through here; it must surface as a real error from the caller's own parsing. */
@@ -104,7 +133,7 @@ async function callGeminiOnce(
     if (!res.ok) {
       const text = await res.text().catch(() => '')
       console.error(`[gemini] model=${model} outcome=http_${res.status} ms=${Date.now() - startedAt}`)
-      throw new GeminiCallError(`gemini ${model} ${res.status}: ${text.slice(0, 300)}`, isRetryableStatus(res.status))
+      throw new GeminiCallError(`gemini ${model} ${res.status}: ${text.slice(0, 300)}`, isRetryableStatus(res.status), 'http', res.status)
     }
     const parsed = await res.json()
     console.log(`[gemini] model=${model} outcome=ok ms=${Date.now() - startedAt} out_tokens=${(parsed as any)?.usageMetadata?.candidatesTokenCount ?? '?'} in_tokens=${(parsed as any)?.usageMetadata?.promptTokenCount ?? '?'}`)
@@ -114,10 +143,10 @@ async function callGeminiOnce(
     if (err instanceof Error && err.name === 'AbortError') {
       const cause = externalSignal?.aborted ? 'deadline' : 'timeout'
       console.error(`[gemini] model=${model} outcome=${cause} ms=${Date.now() - startedAt}`)
-      throw new GeminiCallError(`gemini ${model} aborted (${cause}) after ${Date.now() - startedAt}ms`, cause !== 'deadline')
+      throw new GeminiCallError(`gemini ${model} aborted (${cause}) after ${Date.now() - startedAt}ms`, cause !== 'deadline', cause === 'deadline' ? 'deadline' : 'timeout')
     }
     console.error(`[gemini] model=${model} outcome=network_error ms=${Date.now() - startedAt}`)
-    throw new GeminiCallError(`gemini ${model} network error: ${err instanceof Error ? err.message : String(err)}`, true)
+    throw new GeminiCallError(`gemini ${model} network error: ${err instanceof Error ? err.message : String(err)}`, true, 'network')
   } finally {
     clearTimeout(timer)
     if (externalSignal) externalSignal.removeEventListener('abort', onExternalAbort)
@@ -144,7 +173,7 @@ export async function callGeminiWithFallback(env: GeminiEnv, body: unknown, time
     await new Promise((r) => setTimeout(r, 500 + Math.random() * 1000))
     const remaining = budgetMs != null ? budgetMs - (Date.now() - startedAt) : timeoutMs
     if (remaining <= 1000) {
-      throw new GeminiCallError(`budget exhausted before fallback (${budgetMs}ms)`, true)
+      throw new GeminiCallError(`budget exhausted before fallback (${budgetMs}ms)`, true, 'deadline')
     }
     return await callGeminiOnce(FALLBACK_MODEL, apiKey, env.AI_GATEWAY_URL, body, Math.min(timeoutMs, remaining))
   }

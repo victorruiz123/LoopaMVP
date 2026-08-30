@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { SofaIcon } from "./icons";
+import { useT } from "../lib/i18n";
 
 /**
  * Väntan medan modellerna letas fram.
@@ -20,6 +21,7 @@ const RING =
   "M76 3h42a31 31 0 0 1 31 31v84a31 31 0 0 1-31 31H34a31 31 0 0 1-31-31V34A31 31 0 0 1 34 3Z";
 
 export default function ModelSearchLoader() {
+  const t = useT();
   const [step, setStep] = useState(0);
 
   useEffect(() => {
@@ -44,8 +46,8 @@ export default function ModelSearchLoader() {
         </div>
       </div>
       {/* Nyckeln gör varje ord till ett nytt element, vilket startar om intoningen. */}
-      <p className="model-search-word" key={step}>
-        {WORDS[step % WORDS.length]}…
+      <p className="wait-word" key={step}>
+        {t(WORDS[step % WORDS.length])}…
       </p>
     </div>
   );

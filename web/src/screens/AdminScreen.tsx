@@ -4,9 +4,10 @@ import { ArrowLeftIcon, ChevronRight, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminUser, AdminDirectory } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 /**
- * Adminpanelen: de konton som registrerade sig idag eller igår, med vägen in till deras truth-cards.
+ * Adminpanelen: de konton som registrerade sig idag eller igår, med vägen in till deras annonser.
  *
  * Urvalet görs på servern (server/src/admin.ts) och inte här — det är samma fönster oavsett vem som
  * frågar, och vyn behöver aldrig hämta hem hela användarlistan för att sedan kasta det mesta.
@@ -23,6 +24,7 @@ export default function AdminScreen({
   onOpenUser: (user: AdminUser) => void;
 }) {
   const [users, setUsers] = useState<AdminUser[] | null>(null);
+  const t = useT();
   usePageTitle("Adminpanel");
   const [directory, setDirectory] = useState<AdminDirectory>("jobs");
   const [total, setTotal] = useState(0);
@@ -55,26 +57,28 @@ export default function AdminScreen({
   return (
     <div className="screen screen-light profile admin">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> Tillbaka
+        <ArrowLeftIcon /> {t("Tillbaka")}
       </button>
 
       <header className="admin-head">
         <span className="admin-badge">Admin</span>
-        <h1 className="profile-name">Nya användare</h1>
+        <h1 className="profile-name">{t("Nya användare")}</h1>
       </header>
       <p className="admin-lede">
-        Konton som registrerade sig idag eller igår
-        {users !== null && total > 0 ? ` · ${users.length} av ${total} konton` : ""}
+        {t("Konton som registrerade sig idag eller igår")}
+        {users !== null && total > 0
+          ? ` · ${t("{antal} av {total} konton", { antal: users.length, total })}`
+          : ""}
       </p>
 
       <section className="profile-stats">
         <div className="profile-stat">
           <div className="profile-stat-value">{users?.length ?? "—"}</div>
-          <div className="profile-stat-label">Nya konton</div>
+          <div className="profile-stat-label">{t("Nya konton")}</div>
         </div>
         <div className="profile-stat">
           <div className="profile-stat-value">{users ? totalCards : "—"}</div>
-          <div className="profile-stat-label">Truth-cards</div>
+          <div className="profile-stat-label">{t("Annonser")}</div>
         </div>
       </section>
 
@@ -93,9 +97,9 @@ export default function AdminScreen({
           className="admin-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Sök på e-post eller namn"
+          placeholder={t("Sök på e-post eller namn")}
           autoComplete="off"
-          aria-label="Sök användare"
+          aria-label={t("Sök användare")}
         />
       )}
 
@@ -110,11 +114,13 @@ export default function AdminScreen({
           <span className="profile-empty-mark">
             <UserIcon size={22} />
           </span>
-          <p className="profile-empty-title">{query ? "Ingen träff" : "Inga nya konton"}</p>
+          <p className="profile-empty-title">{query ? t("Ingen träff") : t("Inga nya konton")}</p>
           <p className="profile-empty-hint">
             {query
-              ? "Ingen av de nya användarna matchar sökningen."
-              : "Ingen har registrerat sig idag eller igår. Kontona som fanns sedan tidigare ligger kvar — de visas bara inte här."}
+              ? t("Ingen av de nya användarna matchar sökningen.")
+              : t(
+                  "Ingen har registrerat sig idag eller igår. Kontona som fanns sedan tidigare ligger kvar — de visas bara inte här.",
+                )}
           </p>
         </div>
       ) : (
@@ -131,8 +137,12 @@ export default function AdminScreen({
                     {u.isAdmin && <span className="admin-tag">Admin</span>}
                   </span>
                   <span className="card-row-meta">
-                    {u.cardCount} truth-card{u.cardCount === 1 ? "" : "s"}
-                    {u.jobCount > u.cardCount ? ` · ${u.jobCount - u.cardCount} utan kort` : ""}
+                    {u.cardCount === 1
+                      ? t("{antal} annons", { antal: u.cardCount })
+                      : t("{antal} annonser", { antal: u.cardCount })}
+                    {u.jobCount > u.cardCount
+                      ? ` · ${t("{antal} utan kort", { antal: u.jobCount - u.cardCount })}`
+                      : ""}
                     {u.totalValue > 0 ? ` · ${formatSek(u.totalValue)}` : ""}
                   </span>
                   <span className="card-row-meta admin-row-sub">

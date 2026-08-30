@@ -46,6 +46,15 @@ export interface ProductAttribute {
   value: string
   /** Optional per-field source attribution: an https URL cited in the grounded research for this value. Validated server-side; null when the research didn't cite one. */
   sourceUrl?: string | null
+  /**
+   * True when the value is an ESTIMATE, not a fact about this product.
+   *
+   * Set only server-side, only for dimensions, and only when no source gave any: either the research
+   * call's own "LIKNANDE:" rows (the closest comparable model) or the typical-measurement table in
+   * functions/api/_shared/seller-typical-dimensions.ts. An estimate never counts as verified — it is
+   * left out of `missingFields`, written with "ca", and replaced by the first real measurement.
+   */
+  estimated?: boolean
 }
 
 export interface ProductIdentity {

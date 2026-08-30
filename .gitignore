@@ -8,3 +8,8 @@ dist/
 # till 9,9 GB. GitHub avvisar allt över 100 MB per fil, och Git LFS löser det inte —
 # kvoten är 1 GB. Se README för hur den ska pekas ut lokalt.
 Price_engine/vips-ml-data/
+
+# Dev-certifikat med LAN-adress. Maskinspecifikt och byts vid nätverksbyte.
+web/.certs/
+tools/cloudflared
+deploy/cloudflared/config.local.yml

@@ -1,5 +1,5 @@
 /**
- * Truth-card -> Tradera-annons.
+ * Loopa-annonsen -> Tradera-annons.
  *
  * Det här är översättningen: de tre svaren kortet redan bär — vad möbeln ÄR (annonsgeneratorn), vad den
  * är VÄRD (prismotorn) och vilket SKICK den är i (besiktningen) — packas till en nyttolast Tradera
@@ -10,12 +10,16 @@
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { getJob, jobDir, persist } from "../../jobStore.js";
-import { presentableImages, resolveCoverImageId } from "../../pipeline/cover.js";
-import type { CapturedImage, ConditionJob, Damage, DamageType, Severity, TraderaPublication } from "../../types.js";
+import { resolveCoverImageId } from "../../pipeline/cover.js";
+import { adImages, adTitle, composeAd, renderAdHtml, resolveAdPrice } from "../../adContent.js";
+import type { CapturedImage, ConditionJob, TraderaPublication } from "../../types.js";
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
+import { armPriceLadder } from "../../priceLadder.js";
+import { loopaIdFor } from "../../loopaId.js";
+import { SHIPPING_INCLUDED_SEK, traderaPriceWithShipping } from "./shipping.js";
 import {
   TRADERA_CONDITION,
-  TRADERA_SHIPPING_PICKUP_ID,
+  TRADERA_SHIPPING_OTHER_ID,
   TRADERA_SKICK_ATTRIBUTE_ID,
   traderaCategoryFor,
   traderaPaymentOptionIds,
@@ -50,10 +54,20 @@ function auctionDurationDays(): number {
 /** Vad som kommer att publiceras, så säljaren kan se det INNAN de trycker. */
 export interface PublishPlan {
   title: string;
+  /** Annonsens publika ID. Står i annonstexten och är vägen tillbaka hit från Tradera. */
+  loopaId: string;
   categoryId: number;
   categoryName: string;
+  /**
+   * Vad KÖPAREN betalar: möbeln plus hemleveransen. Det är det här talet som går till Tradera och
+   * står i annonsen — inget tillkommer i kassan.
+   */
   price: number;
-  priceSource: "condition" | "listing";
+  /** Möbelns egen andel. Det är den prisstegen sänker; frakten står stilla. */
+  itemPrice: number;
+  /** Fraktens andel av `price`, utskriven så gränssnittet slipper känna till beloppet. */
+  shippingSek: number;
+  priceSource: "seller" | "condition" | "listing";
   condition: string | null;
   imageCount: number;
   /** "fixed" = Endast Köp Nu till `price`. "auction" = utropspris `price`, inget Köp Nu. */
@@ -65,22 +79,6 @@ export interface PublishPlan {
 export type PublishReadiness =
   | { ok: true; plan: PublishPlan }
   | { ok: false; reason: string };
-
-// Svenska etiketter för annonstexten. Duplicerade från web/src/lib/labels.ts med samma motivering som
-// types.ts bär: motorn är fristående och importerar inte ur webbklienten.
-const TYPE_LABELS: Record<DamageType, string> = {
-  scratch: "Repa", scuff: "Skrapmärke", abrasion: "Nötning", chip: "Flisa", dent: "Buckla",
-  crack: "Spricka", tear: "Reva", hole: "Hål", stain: "Fläck", discoloration: "Missfärgning",
-  fading: "Blekning", rust: "Rost", corrosion: "Korrosion", pilling: "Nopprighet",
-  worn_material: "Slitet material", fraying: "Fransning", compressed_upholstery: "Nertryckt stoppning",
-  peeling_flaking: "Flagnande yta", deformation: "Deformation", loose_component: "Lös komponent",
-  broken_component: "Trasig komponent", missing_part: "Saknad del", sagging: "Nedsjunken",
-  structural_damage: "Strukturell skada", general_wear: "Allmänt slitage", other: "Övrigt",
-};
-
-const SEVERITY_LABELS: Record<Severity, string> = {
-  S1: "mindre", S2: "måttlig", S3: "stor", S4: "kritisk",
-};
 
 // ---------- Planering ----------
 
@@ -96,10 +94,10 @@ export async function planTraderaPublish(job: ConditionJob): Promise<PublishRead
   if (!result) return { ok: false, reason: "Analysen är inte klar än." };
   if (!card) return { ok: false, reason: "Annonsen kunde inte skapas, så det finns inget att publicera." };
 
-  const title = (card.listing.title || [card.identity.brand, card.identity.exactProduct].filter(Boolean).join(" ")).trim();
+  const title = adTitle(job);
   if (!title) return { ok: false, reason: "Annonsen saknar rubrik." };
 
-  const price = resolvePrice(job);
+  const price = resolveAdPrice(job);
   if (!price) return { ok: false, reason: "Det finns inget pris att sätta som utropspris." };
 
   const images = await listingImages(job);
@@ -114,9 +112,12 @@ export async function planTraderaPublish(job: ConditionJob): Promise<PublishRead
     ok: true,
     plan: {
       title: title.slice(0, 80),
+      loopaId: loopaIdFor(job.id),
       categoryId: category.id,
       categoryName: category.name,
-      price: price.value,
+      price: traderaPriceWithShipping(price.value),
+      itemPrice: price.value,
+      shippingSek: SHIPPING_INCLUDED_SEK,
       priceSource: price.source,
       condition: result.grade ? TRADERA_CONDITION[result.grade.grade] : null,
       imageCount: images.length,
@@ -126,35 +127,9 @@ export async function planTraderaPublish(job: ConditionJob): Promise<PublishRead
   };
 }
 
-/**
- * Utropspriset. Besiktningens pris först — det är det enda som räknat AV för skadorna. Faller
- * prismotorn bort används annonsgeneratorns förslag, som inte sett skadorna men är bättre än inget.
- */
-function resolvePrice(job: ConditionJob): { value: number; source: "condition" | "listing" } | null {
-  const price = job.result?.price;
-  if (price?.status === "ok" && price.default && price.default > 0) {
-    return { value: Math.round(price.default), source: "condition" };
-  }
-  const suggested = job.result?.listing?.result?.pricing.suggestedPriceSek;
-  if (suggested && suggested > 0) return { value: Math.round(suggested), source: "listing" };
-  return null;
-}
-
-/**
- * Bilderna till annonsen: omslaget först, obrukbara bildrutor bortsorterade.
- *
- * Tradera gör den FÖRSTA uppladdade bilden till annonsens omslag, så ordningen är inte kosmetisk —
- * den är det köparen ser i sökresultatet. `coverImageId` sätts av pipelinen; saknas den (jobb från
- * före omslagsvalet) räknas den fram av resolveCoverImageId innan det här anropas.
- */
+/** Annonsens bilder, kapade till vad Tradera tar emot. Urvalet och ordningen görs i adContent.ts. */
 async function listingImages(job: ConditionJob): Promise<CapturedImage[]> {
-  const images = job.result?.images ?? job.images ?? [];
-  const presentable = await presentableImages(
-    images,
-    path.join(jobDir(job.id), "originals"),
-    job.result?.coverImageId ?? null,
-  );
-  return presentable.slice(0, MAX_TRADERA_IMAGES);
+  return (await adImages(job)).slice(0, MAX_TRADERA_IMAGES);
 }
 
 // ---------- Publicering ----------
@@ -189,7 +164,9 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       images,
       condition: plan.condition,
       conditionAttributeId: TRADERA_SKICK_ATTRIBUTE_ID,
-      shippingOptionId: TRADERA_SHIPPING_PICKUP_ID,
+      shippingOptionId: TRADERA_SHIPPING_OTHER_ID,
+      // 0 kr, för att frakten redan ligger i priset. Ett belopp här hade lagts PÅ annonspriset i
+      // Traderas kassa och tagit ut de 600 kronorna en andra gång.
       shippingCost: 0,
       paymentOptionIds: traderaPaymentOptionIds(),
       durationDays: plan.durationDays ?? undefined,
@@ -206,6 +183,13 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       publishedAt: new Date().toISOString(),
     }));
     console.info(`[tradera] job ${jobId} publicerat som item ${result.itemId} — ${result.url}`);
+
+    // Först nu börjar veckorna räknas: stegen sänker priset på en annons som ligger uppe, inte på ett
+    // utkast. Efter publiceringen — annonsen är redan live, och ett fel här får inte se ut som att
+    // den inte kom upp.
+    // MÖBELPRISET, inte annonspriset. Stegen räknar i möbelkronor och frakten läggs på först vid
+    // anropet mot Tradera — armeras den med `plan.price` börjar de 15 procenten äta av frakten.
+    await armPriceLadder(jobId, plan.itemPrice, plan.mode);
   } catch (err) {
     const message = explainFailure(err instanceof Error ? err.message : String(err));
     console.warn(`[tradera] job ${jobId} kunde inte publiceras — ${message}`);
@@ -282,62 +266,15 @@ async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
 // ---------- Annonstexten ----------
 
 /**
- * Annonstexten, som HTML — Traderas annonser renderas som HTML (kontrollerat mot en publicerad
- * annons: `<br>` och `<strong>` går fram, `&` kommer tillbaka escapat).
+ * Annonstexten som går upp på Tradera.
  *
- * Skadorna listas ut i klartext. Det är hela poängen med Loopa: en köpare ska se exakt vad
- * besiktningen såg, inte "bruksslitage, se bilder".
+ * Vad som står i den avgörs i adContent.ts, tillsammans med den text Blocket-exporten visar — det är
+ * SAMMA annons om samma möbel, och två texter som beskrev skicket var för sig hade förr eller senare
+ * beskrivit det olika. Det som är Traderas eget ligger här: HTML som renderingsform, och
+ * leveransstycket, som bara stämmer när annonsen ligger på Loopas eget konto.
  */
 export function buildDescription(job: ConditionJob): string {
-  const result = job.result!;
-  const card = result.listing!.result!;
-  const parts: string[] = [];
-
-  parts.push(`<p>${escapeHtml(card.listing.description).replace(/\n+/g, "<br>")}</p>`);
-
-  if (card.attributes.length > 0) {
-    parts.push("<p><strong>Specifikationer</strong></p>");
-    parts.push(
-      `<ul>${card.attributes
-        .map((a) => `<li>${escapeHtml(a.label)}: ${escapeHtml(a.value)}</li>`)
-        .join("")}</ul>`,
-    );
-  }
-
-  parts.push("<p><strong>Skick</strong></p>");
-  const gradeLine = [result.grade?.label, result.grade?.rationale].filter(Boolean).join(" — ");
-  if (gradeLine) parts.push(`<p>${escapeHtml(gradeLine)}</p>`);
-  if (card.listing.conditionText) parts.push(`<p>${escapeHtml(card.listing.conditionText)}</p>`);
-
-  const damages = result.damages.filter((d) => d.sellerAction !== "rejected");
-  if (damages.length > 0) {
-    parts.push(`<p>Besiktningen hittade ${damages.length} synliga ${damages.length === 1 ? "skada" : "skador"}:</p>`);
-    parts.push(`<ul>${damages.map((d) => `<li>${escapeHtml(describeDamage(d))}</li>`).join("")}</ul>`);
-  } else {
-    parts.push("<p>Besiktningen hittade inga synliga skador.</p>");
-  }
-
-  parts.push(
-    `<p><em>Skickbedömd med Loopa: ${result.images.length} vyer, ` +
-      `${result.reviewed ? "två besiktningar" : "en besiktning"}. Hämtas hos säljaren.</em></p>`,
-  );
-
-  return parts.join("\n");
-}
-
-function describeDamage(damage: Damage): string {
-  const head = [TYPE_LABELS[damage.type], damage.part].filter(Boolean).join(" på ");
-  const where = damage.semanticLocation ? ` (${damage.semanticLocation})` : "";
-  const severity = SEVERITY_LABELS[damage.severity];
-  return `${head}${where} — ${severity}. ${damage.description}`.trim();
-}
-
-function escapeHtml(text: string): string {
-  return text
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+  return renderAdHtml(composeAd(job, { delivery: true }));
 }
 
 export { traderaConfigured };

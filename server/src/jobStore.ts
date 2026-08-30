@@ -34,6 +34,20 @@ export async function createJob(
   return job;
 }
 
+/**
+ * Vem jobbet tillhör, med den ena regel som gäller för alla vägar in.
+ *
+ * Jobb skapade före inloggningen har ingen ägare — de kunde inte ha någon, lika lite som det hade ett
+ * maskinkonto. De är privata som standard. LEGACY_JOBS_OWNER adopterar dem till ett konto för den som
+ * vill ha kvar sin historik; det är ett medvetet val, inte ett förval.
+ *
+ * Läses ur miljön vid varje anrop och inte i en konstant: modulen importeras innan server.ts hunnit
+ * läsa server/.env, och en toppnivåkonstant hade därför alltid sett tomt.
+ */
+export function ownerIdOf(job: { ownerId?: string | null }): string | null {
+  return job.ownerId ?? (process.env.LEGACY_JOBS_OWNER || null);
+}
+
 export function getJobSync(id: string): ConditionJob | undefined {
   return jobs.get(id);
 }
@@ -145,6 +159,10 @@ export async function completeJob(id: string, result: ConditionJob["result"]): P
   // Annonsen kan bli klar innan skickresultatet finns att hänga den på — de två spåren kör
   // parallellt och identifieringen är ofta snabbare. Flytta in den i stället för att tappa den.
   if (result && !result.listing && job.pendingListing) result.listing = job.pendingListing;
+  // Samma sak för omslaget: identifieringen kan ha hunnit hämta produktbilden innan besiktningen
+  // blev klar, och den ska inte falla bort bara för att spåren möts i den ordningen.
+  if (result && !result.productImage && job.productImage) result.productImage = job.productImage;
+  if (result && !result.coverCutout && job.coverCutout) result.coverCutout = job.coverCutout;
   job.result = result;
   job.progress = { stage: "done", message: "Analysen är klar." };
   await persist(job);

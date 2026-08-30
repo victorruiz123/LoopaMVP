@@ -6,21 +6,35 @@ import ModelSelectScreen from "./screens/ModelSelectScreen";
 import SpecsScreen from "./screens/SpecsScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
-import TruthCardScreen from "./screens/TruthCardScreen";
+import ListingScreen from "./screens/ListingScreen";
 import AuthScreen from "./screens/AuthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AdminScreen from "./screens/AdminScreen";
 import AdminUserScreen from "./screens/AdminUserScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
+import { legalDocFromPath } from "./lib/legal";
+import LegalScreen from "./screens/LegalScreen";
+import CookieConsent from "./components/CookieConsent";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchLoader from "./components/ModelSearchLoader";
-import { getJob, selectModel, type CapturedShot, ensureMediaSession } from "./api";
+import ListingBuildLoader from "./components/ListingBuildLoader";
+import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, type CapturedShot, ensureMediaSession } from "./api";
+import { useJobPoll } from "./lib/useJobPoll";
+import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
 
 type Screen =
   | { name: "home" }
-  | { name: "capture"; identity: FurnitureIdentity }
+  // `shots` bara på vägen TILLBAKA, ur inloggningen: varvet är då redan filmat och skärmen ska öppna
+  // på bilderna i stället för på kameran.
+  | { name: "capture"; identity: FurnitureIdentity; shots?: CapturedShot[] }
+  // Grinden: bilderna finns, kontot saknas. Ligger mellan filmningen och jobbet — se App nedan.
+  // `resume` = sessionen tog slut med bilderna i handen, inte en ny säljare. Kontot finns redan,
+  // så inloggningen ska öppna på rätt flik och inte be dem skapa ett till.
+  | { name: "signup"; identity: FurnitureIdentity; shots: CapturedShot[]; resume?: boolean }
+  // Uppladdningen. Egen skärm för att den kan följa direkt på en registrering.
+  | { name: "starting"; identity: FurnitureIdentity; shots: CapturedShot[] }
   | { name: "identify"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
   | { name: "specs"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
   | { name: "price"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
@@ -28,25 +42,35 @@ type Screen =
   | { name: "result"; jobId: string }
   // `back` finns för att kortet numera nås från två håll: säljarens egen profil och adminpanelen.
   // Utan det landade en admin på skickvyn för någon annans möbel när de backade ur kortet.
-  | { name: "truthcard"; jobId: string; result: ConditionResult; loopaId?: string; back?: Screen }
+  | { name: "listing"; jobId: string; result: ConditionResult; loopaId?: string; back?: Screen }
   | { name: "lookup" }
+  // Inloggningen utanför flödet: den som vill åt sin profil innan de filmat något.
+  | { name: "login" }
   | { name: "profile" }
   | { name: "admin" }
   | { name: "adminUser"; user: AdminUser };
 
 /**
- * Flödet: märke -> bilder -> VÄLJ MODELL -> specifikationer -> pris -> skick -> truth-card.
+ * Flödet: märke -> bilder -> VÄLJ MODELL -> specifikationer -> pris -> skick -> annons.
  *
- * Truth-cardet är inte ett tillval sist i kedjan utan det enda steget efter skicket: skickvyn har en
+ * Annonsen är inte ett tillval sist i kedjan utan det enda steget efter skicket: skickvyn har en
  * väg vidare och den leder hit. Se ResultScreen.
  *
  * Modellvalet ligger först av allt som händer efter bilderna, för att allt därefter hänger på det:
  * prismotorn söker på modellnamnet, och annonsen byggs runt den. Tidigare låg identifieringen sist,
  * där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris redan räknats.
+ *
+ * INLOGGNINGEN ligger inuti flödet, mellan bilderna och analysen. Den låg tidigare före allt: ett
+ * formulär som mötte den som ännu inte sett vad appen gör. Nu väljs märket och varvet filmas utan
+ * konto, och frågan kommer första gången den betyder något — bilderna ska laddas upp till ett konto,
+ * och annonsen ska ha en profil att ligga i. Senare än så går inte: allt efter bilderna är
+ * kontobundet. Se `capture` i FlowApp.
+ *
+ * Efter kontot händer ingenting som säljaren behöver bevittna: uppladdningen och bildsessionen körs
+ * i bakgrunden och skärmen går rakt in i väntan på modellen — samma väg som en redan inloggad
+ * säljare tar, utan kvittensskärm och utan ett extra tryck.
  */
 export default function App() {
-  const { user, loading } = useAuth();
-
   /**
    * /c/LP-XXXX-XXXX — det publika kortet, FÖRE inloggningen.
    *
@@ -56,22 +80,40 @@ export default function App() {
    * flödet.
    */
   const publicId = loopaIdFromPath(window.location.pathname);
-  if (publicId) return <PublicCardScreen initialId={publicId} />;
 
-  // Inloggningen ligger FÖRE flödet, inte inuti det. Ett truth-card som skapas utan konto har ingen
-  // profil att hamna i, och att fråga efter inloggning först när kortet är klart hade betytt att
-  // säljaren filmar ett varv och sedan får veta att resultatet inte kan sparas.
-  if (loading) {
-    return (
-      <div className="screen screen-light center-column">
-        <div className="spinner" />
-      </div>
-    );
-  }
-  if (!user) return <AuthScreen />;
+  /**
+   * /integritetspolicy, /cookies, /villkor — utanför flödet, och före allt annat.
+   *
+   * Läses ur adressen på samma sätt som det publika kortet och av samma skäl: appen har ingen
+   * router. De ligger FÖRE kortet i ordningen bara för att de är exakta adresser medan kortets är
+   * ett mönster — inte för att de kan krocka.
+   */
+  const legalDoc = legalDocFromPath(window.location.pathname);
 
-  return <SignedInApp />;
+  return (
+    <>
+      {legalDoc ? (
+        <LegalScreen doc={legalDoc} />
+      ) : publicId ? (
+        <PublicCardScreen initialId={publicId} />
+      ) : (
+        <FlowApp />
+      )}
+      {/* Utanför växlingen ovan: rutan ska finnas på varje väg in i appen — även på det publika
+          kortet, som är det enda stället där något funktionellt faktiskt lagras. */}
+      <CookieConsent />
+    </>
+  );
 }
+
+/**
+ * Skärmarna som klarar sig utan konto.
+ *
+ * Allt annat är kontobundet: jobbet ägs av en säljare, annonsen ligger i en profil, adminvyerna
+ * frågar efter en roll. Listan är därför liten med flit — den är villkoret för att appen ska gå att
+ * öppna utloggad, inte en uppräkning av undantag.
+ */
+const OPEN_SCREENS = new Set<Screen["name"]>(["home", "capture", "signup", "login", "lookup"]);
 
 /**
  * Bildkakan hämtas innan något som visar bilder ritas.
@@ -92,7 +134,7 @@ function useMediaSession(userId: string | undefined): boolean {
   return isAdmin;
 }
 
-function SignedInApp() {
+function FlowApp() {
   const { user } = useAuth();
   const isAdmin = useMediaSession(user?.id);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
@@ -103,6 +145,38 @@ function SignedInApp() {
     setScreen({ name: "home" });
   };
 
+  /**
+   * En utloggning — eller en session som tog slut — drar undan underlaget för allt kontobundet. De
+   * skärmarna har inget att rita då, och att lämna dem stående tomma är sämre än att gå hem: hemma
+   * finns märkeslistan, och den fungerar utan konto.
+   *
+   * Villkoret är att kontot FÖRSVANN, inte att det saknas. Skillnaden är hela grinden: `signUp` följt
+   * av `signIn` lämnar sessionen färdig i supabase-klienten, men beskedet hit går via en lyssnare och
+   * kan komma ett ögonblick senare. Den som just skapat sitt konto står då på uppladdningen med
+   * `user` fortfarande null — och en regel som läser det som "utloggad" hade kastat hem dem mitt i
+   * det flöde hela ändringen finns för att hålla ihop. Anropen bär sin token från klienten, inte
+   * härifrån, så uppladdningen påverkas inte av att React ligger efter.
+   */
+  const hadAccount = useRef(false);
+  useEffect(() => {
+    if (user) {
+      hadAccount.current = true;
+      return;
+    }
+    if (!hadAccount.current || OPEN_SCREENS.has(screen.name)) return;
+    /**
+     * Uppladdningen är undantaget: där ligger säljarens ENDA kopia av varvet, i minnet, och att gå
+     * hem därifrån är att be dem filma om möbeln för att sessionen tog slut. De skickas till
+     * inloggningen med bildrutorna kvar i skärmens tillstånd, och kommer tillbaka hit efteråt.
+     */
+    if (screen.name === "starting") {
+      setScreen({ name: "signup", identity: screen.identity, shots: screen.shots, resume: true });
+      return;
+    }
+    goHome();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user, screen.name]);
+
   switch (screen.name) {
     case "home":
       return (
@@ -110,7 +184,8 @@ function SignedInApp() {
           key={homeKey.current}
           onStartScan={(identity) => setScreen({ name: "capture", identity })}
           onOpenJob={(jobId) => setScreen({ name: "result", jobId })}
-          onOpenProfile={() => setScreen({ name: "profile" })}
+          // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
+          onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
           onOpenLookup={() => setScreen({ name: "lookup" })}
         />
       );
@@ -118,9 +193,44 @@ function SignedInApp() {
       return (
         <CaptureScreen
           identity={screen.identity}
+          initialShots={screen.shots}
           onBack={goHome}
-          onCaptured={(jobId, previewShots) =>
-            setScreen({ name: "identify", jobId, identity: screen.identity, previewShots })
+          // HÄR ligger grinden. Jobbet knyts till en säljare på servern, så det kan inte skapas utan
+          // konto — men det är också först nu det saknas något. Den som har konto märker inget.
+          onCaptured={(shots) =>
+            setScreen(
+              user
+                ? { name: "starting", identity: screen.identity, shots }
+                : { name: "signup", identity: screen.identity, shots },
+            )
+          }
+        />
+      );
+    case "signup":
+      return (
+        <AuthScreen
+          intent="flow"
+          // Den som tappat sin session har redan ett konto — då är "logga in" fliken de behöver.
+          initialTab={screen.resume ? "signin" : undefined}
+          // Rakt in i uppladdningen. Sessionen finns när det här anropas, så jobbet får sin token —
+          // och säljaren får ingen kvittensskärm att trycka bort, bara flödet de redan var i.
+          onDone={() => setScreen({ name: "starting", identity: screen.identity, shots: screen.shots })}
+          onBack={() => setScreen({ name: "capture", identity: screen.identity, shots: screen.shots })}
+        />
+      );
+    case "login":
+      return <AuthScreen onDone={goHome} onBack={goHome} />;
+    case "starting":
+      return (
+        <StartingJob
+          identity={screen.identity}
+          shots={screen.shots}
+          onStarted={(jobId) =>
+            setScreen({ name: "identify", jobId, identity: screen.identity, previewShots: screen.shots })
+          }
+          onBack={() => setScreen({ name: "capture", identity: screen.identity, shots: screen.shots })}
+          onNeedsLogin={() =>
+            setScreen({ name: "signup", identity: screen.identity, shots: screen.shots, resume: true })
           }
         />
       );
@@ -176,21 +286,26 @@ function SignedInApp() {
           // här — men faller den hämtningen går kortet ändå fram: det som saknas då är chatten, inte
           // kortet, och steget efter skicket får aldrig sluta i ett tryck som inte gör något.
           onContinue={async (result) => {
-            const loopaId = await getJob(screen.jobId)
-              .then((job) => job.loopaId)
-              .catch(() => undefined);
-            setScreen({ name: "truthcard", jobId: screen.jobId, result, loopaId });
+            // Jobbet hämtas om, och kortet får den FÄRSKA versionen. Skickvyn slutar polla när
+            // fyndlistan och annonsen står — priset kan skrivas in en stund efter det, och kortet
+            // visar det som "Inget prisförslag" om det byggs på skärmens gamla ögonblicksbild.
+            const job = await getJob(screen.jobId).catch(() => undefined);
+            setScreen({ name: "listing", jobId: screen.jobId, result: job?.result ?? result, loopaId: job?.loopaId });
           }}
         />
       );
-    case "truthcard": {
+    case "listing": {
       const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
+      // Adminvägen öppnar samma skärm för någon annans möbel. "Till dina annonser" hade tagit
+      // adminen till sin EGEN profil därifrån — så den vägen finns bara för säljarens eget kort.
+      const ownCard = screen.back?.name !== "adminUser";
       return (
-        <TruthCardScreen
+        <ListingScreen
           result={screen.result}
           loopaId={screen.loopaId}
           onBack={() => setScreen(back)}
           onHome={goHome}
+          onMyListings={ownCard ? () => setScreen({ name: "profile" }) : undefined}
         />
       );
     }
@@ -204,11 +319,11 @@ function SignedInApp() {
           onBack={goHome}
           isAdmin={isAdmin}
           onOpenAdmin={() => setScreen({ name: "admin" })}
-          // Profilen öppnar kortet, inte fyndlistan: det är truth-cardet som sparats, och vägen
+          // Profilen öppnar kortet, inte fyndlistan: det är annonsen som sparats, och vägen
           // tillbaka till skicket finns kvar inifrån det.
           onOpenJob={async (jobId) => {
             const job = await getJob(jobId);
-            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result, loopaId: job.loopaId });
+            if (job.result) setScreen({ name: "listing", jobId, result: job.result, loopaId: job.loopaId });
             else setScreen({ name: "result", jobId });
           }}
         />
@@ -225,7 +340,7 @@ function SignedInApp() {
           // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
           onOpenJob={async (jobId) => {
             const job = await getJob(jobId);
-            if (job.result) setScreen({ name: "truthcard", jobId, result: job.result, loopaId: job.loopaId, back: from });
+            if (job.result) setScreen({ name: "listing", jobId, result: job.result, loopaId: job.loopaId, back: from });
           }}
         />
       );
@@ -234,40 +349,103 @@ function SignedInApp() {
 }
 
 /**
- * Klientens egen bortre gräns.
- *
- * Servern kan dö mellan två pollningar — den lever i minnet, så en omstart tar varje pågående körning
- * med sig. Skärmen ska då sluta snurra och säga det, inte vänta för evigt på ett jobb ingen längre
- * arbetar med. Rundligare än serverns deadline, så serverns felmeddelande hinner fram först.
+ * Väntan medan annonsen byggs. Ligger här och inte i respektive grind för att den syns TVÅ gånger:
+ * en gång direkt efter modellvalet, medan servern arbetar vidare i bakgrunden, och en gång i
+ * specifikationsgrinden som pollar in samma annons. Två skärmar som menar samma sak ska inte kunna
+ * glida isär.
  */
-const CLIENT_GIVE_UP_MS = 300_000;
+function BuildingListing() {
+  const t = useT();
+  return (
+    <div className="screen screen-light center-column">
+      <ListingBuildLoader />
+      <p className="wait-title">{t("Bygger annonsen…")}</p>
+      <p className="muted small">{t("Hämtar mått, material och specifikationer")}</p>
+    </div>
+  );
+}
 
-function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean, intervalMs = 1200) {
-  const [job, setJob] = useState<ConditionJob | null>(null);
-  const [gaveUp, setGaveUp] = useState(false);
+/**
+ * Uppladdningen: bilderna blir ett jobb, och jobbet börjar leta modell.
+ *
+ * Ligger på en egen skärm och inte kvar i kameran, för att den kan följa direkt på en registrering.
+ * Den som just skapat sitt konto ska inte skickas tillbaka till granskningsvyn för att trycka
+ * "starta" en gång till — steget de redan tagit ska inte behöva tas om för att kontot kom emellan.
+ * Skärmen startar därför jobbet själv och lämnar över till identifieringen i samma stund som
+ * servern svarat.
+ */
+function StartingJob({
+  identity,
+  shots,
+  onStarted,
+  onBack,
+  onNeedsLogin,
+}: {
+  identity: FurnitureIdentity;
+  shots: CapturedShot[];
+  onStarted: (jobId: string) => void;
+  onBack: () => void;
+  /** Sessionen bar inte hela vägen. Bilderna ligger kvar — säljaren ska logga in, inte filma om. */
+  onNeedsLogin: () => void;
+}) {
+  const t = useT();
+  const [error, setError] = useState<string | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  /**
+   * Ett anrop per försök, aldrig två: StrictMode kör effekten dubbelt i utvecklingsläget, och sex
+   * bilder som laddas upp två gånger blir två jobb på samma varv.
+   *
+   * Spärren är en räknare och inte en flagga, för att omtaget efter ett fel ska släppas igenom. Och
+   * effekten har ingen avbrottsstädning: den hade i StrictMode avbrutit just det anrop spärren låter
+   * passera, och skärmen blivit stående på spinnern.
+   */
+  const startedAttempt = useRef(-1);
+
   useEffect(() => {
-    let cancelled = false;
-    const until = Date.now() + CLIENT_GIVE_UP_MS;
-    const poll = async () => {
-      if (Date.now() > until) return setGaveUp(true);
-      try {
-        const j = await getJob(jobId);
-        if (cancelled) return;
-        setJob(j);
-        // Ett fällt jobb är ett svar. Att fortsätta polla på det är att snurra på ett dött jobb.
-        if (j.progress.stage === "error" || done(j)) return;
-        setTimeout(poll, intervalMs);
-      } catch {
-        if (!cancelled) setTimeout(poll, 2000);
-      }
-    };
-    poll();
-    return () => {
-      cancelled = true;
-    };
+    if (startedAttempt.current === attempt) return;
+    startedAttempt.current = attempt;
+    createJob(shots, identity)
+      .then(({ jobId }) => onStarted(jobId))
+      .catch((err) => {
+        /**
+         * "Bilderna kom inte fram" är fel besked när sessionen är det som saknas: bildrutorna ligger
+         * kvar, ingenting behöver göras om, och "försök igen" hade gett exakt samma svar varje gång.
+         * Den vägen leder till inloggningen i stället — och tillbaka hit när den är klar.
+         */
+        if (err instanceof AuthRequiredError) return onNeedsLogin();
+        setError(err instanceof Error ? err.message : t("Kunde inte starta analysen."));
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jobId]);
-  return { job, gaveUp, failed: job?.progress.stage === "error" };
+  }, [attempt]);
+
+  if (error) {
+    return (
+      <div className="screen screen-light center-column">
+        <h2 className="failure-title">{t("Bilderna kom inte fram")}</h2>
+        <p className="muted small">{error}</p>
+        {/* Bildrutorna ligger kvar i minnet, så omtaget skickar samma varv igen. Ingen filmar om. */}
+        <button
+          className="btn btn-primary"
+          onClick={() => {
+            setError(null);
+            setAttempt((n) => n + 1);
+          }}
+        >
+          {t("Försök igen")}
+        </button>
+        <button className="btn btn-text" onClick={onBack}>
+          {t("Tillbaka till bilderna")}
+        </button>
+      </div>
+    );
+  }
+  return (
+    <div className="screen screen-light center-column">
+      <div className="spinner" />
+      <p className="wait-title">{t("Laddar upp bilder…")}</p>
+      <p className="muted small">{t("Analysen startar av sig själv när de är uppe")}</p>
+    </div>
+  );
 }
 
 /** Väntar in identifieringen och visar kandidaterna. Hoppas över när den kunde avgöra modellen själv. */
@@ -280,7 +458,18 @@ function IdentifyGate({
   identity: FurnitureIdentity;
   onResolved: () => void;
 }) {
+  const t = useT();
   const [sent, setSent] = useState(false);
+  /**
+   * Ett omval startar om pollningen.
+   *
+   * Den stannade när kandidaterna landade — det var hela dess villkor — och skärmen som ber om nya
+   * förslag har inget som hämtar dem utan den här nyckeln.
+   */
+  const [searchKey, setSearchKey] = useState(0);
+  /** Bryggar glappet mellan trycket på "hitta nya" och serverns besked om att sökningen börjat. */
+  const [starting, setStarting] = useState(false);
+  const [searchError, setSearchError] = useState<string | null>(null);
   const { job, gaveUp, failed } = useJobPoll(
     jobId,
     // Slutar först när bilderna landat också — annars stannar pollningen i samma ögonblick som
@@ -293,7 +482,27 @@ function IdentifyGate({
     // ligger färdiga på servern och syns först vid nästa hämtning, så halva intervallet är halva den
     // sista fördröjningen. Ett jobb som identifieras är kortlivat, så det blir ett fåtal extra GET.
     600,
+    searchKey,
   );
+
+  // Servern flippar jobbet till sökläge INNAN den svarar, så det beskedet är allt som behövs för att
+  // lämna över väntan till pollningen.
+  useEffect(() => {
+    if (job?.identityStatus === "identifying") setStarting(false);
+  }, [job?.identityStatus]);
+
+  /** "Ingen av dem" — be om fyra andra. De avfärdade ligger kvar på jobbet och kommer inte igen. */
+  async function findNew() {
+    setStarting(true);
+    setSearchError(null);
+    try {
+      await findMoreModels(jobId);
+      setSearchKey((n) => n + 1);
+    } catch (err) {
+      setStarting(false);
+      setSearchError(err instanceof Error ? err.message : t("Vi kunde inte söka efter fler modeller just nu."));
+    }
+  }
 
   async function choose(choice: { candidate?: ModelCandidate; manualModel?: string }) {
     setSent(true);
@@ -304,43 +513,55 @@ function IdentifyGate({
   }
 
   if (sent || job?.identityStatus === "resolved") {
-    return (
-      <div className="screen screen-light center-column">
-        <div className="spinner" />
-        <p>Bygger annonsen…</p>
-        <p className="muted small">Hämtar mått, material och specifikationer</p>
-      </div>
-    );
+    return <BuildingListing />;
   }
   // Ö.6: identifieringen får aldrig sluta i en återvändsgränd. Faller den — eller dör jobbet, eller
   // ger klienten upp — landar säljaren på samma skärm med noll kandidater och kan skriva namnet själv.
   // En misslyckad identifiering ska kosta ett handgrepp, inte en omstart.
   const stalled = gaveUp || failed || job?.identityStatus === "unavailable";
-  if (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus)) {
+  const round = job?.candidateRound ?? 0;
+  const brandModels = identity.brand ? t("{märke}-modeller", { märke: identity.brand }) : t("modeller");
+  if (starting || (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus))) {
+    // Samma väntan, annan mening: första gången letas modellen upp, sedan letas den vidare bland de
+    // som blir kvar. Att säga "Letar upp modellen…" en andra gång hade sett ut som att inget hänt.
+    const again = starting || round > 0;
     return (
       <div className="screen screen-light center-column">
         <ModelSearchLoader />
-        <p className="identify-waiting-title">Letar upp modellen…</p>
-        <p className="muted small">Söker efter {identity.brand}-modeller som stämmer med bilderna</p>
+        <p className="wait-title">{again ? t("Letar efter andra modeller…") : t("Letar upp modellen…")}</p>
+        <p className="muted small">
+          {again
+            ? t("Söker vidare bland {modeller} — de du sagt nej till räknas bort", { modeller: brandModels })
+            : t("Söker efter {modeller} som stämmer med bilderna", { modeller: brandModels })}
+        </p>
       </div>
     );
   }
+  // Ett fallet omval säger det med en rad, inte med en tom skärm: säljaren ska veta varför de inte
+  // fick några nya förslag.
+  const note = searchError ?? (stalled ? null : job?.identityError ?? null);
   return (
     <>
-      {stalled && (
+      {(stalled || note) && (
         <p className="identify-fallback-note identify-fallback-floating">
-          {gaveUp
-            ? "Vi fick inget svar från servern."
-            : failed
-              ? job?.error ?? "Analysen avbröts."
-              : "Vi kunde inte söka fram några modeller just nu."}
+          {note ??
+            (gaveUp
+              ? t("Vi fick inget svar från servern.")
+              : failed
+                ? job?.error ?? t("Analysen avbröts.")
+                : t("Vi kunde inte söka fram några modeller just nu."))}
         </p>
       )}
       <ModelSelectScreen
         brand={identity.brand}
         candidates={job?.candidates ?? []}
+        round={round}
+        // Bilderna fylls i av pollningen ovan, och den slutar när den fått sitt sista besked eller
+        // gett upp. Efter det ska ingen ruta stå och skimra som om något vore på väg.
+        searchingImages={!stalled}
         onSelect={(candidate) => choose({ candidate })}
         onManual={(manualModel) => choose({ manualModel })}
+        onFindNew={findNew}
       />
     </>
   );
@@ -348,6 +569,7 @@ function IdentifyGate({
 
 /** Väntar in annonsen efter modellvalet. */
 function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => void; onBack: () => void }) {
+  const t = useT();
   const { job, gaveUp, failed } = useJobPoll(jobId, (j) => {
     const l = j.result?.listing ?? j.pendingListing;
     // `improving` betyder att fas 2 fortfarande söker vidare på egen hand. Skärmen visar det den har
@@ -363,36 +585,30 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
   if (!listing && (gaveUp || failed)) {
     return (
       <div className="screen screen-light center-column">
-        <h2 className="failure-title">Annonsen blev inte klar</h2>
-        <p className="muted small">{gaveUp ? "Vi fick inget svar från servern." : job?.error}</p>
+        <h2 className="failure-title">{t("Annonsen blev inte klar")}</h2>
+        <p className="muted small">{gaveUp ? t("Vi fick inget svar från servern.") : job?.error}</p>
         <button className="btn btn-primary" onClick={onNext}>
-          Fortsätt ändå
+          {t("Fortsätt ändå")}
         </button>
         <button className="btn btn-text" onClick={onBack}>
-          Byt modell
+          {t("Byt modell")}
         </button>
       </div>
     );
   }
   if (!listing || listing.status === "pending") {
-    return (
-      <div className="screen screen-light center-column">
-        <div className="spinner" />
-        <p>Bygger annonsen…</p>
-        <p className="muted small">Hämtar mått, material och specifikationer</p>
-      </div>
-    );
+    return <BuildingListing />;
   }
   if (!listing.result) {
     return (
       <div className="screen screen-light center-column">
-        <h2 className="failure-title">Annonsen kunde inte skapas</h2>
+        <h2 className="failure-title">{t("Annonsen kunde inte skapas")}</h2>
         <p className="muted small">{listing.unavailableReason}</p>
         <button className="btn btn-primary" onClick={onNext}>
-          Fortsätt till priset ändå
+          {t("Fortsätt till priset ändå")}
         </button>
         <button className="btn btn-text" onClick={onBack}>
-          Byt modell
+          {t("Byt modell")}
         </button>
       </div>
     );

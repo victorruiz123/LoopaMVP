@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { ChevronRight, SlidersIcon } from "./icons";
+import { t } from "../lib/i18n";
 import { cropUrl, debugUrl, getDebugTrace, imageUrl } from "../api";
-import { IMPACT_LABELS, SEVERITY_LABELS, TYPE_LABELS } from "../lib/labels";
+import { impactLabel, severityLabel, typeLabel } from "../lib/labels";
 import { CONFIDENCE_LABELS, DEDUCTION_SOURCE_LABELS, formatSek, variantLabel } from "../lib/price";
 import type { ConditionResult, Damage, DebugTrace, PriceEstimate } from "../types";
 
@@ -30,7 +31,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
       <button className="collapsible-header" onClick={() => setOpen((v) => !v)}>
         <span className="collapsible-title collapsible-title-icon">
           <SlidersIcon size={17} />
-          Teknisk information
+          {t("Teknisk information")}
         </span>
         <span className="collapsible-meta">
           <span className={`collapsible-chevron ${open ? "collapsible-chevron-open" : ""}`}>
@@ -42,24 +43,24 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
       {!open ? null : error ? (
         <p className="error-text">{error}</p>
       ) : !trace ? (
-        <p className="muted tech-loading">Hämtar debug-data…</p>
+        <p className="muted tech-loading">{t("Hämtar debug-data…")}</p>
       ) : (
         <div className="tech-body">
-          <TechSection title="Körning">
+          <TechSection title={t("Körning")}>
             <dl className="tech-kv">
-              <Row k="Täckning" v={<CoverageValue result={result} />} />
-              <Row k="Modell" v={result.modelUsed} />
+              <Row k={t("Täckning")} v={<CoverageValue result={result} />} />
+              <Row k={t("Modell")} v={result.modelUsed} />
               <Row
-                k="Cache"
+                k={t("Cache")}
                 v={
                   trace.geminiCalls.length === 0
                     ? "inga anrop"
                     : `${cacheHits} av ${trace.geminiCalls.length} anrop från cache${cacheHits === trace.geminiCalls.length ? " — körningen kostade ingenting" : ""}`
                 }
               />
-              <Row k="Tokens" v={`${result.tokensUsed.toLocaleString("sv-SE")} (~$${result.costUsd.toFixed(4)})`} />
-              <Row k="Total tid" v={`${(result.latencyMs / 1000).toFixed(1)} s`} />
-              <Row k="Dedup" v={`${trace.dedupBefore} fynd → ${trace.dedupAfter} skador`} />
+              <Row k={t("Tokens")} v={`${result.tokensUsed.toLocaleString("sv-SE")} (~$${result.costUsd.toFixed(4)})`} />
+              <Row k={t("Total tid")} v={`${(result.latencyMs / 1000).toFixed(1)} s`} />
+              <Row k={t("Dedup")} v={`${trace.dedupBefore} fynd → ${trace.dedupAfter} skador`} />
             </dl>
           </TechSection>
 
@@ -68,7 +69,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
           <TechSection title={`Gemini-anrop (${trace.geminiCalls.length})`}>
             <table className="tech-table">
               <thead>
-                <tr><th>Syfte</th><th>Modell</th><th>Cache</th><th>Tokens</th><th>Tid</th></tr>
+                <tr><th>{t("Syfte")}</th><th>{t("Modell")}</th><th>{t("Cache")}</th><th>{t("Tokens")}</th><th>{t("Tid")}</th></tr>
               </thead>
               <tbody>
                 {trace.geminiCalls.map((c, i) => (
@@ -83,18 +84,18 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
               </tbody>
             </table>
             {trace.geminiCalls.length === 1 && (
-              <p className="muted tech-note">Verifieringsanropet hoppades över — inget fynd var osäkert nog att motivera det.</p>
+              <p className="muted tech-note">{t("Verifieringsanropet hoppades över — inget fynd var osäkert nog att motivera det.")}</p>
             )}
           </TechSection>
 
           {trace.overallCondition && (
-            <TechSection title="Helhetsbedömning">
+            <TechSection title={t("Helhetsbedömning")}>
               <dl className="tech-kv">
-                <Row k="Slitagenivå" v={trace.overallCondition.overallWearLevel} />
-                <Row k="Utbredning" v={trace.overallCondition.affectedExtent} />
-                <Row k="Funktion påverkad" v={trace.overallCondition.functionalityAffected ? "ja" : "nej"} />
-                <Row k="Struktur intakt" v={trace.overallCondition.structuralIntegrityOk ? "ja" : "NEJ"} />
-                <Row k="Ser tydligt använd ut" v={trace.overallCondition.clearlyUsedAppearance ? "ja" : "nej"} />
+                <Row k={t("Slitagenivå")} v={trace.overallCondition.overallWearLevel} />
+                <Row k={t("Utbredning")} v={trace.overallCondition.affectedExtent} />
+                <Row k={t("Funktion påverkad")} v={trace.overallCondition.functionalityAffected ? "ja" : "nej"} />
+                <Row k={t("Struktur intakt")} v={trace.overallCondition.structuralIntegrityOk ? "ja" : "NEJ"} />
+                <Row k={t("Ser tydligt använd ut")} v={trace.overallCondition.clearlyUsedAppearance ? "ja" : "nej"} />
               </dl>
               {trace.overallCondition.observations.length > 0 && (
                 <ul className="tech-list">
@@ -104,7 +105,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
             </TechSection>
           )}
 
-          <TechSection title="Betygsspår">
+          <TechSection title={t("Betygsspår")}>
             <ul className="tech-list">
               {trace.gradeTrace.map((r, i) => <li key={i}>{r}</li>)}
             </ul>
@@ -113,7 +114,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
           {trace.partsInspected && trace.partsInspected.length > 0 && (
             <TechSection title={`Delar som granskades (${trace.partsInspected.length})`}>
               <table className="tech-table">
-                <thead><tr><th>Del</th><th>Syntes</th><th>Fynd</th></tr></thead>
+                <thead><tr><th>{t("Del")}</th><th>{t("Syntes")}</th><th>{t("Fynd")}</th></tr></thead>
                 <tbody>
                   {trace.partsInspected.map((x, i) => (
                     <tr key={i} className={x.defectsFound === 0 && x.visible ? "tech-part-clean" : undefined}>
@@ -148,7 +149,7 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
 
           <TechSection title={`Fynd (${result.damages.length})`}>
             {result.damages.length === 0 ? (
-              <p className="muted">Inga fynd rapporterades.</p>
+              <p className="muted">{t("Inga fynd rapporterades.")}</p>
             ) : (
               <div className="tech-findings">
                 {result.damages.map((d) => <FindingRow key={d.id} jobId={jobId} damage={d} />)}
@@ -173,37 +174,37 @@ export default function TechnicalPanel({ jobId, result }: { jobId: string; resul
 function PriceSection({ price }: { price: PriceEstimate }) {
   if (price.status !== "ok") {
     return (
-      <TechSection title="Prissättning">
+      <TechSection title={t("Prissättning")}>
         <dl className="tech-kv">
-          <Row k="Status" v={<span className="tech-flag">{price.status}</span>} />
-          <Row k="Orsak" v={price.unavailableReason ?? "—"} />
-          <Row k="Svarstid" v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
+          <Row k={t("Status")} v={<span className="tech-flag">{price.status}</span>} />
+          <Row k={t("Orsak")} v={price.unavailableReason ?? "—"} />
+          <Row k={t("Svarstid")} v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
         </dl>
       </TechSection>
     );
   }
   const valued = price.damageLines.filter((l) => l.deduction > 0);
   return (
-    <TechSection title="Prissättning">
+    <TechSection title={t("Prissättning")}>
       <dl className="tech-kv">
-        <Row k="Intervall" v={`${formatSek(price.low)} — ${formatSek(price.default)} — ${formatSek(price.high)}`} />
-        <Row k="Underlag" v={`${price.matchCount} annonser`} />
-        <Row k="Möbeltyp" v={`${price.variant?.map(variantLabel).join(", ") || "—"}${price.variantMethod ? ` (${price.variantMethod})` : ""}`} />
-        <Row k="Säkerhet" v={(price.confidence && CONFIDENCE_LABELS[price.confidence]) ?? price.confidence ?? "—"} />
+        <Row k={t("Intervall")} v={`${formatSek(price.low)} — ${formatSek(price.default)} — ${formatSek(price.high)}`} />
+        <Row k={t("Underlag")} v={`${price.matchCount} annonser`} />
+        <Row k={t("Möbeltyp")} v={`${price.variant?.map((v) => t(variantLabel(v))).join(", ") || "—"}${price.variantMethod ? ` (${price.variantMethod})` : ""}`} />
+        <Row k={t("Säkerhet")} v={(price.confidence && t(CONFIDENCE_LABELS[price.confidence])) ?? price.confidence ?? "—"} />
         <Row
-          k="Skadeavdrag"
+          k={t("Skadeavdrag")}
           v={
             price.damageDeduction
               ? `${(price.damageDeduction * 100).toFixed(0)} % över ${valued.length} värderad(e) post(er)`
               : "inget"
           }
         />
-        <Row k="Svarstid" v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
+        <Row k={t("Svarstid")} v={`${(price.latencyMs / 1000).toFixed(1)} s`} />
       </dl>
       {price.damageLines.length > 0 && (
         <table className="tech-table">
           <thead>
-            <tr><th>Kategori</th><th>Grad</th><th>Avdrag</th><th>Värdering</th></tr>
+            <tr><th>{t("Kategori")}</th><th>{t("Grad")}</th><th>{t("Avdrag")}</th><th>{t("Värdering")}</th></tr>
           </thead>
           <tbody>
             {price.damageLines.map((line, i) => (
@@ -211,7 +212,7 @@ function PriceSection({ price }: { price: PriceEstimate }) {
                 <td>{line.category ?? "omappad"}{line.count && line.count > 1 ? ` ×${line.count}` : ""}</td>
                 <td>{line.grade ?? "—"}</td>
                 <td>{line.deduction ? `${(line.deduction * 100).toFixed(0)} %` : "—"}</td>
-                <td>{(line.source && DEDUCTION_SOURCE_LABELS[line.source]) ?? line.source ?? "—"}</td>
+                <td>{(line.source && t(DEDUCTION_SOURCE_LABELS[line.source])) ?? line.source ?? "—"}</td>
               </tr>
             ))}
           </tbody>
@@ -237,18 +238,18 @@ function FindingRow({ jobId, damage }: { jobId: string; damage: Damage }) {
   return (
     <div className={`tech-finding tech-finding-${damage.verification}`}>
       {crop ? (
-        <img className="tech-crop" src={cropUrl(jobId, crop)} alt="" title="Utsnittet som verifieringen bedömde" />
+        <img className="tech-crop" src={cropUrl(jobId, crop)} alt="" title={t("Utsnittet som verifieringen bedömde")} />
       ) : (
-        <div className="tech-crop tech-crop-empty" title="Inget utsnitt — fyndet gick aldrig till verifiering">—</div>
+        <div className="tech-crop tech-crop-empty" title={t("Inget utsnitt — fyndet gick aldrig till verifiering")}>—</div>
       )}
       <div className="tech-finding-body">
         <div className="tech-finding-title">
-          <strong>{TYPE_LABELS[damage.type]}</strong>
+          <strong>{typeLabel(damage.type)}</strong>
           <span className="muted">{damage.part}{damage.semanticLocation ? ` · ${damage.semanticLocation}` : ""}</span>
         </div>
         <div className="tech-badges">
-          <span className={`chip chip-${damage.severity}`}>{damage.severity} {SEVERITY_LABELS[damage.severity]}</span>
-          <span className="chip chip-neutral">{IMPACT_LABELS[damage.impact]}</span>
+          <span className={`chip chip-${damage.severity}`}>{damage.severity} {severityLabel(damage.severity)}</span>
+          <span className="chip chip-neutral">{impactLabel(damage.impact)}</span>
           <span className="chip chip-neutral">{damage.confidence}% säkerhet</span>
           <span className={`chip chip-verify-${damage.verification}`}>{damage.verification}</span>
           {damage.sellerAction && <span className="chip chip-neutral">säljare: {damage.sellerAction}</span>}

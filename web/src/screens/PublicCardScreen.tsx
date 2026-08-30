@@ -2,19 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import { fetchPublicCard } from "../api";
 import { loopaIdFromPath, publicCardPath, readTypedLoopaId } from "../lib/loopaId";
 import { ArrowLeftIcon, CardSearchIcon, CloseIcon } from "../components/icons";
-import TruthCardView from "../components/TruthCardView";
+import ListingView from "../components/ListingView";
 import type { PublicCard } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
+import { useLang, useT } from "../lib/i18n";
+import LegalLink from "../components/LegalLink";
 
 /**
- * Det publika truth-cardet — uppslaget på sitt Loopa-ID.
+ * Den publika annonsen — uppslaget på sitt Loopa-ID.
  *
  * Två vägar hit, samma skärm. Inifrån appen, via ikonen i topplisten, är det en sökruta säljaren kan
  * slå upp vilket kort som helst i. Utifrån, på /c/LP-XXXX-XXXX, är det sidan en köpare landar på från
  * Tradera-annonsen — utan konto, utan inloggning. Det är hela poängen med att kortet är publikt: ett
  * skick som inte går att kontrollera är bara ett påstående.
  *
- * Kortet ritas av samma vy som säljarens egen (TruthCardView). Det som skiljer ligger i svaret från
+ * Kortet ritas av samma vy som säljarens egen (ListingView). Det som skiljer ligger i svaret från
  * servern, inte här: säljarens bildrutor och ägaren följer aldrig med ut.
  */
 export default function PublicCardScreen({
@@ -25,12 +27,14 @@ export default function PublicCardScreen({
   /** Saknas när skärmen är sidan på /c/… — då finns ingen app att gå tillbaka till. */
   onBack?: () => void;
 }) {
+  const t = useT();
+  const { lang } = useLang();
   const [query, setQuery] = useState(initialId ?? "");
   const [card, setCard] = useState<PublicCard | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const standalone = !onBack;
-  usePageTitle(card ? `Truth-card ${card.loopaId}` : "Publikt truth-card");
+  usePageTitle(card ? t("Annons {id}", { id: card.loopaId }) : "Publik annons");
 
   const lookup = useCallback(
     async (raw: string) => {
@@ -63,7 +67,7 @@ export default function PublicCardScreen({
     <div className="screen screen-light public-card-screen">
       {onBack ? (
         <button className="btn btn-text btn-back" onClick={onBack}>
-          <ArrowLeftIcon /> Tillbaka
+          <ArrowLeftIcon /> {t("Tillbaka")}
         </button>
       ) : (
         <div className="app-bar">
@@ -73,12 +77,13 @@ export default function PublicCardScreen({
 
       <header className="public-card-head">
         <span className="brand-pill">
-          <span className="brand-dot" /> PUBLIKT TRUTH-CARD
+          <span className="brand-dot" /> {t("PUBLIK ANNONS")}
         </span>
-        <h1 className="public-card-title">Sök på Loopa-ID</h1>
+        <h1 className="public-card-title">{t("Sök på Loopa-ID")}</h1>
         <p className="muted small">
-          Varje truth-card hos Loopa är publikt och har ett eget ID, som står i annonsen. Slå upp det så
-          ser du hela besiktningen bakom priset: skicket, varje skada, måtten och källorna.
+          {t(
+            "Varje annons hos Loopa är publik och har ett eget ID, som står i Tradera-annonsen. Slå upp det så ser du hela besiktningen bakom priset: skicket, varje skada, måtten och källorna.",
+          )}
         </p>
       </header>
 
@@ -100,7 +105,7 @@ export default function PublicCardScreen({
           autoCorrect="off"
           autoCapitalize="characters"
           spellCheck={false}
-          aria-label="Loopa-ID"
+          aria-label={t("Loopa-ID")}
         />
         {query && (
           <button
@@ -111,14 +116,14 @@ export default function PublicCardScreen({
               setCard(null);
               setError(null);
             }}
-            aria-label="Rensa"
+            aria-label={t("Rensa")}
           >
             <CloseIcon size={12} />
           </button>
         )}
       </form>
       <button className="btn btn-primary public-card-submit" onClick={() => void lookup(query)} disabled={loading || !query.trim()}>
-        {loading ? "Söker…" : "Visa truth-card"}
+        {loading ? t("Söker…") : t("Visa annons")}
       </button>
 
       {error && !loading && <p className="public-card-error">{error}</p>}
@@ -127,9 +132,11 @@ export default function PublicCardScreen({
         <>
           <div className="public-card-meta">
             <span className="loopa-id-value">{card.loopaId}</span>
-            <span className="muted small">Besiktigat av Loopas AI {formatDate(card.createdAt)}</span>
+            <span className="muted small">
+              {t("Besiktigat av Loopas AI {datum}", { datum: formatDate(card.createdAt, lang) })}
+            </span>
           </div>
-          <TruthCardView
+          <ListingView
             card={card.card}
             identity={card.identity}
             grade={card.grade}
@@ -138,11 +145,12 @@ export default function PublicCardScreen({
             imageCount={card.imageCount}
             reviewed={card.reviewed}
             productImage={card.productImage}
+            cover={card.cover}
             loopaId={card.loopaId}
           />
           {card.tradera?.status === "published" && card.tradera.url && (
             <a className="btn btn-primary public-card-tradera" href={card.tradera.url} target="_blank" rel="noreferrer">
-              Se annonsen på Tradera
+              {t("Se annonsen på Tradera")}
             </a>
           )}
         </>
@@ -152,8 +160,20 @@ export default function PublicCardScreen({
           ingen väg vidare in i Loopa — inne i appen är knappen en väg tillbaka till där man står. */}
       {standalone && (
         <a className="public-card-cta" href="/">
-          Skickbedöm din egen möbel med Loopa
+          {t("Sälj din egen möbel med Loopa")}
         </a>
+      )}
+
+      {/* Samma villkor som knappen ovanför, av samma skäl. Den som läst ett Loopa-ID i en
+          Tradera-annons har inget konto och kommer aldrig till profilen, där foten annars står —
+          och det är HÄR chatten lagrar något i webbläsaren. Sidan som lagrar ska också vara sidan
+          som säger det. Inne i appen finns foten på profilen i stället. */}
+      {standalone && (
+        <footer className="legal-footer">
+          <LegalLink doc="privacy" />
+          <LegalLink doc="cookies" />
+          <LegalLink doc="terms" />
+        </footer>
       )}
     </div>
   );
@@ -164,6 +184,6 @@ export function publicCardIdFromLocation(): string | null {
   return loopaIdFromPath(window.location.pathname);
 }
 
-function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" });
+function formatDate(iso: string, lang: string): string {
+  return new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "long", year: "numeric" });
 }

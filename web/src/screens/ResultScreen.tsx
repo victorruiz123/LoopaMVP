@@ -11,16 +11,17 @@ import {
   DAMAGE_TYPE_OPTIONS,
   IMPACT_OPTIONS,
   SEVERITY_OPTIONS,
-  TYPE_LABELS,
-  SEVERITY_LABELS,
-  IMPACT_LABELS,
+  typeLabel,
+  severityLabel,
+  impactLabel,
 } from "../lib/labels";
 import { usePageTitle } from "../lib/pageTitle";
+import { t as translate, useLang, useT } from "../lib/i18n";
 
 /**
  * Skicket och skadorna — och EN väg vidare.
  *
- * Truth-cardet var förut en knapp bland tre: "se truth-card", "startsidan", "skanna en möbel till".
+ * Annonsen var förut en knapp bland tre: "se annonsen", "startsidan", "skanna en möbel till".
  * Tre knappar sida vid sida gör kortet till ett val, och ett val går att välja bort — säljaren kunde
  * skanna färdigt utan att någonsin se det kort som är hela produkten. Kortet är inte ett tillval till
  * besiktningen, det ÄR vad besiktningen blir, så det är det enda steget härifrån.
@@ -34,10 +35,12 @@ export default function ResultScreen({
 }: {
   jobId: string;
   onHome: () => void;
-  /** Vidare till truth-cardet. Får resultatet med sig, så steget aldrig kan falla på en hämtning. */
+  /** Vidare till annonsen. Får resultatet med sig, så steget aldrig kan falla på en hämtning. */
   onContinue: (result: ConditionResult) => void;
 }) {
   const [result, setResult] = useState<ConditionResult | null>(null);
+  const t = useT();
+  const { lang } = useLang();
   usePageTitle("Skickbedömning");
   const [imagesExpanded, setImagesExpanded] = useState(false);
   const [viewer, setViewer] = useState<{ damage: Damage; index: number } | null>(null);
@@ -75,7 +78,7 @@ export default function ResultScreen({
     return (
       <div className="screen screen-light center-column">
         <div className="spinner" />
-        <p>Laddar resultat…</p>
+        <p>{t("Laddar resultat…")}</p>
       </div>
     );
   }
@@ -102,11 +105,15 @@ export default function ResultScreen({
       setResult(r.result);
       setVerdict({
         tone: r.verdict === "REMOVE" ? "good" : "warn",
-        title: r.verdict === "REMOVE" ? "Skadan togs bort" : "Skadan står kvar",
+        title: r.verdict === "REMOVE" ? t("Skadan togs bort") : t("Skadan står kvar"),
         reason: r.reason,
       });
     } catch (err) {
-      setVerdict({ tone: "warn", title: "Kunde inte bedöma", reason: err instanceof Error ? err.message : "Något gick fel." });
+      setVerdict({
+        tone: "warn",
+        title: t("Kunde inte bedöma"),
+        reason: err instanceof Error ? err.message : t("Något gick fel."),
+      });
     } finally {
       setDisputing(null);
     }
@@ -124,11 +131,15 @@ export default function ResultScreen({
       setResult(r.result);
       setVerdict({
         tone: r.added ? "good" : "warn",
-        title: r.added ? "Skadan lades till" : "Ingen skada hittades i bilden",
+        title: r.added ? t("Skadan lades till") : t("Ingen skada hittades i bilden"),
         reason: r.reason,
       });
     } catch (err) {
-      setVerdict({ tone: "warn", title: "Kunde inte bedöma", reason: err instanceof Error ? err.message : "Något gick fel." });
+      setVerdict({
+        tone: "warn",
+        title: t("Kunde inte bedöma"),
+        reason: err instanceof Error ? err.message : t("Något gick fel."),
+      });
     } finally {
       setAddingFromPhoto(false);
     }
@@ -146,7 +157,7 @@ export default function ResultScreen({
   return (
     <div className="screen screen-light result-screen">
       <button className="btn btn-text btn-back" onClick={onHome}>
-        <ArrowLeftIcon /> Startsidan
+        <ArrowLeftIcon /> {t("Startsidan")}
       </button>
 
       <FlowSteps current={4} />
@@ -172,30 +183,36 @@ export default function ResultScreen({
         {result.reviewPending && (
           <div className="review-banner">
             <span className="review-spinner" aria-hidden="true" />
-            Andrabesiktningen pågår — listan kan ändras när den är klar.
+            {t("Andrabesiktningen pågår — listan kan ändras när den är klar.")}
           </div>
         )}
 
         {/* Kortet är ett attest. Det ska säga vad det bygger på — antal vyer, hur många besiktningar,
             när — i stället för att låta läsaren anta det starkare alternativet. */}
         <p className="provenance">
-          {result.images.length} {result.images.length === 1 ? "vy" : "vyer"} ·{" "}
-          {result.reviewed ? "två besiktningar" : "en besiktning"} ·{" "}
-          {new Date(result.createdAt).toLocaleString("sv-SE", { dateStyle: "short", timeStyle: "short" })}
+          {result.images.length === 1
+            ? t("{antal} vy", { antal: result.images.length })
+            : t("{antal} vyer", { antal: result.images.length })}{" "}
+          · {result.reviewed ? t("två besiktningar") : t("en besiktning")} ·{" "}
+          {new Date(result.createdAt).toLocaleString(lang, { dateStyle: "short", timeStyle: "short" })}
         </p>
       </div>
 
       {/* Fynden och vad man gör med dem. Datorvyns högerspalt. */}
       <div className="result-main">
         <h3 className="damage-summary-line">
-          {activeCount === 0 ? "Vi hittade inga tydliga skador" : `Vi hittade ${activeCount} synlig${activeCount === 1 ? "" : "a"} skad${activeCount === 1 ? "a" : "or"}`}
+          {activeCount === 0
+            ? t("Vi hittade inga tydliga skador")
+            : activeCount === 1
+              ? t("Vi hittade {antal} synlig skada", { antal: activeCount })
+              : t("Vi hittade {antal} synliga skador", { antal: activeCount })}
         </h3>
 
         <div className="damage-groups">
           {groupByType(visible).map(({ type, items }) => (
             <div key={type} className="damage-group">
               <div className="damage-group-header">
-                {TYPE_LABELS[type]} — {items.filter((d) => d.sellerAction !== "rejected").length}
+                {typeLabel(type)} — {items.filter((d) => d.sellerAction !== "rejected").length}
               </div>
               <div className="damage-list">
                 {items.map((d) => (
@@ -220,11 +237,11 @@ export default function ResultScreen({
           <div className="add-damage-actions">
             <button className="btn btn-text icon-btn" onClick={() => addPhotoInputRef.current?.click()} disabled={addingFromPhoto}>
               <CameraIcon size={17} />
-              {addingFromPhoto ? "Bedömer närbilden…" : "Lägg till skada med närbild"}
+              {addingFromPhoto ? t("Bedömer närbilden…") : t("Lägg till skada med närbild")}
             </button>
             <button className="btn btn-text icon-btn" onClick={() => setAddingDamage(true)}>
               <PlusIcon size={16} />
-              Lägg till för hand
+              {t("Lägg till för hand")}
             </button>
           </div>
         ) : (
@@ -244,21 +261,21 @@ export default function ResultScreen({
               <AlertIcon size={17} />
             </span>
             <span>
-              Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.
+              {t("Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.")}
               {result.coverageNote ? ` ${result.coverageNote}` : ""}
             </span>
           </div>
         )}
 
         <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
-          <span>Se truth-cardet</span>
+          <span>{t("Se annonsen")}</span>
           <span className="next-step-meta">
-            {result.listing?.status === "pending" ? "skapas…" : result.listing?.status === "ok" ? "klart" : ""}
+            {result.listing?.status === "pending" ? t("skapas…") : result.listing?.status === "ok" ? t("klart") : ""}
             <ChevronRight size={18} />
           </span>
         </button>
         <p className="form-hint">
-          Sista steget. Kortet är det köparen ser — skadorna du rättat här följer med dit.
+          {t("Sista steget före försäljningen. Annonsen är det köparen ser — skadorna du rättat här följer med dit.")}
         </p>
       </div>
 
@@ -266,7 +283,7 @@ export default function ResultScreen({
         <button className="collapsible-header" onClick={() => setImagesExpanded((v) => !v)}>
           <span className="collapsible-title collapsible-title-icon">
             <PhotosIcon size={17} />
-            Tagna bilder
+            {t("Tagna bilder")}
           </span>
           <span className="collapsible-meta">
             {result.images.length}
@@ -306,7 +323,7 @@ export default function ResultScreen({
         <div className={`dispute-verdict dispute-${verdict.tone}`} onClick={() => setVerdict(null)}>
           <strong>{verdict.title}</strong>
           <p>{verdict.reason}</p>
-          <span className="muted small">Tryck för att stänga</span>
+          <span className="muted small">{t("Tryck för att stänga")}</span>
         </div>
       )}
 
@@ -329,7 +346,7 @@ function fileToDataUrl(file: File): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = () => resolve(String(reader.result));
-    reader.onerror = () => reject(new Error("Kunde inte läsa bilden."));
+    reader.onerror = () => reject(new Error(translate("Kunde inte läsa bilden.")));
     reader.readAsDataURL(file);
   });
 }
@@ -355,6 +372,7 @@ function AddDamageForm({
   onCancel: () => void;
   onSave: (damage: Pick<Damage, "type" | "part" | "semanticLocation" | "severity" | "impact" | "description">) => void;
 }) {
+  const t = useT();
   const [type, setType] = useState<Damage["type"]>("scratch");
   const [part, setPart] = useState("");
   const [severity, setSeverity] = useState<Damage["severity"]>("S1");
@@ -365,53 +383,57 @@ function AddDamageForm({
     <div className="damage-card">
       <div className="damage-card-body">
         <label>
-          Typ
+          {t("Typ")}
           <select value={type} onChange={(e) => setType(e.target.value as Damage["type"])}>
             {DAMAGE_TYPE_OPTIONS.map((t) => (
               <option key={t} value={t}>
-                {TYPE_LABELS[t]}
+                {typeLabel(t)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Del
-          <input value={part} onChange={(e) => setPart(e.target.value)} placeholder="t.ex. vänster armstöd" />
+          {t("Del")}
+          <input
+            value={part}
+            onChange={(e) => setPart(e.target.value)}
+            placeholder={t("t.ex. vänster armstöd")}
+          />
         </label>
         <label>
-          Allvarlighet
+          {t("Allvarlighet")}
           <select value={severity} onChange={(e) => setSeverity(e.target.value as Damage["severity"])}>
             {SEVERITY_OPTIONS.map((s) => (
               <option key={s} value={s}>
-                {SEVERITY_LABELS[s]}
+                {severityLabel(s)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Typ av påverkan
+          {t("Typ av påverkan")}
           <select value={impact} onChange={(e) => setImpact(e.target.value as Damage["impact"])}>
             {IMPACT_OPTIONS.map((i) => (
               <option key={i} value={i}>
-                {IMPACT_LABELS[i]}
+                {impactLabel(i)}
               </option>
             ))}
           </select>
         </label>
         <label>
-          Beskrivning
+          {t("Beskrivning")}
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} />
         </label>
         <div className="damage-card-actions">
           <button className="btn btn-text" onClick={onCancel}>
-            Avbryt
+            {t("Avbryt")}
           </button>
           <button
             className="btn btn-primary btn-small"
             disabled={!part || !description}
             onClick={() => onSave({ type, part, semanticLocation: "", severity, impact, description })}
           >
-            Lägg till
+            {t("Lägg till")}
           </button>
         </div>
       </div>

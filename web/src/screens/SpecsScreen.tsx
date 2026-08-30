@@ -6,6 +6,7 @@ import FlowSteps from "../components/FlowSteps";
 import FurnitureRender from "../components/FurnitureRender";
 import { archetypeFor, buildModel, parseDimensions } from "../lib/furnitureModel";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 /** Måttraderna i den ordning en möbel mäts, inte i den ordning källan råkade lista dem. */
 const DIM_ROWS: [RegExp, string][] = [
@@ -30,7 +31,7 @@ const STATUS_LABELS: Record<string, string> = {
  * Annonsen, som den ser ut direkt efter modellvalet.
  *
  * NYPRIS VISAS INTE. Det är ett medvetet produktval: säljaren ska förhålla sig till vad möbeln är
- * värd i dag, inte till vad den kostade ny. Fältet finns kvar i datan och i truth-cardets underlag —
+ * värd i dag, inte till vad den kostade ny. Fältet finns kvar i datan och i annonsens underlag —
  * det är bara den här skärmen som håller det utanför.
  */
 export default function SpecsScreen({
@@ -42,7 +43,8 @@ export default function SpecsScreen({
   onNext: () => void;
   onBack: () => void;
 }) {
-  const name = card.identity.exactProduct ?? card.identity.variant ?? "Möbel";
+  const t = useT();
+  const name = card.identity.exactProduct ?? card.identity.variant ?? t("Möbel");
   usePageTitle("Mått och specifikationer");
   // Raderna visar attributets EGEN text ("80–82 cm"), inte ett avrundat tal: det säljaren ska
   // kontrollera mot sin tumstock är det källan påstod.
@@ -50,11 +52,18 @@ export default function SpecsScreen({
     (r) => r.attr,
   );
   /**
-   * Samma modell och samma vy som truth-cardet ritar möbeln i.
+   * Samma modell och samma vy som annonsen ritar möbeln i.
    *
    * Måttsteget hade förut en egen, enklare figur. Två figurer av samma möbel i samma flöde är en för
    * mycket: säljaren ska känna igen bilden när den kommer tillbaka på kortet, och det gör hen bara
    * om det är samma bild.
+   *
+   * Här står den STILL — en bild snett framifrån, inte en figur att vrida på. Frågan under är
+   * "kan det stämma?", och den besvaras med tumstocken i handen mot de tre talen i listan. Att
+   * svänga in möbeln och vagga vidare med den lade en sekund framför en bild som ändå skulle läsas
+   * i vila, och bjöd in till en runda kring en möbel som inte har något på baksidan att visa. Först
+   * på kortet, där skadorna sitter som numrerade punkter, finns det något att vrida fram — och där
+   * rör den sig fortfarande.
    */
   const model = useMemo(() => {
     const archetype = archetypeFor(card.identity.category, card.listing.title);
@@ -68,12 +77,16 @@ export default function SpecsScreen({
       : null;
   }, [card]);
   const hasDims = dimRows.length > 0 || !!model;
+  // Ingen källa gav några mått, så de här kommer ur tabellen över typiska mått för möbeltypen. Frågan
+  // under rubriken är densamma — kan det stämma? — men säljaren ska veta att det är en gissning hen
+  // rättar, inte en uppgift hen kontrollerar.
+  const dimsEstimated = dimRows.length > 0 && dimRows.every((r) => r.attr!.estimated);
   // Måtten bor i sitt eget segment — de ska inte stå två gånger på samma skärm.
   const other = card.attributes.filter((a) => !DIM_LABEL.test(a.label));
   return (
     <div className="screen screen-light specs-screen">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> Byt modell
+        <ArrowLeftIcon /> {t("Byt modell")}
       </button>
 
       <header className="specs-head">
@@ -82,8 +95,8 @@ export default function SpecsScreen({
           {card.identity.brand && <BrandAvatar name={card.identity.brand} size={30} />}
           <span>{name}</span>
         </div>
-        <div className={`truth-confidence truth-confidence-${card.status ?? "partial"}`}>
-          {STATUS_LABELS[card.status ?? "partial"] ?? card.status}
+        <div className={`card-confidence card-confidence-${card.status ?? "partial"}`}>
+          {t(STATUS_LABELS[card.status ?? "partial"] ?? card.status ?? "")}
         </div>
       </header>
 
@@ -93,19 +106,28 @@ export default function SpecsScreen({
         {/* Måtten får ett eget segment. De är det säljaren lättast kan kontrollera mot verkligheten —
             en tumstock räcker — och därför också det enda vi frågar rakt ut om. */}
         {hasDims && (
-          <section className="truth-block dim-block">
-            <h3>Måtten</h3>
-            <p className="dim-question">Såhär blev måtten. Kan det stämma?</p>
+          <section className="card-block dim-block">
+            <h3>{t("Måtten")}</h3>
+            <p className="dim-question">
+              {dimsEstimated
+                ? t(
+                    "Måtten gick inte att belägga mot någon källa. Det här är typiska mått för möbeltypen — stämmer de?",
+                  )
+                : t("Såhär blev måtten. Kan det stämma?")}
+            </p>
             {model && (
               <div className="dim-render">
-                <FurnitureRender model={model} />
+                <FurnitureRender model={model} still />
               </div>
             )}
             <dl className="dim-list">
               {dimRows.map(({ label, attr }) => (
                 <div key={label} className="dim-row">
-                  <dt>{label}</dt>
-                  <dd>{attr!.value}</dd>
+                  <dt>{t(label)}</dt>
+                  <dd>
+                    {attr!.value}
+                    {attr!.estimated && <span className="card-est">{t("uppskattat")}</span>}
+                  </dd>
                 </div>
               ))}
             </dl>
@@ -113,18 +135,20 @@ export default function SpecsScreen({
         )}
 
         {other.length > 0 ? (
-          <section className="truth-block">
-            <h3>Specifikationer</h3>
-            <dl className="truth-specs">
+          <section className="card-block">
+            <h3>{t("Specifikationer")}</h3>
+            <dl className="card-specs">
               {other.map((a) => (
-                <div key={a.key + a.label} className="truth-spec">
+                <div key={a.key + a.label} className="card-spec">
                   <dt>{a.label}</dt>
                   <dd>
                     {a.value}
-                    {a.sourceUrl && (
-                      <a className="truth-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
-                        källa
+                    {a.sourceUrl ? (
+                      <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
+                        {t("källa")}
                       </a>
+                    ) : (
+                      a.estimated && <span className="card-est">{t("uppskattat")}</span>
                     )}
                   </dd>
                 </div>
@@ -132,22 +156,22 @@ export default function SpecsScreen({
             </dl>
           </section>
         ) : (
-          <section className="truth-block">
-            <h3>Specifikationer</h3>
-            <p className="muted small">Inga specifikationer kunde beläggas mot en källa.</p>
+          <section className="card-block">
+            <h3>{t("Specifikationer")}</h3>
+            <p className="muted small">{t("Inga specifikationer kunde beläggas mot en källa.")}</p>
           </section>
         )}
       </div>
 
-      <section className="truth-block">
-        <h3>Annonstext</h3>
-        <div className="truth-listing-title">{card.listing.title}</div>
-        <p className="truth-listing-body">{card.listing.description}</p>
+      <section className="card-block">
+        <h3>{t("Annonstext")}</h3>
+        <div className="card-listing-title">{card.listing.title}</div>
+        <p className="card-listing-body">{card.listing.description}</p>
       </section>
 
       {card.missingNotes && card.missingNotes.length > 0 && (
-        <section className="truth-block truth-missing">
-          <h3>Kunde inte bekräftas</h3>
+        <section className="card-block card-missing">
+          <h3>{t("Kunde inte bekräftas")}</h3>
           <ul>
             {card.missingNotes.map((n, i) => (
               <li key={i}>{n}</li>
@@ -157,7 +181,7 @@ export default function SpecsScreen({
       )}
 
       <button className="btn btn-primary next-step" onClick={onNext}>
-        <span>Se prisförslaget</span>
+        <span>{t("Se prisförslaget")}</span>
         <span className="next-step-meta">
           <ChevronRight size={18} />
         </span>

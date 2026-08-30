@@ -2,7 +2,8 @@ import { useState } from "react";
 import { ArrowLeftIcon, MinusIcon, PlusIcon } from "./icons";
 import { imageUrl } from "../api";
 import type { CapturedImage, Damage } from "../types";
-import { TYPE_LABELS } from "../lib/labels";
+import { typeLabel } from "../lib/labels";
+import { useT } from "../lib/i18n";
 
 const ZOOM_LEVELS = [100, 150, 250, 400];
 
@@ -19,6 +20,7 @@ export default function EvidenceViewer({
   startIndex: number;
   onClose: () => void;
 }) {
+  const t = useT();
   const [index, setIndex] = useState(startIndex);
   const [zoomIdx, setZoomIdx] = useState(0);
   const [drag, setDrag] = useState({ x: 0, y: 0 });
@@ -71,18 +73,18 @@ export default function EvidenceViewer({
     <div className="evidence-viewer">
       <div className="evidence-viewer-top">
         <button className="btn btn-ghost" onClick={onClose}>
-          <ArrowLeftIcon /> Tillbaka
+          <ArrowLeftIcon /> {t("Tillbaka")}
         </button>
         <div className="evidence-viewer-title">
-          {TYPE_LABELS[damage.type] ?? damage.type}
-          {imgMeta?.viewLabel ? ` · ${imgMeta.viewLabel}` : ""}
+          {typeLabel(damage.type) ?? damage.type}
+          {imgMeta?.viewLabel ? ` · ${t(imgMeta.viewLabel)}` : ""}
         </div>
         <div className="zoom-controls">
-          <button onClick={zoomOut} aria-label="Zooma ut">
+          <button onClick={zoomOut} aria-label={t("Zooma ut")}>
             <MinusIcon size={15} />
           </button>
           <span>{zoom}%</span>
-          <button onClick={zoomIn} aria-label="Zooma in">
+          <button onClick={zoomIn} aria-label={t("Zooma in")}>
             <PlusIcon size={15} />
           </button>
         </div>
@@ -125,7 +127,7 @@ export default function EvidenceViewer({
               key={i}
               type="button"
               className={`evidence-dot ${i === index ? "active" : ""}`}
-              aria-label={`Bild ${i + 1} av ${damage.evidence.length}`}
+              aria-label={t("Bild {nr} av {antal}", { nr: i + 1, antal: damage.evidence.length })}
               aria-current={i === index}
               onClick={() => {
                 setIndex(i);

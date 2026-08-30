@@ -20,6 +20,8 @@ export interface RunResult {
 }
 
 const BASE = "http://localhost:8799";
+// /api kräver identitet sedan auth-grinden kom på plats; harnesset använder maskinkontot.
+const AUTH = { "x-api-key": process.env.CONDITION_SERVICE_KEY ?? "" };
 
 /** 503 och timeout betyder att modellen aldrig svarade — jämför inte mot ett fallet anrop. */
 function invalidity(job: { progress: { stage: string }; error: string | null }): string | null {
@@ -33,7 +35,7 @@ function invalidity(job: { progress: { stage: string }; error: string | null }):
 export async function waitForJob(jobId: string, timeoutMs = 240_000): Promise<RunResult["result"] | null> {
   const until = Date.now() + timeoutMs;
   while (Date.now() < until) {
-    const job = await (await fetch(`${BASE}/api/jobs/${jobId}`)).json();
+    const job = await (await fetch(`${BASE}/api/jobs/${jobId}`, { headers: AUTH })).json();
     if (job.progress.stage === "error") return null;
     if (job.result && !job.result.reviewPending) return job.result as ConditionResult;
     await new Promise((r) => setTimeout(r, 1500));
@@ -42,7 +44,7 @@ export async function waitForJob(jobId: string, timeoutMs = 240_000): Promise<Ru
 }
 
 export async function jobState(jobId: string) {
-  return (await (await fetch(`${BASE}/api/jobs/${jobId}`)).json()) as {
+  return (await (await fetch(`${BASE}/api/jobs/${jobId}`, { headers: AUTH })).json()) as {
     progress: { stage: string };
     error: string | null;
     result: ConditionResult | null;

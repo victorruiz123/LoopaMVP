@@ -124,6 +124,15 @@ function gradeFromOverallCondition(oc: OverallCondition): { grade: ConditionGrad
   return { grade, reasons };
 }
 
+/**
+ * STÅR fyndet kvar? Ett underkänt fynd räknas inte i betyget, prissätts inte, står inte på kortet och
+ * följer inte med till annonsen — den regeln fanns tidigare bara här i betyget, och kortet visade
+ * därför anmärkningar som ingen del av bedömningen längre trodde på.
+ */
+export function damageStands(d: Damage): boolean {
+  return effectiveVerification(d) === "CONFIRMED";
+}
+
 function effectiveVerification(d: Damage): "CONFIRMED" | "REJECTED" | "UNCERTAIN" {
   if (d.sellerAction === "rejected") return "REJECTED";
   if (d.sellerAction === "confirmed" || d.sellerAction === "corrected") return "CONFIRMED";

@@ -9,10 +9,17 @@ import type { IncomingMessage } from "node:http";
  *
  * Ingen hemlighet behövs — /auth/v1/user tar den publika anon-nyckeln och den token som ska prövas.
  */
-const SUPABASE_URL = process.env.SUPABASE_URL ?? "https://tyxqxodnfyzxpwdgtypd.supabase.co";
-const SUPABASE_ANON_KEY =
-  process.env.SUPABASE_ANON_KEY ??
+const DEFAULT_URL = "https://tyxqxodnfyzxpwdgtypd.supabase.co";
+const DEFAULT_ANON_KEY =
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5eHF4b2RuZnl6eHB3ZGd0eXBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyOTI1MzcsImV4cCI6MjA3Mzg2ODUzN30.Oql80KZxvtdXEYK_J_7xxGDJAfEvzEPQ7FK1_G7gJqY";
+
+/**
+ * Läses LAT, av samma skäl som hemligheten i identity.ts: server.ts kallar process.loadEnvFile i sin
+ * egen kropp, och ESM kör varje import före den. En konstant på toppnivå här hade alltid sett en tom
+ * miljö, och en överskrivning i server/.env hade tyst fallit tillbaka på förvalet nedan.
+ */
+export const supabaseUrl = () => process.env.SUPABASE_URL || DEFAULT_URL;
+export const supabaseAnonKey = () => process.env.SUPABASE_ANON_KEY || DEFAULT_ANON_KEY;
 
 export interface SupabaseUser {
   id: string;
@@ -27,7 +34,8 @@ export interface SupabaseUser {
 const TTL_MS = 5 * 60 * 1000;
 const cache = new Map<string, { user: SupabaseUser; expires: number }>();
 
-function bearer(req: IncomingMessage): string | null {
+/** Token anropet bär, om det bär något. Adminvägarna behöver den rå för att fråga Supabase i tur. */
+export function bearerToken(req: IncomingMessage): string | null {
   const header = req.headers.authorization;
   const value = Array.isArray(header) ? header[0] : header;
   if (!value?.startsWith("Bearer ")) return null;
@@ -35,15 +43,15 @@ function bearer(req: IncomingMessage): string | null {
 }
 
 export async function userFromRequest(req: IncomingMessage): Promise<SupabaseUser | null> {
-  const token = bearer(req);
+  const token = bearerToken(req);
   if (!token) return null;
 
   const hit = cache.get(token);
   if (hit && hit.expires > Date.now()) return hit.user;
 
   try {
-    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
-      headers: { Authorization: `Bearer ${token}`, apikey: SUPABASE_ANON_KEY },
+    const res = await fetch(`${supabaseUrl()}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey() },
     });
     if (!res.ok) return null;
     const body = (await res.json()) as { id?: string; email?: string | null };

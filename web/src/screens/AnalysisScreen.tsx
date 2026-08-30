@@ -5,6 +5,7 @@ import { explainError } from "../lib/errors";
 import type { CapturedShot } from "../api";
 import type { AnalysisStage, ConditionJob, FurnitureIdentity } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
+import { useT } from "../lib/i18n";
 
 const CHECKLIST: { stage: AnalysisStage; label: string }[] = [
   { stage: "preparing", label: "Bilder förberedda" },
@@ -31,6 +32,7 @@ export default function AnalysisScreen({
   onAbort: () => void;
 }) {
   const [job, setJob] = useState<ConditionJob | null>(null);
+  const t = useT();
   usePageTitle("Analyserar möbeln");
   const [retrying, setRetrying] = useState(false);
   const [retryError, setRetryError] = useState<string | null>(null);
@@ -70,7 +72,7 @@ export default function AnalysisScreen({
       setJob(null);
       setAttempt((n) => n + 1);
     } catch (err) {
-      setRetryError(err instanceof Error ? err.message : "Kunde inte starta om analysen.");
+      setRetryError(err instanceof Error ? err.message : t("Kunde inte starta om analysen."));
     } finally {
       setRetrying(false);
     }
@@ -94,15 +96,15 @@ export default function AnalysisScreen({
           <p className="failure-body">{explained.body}</p>
           {explained.retryable && (
             <button className="btn btn-primary" onClick={handleRetry} disabled={retrying}>
-              {retrying ? "Startar om…" : "Försök igen"}
+              {retrying ? t("Startar om…") : t("Försök igen")}
             </button>
           )}
           <button className="btn btn-text failure-secondary" onClick={onAbort}>
-            Tillbaka till start
+            {t("Tillbaka till start")}
           </button>
           {retryError && <p className="error-text">{retryError}</p>}
           <details className="failure-details">
-            <summary>Tekniska detaljer</summary>
+            <summary>{t("Tekniska detaljer")}</summary>
             <code>{job.error}</code>
           </details>
         </div>
@@ -136,7 +138,7 @@ export default function AnalysisScreen({
                 <span className="checklist-marker">
                   {state === "done" ? <CheckCircleIcon size={17} /> : <span className="checklist-dot" />}
                 </span>
-                {c.label}
+                {t(c.label)}
               </li>
             );
           })}

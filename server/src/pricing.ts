@@ -7,6 +7,7 @@ import type {
   PriceEstimate,
   Severity,
 } from "./types.js";
+import { damageStands } from "./pipeline/grade.js";
 
 const PRICE_ENGINE_URL = (process.env.PRICE_ENGINE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 const PRICE_ENGINE_API_KEY = process.env.PRICE_ENGINE_API_KEY ?? null;
@@ -29,15 +30,29 @@ const SEND_COVER_IMAGE = process.env.PRICE_ENGINE_USE_IMAGE === "1";
 /**
  * Condition damage type -> the price engine's own deduction category.
  *
- * Deliberately PARTIAL. The engine values a damage only through a category in its table, and a wrong
- * category is worse than none: it moves real money on a guess. Everything mapped here is an unambiguous
- * one-to-one; everything else is sent as Swedish free text and left to the engine's own synonym matcher
- * (`damage_pricing.match_category`), which either finds a category or records the finding as
- * `no_valuation` — listed, but costing nothing.
+ * Still PARTIAL, and for the same reason as before: the engine values a damage only through a category
+ * in its table, and a wrong category is worse than none — it moves real money on a guess. What is
+ * mapped here is a synonym of a row that already exists, nothing more.
+ *
+ * MÄTT, och skälet till att luckorna täpptes till: en NORDVIKEN-stol gav fyra fynd över nitton
+ * körningar, varav TVÅ på S2 — `worn_material` på ryggstödet och `abrasion` på fotstödet. Båda saknade
+ * kategori, gick som fritext, och kom tillbaka `no_valuation`: noll kronor. Samma stol dagen innan,
+ * när inspektionen råkade skriva `scuff` om exakt samma ryggstöd, gav `repa_hard` grad 2 och 6 % i
+ * avdrag. Skillnaden i pris låg alltså i vilket ORD modellen valde, inte i möbelns skick — och
+ * `abrasion` mot `scuff` är inte två skador, det är två ord för nötning.
+ *
+ * Kvar utanför med flit: `pilling` och `fraying`. De är textilslitage, och tabellen har ingen rad för
+ * det. Varje befintlig rad vore fel — `reva_hal` (14–30 %) tar betalt för ett hål som inte finns, och
+ * `nedsutten` betyder tappad FORM, inte nött yta. De ska ha en egen mätt rad i tabellen, inte lånas in
+ * i någon annans. `other` står utanför av samma skäl: en catch-all har ingen innebörd att mappa.
  */
 const CATEGORY_BY_TYPE: Partial<Record<DamageType, string>> = {
   scratch: "repa_hard",
   scuff: "repa_hard",
+  // Nötning är samma yta och samma rad som scuff — "Repa i trä/lack/metall".
+  abrasion: "repa_hard",
+  worn_material: "repa_hard",
+  general_wear: "repa_hard",
   chip: "repa_hard",
   dent: "repa_hard",
   tear: "reva_hal",
@@ -45,10 +60,18 @@ const CATEGORY_BY_TYPE: Partial<Record<DamageType, string>> = {
   stain: "flack",
   discoloration: "missfargning",
   fading: "missfargning",
+  // Rost och korrosion har ingen egen rad. `missfargning` är den närmaste MÄTTA raden och rätt
+  // storleksordning för en rostfläck på ett stolsben: kosmetisk, 7 % synlig / 16 % framträdande.
+  rust: "missfargning",
+  corrosion: "missfargning",
   compressed_upholstery: "nedsutten",
   sagging: "nedsutten",
+  // "Nedsutten / tappad form" är precis vad en deformation är.
+  deformation: "nedsutten",
   peeling_flaking: "skinnflagning",
   loose_component: "stomskada",
+  broken_component: "stomskada",
+  crack: "stomskada",
   structural_damage: "stomskada",
   missing_part: "saknad_del",
 };
@@ -63,16 +86,18 @@ const LEATHER_WORDS = /\b(skinn|läder|lader|leather)/i;
  */
 const GRADE_BY_SEVERITY: Record<Severity, number> = { S1: 0, S2: 1, S3: 2, S4: 2 };
 
-function isPriceable(d: Damage): boolean {
-  if (d.sellerAction === "rejected") return false;
-  if (d.sellerAction === "confirmed" || d.sellerAction === "corrected") return true;
-  // NOT_RUN = aldrig granskad, inte underkänd. Fyndet ska värderas som det rapporterades.
-  return d.verification === "CONFIRMED" || d.verification === "NOT_RUN";
-}
+// NOT_RUN = aldrig granskad, inte underkänd. Fyndet ska värderas som det rapporterades — se
+// damageStands, som är samma regel betyget använder.
+const isPriceable = damageStands;
 
 function categoryFor(d: Damage): string | undefined {
+  const leather = LEATHER_WORDS.test(`${d.part} ${d.description}`);
+  // En spricka i skinn är sprucket skinn, inte en skadad stomme. Villkoret sitter på TYPEN och inte
+  // på kategorin: `structural_damage` i en skinnsoffas ram är fortfarande en stomskada, och en regel
+  // som läste kategorin hade flyttat även den till skinnraden.
+  if (d.type === "crack" && leather) return "skinnflagning";
   const category = CATEGORY_BY_TYPE[d.type];
-  if (category === "repa_hard" && LEATHER_WORDS.test(`${d.part} ${d.description}`)) return "repa_skinn";
+  if (category === "repa_hard" && leather) return "repa_skinn";
   return category;
 }
 

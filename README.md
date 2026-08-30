@@ -325,9 +325,9 @@ Säljaren skriver **bara märket**. Modellen letar systemet upp ur bilderna och 
 upp till fyra kandidater, "är det någon av dessa?", plus möjligheten att skriva namnet själv.
 
 Ordningen är omvänd mot tidigare. Förut skrevs modellen för hand först, och identifieringen låg SIST —
-i truth-cardet, där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris
+i annonsen, där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris
 redan räknats på den. Nu: märke -> bilder -> **välj modell** -> specifikationer -> pris -> skick ->
-truth-card.
+annons.
 
 Maskineriet kommer från `loopa-landing-page-main` och **anropas, inte kopieras**:
 `_shared/seller-candidates.ts` läser `KANDIDAT:`-rader ur den grundade sökningen, och
@@ -359,10 +359,10 @@ modellen och skadelistan. Kedjade betydde det att prissättningen inte ens börj
 klar: den stod still i 13-20 sekunder medan säljaren läste specifikationerna, för att sedan ta sina
 tio när de klickade vidare. Nu löper de bredvid varandra.
 
-**Nypris visas inte**, varken i specifikationerna eller i truth-cardet. Säljaren ska förhålla sig till
+**Nypris visas inte**, varken i specifikationerna eller i annonsen. Säljaren ska förhålla sig till
 vad möbeln är värd i dag. Fältet finns kvar i datan.
 
-## Truth-cardet
+## Annonsen
 
 Tredje motorn i flödet: `loopa-landing-page-main` tar bildrutorna och märket och letar upp VAD möbeln
 är — exakt modell, mått, material, nypris — och skriver en färdig annonstext, med källor.
@@ -398,13 +398,13 @@ anrop, och ett Gemini-avbrott i den ena ska inte kasta arbete den andra redan be
 
 ### Ordningen på skärmen
 
-**Pris → skick → truth-card.** Priset visas först men räknas *sist*: prismotorn drar av för skadorna,
+**Pris → skick → annons.** Priset visas först men räknas *sist*: prismotorn drar av för skadorna,
 så en siffra hämtad innan skickgraderingen är klar är en annan siffra än den riktiga. Prisvyn väntar
 därför in `reviewPending: false` innan den visar något tal alls. Ett preliminärt pris som sedan sjunker
 läser som ett svek även när det är riktigare.
 
 Generatorn svarar hellre degraderat än med fel — `status` säger `full`, `partial` eller `fallback`, och
-truth-cardet visar det på kortet i stället för i en fotnot. En annons där måtten är gissade ska inte se
+annonsen visar det på kortet i stället för i en fotnot. En annons där måtten är gissade ska inte se
 likadan ut som en där de har en källa.
 
 ## Prissättningen
@@ -442,6 +442,42 @@ ur betyget men fortfarande dras av från priset finns inte.
 
 Går prismotorn inte att nå vid en omräkning behålls det gamla priset med en notering. Ett inaktuellt tal
 med en förklaring är bättre än att blanka ut ett tal säljaren redan tittade på.
+
+## Juridik och samtycke
+
+Tre dokument ligger på egna adresser i webbappen — `/integritetspolicy`, `/cookies` och `/villkor`.
+De läses ur adressen på samma sätt som det publika kortet (appen har ingen router) och länkas alltid
+i en **ny flik**: villkorslänken står på inloggningen mitt i säljflödet, där säljarens filmade
+bildrutor ligger i minnet och en vanlig navigering hade kastat bort dem.
+
+| Fil | Vad |
+|---|---|
+| `web/src/lib/legal.ts` | Adresserna, datumet och den personuppgiftsansvariges uppgifter. |
+| `web/src/lib/consent.ts` | Samtycket, och städningen när det tas tillbaka. |
+| `web/src/components/CookieConsent.tsx` | Rutan. |
+| `web/src/screens/legal/` | De tre texterna. |
+
+**`CONTROLLER` i `lib/legal.ts` innehåller platshållare** — firmanamn, organisationsnummer och
+postadress. GDPR artikel 13 kräver dem, och de står kvar som `[FYLL I: …]` med flit: ett påhittat
+organisationsnummer i en integritetspolicy vore värre än ett tomt fält. Fyll i dem innan appen möter
+riktiga säljare.
+
+### Vad rutan faktiskt styr
+
+Appen har ingen analys, ingen mätpixel och ingen annonsspårning, så rutan har inga kryssrutor för
+sådant. Kvar blir två sorter:
+
+- **Nödvändigt** — `loopa_media` (bildkakan, `server/src/identity.ts`), Supabase inloggningstoken,
+  själva samtyckesvalet, och `loopa.view-mode`. Kräver inget samtycke.
+- **Funktionellt** — `loopa-card-chat:<Loopa-ID>`, chatthistoriken på det publika kortet. Kräver
+  samtycke, och `ListingChat` prövar det vid varje skrivning. Ett återkallat ja **raderar** det som
+  redan lagrats — se `purgeFunctional` i `consent.ts`.
+
+Lägger någon till en post till i webbläsarens lagring ska den skrivas in i `CookieText.tsx`. En
+cookielista som inte stämmer med koden är precis vad tillsynen tittar på.
+
+`CONSENT_VERSION` höjs när kategorierna ändras — inte när texten justeras. Ett höjt tal frågar alla
+användare på nytt.
 
 ## API
 

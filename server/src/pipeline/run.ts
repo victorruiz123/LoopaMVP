@@ -4,13 +4,14 @@ import { jobDir, updateProgress, completeJob, failJob, saveDebugTrace, getJobSyn
 import { loadImageAsBase64 } from "../imageUtils.js";
 import { estimatePrice, pricingSignature } from "../pricing.js";
 
-import { VERIFY_ENABLED } from "../config.js";
+import { COVER_CUTOUT_ENABLED, VERIFY_ENABLED } from "../config.js";
 import type { CallMeta, CapturedImage, ConditionResult, Damage, DebugTrace, FurnitureIdentity, ListingResult } from "../types.js";
 import { DAMAGE_TYPES, inspectFurniture } from "./inspect.js";
 import { needsVerification, verifyFindings } from "./verify.js";
 import { dedupeDamages } from "./dedup.js";
 import { gradeCondition } from "./grade.js";
 import { coverFirst, pickCoverImageId } from "./cover.js";
+import { buildCover } from "./cutout.js";
 
 /**
  * Runs the full ConditionInput -> ConditionResult pipeline. AT MOST 2 Gemini calls: one main inspection
@@ -74,6 +75,10 @@ export async function runConditionGrading(
       path.join(dir, "originals"),
       inspection.coverImageIndex,
     );
+
+    // Omslaget klipps ut här och inte senare: bildrutan är vald, och urklippet ska vara framme när
+    // säljaren når annonsen — flera skärmar och en modellsökning bort. Det väntas aldrig in.
+    startCover(jobId, dir, images, coverImageId);
 
     /**
      * Andrabesiktningen är urkopplad (VERIFY_ENABLED, default av). Med flaggan AV går fynden rakt
@@ -186,7 +191,7 @@ export async function runConditionGrading(
       coverImageId, startedAt,
     });
     // Publiceras UTAN att vänta in annonsen. Skicket och priset är färdiga; att hålla dem inne tills
-    // truth-cardet är klart hade gjort den långsammaste av tre parallella grenar till allas tempo.
+    // annonsen är klar hade gjort den långsammaste av tre parallella grenar till allas tempo.
     await completeJob(jobId, result);
     timer.lap("price_publish");
 
@@ -232,6 +237,27 @@ export async function runConditionGrading(
   }
 }
 
+/**
+ * Urklippet av säljarens omslagsbildruta, startat och släppt.
+ *
+ * Ingen väntar på det: `void` med flit, och varje fel sväljs. Det som skulle hända annars är att en
+ * modell som inte svarar tar med sig hela skickbedömningen, för en bild kortet klarar sig utan.
+ */
+function startCover(jobId: string, dir: string, images: CapturedImage[], coverImageId: string | null): void {
+  const image = coverFirst(images, coverImageId)[0];
+  if (!image || !COVER_CUTOUT_ENABLED) return;
+  void buildCover(jobId, dir, image.id, image.path)
+    .then(async (cutout) => {
+      if (!cutout) return;
+      const job = getJobSync(jobId);
+      if (!job) return;
+      job.coverCutout = cutout;
+      if (job.result) job.result.coverCutout = cutout;
+      await persist(job);
+    })
+    .catch(() => {});
+}
+
 /** Assembles a ConditionResult. Shared so the provisional and the final one cannot drift apart. */
 function buildResult(a: {
   jobId: string;
@@ -264,6 +290,11 @@ function buildResult(a: {
     overallCondition: a.inspection.overallCondition,
     images: a.images,
     coverImageId: a.coverImageId,
+    // Omslaget hör till identifieringsspåret, som kör bredvid det här. completeJob flyttar in det
+    // från jobbet när det landat — här finns bara skicket att veta något om.
+    productImage: null,
+    // Urklippet likaså: det byggs bredvid (se startCover) och flyttas in av completeJob.
+    coverCutout: null,
     modelUsed: summarizeModelUsage(a.calls),
     tokensUsed: a.tokensUsed,
     costUsd: estimateCostUsd(a.tokensUsed),

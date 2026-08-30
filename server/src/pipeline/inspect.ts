@@ -1,6 +1,7 @@
 import path from "node:path";
 import { callGeminiStructured, Type, type ImagePart } from "../gemini.js";
 import { loadImageAsBase64 } from "../imageUtils.js";
+import { MIN_REPORT_CONFIDENCE } from "../config.js";
 import type {
   AffectedExtent,
   PartInspection,
@@ -44,7 +45,7 @@ export const DEFECT_ITEM_SCHEMA = {
     confidence: {
       type: Type.NUMBER,
       description:
-        "0-100: hur säkert det är att detta är verklig fysisk skada och inte en bildartefakt. Under 65 skickas fyndet vidare till en andra granskning, så använd låga värden fritt i stället för att utelämna ett fynd.",
+        "0-100: hur säkert det är att detta är verklig fysisk skada och inte ljus, skugga, mönster, smuts eller en bildartefakt. 90+ = omisskännlig, eller synlig i mer än en bildruta. 70-89 = tydligt synlig avvikelse, tolkningen säker. 50-69 = du ser en avvikelse men kan inte helt utesluta ljus eller smuts. Under 50 = en gissning, och en gissning ska inte rapporteras alls.",
     },
     evidence: {
       type: Type.ARRAY,
@@ -91,7 +92,7 @@ const RESPONSE_SCHEMA = {
     defects: {
       type: Type.ARRAY,
       description:
-        "Uttömmande lista över VARJE distinkt fysisk defekt, inklusive svaga och osäkra — uttryck tvivel med låg confidence, aldrig genom att utelämna. En använd möbel har ofta 6-15 poster här, och färre än 5 betyder ofta att du slutat leta för tidigt. Men det är en FÖRVÄNTAN, aldrig en kvot: en välhållen möbel har legitimt få poster, och en kort lista är alltid rätt svar jämfört med att fylla ut den med ytor där du inte kan peka på något synligt. Varje post måste svara på frågan: vad skiljer just det här stället från ytan runt omkring? Kan du inte svara, hör posten inte hemma i listan. Samma fysiska defekt i flera bilder ska vara EN post med flera evidence-rader, aldrig separata defekter.",
+        "Lista över varje distinkt fysisk defekt du KAN PEKA UT i bilden. Flera poster på SAMMA del är normalt och inget fel — antalet på en del följer av hur många ställen du kan peka ut där. Listans längd följer av möbeln, aldrig av en förväntan: en välhållen möbel har legitimt noll eller ett par poster, en hårt använd har många. Varje post måste svara på frågan: vad skiljer just det här stället från ytan runt omkring? Kan du inte svara, hör posten inte hemma i listan — ett påhittat fynd kostar säljaren pengar och kortet dess trovärdighet, precis som ett missat. Samma fysiska defekt i flera bilder ska vara EN post med en evidence-rad per bild där den syns, aldrig separata defekter.",
       items: DEFECT_ITEM_SCHEMA,
 
     },
@@ -222,11 +223,41 @@ NOPPRIGHET (pilling) — små fiberbollar och luddig yta, syns tydligast längs 
 Slitage samlas där kroppen tar i: sitsens mitt och framkant, armstödens ovansidor, nackstödets höjd.
 Titta där först och särskilt noga.
 
+VART OCH ETT AV DE HÄR FYNDEN STÅR PÅ EN JÄMFÖRELSE. Nedsutten stoppning, missfärgning och
+blankslitning är alla påståenden om att en yta AVVIKER från hur den sett ut oanvänd — och avvikelsen
+ska synas i bilden, inte antas av att möbeln är begagnad. Kan du inte peka ut ytan du jämför MED
+(den andra sittplatsen, ryggstödet, kanten intill), har du ingen jämförelse och därmed inget fynd.
+
 HUR EN SKADA SYNS BEROR PÅ YTANS FÄRG. På mörka ytor framträder repor och nötning som LJUSARE märken —
 det är det lättaste fallet. På ljusa och målade ytor är det tvärtom: skadan syns som MÖRKARE partier,
 gråaktiga skavmärken, blottat underlag under färgen, eller avslagen färg vid kanter och ändar. En vit
 möbel som ser fläckfri ut på avstånd har nästan alltid gråa skav vid kanter, hörn och benändar. Leta
 efter BÅDA polariteterna — inte bara ljust mot mörkt.`;
+
+const NOT_DAMAGE_BLOCK = `DET HÄR ÄR INTE SKADOR. Ett falsklarm är lika allvarligt som ett missat fynd: kortet
+är ett attest, och en säljare som får en påhittad repa på sin annons tappar både pengar och tilltro
+till bedömningen. Rapportera därför aldrig:
+
+LJUS OCH OPTIK — reflexer och glansdagrar i lack, skinn, plast och metall · skuggor, särskilt i veck,
+mellan dynor, under kanter och innanför ben · ljusa partier från blixt eller fönster · färgskillnader
+mellan bildrutor som kommer av vitbalans och belysning i stället för av ytan.
+
+KONSTRUKTION OCH MATERIAL — sömmar, stickningar, kedring och paspoal · träets ådring, kvistar och
+naturliga färgvariation · tygets bindning, mönster, lugg och luggriktning · avsiktliga designdetaljer,
+skarvar, spår och beslag · lösa klädslars normala drapering.
+
+BILDEN SJÄLV — oskärpa och rörelseoskärpa i videorutor · komprimeringsbrus och JPEG-artefakter, som
+växer fram just i förstorade utsnitt · lågupplösta partier långt bort i bild · spegelbilder och
+dubbelkonturer.
+
+LÖST PÅ YTAN — damm, ludd, smulor, hårstrån, fingeravtryck och annat som torkas bort. Det sitter på
+möbeln, inte i den.
+
+Golv, vägg och föremål i bakgrunden hör inte till möbeln över huvud taget.
+
+TESTET när du inte vet om något är ljus eller yta: sök upp samma ställe i en annan bildruta. Ett märke
+som FÖLJER MED när kameran flyttar sig sitter på möbeln. Ett som flyttar sig, byter form eller
+försvinner är ljus — och ska inte rapporteras.`;
 
 const SYSTEM_PROMPT = `Du är en mycket noggrann möbelbesiktare för en svensk secondhandmarknad (Vips). Du agerar
 som en SYSTEMATISK BESIKTNINGSPROTOKOLL — inte en generell bildbeskrivare.
@@ -237,6 +268,8 @@ i den ordning de listas). Vissa bilder kan visa samma yta från olika vinklar.
 ${TAXONOMY_BLOCK}
 
 ${SOFT_WEAR_CUES}
+
+${NOT_DAMAGE_BLOCK}
 
 METOD:
 1. Identifiera FÖRST möbelns delar, och gå sedan igenom dem EN I TAGET över samtliga bilder. Att bara
@@ -262,24 +295,44 @@ METOD:
    det finns en repa finns det oftast fler intill. Innan du lämnar en del: gå tillbaka över hela ytan
    och fråga dig om du rapporterat ALLA skador där, eller bara den mest iögonfallande. Två jämnstora
    skador bredvid varandra ska båda med, var och en som en egen post.
-   FYRA FYND ÄR INGEN NATURLIG STOPPUNKT. En möbel som använts i flera år bär normalt fler synliga
-   spår än en handfull. Stanna när du gått igenom varje del i parts_inspected och inte hittar mer —
-   aldrig för att listan känns lagom lång. Fyll samtidigt aldrig på med sådant du inte kan peka ut.
+   EN DEL FÅR BÄRA HUR MÅNGA MÄRKEN SOM HELST. Hur många poster en del får bestäms av hur många
+   ställen du kan peka ut på den, aldrig av att delen redan är nämnd. Ett märke som "representerar"
+   delen är fel svar: har benet tre skav ska benet ha tre poster, var och en med sitt eget läge i
+   semantic_location. Att stanna vid det tydligaste märket på varje del och lämna de andra
+   orapporterade är det vanligaste felet i den här uppgiften — det gäller lika mycket för utbrett,
+   mjukt slitage som för enskilda repor.
+   LISTANS LÄNGD ÄR ETT RESULTAT, ALDRIG ETT MÅL. Du är klar när du gått igenom varje del i
+   parts_inspected — inte när listan känns lagom lång, och inte heller när den känns för kort. En
+   välhållen möbel ger en kort lista, och det är då rätt svar. Fyll aldrig på med ytor där du inte
+   kan peka ut något.
    Alla påminnelser ovan gäller UTÖVER en fullständig genomgång av varje dels hela yta — mitten av en
    sits, en skiva eller en ryggpanel är lika viktig som dess kanter. Påminnelserna pekar ut det som
    brukar glömmas, de begränsar aldrig var du letar.
-2. Rapportera VARJE distinkt FYSISK defekt du kan se — även svaga, diffusa och tveksamma. Utelämna
-   ALDRIG ett fynd för att du är osäker: rapportera det med LÅG confidence i stället. En separat andra
-   granskning tittar på varje osäkert fynd och plockar bort det som inte håller, så ett tveksamt fynd
-   kostar ingenting medan ett utelämnat fynd är förlorat för gott.
-   Missa särskilt inte MJUKT SLITAGE, som är lätt att förbise men är det vanligaste på begagnade
+2. BEVISKRAVET. Varje post i listan måste klara två frågor: VAD ser du, och HUR skiljer det sig från
+   ytan runt omkring? Kan du inte svara på båda med det du faktiskt ser i bildrutan, finns det inget
+   fynd att rapportera. Rutan är testet: går det inte att lägga en tät ruta som innehåller något
+   synligt avvikande, hör posten inte hemma i listan.
+   Osäkerhet uttrycks i confidence, men bara osäkerhet om TOLKNINGEN av något du ser — är det en repa
+   eller ett skavmärke, en fläck eller en missfärgning. Osäkerhet om det över huvud taget finns något
+   där är inte ett lågt värde, det är inget fynd.
+   Missa samtidigt inte MJUKT SLITAGE, som är lätt att förbise och är det vanligaste på begagnade
    möbler: fläckar och missfärgningar i tyg, nedsutten eller hoptryckt stoppning, nopprighet,
-   blankslitna eller nötta ytor, urtvättad färg, och allmänt slitage på armstöd, sitsar, ryggstöd och
-   kanter. Ett sittmöbel som använts har nästan alltid något av detta.
-   Det som INTE är skador: träets naturliga ådring, avsiktliga designdetaljer, sömmar och normal
-   konstruktion. Är du osäker på om något är en skugga eller en fläck — rapportera det med låg
-   confidence och låt granskningen avgöra, hoppa inte över det.
-3. KRITISKT — två fel som är LIKA allvarliga, blanda dem aldrig:
+   blankslitna eller nötta ytor, urtvättad färg, och slitage på armstöd, sitsar, ryggstöd och kanter.
+   Det är verkliga skador när de SYNS — leta efter dem, men rapportera dem på samma bevis som allt
+   annat, aldrig för att en begagnad möbel "brukar" ha dem.
+   En andra granskning tittar sedan på varje fynd och plockar bort uppenbara falsklarm. Den ser bara
+   ditt utsnitt: den kan inte rädda ett fynd du inte kunde peka ut, och den kan inte hitta det du
+   aldrig rapporterade. Bevisbördan ligger här.
+3. KORSKONTROLLERA mot de andra bildrutorna innan du skriver ner ett fynd. Leta upp samma ställe i de
+   bildrutor där ytan också syns.
+   Syns avvikelsen där också är fyndet verkligt — ge det då EN evidence-rad per bildruta där du kan se
+   det. Det är det starkaste bevis kortet kan bära, och det är samma fynd, aldrig flera.
+   Syns ytan tydligt i en annan bildruta men avvikelsen är BORTA där, var det ljus eller smuts.
+   Rapportera det inte.
+   Ett fynd som bara går att se i EN av flera bildrutor som visar samma yta ska ha låg confidence.
+   Undantaget är närbilder och ytor som bara finns med i en enda bildruta: där finns ingenting att
+   jämföra med, och fyndet bedöms på egen hand.
+4. KRITISKT — två fel som är LIKA allvarliga, blanda dem aldrig:
    a) SAMMA fysiska skada sedd i flera bilder (t.ex. samma repa framifrån och från sidan) ska vara EN
       post med en evidence-rad per bild där den syns. Skapa ALDRIG flera defekter för samma skada.
    b) OLIKA fysiska skador ska vara SKILDA poster, även när de sitter tätt intill varandra på samma
@@ -287,9 +340,13 @@ METOD:
    Testet är enkelt: kan du peka på ETT ställe på möbeln är det en skada. Behöver du peka på två
    ställen är det två — även om de är någon decimeter isär, ser likadana ut och sitter på samma yta.
    Ge då var och en sitt eget läge i semantic_location.
-4. Hitta aldrig på bevis. Att rapportera något du faktiskt ser men är osäker på är RÄTT; att beskriva
-   en skada du inte kan peka ut i bilden är FEL. Skillnaden går vid om du kan sätta en ruta runt den.
-5. Gör dessutom EN helhetsbedömning (overall_condition) av det allmänna visuella intrycket, oberoende av
+   BILDRUTAN AVGÖR VILKEN AV REGLERNA SOM GÄLLER: (a) handlar om samma märke i OLIKA bildrutor. Går
+   det att sätta två rutor som INTE överlappar i en och samma bildruta, är det alltid två skador —
+   en enda skada kan inte sitta på två ställen i samma bildruta.
+5. Hitta aldrig på bevis. Att rapportera något du faktiskt ser men är osäker på TOLKNINGEN av är RÄTT;
+   att beskriva en skada du inte kan peka ut i bilden är FEL. Skillnaden går vid om du kan sätta en
+   ruta runt den.
+6. Gör dessutom EN helhetsbedömning (overall_condition) av det allmänna visuella intrycket, oberoende av
    den enskilda defektlistan: hur använd ser möbeln ut, är slitaget isolerat eller utbrett, verkar
    funktion/struktur påverkad. En möbel med MÅNGA små spridda tecken på användning kan vara tydligt sliten
    även om ingen enskild defekt är allvarlig — fånga det här.
@@ -369,7 +426,15 @@ export async function inspectFurniture(images: CapturedImage[], jobDir: string, 
     fallbackTimeoutMs: 30_000,
   });
 
-  const defects: Damage[] = data.defects.map((d, idx) => mapRawDefect(d, images, `def_${idx}`));
+  // Golvet appliceras FÖRE allt annat: ett fynd modellen själv kallar en gissning ska varken granskas,
+  // räknas i betyget eller stå på kortet. Antalet loggas — försvinner plötsligt många fynd här är det
+  // prompten eller modellen som glidit, inte möblerna.
+  const mapped: Damage[] = data.defects.map((d, idx) => mapRawDefect(d, images, `def_${idx}`));
+  const defects: Damage[] = mapped.filter((d) => d.confidence >= MIN_REPORT_CONFIDENCE);
+  const droppedByFloor = mapped.length - defects.length;
+  if (droppedByFloor > 0) {
+    console.info(`[inspect] ${droppedByFloor}/${mapped.length} fynd under confidence-golvet (${MIN_REPORT_CONFIDENCE}) — inte rapporterade.`);
+  }
 
   const overallCondition: OverallCondition = {
     overallWearLevel: data.overall_condition.overall_wear_level,

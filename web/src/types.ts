@@ -128,6 +128,8 @@ export interface ListingAttribute {
   label: string;
   value: string;
   sourceUrl?: string | null;
+  /** Uppskattat värde, inte belagt: typiska mått för möbeltypen när ingen källa gav några. Visas märkt. */
+  estimated?: boolean;
 }
 
 export interface ListingSource {
@@ -137,7 +139,7 @@ export interface ListingSource {
 }
 
 /**
- * Annonsgeneratorns svar, som det kommer ur loopa-landing-page-main. Bara de fält truth-cardet visar
+ * Annonsgeneratorns svar, som det kommer ur loopa-landing-page-main. Bara de fält annonsen visar
  * är typade här — resten följer med orört i `raw` för den som vill gräva.
  */
 export interface GeneratedListing {
@@ -166,7 +168,7 @@ export interface GeneratedListing {
   missingNotes?: string[];
 }
 
-/** Truth-cardets halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
+/** Annonsens halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
 export interface ListingResult {
   /** "pending" medan generatorn fortfarande kör — den startar samtidigt som besiktningen. */
   status: "pending" | "ok" | "unavailable";
@@ -249,7 +251,7 @@ export interface ModelCandidate {
 export type IdentityStatus = "identifying" | "needs_selection" | "resolved" | "unavailable";
 
 /**
- * Tillverkarens produktbild av modellen — truth-cardets omslag.
+ * Tillverkarens produktbild av modellen — annonsens omslag.
  *
  * Möbeln framifrån mot vit bakgrund, hämtad ur en produktsida som nämner modellen vid namn. Den visar
  * en NY exemplar av modellen, inte den som säljs: därför är den omslag och aldrig underlag för
@@ -259,6 +261,28 @@ export interface ProductImage {
   url: string;
   /** Sidan bilden hämtades från, så påståendet går att kontrollera. */
   sourceUrl: string | null;
+}
+
+/**
+ * Kortets omslag: möbeln som faktiskt säljs.
+ *
+ * `cutout` = säljarens egen bildruta med rummet bortklippt och möbeln lagd på vitt (server:
+ * pipeline/cutout.ts). `photo` = samma bildruta som den togs, när urklippet inte gick att göra —
+ * bara för säljaren själv, aldrig på det publika kortet.
+ *
+ * Adressen skiljer sig åt mellan de två kortvyerna: säljarens hämtar på jobbet, det publika på
+ * Loopa-ID:t. Därför bär omslaget sin egen url i stället för att byggas ihop i vyn.
+ */
+export interface CardCover {
+  url: string;
+  kind: "cutout" | "photo";
+}
+
+/** Att ett urklipp finns, och ur vilken bildruta. Bilden själv hämtas på /api/jobs/:id/cover. */
+export interface CoverCutout {
+  sourceImageId: string;
+  label: string | null;
+  createdAt: string;
 }
 
 export interface ConditionResult {
@@ -295,6 +319,11 @@ export interface ConditionResult {
    * att belägga — då får renderingen stå som kortets bild i stället.
    */
   productImage: ProductImage | null;
+  /**
+   * Urklippet av omslagsbildrutan: möbeln fri från rummet, mot vitt. null = det gjordes inte, eller
+   * dög inte — då visar kortet bildrutan som den är.
+   */
+  coverCutout: CoverCutout | null;
   modelUsed: string;
   tokensUsed: number;
   costUsd: number;
@@ -371,7 +400,7 @@ export interface TraderaPublication {
 /** Vad som KOMMER att publiceras. Visas i bekräftelsesteget så säljaren ser det innan de trycker. */
 export interface TraderaPlan {
   title: string;
-  /** Truth-cardets publika ID. Står i annonstexten och är köparens väg tillbaka till kortet. */
+  /** Annonsens publika ID. Står i annonstexten och är köparens väg tillbaka till kortet. */
   loopaId: string;
   categoryId: number;
   categoryName: string;
@@ -404,7 +433,7 @@ export interface TraderaState {
 export interface ConditionJob {
   id: string;
   /**
-   * Truth-cardets publika ID, LP-XXXX-XXXX. Sätts av servern i svaret, inte i jobbet: det är härlett
+   * Annonsens publika ID, LP-XXXX-XXXX. Sätts av servern i svaret, inte i jobbet: det är härlett
    * ur id:t. Saknas i äldre svar och i jobb klienten byggt själv.
    */
   loopaId?: string;
@@ -420,6 +449,10 @@ export interface ConditionJob {
   identityStatus?: IdentityStatus;
   /** Upp till fyra troliga modeller av märket, bäst först. */
   candidates?: ModelCandidate[];
+  /** De förslag säljaren redan avfärdat med "hitta nya". Kommer aldrig tillbaka i `candidates`. */
+  rejectedCandidates?: ModelCandidate[];
+  /** Hur många gånger säljaren bett om nya förslag. 0 (eller osatt) = den första omgången. */
+  candidateRound?: number;
   /** Den säljaren valde, eller den identifieringen kunde avgöra själv. */
   selected?: ModelCandidate | null;
   identityError?: string | null;
@@ -436,13 +469,25 @@ export interface ConditionJob {
    * jobb från före stegen ska inte börja sjunka av sig självt.
    */
   priceLadder?: PriceLadder | null;
-  /** Supabase-användaren som skapade jobbet. Det är den profilen truth-cardet sparas i. */
+  /** Supabase-användaren som skapade jobbet. Det är den profilen annonsen sparas i. */
   ownerId?: string | null;
+}
+
+/**
+ * Var försäljningen står för ett kort som lagts ut till salu.
+ *
+ * Saknas den (null) har möbeln aldrig lagts ut. Det är skillnaden mellan en sparad annons och en som
+ * säljs just nu, och den skillnaden är hela skälet till att raden finns i profilen.
+ */
+export interface JobSale {
+  status: "publishing" | "published" | "error";
+  /** Annonsen hos marknadsplatsen. Finns först när den gått upp. */
+  url: string | null;
 }
 
 export interface JobSummary {
   id: string;
-  /** Truth-cardets publika ID, LP-XXXX-XXXX. */
+  /** Annonsens publika ID, LP-XXXX-XXXX. */
   loopaId: string;
   createdAt: string;
   progress: JobProgress;
@@ -450,14 +495,16 @@ export interface JobSummary {
   identity: FurnitureIdentity | null;
   price: PriceEstimate | null;
   thumbnailImageId: string | null;
-  /** Kortets omslag, samma produktbild som ligger överst på truth-cardet. Miniatyren faller tillbaka
+  /** Kortets omslag, samma produktbild som ligger överst på annonsen. Miniatyren faller tillbaka
       på `thumbnailImageId` när den saknas. */
   coverImageUrl: string | null;
   error: string | null;
-  /** Om annonsgeneratorn hann bli klar — det är det som gör jobbet till ett truth-card. */
-  hasTruthCard: boolean;
+  /** Om annonsgeneratorn hann bli klar — det är det som gör jobbet till en annons. */
+  hasListing: boolean;
   /** Den genererade annonsrubriken, som den står på kortet. Bättre listrad än märke + modell. */
   listingTitle: string | null;
+  /** Försäljningen, när säljaren lagt ut möbeln. null = sparad, men aldrig utlagd. */
+  sale: JobSale | null;
 }
 
 // ---- adminpanelen (GET /api/admin/users) ----
@@ -471,7 +518,7 @@ export interface AdminUser {
   isAdmin: boolean;
   /** Allt kontot startat, inklusive det som föll. */
   jobCount: number;
-  /** Så många av dem som blev truth-cards — de som går att öppna. */
+  /** Så många av dem som blev annonser — de som går att öppna. */
   cardCount: number;
   totalValue: number;
   lastActivity: string | null;
@@ -500,7 +547,7 @@ export interface AdminUsers {
   since: string;
 }
 
-// ---- publikt truth-card (GET /api/cards/:loopaId) ----
+// ---- publik annons (GET /api/cards/:loopaId) ----
 
 /**
  * Skadan som den står på ett publikt kort: platsen, allvaret och beskrivningen — inte bevisbilderna
@@ -524,7 +571,7 @@ export interface CardPrice {
 }
 
 /** Allt kortvyn ritar. Byggs antingen ur ett eget ConditionResult eller ur ett publikt kort. */
-export interface TruthCardData {
+export interface ListingViewData {
   card: GeneratedListing;
   identity: FurnitureIdentity | null;
   grade: GradeExplanation | null;
@@ -534,10 +581,12 @@ export interface TruthCardData {
   imageCount: number;
   reviewed: boolean;
   productImage: ProductImage | null;
+  /** Möbeln som säljs, mot vitt. Går före produktbilden — se ListingView. */
+  cover: CardCover | null;
 }
 
-/** Svaret från GET /api/cards/:loopaId — truth-cardet som vem som helst med ID:t kan läsa. */
-export interface PublicCard extends TruthCardData {
+/** Svaret från GET /api/cards/:loopaId — annonsen som vem som helst med ID:t kan läsa. */
+export interface PublicCard extends ListingViewData {
   loopaId: string;
   createdAt: string;
   tradera: { status: string; url: string | null } | null;
@@ -546,7 +595,7 @@ export interface PublicCard extends TruthCardData {
 /**
  * Vad ett chattsvar står på.
  *
- * `card` = det står på truth-cardet. `general` = allmän möbelkunskap som INTE är besiktad för just
+ * `card` = det står på annonsen. `general` = allmän möbelkunskap som INTE är besiktad för just
  * den här möbeln. Skillnaden skrivs ut i chatten: ett kort vars svar inte går att skilja åt är
  * tillbaka på att vara ett påstående. Se server/src/cardChat.ts.
  */

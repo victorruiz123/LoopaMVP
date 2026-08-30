@@ -233,6 +233,13 @@ body {
 .btn-text { background: none; color: var(--accent); padding: 10px; box-shadow: none; font-weight: 600; }
 .btn-text:active { opacity: 0.55; }
 .btn-ghost { background: rgba(0,0,0,0.45); color: #fff; box-shadow: none; }
+/* Konturknapp: en riktig åtgärd som inte är skärmens huvudåtgärd. Två fyllda knappar
+   under varandra tävlar om samma blick, och den som publicerar ska vinna. */
+.btn-outline {
+  background: var(--surface); color: var(--ink); box-shadow: none;
+  border: 1px solid var(--hairline);
+}
+.btn-outline:not(:disabled):active { background: var(--surface-pressed); }
 .btn:disabled { background: var(--field); color: var(--muted-soft); cursor: not-allowed; box-shadow: none; }
 .btn-text:disabled { background: none; }
 .btn:focus-visible { outline: none; box-shadow: var(--focus); }
@@ -263,6 +270,13 @@ body {
   padding: calc(44px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
     calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
   display: flex; flex-direction: column;
+}
+/* Vägen ut ur inloggningen. Ligger ovanpå skärmen och inte i .auth-inner: den är ett rutnät i
+   datorvyn där varje del har sin ruta utpekad, och en knapp till hade auto-placerats i någon
+   annans. Ordmärket är centrerat, så hörnet är ledigt i båda vyerna. */
+.auth-back {
+  position: absolute; z-index: 2;
+  top: calc(10px + env(safe-area-inset-top)); left: calc(14px + env(safe-area-inset-left));
 }
 .auth-wordmark { font-size: 34px; line-height: 1; text-align: center; margin-bottom: 34px; }
 .auth-hero { text-align: center; margin-bottom: 24px; }
@@ -340,10 +354,13 @@ body {
 }
 
 /* ==========================================================================
-   Profilen — sparade truth-cards
+   Profilen — sparade annonser
    ========================================================================== */
 .profile { gap: 14px; }
-.profile-head { display: flex; align-items: center; gap: 14px; margin-top: 4px; }
+/* Huvudet lyfts ur staplingen med flit: språkmenyn fälls ned ÖVER nyckeltalen under, och utan
+   ett eget z-index på föräldern målas de vita korten ovanpå menyn — den blir genomskinlig utan
+   att vara det. */
+.profile-head { position: relative; z-index: 20; display: flex; align-items: center; gap: 14px; margin-top: 4px; }
 .profile-avatar {
   width: 56px; height: 56px; border-radius: 999px; flex-shrink: 0;
   display: flex; align-items: center; justify-content: center;
@@ -356,6 +373,39 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .profile-email { margin: 2px 0 0; font-size: var(--fs-md); color: var(--muted); }
+
+/* ---- språkväljaren ----
+   Ligger i huvudets högerkant, i profilens egen ton: dämpad tills man rör den, aldrig
+   en knapp som konkurrerar med namnet bredvid. Menyn hänger under och är smal — tre
+   rader är hela innehållet. */
+.lang-picker { position: relative; margin-left: auto; flex-shrink: 0; }
+.lang-button {
+  display: inline-flex; align-items: center; gap: 7px;
+  min-height: var(--tap); padding: 0 12px; border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface); color: var(--muted); font-family: inherit;
+  font-size: var(--fs-md); font-weight: 600; letter-spacing: -0.01em; cursor: pointer;
+  transition: color var(--t) var(--ease-ui), border-color var(--t) var(--ease-ui);
+}
+.lang-button:hover { color: var(--ink); border-color: var(--muted-soft); }
+.lang-button:focus-visible { outline: none; box-shadow: var(--focus); }
+.lang-menu {
+  position: absolute; top: calc(100% + 6px); right: 0; z-index: 20;
+  min-width: 170px; padding: 6px; border-radius: var(--r-lg);
+  background: var(--surface); box-shadow: var(--shadow-raised); border: 1px solid var(--hairline);
+  display: flex; flex-direction: column;
+  animation: lang-menu-in 140ms var(--ease-ui) both;
+}
+@keyframes lang-menu-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.lang-option {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  width: 100%; min-height: 40px; padding: 0 10px; border: none; border-radius: var(--r-sm);
+  background: none; color: var(--ink); font-family: inherit; font-size: var(--fs-base);
+  text-align: left; cursor: pointer;
+}
+.lang-option:hover { background: var(--field); }
+.lang-option:focus-visible { outline: none; box-shadow: var(--focus); }
+.lang-option-active { font-weight: 700; color: var(--accent-ink); }
+.lang-option-active svg { color: var(--accent); }
 
 .profile-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 .profile-stat {
@@ -411,6 +461,16 @@ body {
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
 }
 .card-row-meta { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+/* Kortet ligger ute till salu: en tredje rad i listraden, i samma gröna som kvittot på annonsen ger.
+   Egen rad och inte inflätad i metaraden — datum och pris är kortets historia, det här är dess läge
+   just nu. */
+.card-row-sale {
+  align-self: flex-start; margin-top: 3px; padding: 2px 7px; border-radius: 999px;
+  background: var(--green-light); color: var(--green-dark);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.card-row-sale-publishing { background: var(--accent-light); color: var(--accent); }
+.card-row-sale-error { background: var(--danger-light); color: var(--danger-dark); }
 .card-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; }
 
 /* ==========================================================================
@@ -437,10 +497,23 @@ body {
    en bild av text, tappar kontrast mot bakgrunden i sin ljusa ände och kan inte ärva
    någon systemfärg. Ett ord i accentfärg gör samma sak utan att kosta läsbarhet. */
 .accent { color: var(--accent); }
+/* Löftet under rubriken. På telefonen är startsidan en fast skärmhöjd med märkeslistan
+   som rullande rest — leden står därför i brödtextens storlek och inte i knapparnas, så
+   två rader kostar listan så lite som möjligt. Datorvyn sätter upp den igen. */
 .home-lede {
-  margin: 12px 0 0; font-size: var(--fs-lg); line-height: 1.45; color: var(--muted); max-width: 32ch;
+  margin: 10px 0 0; font-size: var(--fs-base); line-height: 1.45; color: var(--muted); max-width: 34ch;
   letter-spacing: -0.012em;
 }
+/* ---- vad Loopa tar ----
+   En rad, sist på sidan. Frågan "vad kostar det?" ställer man sig i samma stund som man
+   förstår erbjudandet, och svaret ska inte vänta till sista skärmen — men det är en
+   uppgift och inte en affisch, så det står som text i brödstorlek och inte som ett
+   diagram. Krymper inte: det är märkeslistan som är sidans elastiska del. */
+.home-fee-line {
+  flex-shrink: 0; margin: 2px 0 0; text-align: center;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+}
+
 .brand-header { text-align: center; }
 .brand-header h1 { font-size: 26px; margin: 0; line-height: 1.2; }
 
@@ -499,7 +572,7 @@ body {
    tjugo olika typografier bara göra det svårare att hitta rätt. */
 .form-row-text-brand { font-size: var(--fs-lg); }
 
-/* ---- sparade truth-cards på startsidan ---- */
+/* ---- sparade annonser på startsidan ---- */
 .collapsible-card {
   background: var(--surface); border-radius: var(--r-lg);
   padding: 12px 14px; box-shadow: var(--shadow-card);
@@ -527,7 +600,7 @@ body {
 .saved-item-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
 
 /* Siffror som inte hoppar i bredd när de uppdateras. */
-.price-main, .price-range-end em, .saved-item .small, .truth-price, .profile-stat-value {
+.price-main, .price-range-end em, .saved-item .small, .card-price, .profile-stat-value {
   font-variant-numeric: tabular-nums;
 }
 
@@ -846,6 +919,88 @@ body {
   .guide3d-ring-arrow, .record-btn-hint, .lap-ring-lead, .capture-guide { animation: none; }
 }
 
+/* Vägen från filmguiden till fotoguiden. Overlayen släpper igenom tryck så att inspelningsknappen
+   under den går att nå — den här knappen måste ta tillbaka dem åt sig. */
+.capture-guide-switch {
+  pointer-events: auto; color: #fff; text-decoration: underline;
+  text-underline-offset: 3px; font-size: var(--fs-md); font-weight: 600; padding: 8px 4px;
+}
+
+/* ---- fotoguiden: en vinkel i taget, ovanpå kameran ---- */
+/* Kortet ligger KVAR medan säljaren ramar in. Filmguidens ruta täcker hela bilden för att den bara
+   ska läsas en gång, innan inspelningen; den här ska läsas samtidigt som man siktar. */
+.photo-guide {
+  position: absolute; top: calc(60px + env(safe-area-inset-top));
+  left: var(--safe-left); right: var(--safe-right);
+  display: flex; flex-direction: column; gap: 10px; pointer-events: none;
+}
+/* Scenen får krympa hellre än att kortet äter kamerabilden man ska rama in i — och hellre än att
+   instruktionen trängs ihop till en spalt på tre ord per rad på den smalaste telefonen. */
+@media (max-height: 700px), (max-width: 370px) {
+  .photo-guide-scene { flex-basis: 96px; width: 96px; }
+  .photo-guide-instruction { font-size: var(--fs-xs); }
+}
+.photo-guide-card {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px 10px 6px;
+  border-radius: var(--r); color: #fff; text-align: left;
+  background: rgba(12, 10, 8, 0.52);
+  backdrop-filter: blur(14px) saturate(0.85);
+  -webkit-backdrop-filter: blur(14px) saturate(0.85);
+}
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .photo-guide-card { background: rgba(12, 10, 8, 0.8); }
+}
+.photo-guide-scene { flex: 0 0 132px; width: 132px; }
+.photo-guide-text { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.photo-guide-step {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase;
+  color: rgba(255,255,255,0.66);
+}
+.photo-guide-title { margin: 0; font-size: var(--fs-lg); font-weight: 700; line-height: 1.2; }
+.photo-guide-instruction {
+  margin: 0; font-size: var(--fs-sm); line-height: 1.35; color: rgba(255,255,255,0.86);
+}
+
+/* Stegraden är kvitto och karta i ett: vad som är taget, och vägen tillbaka till en bild som blev
+   suddig. Vinklarna är namngivna platser, så att gå tillbaka till en av dem är en rörelse i guiden
+   och inte en ångerknapp. */
+.photo-guide-strip {
+  list-style: none; margin: 0; padding: 0; pointer-events: auto;
+  display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px;
+}
+.photo-guide-stop {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; min-width: 0;
+  background: none; border: 0; padding: 0; cursor: pointer; color: rgba(255,255,255,0.62);
+}
+.photo-guide-stop-frame {
+  position: relative; width: 100%; aspect-ratio: 1; border-radius: var(--r-sm);
+  display: grid; place-items: center; overflow: hidden;
+  background: rgba(12, 10, 8, 0.5); border: 1.5px solid rgba(255,255,255,0.28);
+}
+.photo-guide-stop-frame img { width: 100%; height: 100%; object-fit: cover; }
+.photo-guide-stop-index { font-size: var(--fs-sm); font-weight: 700; color: rgba(255,255,255,0.62); }
+.photo-guide-stop-check {
+  position: absolute; right: 2px; bottom: 2px; width: 15px; height: 15px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--green); color: #fff;
+}
+.photo-guide-stop-label {
+  font-size: 9px; font-weight: 600; line-height: 1.15; text-align: center; overflow-wrap: anywhere;
+}
+.photo-guide-stop-active { color: #fff; }
+.photo-guide-stop-active .photo-guide-stop-frame { border-color: #fff; box-shadow: 0 0 0 2px rgba(255,255,255,0.28); }
+.photo-guide-stop-active .photo-guide-stop-index { color: #fff; }
+.photo-guide-stop-done { color: rgba(255,255,255,0.9); }
+
+.capture-done-top { position: absolute; top: var(--safe-top); right: var(--safe-right); }
+/* Slutaren i mitten, de två besluten om den vid varsin kant: fyll vinkeln med en bild som finns,
+   eller lämna den. Utan kamera faller slutaren bort och gapet håller de två kvar där de stod. */
+.guided-controls {
+  position: absolute; bottom: var(--safe-bottom-sm); left: var(--safe-left); right: var(--safe-right);
+  display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; justify-items: center;
+}
+.guided-side { display: flex; align-items: center; gap: 6px; font-size: var(--fs-md); padding: 10px 14px; }
+.guided-shutter-gap { width: 68px; height: 68px; }
+
 /* granskning av bildrutorna */
 .review-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .review-thumb { position: relative; border-radius: var(--r); overflow: hidden; aspect-ratio: 3/4; background: var(--field); }
@@ -864,6 +1019,15 @@ body {
   width: 22px; height: 22px; border-radius: 999px; background: rgba(0,0,0,0.6);
 }
 .review-thumb-remove svg { position: relative; }
+/* Vinklar guiden bad om och inte fick. Bärnsten, inte rött: en saknad sida är ett upplyst val, inte
+   ett fel — och texten ska säga vad besiktningen inte kan uttala sig om, inte skälla. */
+.review-missing {
+  margin: 0; padding: 11px 13px; border-radius: var(--r-sm);
+  background: var(--amber-light); color: var(--amber-ink);
+  font-size: var(--fs-md); line-height: 1.45;
+}
+.btn-inline { display: inline; padding: 0; font-size: inherit; }
+
 .review-add-actions { display: flex; gap: 8px; }
 .review-add-actions .btn-text {
   flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
@@ -929,13 +1093,86 @@ body {
   52% { transform: scale(1.06); opacity: 0.26; }
 }
 
-.identify-waiting-title { margin: 4px 0 0; font-size: var(--fs-base); font-weight: 600; }
+/* Delas av båda väntorna: samma rubrik och samma ordbyte, för att det är samma sorts paus. */
+.wait-title { margin: 4px 0 0; font-size: var(--fs-base); font-weight: 600; }
 
-.model-search-word {
+.wait-word {
   margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink-soft);
-  animation: model-search-word-in 0.4s var(--ease-ui);
+  animation: wait-word-in 0.4s var(--ease-ui);
 }
-@keyframes model-search-word-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+@keyframes wait-word-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
+
+/* ==========================================================================
+   Annonsbygget — luppen synar möbeln medan måttbandet dras ut
+   ==========================================================================
+   Väntan direkt efter modellvalet, och med flit inte modelletningens studs: två
+   likadana väntor i rad läser som EN vänta som hängt sig. Bandet har lika lite
+   riktig progress att mäta som ringen ovan, och är lika trögt på slutet. */
+.listing-build { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.listing-build-frame { position: relative; width: 144px; height: 144px; display: grid; place-items: center; }
+
+.listing-build-box {
+  width: 106px; height: 106px; border-radius: var(--r-lg); overflow: hidden;
+  background: var(--surface); box-shadow: var(--shadow-card);
+  display: grid; place-items: center;
+}
+/* Möbeln är föremålet som synas, inte huvudpersonen: accentfärgen bär luppen och märkena. */
+.listing-build-piece {
+  display: block; color: var(--ink-soft); transform-origin: 50% 100%;
+  animation: listing-build-flinch 7s infinite;
+}
+.listing-build-piece svg { display: block; }
+
+.listing-build-scan { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; }
+.listing-build-loupe { animation: listing-build-loupe 7s ease-in-out infinite; }
+/* Glaset lättar upp det som ligger under i stället för att skyla det. En lupp man inte ser
+   igenom är bara en cirkel som åker omkring. */
+.listing-build-loupe-glass { fill: var(--surface); fill-opacity: 0.3; stroke: var(--accent); stroke-width: 2.5; }
+.listing-build-loupe-grip { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
+
+.listing-build-mark { fill: var(--accent); transform-box: fill-box; transform-origin: center; }
+.listing-build-mark-a { animation: listing-build-mark-a 7s infinite; }
+.listing-build-mark-b { animation: listing-build-mark-b 7s infinite; }
+
+/* Pauserna är halva poängen: en lupp i ständig rörelse letar, en som stannar har SETT något. */
+@keyframes listing-build-loupe {
+  0% { transform: translate(48px, 92px); opacity: 0; }
+  7% { transform: translate(51px, 88px); opacity: 1; }
+  26%, 36% { transform: translate(63px, 63px); opacity: 1; }
+  57%, 67% { transform: translate(86px, 79px); opacity: 1; }
+  90% { transform: translate(98px, 94px); opacity: 1; }
+  /* Tonas ut FÖRE återhoppet till startpunkten, annars syns luppen dra sig baklänges. */
+  97%, 100% { transform: translate(98px, 94px); opacity: 0; }
+}
+@keyframes listing-build-mark-a {
+  0%, 24% { opacity: 0; transform: scale(0.3); }
+  30% { opacity: 1; transform: scale(1.35); }
+  35%, 92% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes listing-build-mark-b {
+  0%, 55% { opacity: 0; transform: scale(0.3); }
+  61% { opacity: 1; transform: scale(1.35); }
+  66%, 92% { opacity: 1; transform: scale(1); }
+  100% { opacity: 0; transform: scale(1); }
+}
+/* Ryckningen kommer på fyndet, inte före det: möbeln reagerar på att bli påkommen. */
+@keyframes listing-build-flinch {
+  0%, 26%, 34%, 57%, 65%, 100% { transform: translateY(0) rotate(0deg); }
+  29% { transform: translateY(-3px) rotate(-2deg); }
+  60% { transform: translateY(-3px) rotate(2deg); }
+}
+
+/* Måttbandet mäter väntan, inte möbeln — samma tröga kurva som ringen i modelletningen. */
+.listing-build-tape { width: 144px; height: 22px; fill: none; }
+.listing-build-tape-tick { stroke: var(--border); stroke-width: 2; stroke-linecap: round; }
+.listing-build-tape-track { stroke: var(--border); stroke-width: 3; stroke-linecap: round; }
+.listing-build-tape-fill {
+  stroke: var(--accent); stroke-width: 3; stroke-linecap: round;
+  stroke-dasharray: 100; stroke-dashoffset: 100;
+  animation: listing-build-tape 24s cubic-bezier(0.05, 0.7, 0.2, 1) forwards;
+}
+@keyframes listing-build-tape { to { stroke-dashoffset: 6; } }
 
 /* ==========================================================================
    Analys — checklistan medan pipelinen kör
@@ -1006,10 +1243,24 @@ body {
 .damage-card-open:disabled { cursor: default; }
 .damage-card-open:active:not(:disabled) { opacity: 0.6; }
 .damage-card-open:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
-/* Utan bild i kortet syns det inte att det FINNS en bild. Raden säger det, och hur många. */
-.damage-evidence-hint {
-  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 10px;
-  font-size: var(--fs-sm); font-weight: 600; color: var(--accent);
+/* Telefonens kort: utsnittet till vänster, texten bredvid — hela raden är samma tryckyta. */
+.damage-card-open-row { display: flex; align-items: flex-start; gap: 12px; }
+.damage-card-open-text { flex: 1; min-width: 0; }
+/* Skadan i miniatyr. Kvadratisk, så en lista med olika liggande och stående foton ändå får en rak
+   kant att läsa längs — utsnittet inuti behåller bildens egna proportioner. */
+.damage-crop {
+  position: relative; flex-shrink: 0; width: 72px; height: 72px;
+  border-radius: var(--r-sm); overflow: hidden; background: var(--field);
+}
+/* Absolut placerad och fritt förstorad: rutan är fönstret, bilden ligger och glider bakom det.
+   `max-width: none` för att sidans egen bildregel annars klämmer den tillbaka till rutans bredd. */
+.damage-crop-img { position: absolute; max-width: none; display: block; }
+.damage-crop-whole { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Fler bildrutor än en säger sig själv i hörnet — samma språk som vinkeletiketten på miniatyren. */
+.damage-crop-count {
+  position: absolute; right: 3px; bottom: 3px;
+  background: rgba(0,0,0,0.6); color: #fff; font-size: 9px; font-weight: 700;
+  padding: 1px 5px; border-radius: 4px;
 }
 .damage-card-actions { display: flex; justify-content: flex-end; gap: 12px; }
 .damage-card-actions .btn-remove { color: var(--danger-dark); }
@@ -1318,87 +1569,158 @@ body {
 .ladder-status-error { color: var(--danger-dark); }
 
 /* Stegens läge på en annons som redan ligger uppe. */
-.tradera-ladder {
+.sell-ladder {
   border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 12px;
   display: flex; flex-direction: column; gap: 6px;
 }
-.tradera-ladder-now { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
-.tradera-ladder-now strong { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.sell-ladder-now { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.sell-ladder-now strong { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 
 /* ==========================================================================
-   Truth-cardet
+   Annonsen
    ========================================================================== */
-.truth-card {
+.card-panel {
   background: var(--surface); border-radius: var(--r-lg);
   padding: 22px 20px; box-shadow: var(--lift); display: flex; flex-direction: column; gap: 7px;
 }
-.truth-kicker {
+.card-kicker {
   font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--accent);
 }
-.truth-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
-.truth-sub { font-size: var(--fs-base); color: var(--muted); }
+.card-title { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); }
+.card-sub { font-size: var(--fs-base); color: var(--muted); }
 /* Hur mycket generatorn kunde belägga står på kortet, inte i en fotnot: en annons där måtten är
    gissade ska inte se likadan ut som en där de har en källa. */
-.truth-confidence {
+.card-confidence {
   align-self: flex-start; margin-top: 6px; font-size: var(--fs-xs); font-weight: 700;
   border-radius: 999px; padding: 5px 11px;
 }
-.truth-confidence-full { background: var(--green-light); color: var(--green-dark); }
-.truth-confidence-partial { background: var(--amber-light); color: var(--amber-ink); }
-.truth-confidence-fallback { background: var(--danger-light); color: var(--danger-dark); }
-.truth-caveat { margin: 6px 0 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
+.card-confidence-full { background: var(--green-light); color: var(--green-dark); }
+.card-confidence-partial { background: var(--amber-light); color: var(--amber-ink); }
+.card-confidence-fallback { background: var(--danger-light); color: var(--danger-dark); }
 
-.truth-block {
+.card-block {
   background: var(--surface); border-radius: var(--r-lg);
   padding: 16px 18px; box-shadow: var(--shadow-card);
 }
-.truth-block h3 {
+.card-block h3 {
   margin: 0 0 12px; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
 }
-.truth-verdict { display: flex; align-items: center; gap: 12px; }
-.truth-verdict-label { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
-.truth-price {
+.card-verdict { display: flex; align-items: center; gap: 12px; }
+.card-verdict-label { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.card-price {
   margin-left: auto; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em;
   color: var(--ink); text-align: right;
 }
-.truth-price .small { display: block; font-weight: 500; letter-spacing: 0; color: var(--muted); }
-.truth-specs { margin: 0; display: flex; flex-direction: column; }
-.truth-spec { display: flex; gap: 14px; padding: 9px 0; align-items: baseline; }
-.truth-spec + .truth-spec { border-top: 1px solid var(--hairline); }
-.truth-spec dt { flex-shrink: 0; min-width: 96px; font-size: var(--fs-md); color: var(--muted); }
-.truth-spec dd { margin: 0; flex: 1; font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
-.truth-src { margin-left: 8px; font-size: var(--fs-xs); font-weight: 500; color: var(--accent); }
-.truth-listing-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
-.truth-listing-body { margin: 8px 0 0; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
-.truth-listing-condition { margin: 10px 0 0; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
-.truth-retail { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
-.truth-sources { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; }
-.truth-sources a { font-size: var(--fs-md); color: var(--accent); word-break: break-word; }
-.truth-missing ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; }
-.truth-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: var(--fs-lg); }
+.card-price .small { display: block; font-weight: 500; letter-spacing: 0; color: var(--muted); }
+.card-specs { margin: 0; display: flex; flex-direction: column; }
+.card-spec { display: flex; gap: 14px; padding: 9px 0; align-items: baseline; }
+.card-spec + .card-spec { border-top: 1px solid var(--hairline); }
+.card-spec dt { flex-shrink: 0; min-width: 96px; font-size: var(--fs-md); color: var(--muted); }
+.card-spec dd { margin: 0; flex: 1; font-size: var(--fs-base); font-weight: 600; color: var(--ink); }
+.card-src { margin-left: 8px; font-size: var(--fs-xs); font-weight: 500; color: var(--accent); }
+/* Uppskattat mått. Står på källänkens plats men i grått och utan länk — det finns ingen sida att gå
+   till, och skillnaden mellan "belagt" och "uppskattat" ska synas utan att raden behöver läsas. */
+.card-est { margin-left: 8px; font-size: var(--fs-xs); font-weight: 500; color: var(--muted); }
+.card-listing-title { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
+.card-listing-body { margin: 8px 0 0; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); white-space: pre-wrap; }
+.card-listing-condition { margin: 10px 0 0; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
+.card-retail { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.card-missing ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; }
+.card-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: var(--fs-lg); }
 .provenance { margin: 0; font-size: var(--fs-xs); color: var(--muted-soft); letter-spacing: 0.01em; }
 
 /* ==========================================================================
-   Publicera på Tradera
-   ========================================================================== */
-.tradera-block { display: flex; flex-direction: column; gap: 10px; }
-.tradera-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg); }
-.tradera-block p { margin: 0; }
-.tradera-waiting { display: flex; align-items: center; gap: 12px; }
-.tradera-plan { margin: 2px 0 0; }
-.tradera-confirm-actions { display: flex; gap: 10px; align-items: center; }
-.tradera-confirm-actions .btn-text { flex: 1; }
-.tradera-confirm-actions .btn-primary { flex: 2; }
-.tradera-error {
+   Sälj med Loopa
+   ==========================================================================
+   Sista blocket på annonsen: knappen som lägger ut möbeln till salu, och
+   kvittot den blir. Klasserna hette .tradera-* när knappen hette "Publicera
+   på Tradera" — marknadsplatsen är hur vi gör det, inte vad vi erbjuder. */
+.sell-block { display: flex; flex-direction: column; gap: 10px; }
+.sell-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg); }
+.sell-block p { margin: 0; }
+.sell-waiting { display: flex; align-items: center; gap: 12px; }
+.sell-plan { margin: 2px 0 0; }
+.sell-confirm-actions { display: flex; gap: 10px; align-items: center; }
+.sell-confirm-actions .btn-text { flex: 1; }
+.sell-confirm-actions .btn-primary { flex: 2; }
+.sell-error {
   padding: 10px 12px; border-radius: var(--r-sm); background: var(--danger-light); color: var(--danger-dark);
   font-size: var(--fs-md); line-height: 1.45;
 }
 /* Publicerad: samma gröna kvitto som resten av appen ger för ett avslutat steg. */
-.tradera-done h3 { color: var(--green-dark); }
-.tradera-link {
+.sell-done h3 { color: var(--green-dark); }
+.sell-link {
   display: flex; align-items: center; justify-content: center; text-decoration: none;
   background: var(--green); color: #fff; box-shadow: 0 4px 14px hsl(142 45% 38% / 0.26);
+}
+/* Dämpad: annonsen är huvudsaken i kvittot, listan är vägen vidare därifrån. */
+.sell-mine { align-self: center; color: var(--muted); }
+
+/* ---- bekräftelsen, i helskärm ----
+   Sista beslutet togs förut i den nedersta rutan på en lång sida, med hela annonsen kvar
+   ovanför som konkurrens. Här är granskningen den enda bilden: rubriken står stilla, kroppen
+   rullar, och "Ja, sälj den" ligger kvar i underkanten hela vägen. */
+.sell-modal-root { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; }
+.sell-modal-scrim {
+  position: absolute; inset: 0; background: hsl(var(--scrim) / 0.5);
+  animation: sell-modal-fade var(--t-slow) var(--ease-ui) both;
+}
+/* Telefonen får hela skärmen; på en bredare ruta stannar spalten på flödets egen bredd
+   i stället för att dra ut en tabell över halva fönstret. */
+.sell-modal-panel {
+  position: relative; z-index: 1; width: 100%; max-width: 520px; max-height: 100%;
+  display: flex; flex-direction: column; background: var(--bg);
+  animation: sell-modal-rise 380ms var(--ease-sheet) both;
+}
+.sell-modal-panel:focus { outline: none; }
+.sell-modal-head {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(14px + env(safe-area-inset-top)) var(--safe-right) 13px var(--safe-left);
+  background: var(--surface); border-bottom: 1px solid var(--hairline);
+}
+.sell-modal-head h2 {
+  margin: 0; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.025em; color: var(--ink);
+}
+/* Samma kryss som arkens: rund tryckyta, ingen ram förrän den rörs vid. */
+.sell-modal-close {
+  position: relative; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+  width: var(--tap); height: var(--tap); margin-right: -10px;
+  background: none; border: none; color: var(--muted); cursor: pointer;
+}
+.sell-modal-close::before {
+  content: ""; position: absolute; width: 32px; height: 32px; border-radius: 999px;
+  background: transparent; transition: background var(--t) var(--ease-ui);
+}
+.sell-modal-close svg { position: relative; }
+.sell-modal-close:hover { color: var(--ink); }
+.sell-modal-close:hover::before { background: var(--surface-sunk); }
+.sell-modal-close:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 999px; }
+.sell-modal-close:disabled { color: var(--muted-soft); cursor: not-allowed; }
+.sell-modal-body {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  display: flex; flex-direction: column; gap: 12px;
+  padding: 16px var(--safe-right) 22px var(--safe-left);
+}
+.sell-modal-body > p { margin: 0; }
+.sell-modal-body .card-block { display: flex; flex-direction: column; gap: 11px; }
+.sell-modal-body .card-block h3 { margin: 0; }
+.sell-modal-lede { font-size: var(--fs-base); line-height: 1.5; color: var(--ink-soft); }
+/* Knapparna följer inte med rullningen. Det som ska tryckas ska aldrig behöva letas fram. */
+.sell-modal-actions {
+  flex-shrink: 0; display: flex; align-items: center; gap: 10px;
+  padding: 12px var(--safe-right) calc(14px + env(safe-area-inset-bottom)) var(--safe-left);
+  background: var(--surface); border-top: 1px solid var(--hairline);
+}
+.sell-modal-actions .btn-text { flex: 1; }
+.sell-modal-actions .btn-primary {
+  flex: 2; min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg);
+}
+@keyframes sell-modal-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes sell-modal-rise { from { transform: translateY(100%); } to { transform: none; } }
+@keyframes sell-modal-pop {
+  from { opacity: 0; transform: translateY(12px) scale(0.985); }
+  to { opacity: 1; transform: none; }
 }
 
 /* ==========================================================================
@@ -1432,16 +1754,26 @@ body {
   box-shadow: inset 0 0 0 1px hsl(var(--scrim) / 0.05);
 }
 .candidate-photo img { width: 100%; height: 100%; object-fit: contain; display: block; }
-/* Platshållare i bildens storlek, så listan inte hoppar när bilderna tonar in. */
-.candidate-photo-empty {
-  width: 100%; height: 100%;
-  background: var(--skeleton);
+/* Platshållare i bildens storlek, så listan inte hoppar när bilderna tonar in. Stilla som
+   grundläge: rutan står kvar även för den kandidat som fått sitt besked att ingen bild finns, och
+   en platshållare som rör sig lovar att något är på väg. */
+.candidate-photo-empty { width: 100%; height: 100%; background: var(--skeleton); }
+/* Skimret betyder EN sak: servern letar fortfarande efter just den här bilden. */
+.candidate-photo-empty.is-searching {
   background-size: 240% 100%; animation: price-shimmer 1.4s var(--ease-ui) infinite;
 }
 .manual-model-link { align-self: center; margin-top: 4px; }
+/* Frågan och dess två svar på en rad: "Ingen av dem?" är inte en knapp, de andra två är det. Raden
+   får bryta på smala skärmar hellre än att knapptexterna trängs ihop. */
+.candidate-none {
+  display: flex; align-items: center; justify-content: center; flex-wrap: wrap;
+  gap: 2px; margin-top: 4px;
+}
+.candidate-none-label { color: var(--muted); font-size: var(--fs-sm); }
+.candidate-none .btn-text { padding: 10px 8px; font-size: var(--fs-base); }
 .manual-model { margin-top: 4px; }
 .specs-head { display: flex; flex-direction: column; gap: 8px; margin-bottom: 4px; }
-.specs-head .truth-confidence { margin-top: 2px; }
+.specs-head .card-confidence { margin-top: 2px; }
 /* ==========================================================================
    Stegindikatorn
    ==========================================================================
@@ -1483,11 +1815,17 @@ body {
   .sheet, .sheet-overlay, .collapsible-chevron, .btn, .brand-use-typed, .auth-tabs-thumb {
     transition-duration: 1ms;
   }
-  .price-skeleton, .review-spinner, .candidate-photo-empty { animation-duration: 3s; }
+  .sell-modal-panel, .sell-modal-scrim { animation-duration: 1ms; }
+  .price-skeleton, .review-spinner, .candidate-photo-empty.is-searching { animation-duration: 3s; }
   /* Möbeln slutar studsa; ringen får stå kvar som stillbild med lite fyllning. */
-  .model-search-icon, .model-search-shadow, .model-search-word { animation: none; }
+  .model-search-icon, .model-search-shadow, .wait-word { animation: none; }
   .model-search-shadow { opacity: 0.16; }
   .model-search-ring-fill { animation: none; stroke-dashoffset: 72; }
+  /* Luppen slutar vandra och blir liggande över möbeln med båda fynden redan utpekade;
+     måttbandet står kvar som stillbild med lite utdraget. */
+  .listing-build-piece, .listing-build-loupe, .listing-build-mark { animation: none; }
+  .listing-build-loupe { transform: translate(75px, 70px); }
+  .listing-build-tape-fill { animation: none; stroke-dashoffset: 72; }
 }
 
 
@@ -1508,7 +1846,7 @@ body {
 
 /* Rubriker i grupperade kort följer iOS: versaler, grå, tunn spärr — etiketten
    över en lista, inte en rubrik som konkurrerar med innehållet under sig. */
-.truth-block h3, .profile-section-title, .tech-section h4, .sheet-section-title, .price-panel-head {
+.card-block h3, .profile-section-title, .tech-section h4, .sheet-section-title, .price-panel-head {
   font-weight: 600; letter-spacing: 0.05em;
 }
 
@@ -1595,7 +1933,7 @@ body {
 /* ---- måttsegmentet ---- */
 .dim-block { padding-bottom: 14px; }
 .dim-question { margin: -4px 0 12px; font-size: var(--fs-base); font-weight: 600; color: var(--brand-ink-strong); letter-spacing: -0.01em; }
-/* Måttfiguren är truth-cardets rendering, i måttstegets egen ram: samma ljusa yta som kortets
+/* Måttfiguren är annonsens rendering, i måttstegets egen ram: samma ljusa yta som kortets
    scen, utan egen skugga — den ligger redan på ett kort. */
 .dim-render {
   margin: 0 -6px 4px; border-radius: var(--r-lg); overflow: hidden;
@@ -1610,12 +1948,12 @@ body {
 
 
 /* ==========================================================================
-   Truth-cardet som annons
+   Annonsen
    ==========================================================================
-   Kortet är det säljaren publicerar, så det ska se ut som det den blir: ett
+   Kortet ÄR annonsen säljaren publicerar, så det ska se ut som en annons: ett
    produktkort. Bild, namn, pris, specifikationer, beskrivning — i den ordningen,
    som på en annons för en ny möbel. Skillnaden är att skicket står med. */
-.truth-screen { gap: 14px; }
+.card-screen { gap: 14px; }
 .listing { display: flex; flex-direction: column; gap: 14px; }
 .listing-facts { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
 
@@ -1636,6 +1974,11 @@ body {
 /* Produktbilden bär sin EGEN vita bakgrund, så ytan under den måste vara vit och inte scenens
    toning — annars ritar bilden en synlig fyrkant runt sig där dess vita tar slut mot vår gråa. */
 .listing-stage-photo { background: #ffffff; }
+/* Urklippet får hela rutan och en kvadrat att stå i: bilden ÄR redan vit runt möbeln, med sin egen
+   luft inräknad (se cutout.ts), så en paddning till hade bara krympt möbeln. Kvadraten är formatet
+   varje butik visar en produkt i — och en 4:3-ruta hade lagt vita bälten längs sidorna på en stående
+   möbel i en redan vit bild. */
+.listing-stage-cutout .listing-cover { aspect-ratio: 1 / 1; padding: 0; }
 /* Fast höjd oavsett bildens proportion: en stående fåtöljbild och en liggande soffbild ska ge kort
    som ser likadana ut. `contain` skalar in hela möbeln, så inget beskärs bort på köpet. */
 .listing-cover {
@@ -1655,6 +1998,9 @@ body {
 .render-stage { position: relative; }
 .render-canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
 .render-canvas:active { cursor: grabbing; }
+/* Stillbilden är en bild. Inget grip-handtag, och fingret får rulla sidan rakt igenom den — annars
+   fastnar scrollen på måttsteget mitt i den största ytan på skärmen. */
+.render-canvas-still, .render-canvas-still:active { touch-action: auto; cursor: default; }
 /* Kontaktskuggan: möbelns eget avtryck på golvet, suddat. Mörkare än en generell skugga, för det
    är den enda kontakten mellan möbeln och rummet — utan den svävar den i rutan. */
 .render-contact { fill: hsl(var(--scrim) / 0.26); }
@@ -1760,13 +2106,10 @@ body {
 .listing-pin-note { margin: 12px 0 0; font-size: var(--fs-xs); color: var(--muted-soft); }
 
 .listing-title-line { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
-.listing-provenance { display: flex; flex-direction: column; gap: 10px; }
-.listing-provenance .truth-confidence { margin-top: 0; }
-.listing-provenance .truth-caveat { margin: 0; }
 
 
 /* ==========================================================================
-   Loopa-ID och det publika truth-cardet
+   Loopa-ID och den publika annonsen
    ==========================================================================
    Kortet är publikt och nås på sitt ID: det står i Tradera-annonsen och slås upp
    antingen på /c/LP-XXXX-XXXX eller i sökrutan bakom ikonen i topplisten. ID:t
@@ -1832,7 +2175,7 @@ body {
 }
 .public-card-cta:hover { text-decoration: underline; text-underline-offset: 3px; }
 
-/* ---- chatten på truth-cardet ---- */
+/* ---- chatten på annonsen ---- */
 /* Ett block bland de andra, med samma yta och skugga. Chatten är en del av kortet och ska se ut som
    det — en flytande bubbla i hörnet hade tillhört sajten, inte möbeln. */
 .card-chat { display: flex; flex-direction: column; gap: 12px; }
@@ -1912,7 +2255,7 @@ body {
 .card-chat-send:focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* ==========================================================================
-   Adminpanelen — alla konton, och vägen in till deras truth-cards
+   Adminpanelen — alla konton, och vägen in till deras annonser
    ========================================================================== */
 .admin-head { display: flex; align-items: center; gap: 10px; margin-top: 4px; }
 .admin-badge {
@@ -2027,7 +2370,7 @@ body {
   max-width: 860px; padding: 34px 40px 76px; gap: 18px;
 }
 [data-view="desktop"] .home { max-width: 1240px; }
-[data-view="desktop"] .truth-screen { max-width: 1140px; }
+[data-view="desktop"] .card-screen { max-width: 1140px; }
 [data-view="desktop"] .public-card-screen { max-width: 1140px; }
 [data-view="desktop"] .result-screen { max-width: 1100px; }
 [data-view="desktop"] .price-screen, [data-view="desktop"] .specs-screen { max-width: 980px; }
@@ -2061,7 +2404,7 @@ body {
 [data-view="desktop"] .brand-use-typed:hover { background: var(--accent-dark); }
 [data-view="desktop"] .app-bar-profile:hover,
 [data-view="desktop"] .app-bar-icon:hover { background: hsl(40 26% 83%); color: var(--ink); }
-[data-view="desktop"] .truth-src:hover, [data-view="desktop"] .truth-sources a:hover { color: var(--accent-dark); }
+[data-view="desktop"] .card-src:hover { color: var(--accent-dark); }
 
 /* Knappen lyfter en aning och lägger en färgad skugga under sig. Ett tryck på en
    telefon svarar med opacitet för att fingret ändå täcker knappen; en mus gör det inte. */
@@ -2120,7 +2463,10 @@ body {
   grid-column: 1; grid-row: 2 / span 2; align-self: start; margin-bottom: 0;
 }
 [data-view="desktop"] .home > .brand-search { grid-column: 2; grid-row: 2; margin-bottom: 0; }
-[data-view="desktop"] .home > .brand-scroll { grid-column: 2; grid-row: 3 / span 2; min-height: 0; }
+[data-view="desktop"] .home > .brand-scroll { grid-column: 2; grid-row: 3; min-height: 0; }
+/* Priset står under mosaiken, i märkenas egen spalt och i dess fulla bredd — sista raden
+   i den kolumn man handlar i, inte en fotnot i den man läser. */
+[data-view="desktop"] .home > .home-fee-line { grid-column: 2; grid-row: 4; margin-top: 0; }
 /* Historiken ankras i nederkanten av vänsterspalten: den är ett arkiv, inte nästa steg. */
 [data-view="desktop"] .home > .collapsible-card { grid-column: 1; grid-row: 4; align-self: end; }
 
@@ -2204,6 +2550,7 @@ body {
   grid-template-rows: auto auto 1fr;
   column-gap: 72px; align-content: center;
 }
+[data-view="desktop"] .auth-back { top: 26px; left: 30px; }
 [data-view="desktop"] .auth-wordmark {
   grid-column: 1; grid-row: 1; text-align: left; font-size: 40px; margin-bottom: 28px;
 }
@@ -2256,13 +2603,13 @@ body {
 /* Åtta fält under varandra blir en remsa; två spalter ger ögat en kant att läsa längs — men
    bara när kortet är brett nog. auto-fit faller tillbaka till en spalt inne i rutnätet, där
    två hade brutit "Massivt trä" mitt itu. */
-[data-view="desktop"] .truth-specs {
+[data-view="desktop"] .card-specs {
   display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); column-gap: 34px;
 }
-[data-view="desktop"] .truth-spec, [data-view="desktop"] .truth-spec + .truth-spec {
+[data-view="desktop"] .card-spec, [data-view="desktop"] .card-spec + .card-spec {
   border-top: 1px solid var(--hairline);
 }
-[data-view="desktop"] .truth-block { padding: 20px 22px; }
+[data-view="desktop"] .card-block { padding: 20px 22px; }
 /* Mätaren följer inte skärmens bredd. Fyra segment utsträckta över en meter läser
    som en avdelare, inte som en räkning. */
 [data-view="desktop"] .flow-steps { max-width: 420px; }
@@ -2385,7 +2732,7 @@ body {
 }
 
 /* ==========================================================================
-   Truth-cardet — bilden till vänster, fakta till höger
+   Annonsen — bilden till vänster, fakta till höger
    ==========================================================================
    Renderingen följer med när fakta rullas: punkterna i bilden ska gå att titta på
    samtidigt som man läser raden de hör till. */
@@ -2397,13 +2744,23 @@ body {
 [data-view="desktop"] .listing-name { font-size: 42px; }
 [data-view="desktop"] .listing-price-now { font-size: 44px; }
 [data-view="desktop"] .listing-block { padding: 20px 22px; }
-[data-view="desktop"] .truth-done { max-width: 360px; align-self: center; }
+[data-view="desktop"] .card-done { max-width: 360px; align-self: center; }
 [data-view="desktop"] .card-chat-stream { max-height: 420px; }
 [data-view="desktop"] .loopa-id-copy:hover { background: var(--surface-sunk); color: var(--ink); }
 [data-view="desktop"] .public-card-head,
 [data-view="desktop"] .public-card-search,
 [data-view="desktop"] .public-card-submit,
 [data-view="desktop"] .public-card-error { max-width: 520px; }
+
+/* ---- bekräftelsen: en centrerad dialog, inte en helskärmsruta ----
+   På telefonen ÄR skärmen rutan. På en dator vore samma sak ett fönsterbyte; här räcker
+   det att allt annat sjunker undan bakom blädden. */
+[data-view="desktop"] .sell-modal-root { align-items: center; padding: 32px; }
+[data-view="desktop"] .sell-modal-panel {
+  max-width: 560px; max-height: min(88vh, 880px);
+  border-radius: var(--r-xl); overflow: hidden; box-shadow: var(--shadow-raised);
+  animation-name: sell-modal-pop; animation-duration: 260ms; animation-timing-function: var(--ease-ui);
+}
 
 /* ==========================================================================
    Märkesväljaren — dialog i stället för bottensheet
@@ -2427,6 +2784,10 @@ body {
   border-radius: var(--r-xl); box-shadow: var(--shadow-raised);
 }
 [data-view="desktop"] .camera-feed { height: min(70vh, 640px); }
+/* Fotoguiden i en 820 px panel: utan tak blir de sex stegen 130 px breda miniatyrer av något som är
+   en fotnot till kamerabilden. Kortet och stegraden håller telefonbredd och centreras. */
+[data-view="desktop"] .photo-guide { left: 0; right: 0; max-width: 560px; margin: 0 auto; }
+[data-view="desktop"] .guided-controls { left: 0; right: 0; max-width: 560px; margin: 0 auto; }
 [data-view="desktop"] .review-grid { grid-template-columns: repeat(4, 1fr); }
 
 /* ---- låga fönster ----
@@ -2451,4 +2812,421 @@ body {
   [data-view="desktop"] .candidate,
   [data-view="desktop"] .choose-card,
   [data-view="desktop"] .btn-primary:not(:disabled):hover { transform: none; }
+}
+
+/* ==========================================================================
+   Juridiken — cookierutan och de tre dokumenten
+   ==========================================================================
+   Sidorna är prosa och inte flöde, så de bryter medvetet mot appens övriga mått:
+   radlängden får gå till 62 tecken i stället för att hålla telefonkolumnens 480 px,
+   eftersom en policy läses och inte trycks på. Allt annat — färger, radier, typsnitt —
+   är samma tokens som resten. */
+
+/* Översättningsnotisen: en dämpad rad över dokumentet, aldrig en varning. Den som läser
+   engelska ska veta vilken text som gäller, inte skrämmas från att läsa vidare. */
+.legal-translation-note {
+  margin: 0 0 18px; padding: 10px 14px; border-radius: var(--r-sm);
+  background: var(--field); color: var(--muted); font-size: var(--fs-sm); line-height: 1.45;
+}
+
+/* ---- länken, varhelst den står ---- */
+.legal-link {
+  color: var(--muted); font-size: var(--fs-sm); font-weight: 600;
+  text-decoration: none; border-bottom: 1px solid var(--border);
+  transition: color var(--t) var(--ease-ui), border-color var(--t) var(--ease-ui);
+}
+.legal-link:hover { color: var(--ink); border-color: var(--muted-soft); }
+.legal-link:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 2px; }
+/* Cookieinställningar är en knapp och inte en länk — den navigerar inte, den glömmer ett val.
+   Att den SER ut som grannarna är rätt: för läsaren är det samma sorts sak. */
+.legal-link-button {
+  background: none; border: none; border-bottom: 1px solid var(--border);
+  padding: 0; font-family: inherit; cursor: pointer;
+}
+
+/* ---- foten på start- och profilskärmen ---- */
+.legal-footer {
+  display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px;
+  margin-top: auto; padding-top: 24px;
+}
+
+/* ---- cookierutan ---- */
+.consent {
+  position: fixed; z-index: 70;
+  left: 0; right: 0; bottom: 0;
+  padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+  pointer-events: none; /* bara kortet tar tryck — sidan bakom ska gå att använda */
+}
+/* Inte över kameran.
+   Kameravyn ritar sina kontroller direkt på bildrutan, i underkanten — samma plats som rutan tar.
+   Den som filmar sitt varv hade fått avtryckaren skymd av en fråga om cookies, mitt i den enda
+   handling appen finns för. Frågan är inte brådskande; den står kvar och möter dem när de kommer
+   ut ur kameran igen. */
+body:has(.screen-camera) .consent { display: none; }
+.consent-inner {
+  pointer-events: auto;
+  max-width: 480px; margin: 0 auto;
+  background: var(--surface); border-radius: var(--r-xl);
+  border: 1px solid var(--hairline);
+  box-shadow: var(--shadow-raised);
+  padding: 18px 18px 14px;
+  animation: consent-in 320ms var(--ease-sheet) both;
+}
+@keyframes consent-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.consent-title {
+  margin: 0 0 6px; font-size: var(--fs-lg); font-weight: 700;
+  letter-spacing: -0.015em; color: var(--ink);
+}
+.consent-body { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
+.consent-body strong { color: var(--ink-soft); font-weight: 600; }
+/* Två spalter av samma bredd. Rutnätet ÄR regeln: ingen av knapparna kan råka bli den större,
+   och den dagen någon lägger till en tredje delas bredden lika igen. */
+.consent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.consent-choice { width: 100%; padding: 12px 10px; font-size: var(--fs-md); min-height: var(--tap); }
+.consent-links {
+  margin: 12px 0 0; text-align: center;
+  display: flex; justify-content: center; gap: 12px;
+}
+
+/* ---- dokumenten ---- */
+.legal { gap: 0; }
+.legal-head { margin: 8px 0 20px; }
+.legal-title { margin: 0; font-size: 28px; line-height: 1.15; letter-spacing: -0.02em; color: var(--ink); }
+.legal-updated { margin: 6px 0 0; font-size: var(--fs-sm); color: var(--muted-soft); }
+
+.legal-body { color: var(--ink-soft); font-size: var(--fs-base); line-height: 1.6; max-width: 62ch; }
+.legal-body h2 {
+  margin: 30px 0 10px; font-size: var(--fs-title); line-height: 1.25;
+  letter-spacing: -0.02em; color: var(--ink);
+}
+.legal-body h3 {
+  margin: 22px 0 6px; font-size: var(--fs-lg); letter-spacing: -0.01em; color: var(--ink);
+}
+.legal-body p { margin: 0 0 12px; }
+.legal-body ul { margin: 0 0 14px; padding-left: 20px; }
+.legal-body li { margin-bottom: 6px; }
+.legal-body strong { color: var(--ink); font-weight: 600; }
+.legal-body a { color: var(--accent-ink); text-decoration: underline; text-underline-offset: 2px; }
+.legal-body code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.88em;
+  background: var(--field); border-radius: var(--r-xs); padding: 1px 5px; color: var(--ink);
+}
+.legal-lede {
+  font-size: var(--fs-lg); line-height: 1.5; color: var(--muted);
+  margin-bottom: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--hairline);
+}
+/* Den rättsliga grunden hör till stycket ovanför utan att vara en del av det — därför indragen
+   och mindre, som en fotnot på plats i stället för längst ned. */
+.legal-basis {
+  font-size: var(--fs-sm); color: var(--muted-soft);
+  border-left: 2px solid var(--border); padding-left: 10px; margin-bottom: 18px;
+}
+
+.legal-list { margin: 0 0 16px; }
+.legal-list dt { margin-top: 14px; font-weight: 700; color: var(--ink); }
+.legal-list dt:first-child { margin-top: 0; }
+.legal-list dd { margin: 4px 0 0; }
+/* Livslängden står bredvid nyckelns namn och inte i en egen kolumn: en tabell med fem rader
+   tvingar fram vågrät rullning på en telefon för att vinna en uppställning ingen behöver. */
+.legal-tag {
+  display: inline-block; margin-left: 6px; font-size: var(--fs-2xs); font-weight: 600;
+  letter-spacing: 0.02em; color: var(--muted-soft); background: var(--field);
+  border-radius: 999px; padding: 2px 8px; vertical-align: middle; white-space: nowrap;
+}
+
+.legal-nav {
+  display: flex; flex-wrap: wrap; gap: 10px 18px;
+  margin-top: 34px; padding-top: 18px; border-top: 1px solid var(--hairline);
+}
+.legal-nav-link {
+  color: var(--accent-ink); font-size: var(--fs-md); font-weight: 600; text-decoration: none;
+}
+.legal-nav-link:hover { text-decoration: underline; text-underline-offset: 2px; }
+
+/* ---- datorvy ---- */
+[data-view="desktop"] .legal { max-width: 720px; padding-top: 40px; }
+[data-view="desktop"] .legal-title { font-size: 36px; }
+[data-view="desktop"] .consent-inner { padding: 20px 22px 16px; }
+
+/* ==========================================================================
+   Den animerade prototypen — "Hur funkar Loopa?"
+   ==========================================================================
+   Fem scener i en ram med fast höjd. Höjden är fast för att scenerna är olika
+   höga, och en ram som växer och krymper var femte sekund flyttar allt under
+   sig medan man läser det. Av samma skäl har bildtexten en minsta höjd.
+
+   Formerna är appens egna: samma tokens, samma radier, samma orange, så att
+   scenen och skärmen den beskriver ser ut att höra ihop. */
+
+.proto-heading {
+  margin: 0 0 14px; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+}
+/* Ordmärket mitt i rubriken bär sin form och sin färg, men inte sin storlek — 30 px hade
+   stuckit ut ur raden det står i. */
+.proto-heading-mark { font-size: inherit; }
+
+.proto-frame {
+  height: 330px; padding: 20px 18px; overflow: hidden;
+  background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--shadow-raised);
+  display: grid; place-items: center;
+}
+.proto-screen { width: 100%; }
+.proto-scene {
+  display: flex; flex-direction: column; gap: 14px; width: 100%;
+  animation: proto-scene-in 340ms var(--ease-ui) both;
+}
+@keyframes proto-scene-in { from { opacity: 0; transform: translateY(7px); } }
+
+/* En gest, många tider. Allt som kommer in i en scen gör det likadant; det som skiljer dem
+   åt är NÄR, och den ordningen står i JSX som --d eftersom den hör till innehållet.
+   Animationerna går alla från ett dolt läge till elementets vanliga — därför blir "ingen
+   animation" automatiskt det färdiga läget, vilket är precis vad reducerad rörelse vill ha. */
+.proto-chip, .proto-pricerow, .proto-mark, .proto-verdict, .proto-id, .proto-mini,
+.proto-market, .proto-stat, .proto-assure li, .proto-sold, .proto-ledger > div, .proto-note {
+  animation: proto-in 420ms var(--ease-ui) both;
+  animation-delay: var(--d, 0s);
+}
+@keyframes proto-in { from { opacity: 0; transform: translateY(7px); } }
+@keyframes proto-grow-x { from { width: 0; } }
+
+/* scen 1: varvet filmas och annonsen skriver sig själv */
+.proto-lens {
+  position: relative; height: 112px; overflow: hidden;
+  border-radius: var(--r-lg); background: var(--ink);
+  display: grid; place-items: center;
+}
+.proto-lens-piece { display: flex; color: var(--on-dark-strong); }
+.proto-ring { position: absolute; width: 96px; height: 96px; }
+.proto-ring-track { fill: none; stroke: hsl(38 9% 66% / 0.2); stroke-width: 4; }
+.proto-ring-fill {
+  fill: none; stroke: var(--accent); stroke-width: 4; stroke-linecap: round;
+  stroke-dasharray: 365; transform: rotate(-90deg); transform-origin: 50% 50%;
+  animation: proto-ring 2.6s var(--ease-ui) both;
+}
+@keyframes proto-ring { from { stroke-dashoffset: 365; } }
+.proto-lens-tag {
+  position: absolute; bottom: 9px; left: 50%; transform: translateX(-50%); white-space: nowrap;
+  font-size: var(--fs-2xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--on-dark); background: hsl(var(--scrim) / 0.55); border-radius: 999px; padding: 3px 10px;
+}
+
+.proto-sheet { display: flex; flex-direction: column; gap: 8px; }
+.proto-sheet-head {
+  display: flex; align-items: center; gap: 6px; margin-bottom: 2px;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+  color: var(--accent);
+}
+/* Raderna växer på bredden i stället för att tona in: det är skillnaden mellan text som
+   skrivs och text som redan låg där. */
+.proto-write {
+  display: block; width: 100%; height: 9px; border-radius: 999px; background: var(--field);
+  animation: proto-write 640ms var(--ease-ui) both; animation-delay: var(--d, 0s);
+}
+.proto-write-lg { width: 74%; height: 13px; background: var(--surface-sunk); }
+.proto-write-sm { width: 58%; }
+@keyframes proto-write { from { width: 0; opacity: 0.25; } }
+
+.proto-chiprow { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+.proto-chip {
+  font-size: var(--fs-2xs); font-weight: 600; color: var(--ink-soft); white-space: nowrap;
+  background: var(--field); border-radius: 999px; padding: 4px 10px;
+}
+.proto-pricerow {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  margin-top: 4px; padding-top: 9px; border-top: 1px solid var(--hairline);
+  font-size: var(--fs-md); color: var(--muted);
+}
+.proto-pricerow strong { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); }
+
+/* scen 2: skicket granskas */
+.proto-photo {
+  position: relative; height: 148px; overflow: hidden;
+  border-radius: var(--r-lg); background: var(--field);
+  display: grid; place-items: center;
+}
+.proto-photo-piece { display: flex; color: var(--muted-soft); }
+.proto-sweep {
+  position: absolute; top: 0; bottom: 0; left: 0; width: 44%;
+  background: linear-gradient(90deg, transparent, hsl(14 77% 54% / 0.16), transparent);
+  animation: proto-sweep 2.3s var(--ease-ui) both;
+}
+@keyframes proto-sweep { from { transform: translateX(-100%); } to { transform: translateX(280%); } }
+.proto-mark { position: absolute; display: flex; align-items: center; gap: 7px; }
+.proto-mark-ring {
+  width: 14px; height: 14px; border-radius: 999px; flex-shrink: 0;
+  border: 2px solid var(--accent); background: hsl(14 77% 54% / 0.2);
+  box-shadow: 0 0 0 4px hsl(14 77% 54% / 0.12);
+}
+.proto-mark-label {
+  font-style: normal; font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap;
+  background: var(--surface); color: var(--ink); border-radius: 999px; padding: 3px 9px;
+  box-shadow: var(--shadow-card);
+}
+.proto-verdict { display: flex; align-items: center; gap: 11px; }
+.proto-grade {
+  width: 38px; height: 38px; flex-shrink: 0; border-radius: var(--r);
+  display: grid; place-items: center;
+  background: var(--green-light); color: var(--green-dark);
+  font-size: 19px; font-weight: 800; letter-spacing: -0.02em;
+}
+.proto-verdict-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
+.proto-verdict-text strong { font-size: var(--fs-base); color: var(--ink); }
+.proto-verdict-text em { font-style: normal; font-size: var(--fs-xs); color: var(--muted); }
+.proto-id {
+  align-self: flex-start; padding: 4px 9px; border-radius: var(--r-xs);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: var(--fs-xs);
+  letter-spacing: 0.04em; background: var(--accent-light); color: var(--accent-ink);
+}
+
+/* scen 3: annonsen läggs ut */
+.proto-scene-listed { gap: 0; }
+.proto-mini {
+  display: flex; align-items: center; gap: 11px; padding: 9px 12px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r);
+  box-shadow: var(--shadow-card);
+}
+.proto-mini-thumb {
+  width: 42px; height: 42px; flex-shrink: 0; border-radius: var(--r-sm);
+  background: var(--field); color: var(--muted-soft); display: grid; place-items: center;
+}
+.proto-mini-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.35; }
+.proto-mini-text strong { font-size: var(--fs-md); color: var(--ink); }
+.proto-mini-text em { font-style: normal; font-size: var(--fs-xs); color: var(--muted); }
+/* Tre streck ut ur en annons. Ritas ut med streckad kontur i stället för att tona in —
+   linjen ska läsa som en väg någonstans, och en väg dras. */
+.proto-fan { width: 100%; height: 42px; }
+.proto-fan path {
+  fill: none; stroke: var(--border); stroke-width: 1.6; vector-effect: non-scaling-stroke;
+  stroke-dasharray: 90; animation: proto-draw 520ms var(--ease-ui) both; animation-delay: var(--d, 0s);
+}
+@keyframes proto-draw { from { stroke-dashoffset: 90; } }
+.proto-markets { display: flex; gap: 8px; }
+.proto-market {
+  flex: 1; min-width: 0; padding: 9px 4px; text-align: center;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: var(--fs-xs); font-weight: 700; color: var(--ink-soft);
+  background: var(--field); border-radius: var(--r-sm);
+}
+.proto-stat {
+  display: flex; align-items: center; gap: 7px; margin: 16px 0 0;
+  font-size: var(--fs-md); color: var(--muted);
+}
+.proto-stat strong { color: var(--ink); font-variant-numeric: tabular-nums; }
+.proto-stat-dot { width: 3px; height: 3px; border-radius: 999px; background: var(--muted-soft); }
+
+/* scen 4: frakten */
+.proto-route {
+  display: grid; grid-template-columns: 78px 1fr 78px; align-items: start; gap: 8px;
+  padding: 10px 0 2px;
+}
+.proto-stop {
+  display: flex; flex-direction: column; align-items: center; gap: 9px; text-align: center;
+  font-size: var(--fs-2xs); font-weight: 600; line-height: 1.3; color: var(--muted);
+}
+.proto-stop-dot {
+  width: 13px; height: 13px; border-radius: 999px;
+  border: 3px solid var(--border); background: var(--surface);
+}
+.proto-stop-dot-end { border-color: var(--green); }
+/* Sträckan är lika hög som pricken och ligger överst i sin kolumn, så linjen träffar
+   prickarnas mitt i stället för mitten av kolumnen med etiketten under. */
+.proto-track { position: relative; height: 13px; }
+.proto-track::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; margin-top: -1px; height: 2px;
+  background: repeating-linear-gradient(90deg, var(--border) 0 6px, transparent 6px 12px);
+}
+.proto-track-done {
+  position: absolute; left: 0; top: 50%; margin-top: -1px; height: 2px; width: 100%;
+  border-radius: 2px; background: var(--accent);
+  animation: proto-grow-x 2.7s var(--ease-ui) both;
+}
+.proto-van {
+  position: absolute; top: 50%; left: 100%; transform: translate(-50%, -50%);
+  width: 26px; height: 26px; border-radius: 999px; display: grid; place-items: center;
+  background: var(--accent); color: #fff; box-shadow: var(--shadow-card);
+  animation: proto-van 2.7s var(--ease-ui) both;
+}
+@keyframes proto-van { from { left: 0; } }
+.proto-assure {
+  list-style: none; margin: 8px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.proto-assure li { display: flex; align-items: center; gap: 9px; font-size: var(--fs-md); color: var(--ink-soft); }
+.proto-assure svg { flex-shrink: 0; color: var(--green); }
+
+/* scen 5: transaktionen och provisionen */
+.proto-sold {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+  font-size: var(--fs-md); color: var(--muted);
+}
+.proto-sold strong { font-size: 24px; font-weight: 700; letter-spacing: -0.025em; color: var(--ink); }
+/* Andelarna får krympa: 80 % + 20 % + mellanrummet är mer än hundra, och det är mellanrummet
+   som ska ge vika — inte proportionen mellan de två. */
+.proto-bar { display: flex; gap: 4px; height: 14px; }
+.proto-bar span {
+  display: block; flex: 0 1 auto; min-width: 0; border-radius: 999px;
+  animation: proto-grow-x 720ms var(--ease-ui) both; animation-delay: var(--d, 0s);
+}
+.proto-bar-seller { background: var(--accent); }
+.proto-bar-loopa { background: var(--surface-sunk); }
+.proto-ledger { margin: 0; display: flex; flex-direction: column; gap: 9px; }
+.proto-ledger > div { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.proto-ledger dt { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); color: var(--muted); }
+.proto-ledger dd { margin: 0; display: flex; align-items: baseline; gap: 9px; }
+.proto-ledger dd strong { font-size: var(--fs-base); font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; }
+.proto-ledger dd em {
+  font-style: normal; font-size: var(--fs-2xs); font-weight: 700; white-space: nowrap;
+  color: var(--muted-soft); background: var(--field); border-radius: 999px; padding: 2px 7px;
+}
+.proto-key { width: 9px; height: 9px; flex-shrink: 0; border-radius: 3px; }
+.proto-key-seller { background: var(--accent); }
+.proto-key-loopa { background: var(--surface-sunk); }
+.proto-note { margin: 4px 0 0; font-size: var(--fs-xs); line-height: 1.45; color: var(--muted-soft); }
+
+/* ---- bildtexten och stegraden ---- */
+.proto-caption {
+  display: flex; flex-direction: column; gap: 4px; margin: 16px 0 0; min-height: 96px;
+}
+.proto-caption strong { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.proto-caption span { font-size: var(--fs-md); line-height: 1.45; color: var(--muted); }
+
+.proto-rail { list-style: none; display: flex; gap: 8px; margin: 0; padding: 0; }
+.proto-rail li { flex: 1; }
+/* Strecket är 4 px, tryckytan 44. Paddningen ÄR tryckytan — den ger också avståndet upp
+   till bildtexten, vilket är varför raden själv inte har någon marginal. */
+.proto-rail-step {
+  position: relative; display: block; width: 100%; padding: 20px 0;
+  border: none; background: none; cursor: pointer;
+}
+.proto-rail-step::before {
+  content: ""; position: absolute; left: 0; right: 0; top: 50%; margin-top: -2px; height: 4px;
+  border-radius: 999px; background: var(--surface-sunk);
+}
+.proto-rail-fill {
+  position: absolute; left: 0; top: 50%; margin-top: -2px; height: 4px; width: 0;
+  border-radius: 999px; background: var(--accent);
+}
+/* Spelas scenen upp fylls strecket i takt med den, och varaktigheten kommer med som
+   inlinestil. Står den still — någon har valt scenen själv — är strecket bara fyllt:
+   utan varaktighet blir animationen noll sekunder lång och landar direkt i slutläget. */
+.proto-rail-step-on .proto-rail-fill { width: 100%; animation: proto-grow-x linear both; }
+.proto-rail-step:focus-visible { outline: none; }
+.proto-rail-step:focus-visible::before { box-shadow: var(--focus); }
+
+/* ---- datorvy ---- */
+[data-view="desktop"] .proto-heading { font-size: 32px; }
+[data-view="desktop"] .proto-frame { height: 360px; padding: 26px 24px; }
+[data-view="desktop"] .proto-caption { min-height: 76px; }
+
+@media (prefers-reduced-motion: reduce) {
+  /* Ingenting spelas upp av sig självt (se HowLoopaWorks), och ingenting rör sig heller.
+     Varje animation ovan går från ett dolt läge till elementets vanliga, så det räcker att
+     stänga av dem — utom de två som flyttar sig i rummet och måste läggas på plats för hand. */
+  .proto-scene, .proto-scene *, .proto-rail-fill { animation: none; }
+  .proto-ring-fill { stroke-dashoffset: 0; }
+  .proto-sweep { display: none; }
+  .proto-van { left: 100%; }
 }

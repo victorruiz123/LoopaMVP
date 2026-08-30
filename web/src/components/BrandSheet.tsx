@@ -3,6 +3,7 @@ import { KNOWN_BRANDS } from "../lib/brands";
 import { POPULAR_BRANDS } from "../lib/brandSeed";
 import BrandAvatar from "./BrandAvatar";
 import { CheckIcon, CloseIcon, PlusIcon, SearchIcon } from "./icons";
+import { useT } from "../lib/i18n";
 
 const ANIMATION_MS = 420;
 /** Hur långt ned man måste dra, eller hur snabbt, för att släppet ska räknas som "stäng". */
@@ -40,6 +41,7 @@ export default function BrandSheet({
   onSelect: (brand: string) => void;
   onClose: () => void;
 }) {
+  const t = useT();
   const [query, setQuery] = useState("");
   /**
    * `open` styr om arket SKA synas, `shown` om det syns just nu. Två flaggor behövs för att animera
@@ -138,7 +140,7 @@ export default function BrandSheet({
   const offset = dragging ? Math.max(dragY, -20) : 0;
 
   return (
-    <div className="sheet-root" role="dialog" aria-modal="true" aria-label="Välj märke">
+    <div className="sheet-root" role="dialog" aria-modal="true" aria-label={t("Välj märke")}>
       <div
         className={`sheet-overlay ${shown ? "sheet-overlay-shown" : ""}`}
         style={dragging ? { opacity: Math.max(0.15, 1 - dragY / 400) } : undefined}
@@ -157,8 +159,8 @@ export default function BrandSheet({
         >
           <div className="sheet-handle" aria-hidden="true" />
           <header className="sheet-header">
-            <h2>Välj märke</h2>
-            <button type="button" className="sheet-close" onClick={onClose} aria-label="Stäng">
+            <h2>{t("Välj märke")}</h2>
+            <button type="button" className="sheet-close" onClick={onClose} aria-label={t("Stäng")}>
               <CloseIcon />
             </button>
           </header>
@@ -171,14 +173,14 @@ export default function BrandSheet({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Sök märke"
+            placeholder={t("Sök märke")}
             autoComplete="off"
             autoCorrect="off"
             spellCheck={false}
-            aria-label="Sök märke"
+            aria-label={t("Sök märke")}
           />
           {query && (
-            <button type="button" className="sheet-search-clear" onClick={() => setQuery("")} aria-label="Rensa sökning">
+            <button type="button" className="sheet-search-clear" onClick={() => setQuery("")} aria-label={t("Rensa sökning")}>
               <CloseIcon size={12} />
             </button>
           )}
@@ -191,7 +193,7 @@ export default function BrandSheet({
                 <SearchIcon size={22} />
               </span>
               <p className="sheet-empty-title">Inga träffar på ”{query.trim()}”</p>
-              <p className="sheet-empty-hint">Märket finns inte i listan — men du kan använda det ändå.</p>
+              <p className="sheet-empty-hint">{t("Märket finns inte i listan — men du kan använda det ändå.")}</p>
               {/* Sökrutan innehåller redan det märket ska heta, så den manuella vägen behöver inget
                   eget fält — bara ett sätt att säga "ja, det där". */}
               <button type="button" className="brand-use-typed" onClick={() => onSelect(query.trim())}>
@@ -215,7 +217,7 @@ export default function BrandSheet({
                         <BrandAvatar name={name} size={34} />
                         <span className="brand-row-name">{name}</span>
                         {isSelected && (
-                          <span className="brand-row-check" role="img" aria-label="Valt">
+                          <span className="brand-row-check" role="img" aria-label={t("Valt")}>
                             <CheckIcon />
                           </span>
                         )}

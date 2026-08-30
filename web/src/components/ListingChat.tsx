@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { askTruthCard } from "../api";
+import { askListing } from "../api";
 import type { AnswerSource } from "../types";
 import { SendIcon, SparkIcon } from "./icons";
+import { useT } from "../lib/i18n";
+import { hasConsent, useConsent } from "../lib/consent";
 
 /**
- * Chatten på truth-cardet.
+ * Chatten på annonsen.
  *
  * Kortet svarar redan på allt som står på det — men den som bara vill veta en sak läser inte ett helt
  * kort för att hitta den. Frågan "hur djup är repan på armstödet" ska gå att ställa rakt ut, och
@@ -13,7 +15,7 @@ import { SendIcon, SparkIcon } from "./icons";
  * Två egenskaper gör den till en del av kortet och inte en pratbubbla ovanpå det:
  *
  * DEN SITTER I KORTET. Inte som en flytande knapp i hörnet, utan som ett block bland de andra, sist
- * efter underlaget. En flytande bubbla följer med hela sidan och tillhör sajten; det här blocket hör
+ * efter beskrivningen. En flytande bubbla följer med hela sidan och tillhör sajten; det här blocket hör
  * till möbeln, och står där frågorna faktiskt uppstår — efter att man läst skicket.
  *
  * DEN SÄGER VARIFRÅN SVARET KOMMER. Servern märker varje svar med `source` (se cardChat.ts), och ett
@@ -39,6 +41,9 @@ function storageKey(loopaId: string): string {
 }
 
 function readStored(loopaId: string): ChatMessage[] {
+  // Utan samtycke finns ingenting lagrat att läsa — och skulle det ligga kvar från ett tidigare ja
+  // är det inte vårt att läsa. Städningen sköts av consent.ts när samtycket tas tillbaka.
+  if (!hasConsent("functional")) return [];
   try {
     const raw = window.localStorage.getItem(storageKey(loopaId));
     if (!raw) return [];
@@ -54,7 +59,7 @@ function readStored(loopaId: string): ChatMessage[] {
   }
 }
 
-export default function TruthCardChat({
+export default function ListingChat({
   loopaId,
   name,
   damageCount,
@@ -69,6 +74,7 @@ export default function TruthCardChat({
   specLabels: string[];
   hasPrice: boolean;
 }) {
+  const functional = useConsent()?.functional === true;
   const [messages, setMessages] = useState<ChatMessage[]>(() => readStored(loopaId));
   const [input, setInput] = useState("");
   const [pending, setPending] = useState(false);
@@ -84,12 +90,15 @@ export default function TruthCardChat({
 
   useEffect(() => {
     if (messages.length === 0) return;
+    // Samtycket prövas vid VARJE skrivning, inte en gång vid montering: cookierutan kan besvaras
+    // medan kortet står öppet, och ett nej ska sluta lagra i samma stund det ges.
+    if (!functional) return;
     try {
       window.localStorage.setItem(storageKey(loopaId), JSON.stringify(messages.slice(-KEPT_MESSAGES)));
     } catch {
       // Se readStored: lagring som inte går är inte ett fel värt att visa.
     }
-  }, [messages, loopaId]);
+  }, [messages, loopaId, functional]);
 
   // Rullar strömmen och inte sidan: blocket ligger mitt i kortet, och att kasta läsaren nedåt varje
   // gång ett svar kommer vore att flytta hela kortet under fingret.
@@ -112,7 +121,7 @@ export default function TruthCardChat({
     setInput("");
     setPending(true);
     try {
-      const { answer, source } = await askTruthCard(loopaId, trimmed, history);
+      const { answer, source } = await askListing(loopaId, trimmed, history);
       setMessages((prev) => [...prev, { role: "assistant", content: answer, source }]);
     } catch (err) {
       setMessages((prev) => [
@@ -124,16 +133,19 @@ export default function TruthCardChat({
     }
   }
 
+  const t = useT();
   const suggestions = suggestionsFor(damageCount, specLabels, hasPrice);
 
   return (
     <section className="listing-block card-chat">
-      <h3>Fråga om möbeln</h3>
+      <h3>{t("Fråga om möbeln")}</h3>
 
       {messages.length === 0 ? (
         <p className="card-chat-intro">
-          Ställ en fråga om {name}. Svaren kommer ur besiktningen bakom det här kortet — måtten,
-          skicket, varje anmärkning och priset.
+          {t(
+            "Ställ en fråga om {namn}. Svaren kommer ur besiktningen bakom den här annonsen — måtten, skicket, varje anmärkning och priset.",
+            { namn: name },
+          )}
         </p>
       ) : (
         <div className="card-chat-stream" ref={streamRef} role="log" aria-live="polite">
@@ -143,13 +155,13 @@ export default function TruthCardChat({
               {/* Notisen bara när svaret INTE står på kortet. Ett "belagt"-märke på varje rad blir
                   dekoration man slutar se; undantaget är det som betyder något. */}
               {m.role === "assistant" && !m.failed && m.source !== "card" && (
-                <p className="card-chat-note">Allmän kunskap — inte besiktat för just den här möbeln.</p>
+                <p className="card-chat-note">{t("Allmän kunskap — inte besiktat för just den här möbeln.")}</p>
               )}
             </div>
           ))}
           {pending && (
             <div className="card-chat-turn card-chat-turn-assistant">
-              <div className="card-chat-bubble card-chat-typing" aria-label="Skriver svar">
+              <div className="card-chat-bubble card-chat-typing" aria-label={t("Skriver svar")}>
                 <span />
                 <span />
                 <span />
@@ -174,7 +186,7 @@ export default function TruthCardChat({
                 inputRef.current?.focus();
               }}
             >
-              {s}
+              {t(s)}
             </button>
           ))}
         </div>
@@ -194,12 +206,12 @@ export default function TruthCardChat({
           ref={inputRef}
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Skriv en fråga…"
+          placeholder={t("Skriv en fråga…")}
           maxLength={500}
           disabled={pending}
-          aria-label="Fråga om möbeln"
+          aria-label={t("Fråga om möbeln")}
         />
-        <button type="submit" className="card-chat-send" disabled={pending || !input.trim()} aria-label="Skicka frågan">
+        <button type="submit" className="card-chat-send" disabled={pending || !input.trim()} aria-label={t("Skicka frågan")}>
           <SendIcon size={16} />
         </button>
       </form>
