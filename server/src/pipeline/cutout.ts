@@ -32,7 +32,7 @@
 import { mkdir } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
-import { Type, callGeminiStructured, type ImagePart } from "../gemini.js";
+import { callGeminiStructured, type ImagePart } from "../gemini.js";
 import { loadImageAsBase64 } from "../imageUtils.js";
 import type { CoverCutout } from "../types.js";
 
@@ -83,30 +83,9 @@ VAD SOM INTE ÄR MÖBELN:
 - Föremål som ligger löst ovanpå och inte hör till möbeln (kaffekopp, väska, kläder, verktyg).
 - Möbelns skugga på golvet eller väggen.
 
-Hittar du ingen sådan möbel: svara found=false och lämna box_2d tom och mask som tom sträng.`;
-
-const SEGMENT_SCHEMA = {
-  type: Type.OBJECT,
-  properties: {
-    found: { type: Type.BOOLEAN, description: "true om en möbel i förgrunden kunde pekas ut" },
-    box_2d: {
-      type: Type.ARRAY,
-      items: { type: Type.INTEGER },
-      description: "Möbelns omslutande rektangel som [y0, x0, y1, x1], normaliserad till 0-1000.",
-    },
-    mask: {
-      type: Type.STRING,
-      description:
-        "Möbelns mask INOM rektangeln, som en PNG i base64 på formen 'data:image/png;base64,...'. " +
-        "Vit = möbel, svart = allt annat. Masken ska täcka exakt rektangelns yta.",
-    },
-    label: { type: Type.STRING, description: "Vad möbeln är, ett eller två ord: 'barstol', 'soffa'." },
-  },
-  required: ["found", "box_2d", "mask", "label"],
-};
+Hittar du ingen sådan möbel: svara med en tom lista.`;
 
 interface Segmentation {
-  found: boolean;
   box_2d: number[];
   mask: string;
   label: string;
@@ -147,7 +126,26 @@ export async function buildCover(
   const box = pixelBox(segmented.box_2d, width, height);
   if (!box) return null;
 
-  const cover = await composeCutout(src, maskBuffer(segmented.mask), box, width, height);
+  /**
+   * Är masken pixlar, eller är den påhittad?
+   *
+   * Kontrollen finns för att det felet en gång var OSYNLIGT. En hallucinerad base64 bär rätt PNG-huvud,
+   * går igenom `Buffer.from(..., "base64")` utan att klaga, och dör först långt ner i sharp — där
+   * felet såg ut som "masken underkänd", alltså exakt som en ärligt dålig silhuett. Skillnaden mellan
+   * "modellen såg fel" och "modellen skrev skräp" är hela skillnaden mellan att justera en tröskel och
+   * att bygga om anropet, och den ska stå i loggen.
+   */
+  const maskBytes = maskBuffer(segmented.mask);
+  try {
+    await sharp(maskBytes).metadata();
+  } catch {
+    console.warn(
+      `[omslag] ${jobId.slice(0, 8)} masken är inte en bild (${maskBytes.length} byte) — modellen svarade text, inte pixlar`,
+    );
+    return null;
+  }
+
+  const cover = await composeCutout(src, maskBytes, box, width, height);
   if (!cover) {
     console.info(`[omslag] ${jobId.slice(0, 8)} masken underkänd — kortet får bildrutan som den är`);
     return null;
@@ -192,23 +190,60 @@ function maskBuffer(mask: string): Buffer {
   return Buffer.from(base64, "base64");
 }
 
-/** Silhuetten från modellen. Ett anrop, inga omförsök utöver wrapperns egna — omslaget är inte kritiskt. */
+/**
+ * Silhuetten från modellen. Ett anrop, inga omförsök utöver wrapperns egna — omslaget är inte kritiskt.
+ *
+ * INGET responseSchema, och det är hela poängen. Anropet hade ett: masken låg som ett obligatoriskt
+ * `Type.STRING` med beskrivningen "en PNG i base64". Ett schema tvingar fram varje fält, så modellen
+ * fyllde i det — genom att SKRIVA base64. Sju cachade svar såg likadana ut: rätt PNG-huvud
+ * (`iVBORw0KGgoAAAANSU…`, den vanligaste teckenföljden i vilken träningsmängd som helst) och sedan
+ * engelska ord mitt i strömmen — "refugees", "header...", "Queue", "UUIDs". Avkodat blev det 18 till
+ * 2 743 byte, alltså inga pixlar alls. Masken underkändes varje gång, felet svaldes, och kortet föll
+ * tillbaka på säljarens bildruta. Noll av 193 jobb fick ett urklipp.
+ *
+ * Utan schema svarar modellen i sitt EGNA maskformat i stället: en lista med `box_2d`, `mask` och
+ * `label`, där masken är en riktig PNG. Formatet är det efterbehandlingen redan väntade sig — bara
+ * anropet var fel, aldrig aritmetiken efter det.
+ */
 async function segment(part: ImagePart): Promise<Segmentation | null> {
+  let raw: unknown;
   try {
-    const { data } = await callGeminiStructured<Segmentation>({
+    const { data } = await callGeminiStructured<unknown>({
       purpose: "cover_cutout",
       systemPrompt: SYSTEM_PROMPT,
-      userPrompt: "Peka ut möbeln som säljs i den här bilden och lämna dess mask enligt schemat.",
+      // Den formulering modellens maskläge är tränat på. Svenska i systemprompten avgör VAD som ska
+      // klippas ut; den här raden avgör HUR svaret ska se ut, och den ska stå som den är tränad.
+      userPrompt:
+        "Give the segmentation mask for the piece of furniture being sold in this photo. " +
+        "Output a JSON list of segmentation masks where each entry contains the 2D bounding box " +
+        'in the key "box_2d", the segmentation mask in key "mask", and the text label in the key "label".',
       images: [part],
-      responseSchema: SEGMENT_SCHEMA,
       // Masken ÄR upplösningen: en silhuett räknad ur en nedskalad bild tappar stolsben.
       resolution: "high",
       primaryTimeoutMs: 30_000,
     });
-    return data?.found && data.mask ? data : null;
+    raw = data;
   } catch {
     return null;
   }
+
+  const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : [];
+  const candidates = list.filter(
+    (d): d is Segmentation =>
+      !!d && typeof d === "object" && typeof (d as Segmentation).mask === "string" && Array.isArray((d as Segmentation).box_2d),
+  );
+  if (!candidates.length) return null;
+
+  // Möbeln som säljs är den som fyller mest av bilden — samma regel som systemprompten beskriver,
+  // tillämpad här för det fall modellen ändå listar rummets övriga föremål.
+  return candidates.sort((a, b) => boxArea(b.box_2d) - boxArea(a.box_2d))[0];
+}
+
+/** Rektangelns yta i tusendelar², bara för att kunna välja den största av flera. */
+function boxArea(box: number[]): number {
+  if (!Array.isArray(box) || box.length !== 4) return 0;
+  const [y0, x0, y1, x1] = box;
+  return Math.abs(y1 - y0) * Math.abs(x1 - x0);
 }
 
 /** [y0, x0, y1, x1] i tusendelar → pixlar, klippt mot bildens kant. */

@@ -145,7 +145,15 @@ export async function callGeminiStructured<T>(opts: {
   systemPrompt: string;
   userPrompt: string;
   images: ImagePart[];
-  responseSchema: object;
+  /**
+   * Utelämnas för de anrop där ett schema är fel verktyg.
+   *
+   * Ett `responseSchema` TVINGAR fram varje fält, och för allt som är text är det precis vad vi vill.
+   * För segmenteringsmasken var det felet: ett obligatoriskt strängfält som ska bära en PNG fick
+   * modellen att SKRIVA base64 i stället för att lämna bilden — se pipeline/cutout.ts. Utan schema
+   * svarar den i sitt eget maskformat, och då är masken riktiga pixlar.
+   */
+  responseSchema?: object;
   /** "low" for cheap/simple passes, "high" (default) for anything defect-relevant */
   resolution?: "low" | "medium" | "high";
   primaryTimeoutMs?: number;
@@ -158,7 +166,7 @@ export async function callGeminiStructured<T>(opts: {
   // under the answering model's key, and a read that finds a mismatched modelUsed is treated as a miss
   // so any entry already poisoned on disk self-heals.
   const cacheKeyFor = (model: string) =>
-    hashCall(`${model}:${resolution}`, opts.systemPrompt, opts.userPrompt, opts.responseSchema, opts.images);
+    hashCall(`${model}:${resolution}`, opts.systemPrompt, opts.userPrompt, opts.responseSchema ?? {}, opts.images);
   const cached = await readCache(cacheKeyFor(GEMINI_MODEL));
   if (cached && cached.modelUsed === GEMINI_MODEL) {
     return { data: cached.data as T, tokensUsed: cached.tokensUsed, cached: true, purpose: opts.purpose, modelUsed: cached.modelUsed, latencyMs: 0 };
@@ -183,7 +191,7 @@ export async function callGeminiStructured<T>(opts: {
       config: {
         systemInstruction: opts.systemPrompt,
         responseMimeType: "application/json",
-        responseSchema: opts.responseSchema,
+        ...(opts.responseSchema ? { responseSchema: opts.responseSchema } : {}),
         temperature: 0,
         mediaResolution: RESOLUTION_MAP[resolution],
         httpOptions: { timeout: timeoutMs },
