@@ -13,3 +13,7 @@ Price_engine/vips-ml-data/
 web/.certs/
 tools/cloudflared
 deploy/cloudflared/config.local.yml
+
+# Originalen som scripts/set-account-price.mjs sparar undan före en prisskrivning.
+# Kopior av riktiga jobb, med ägar-id och prisstegar — samma sort data som server/data/.
+.price-backup/
