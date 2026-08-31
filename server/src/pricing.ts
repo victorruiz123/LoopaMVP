@@ -137,6 +137,63 @@ export function mapDamagesForPricing(damages: Damage[]): Array<Record<string, un
  * Sorteras, eftersom `mapDamagesForPricing` bevarar inmatningsordningen och verify kan flytta om ett
  * fynd utan att ändra vad som står i det.
  */
+/**
+ * Det spekulativa priset, buret från besiktningen fram till att säljaren valt modell.
+ *
+ * DET HÄR VAR FELET bakom "prissystemet är segt". Spekulationen fanns redan: prismotorn startades på
+ * den preliminära skadelistan parallellt med granskningen (se pipeline/run.ts), och när den
+ * verifierade listan gav samma prissignatur var det svaret EXAKT rätt. Men koden gjorde bara en sak
+ * med den kunskapen — skrev "hit" i telemetrin och kastade svaret med `abort()`. Säljaren fick sedan
+ * vänta ut ett nytt, identiskt anrop: 15 s median och 31 s p90 mätt över 109 sparade jobb. Priset var
+ * alltså färdigräknat innan prisskärmen ens öppnades, och slängdes.
+ *
+ * Löftet sparas, inte talet. Är anropet klart går det ut direkt; är det inte klart väntar säljaren på
+ * den TID SOM ÅTERSTÅR av ett anrop som redan löper, aldrig på ett nytt från noll.
+ *
+ * TVÅ villkor, och båda måste hålla. Signaturen säger att skadelistan är densamma som spekulationen
+ * räknade på. Identiteten säger att säljaren valde den modell spekulationen gissade — den gissningen
+ * är säljarens egen text från startsidan, och den som skriver "Ektorp" och sedan väljer "Landskrona"
+ * ska inte få Ektorps pris.
+ */
+interface SpeculativePrice {
+  identity: FurnitureIdentity;
+  signature: string;
+  promise: Promise<PriceEstimate | null>;
+}
+
+const speculativePrices = new Map<string, SpeculativePrice>();
+
+export function stashSpeculativePrice(jobId: string, entry: SpeculativePrice): void {
+  speculativePrices.set(jobId, entry);
+}
+
+/** Glöm spekulationen — listan ändrades, och då är dess svar fel svar. */
+export function dropSpeculativePrice(jobId: string): void {
+  speculativePrices.delete(jobId);
+}
+
+const sameText = (a: string | null | undefined, b: string | null | undefined) =>
+  (a ?? "").trim().toLowerCase() === (b ?? "").trim().toLowerCase();
+
+/**
+ * Spekulationens pris om det gäller för just den här modellen och den här skadelistan, annars null.
+ * Hämtas EN gång per jobb: den som frågar tar över svaret.
+ */
+export async function takeSpeculativePrice(
+  jobId: string,
+  identity: FurnitureIdentity,
+  signature: string,
+): Promise<PriceEstimate | null> {
+  const stashed = speculativePrices.get(jobId);
+  if (!stashed) return null;
+  speculativePrices.delete(jobId);
+  if (stashed.signature !== signature) return null;
+  if (!sameText(stashed.identity.brand, identity.brand) || !sameText(stashed.identity.model, identity.model)) return null;
+  const price = await stashed.promise;
+  // Ett spekulativt anrop som föll ska inte bli säljarens svar — den seriella vägen tar över.
+  return price && price.status !== "unavailable" ? price : null;
+}
+
 export function pricingSignature(damages: Damage[], canonicalCondition: string | null): string {
   const mapped = mapDamagesForPricing(damages)
     .map((entry) => JSON.stringify(entry, Object.keys(entry).sort()))

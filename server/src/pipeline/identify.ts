@@ -2,7 +2,7 @@ import { callSellerGenerate, type Resolution, type SellerCall } from "../listing
 import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../candidateImages.js";
 import { mergeSpecs } from "../specHarvest.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
-import { estimatePrice } from "../pricing.js";
+import { estimatePrice, pricingSignature, takeSpeculativePrice } from "../pricing.js";
 import type { CapturedImage, ListingAttribute, ModelCandidate, ProductImage } from "../types.js";
 
 /** Hur länge prissättningen väntar på att skickbedömningen ska bli klar. */
@@ -628,19 +628,28 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     // Priset behöver skadelistan. Skickbedömningen kör i sitt eget spår och kan mycket väl vara klar.
     const ready = await waitForCondition(jobId);
     if (!ready?.result) return null;
-    const price = await estimatePrice(
-      { brand, model },
-      ready.result.damages,
-      ready.result.grade?.canonicalCondition ?? null,
-      null,
-    );
+    /**
+     * Spekulationen först: prismotorn kan redan ha räknat fram exakt det här talet parallellt med
+     * granskningen. Gäller den både modellen säljaren valde och den slutliga skadelistan är svaret
+     * säljarens — annars faller vi tillbaka på anropet som alltid gjorts här.
+     */
+    const signature = pricingSignature(ready.result.damages, ready.result.grade?.canonicalCondition ?? null);
+    const speculated = await takeSpeculativePrice(jobId, { brand, model }, signature);
+    const price =
+      speculated ??
+      (await estimatePrice(
+        { brand, model },
+        ready.result.damages,
+        ready.result.grade?.canonicalCondition ?? null,
+        null,
+      ));
     const target = getJobSync(jobId) ?? (await getJob(jobId));
     if (target?.result) {
       target.result.price = price;
       target.result.identity = { brand, model };
       await persist(target);
     }
-    console.info(`[identify] ${jobId.slice(0, 8)} price=${price?.status ?? "none"} ms=${Date.now() - startedAt}`);
+    console.info(`[identify] ${jobId.slice(0, 8)} price=${price?.status ?? "none"} spekulerat=${speculated ? "ja" : "nej"} ms=${Date.now() - startedAt}`);
     return price;
   })();
 

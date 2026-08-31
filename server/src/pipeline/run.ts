@@ -2,7 +2,7 @@ import path from "node:path";
 import { GEMINI_MODEL } from "../gemini.js";
 import { jobDir, updateProgress, completeJob, failJob, saveDebugTrace, getJobSync, persist } from "../jobStore.js";
 import { loadImageAsBase64 } from "../imageUtils.js";
-import { estimatePrice, pricingSignature } from "../pricing.js";
+import { dropSpeculativePrice, estimatePrice, pricingSignature, stashSpeculativePrice } from "../pricing.js";
 
 import { COVER_CUTOUT_ENABLED, VERIFY_ENABLED } from "../config.js";
 import type { CallMeta, CapturedImage, ConditionResult, Damage, DebugTrace, FurnitureIdentity, ListingResult } from "../types.js";
@@ -181,8 +181,18 @@ export async function runConditionGrading(
     let priceSpeculation: "hit" | "miss" | "failed" | "skipped" = "skipped";
     if (speculation) {
       const finalSignature = pricingSignature(damages, grade.canonicalCondition);
-      priceSpeculation = finalSignature === speculation.signature ? "hit" : "miss";
-      speculation.abort.abort();
+      const hit = finalSignature === speculation.signature;
+      priceSpeculation = hit ? "hit" : "miss";
+      if (hit && identity) {
+        // Träff: granskningen ändrade ingenting som priset beror på, så anropet som redan löper
+        // svarar på exakt rätt fråga. Det SPARAS åt prisspåret i stället för att avbrytas — se
+        // takeSpeculativePrice i pricing.ts för varför det förr kastades och vad det kostade.
+        // Löftet, inte talet: publiceringen av skicket får inte vänta in ett anrop som ännu löper.
+        stashSpeculativePrice(jobId, { identity, signature: finalSignature, promise: speculation.promise });
+      } else {
+        speculation.abort.abort();
+        dropSpeculativePrice(jobId);
+      }
     }
 
     const result = buildResult({
