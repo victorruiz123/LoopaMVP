@@ -65,7 +65,7 @@ export default function ProductScreen({ id }: { id: string }) {
       <div className="butik-empty">
         <h3>Möbeln finns inte kvar</h3>
         <p>{error}</p>
-        <Link to={{ name: "landing" }} className="btn btn-outline btn-small">Till butiken</Link>
+        <Link to={{ name: "search", q: "" }} className="btn btn-outline btn-small">Till butiken</Link>
       </div>
     );
   }

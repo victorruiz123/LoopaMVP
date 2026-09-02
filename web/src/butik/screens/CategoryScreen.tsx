@@ -35,7 +35,7 @@ export default function CategoryScreen({ slug }: { slug: string }) {
       <div className="butik-empty">
         <h3>Kategorin finns inte</h3>
         <p>Länken kan vara gammal. Här är allt vi har just nu.</p>
-        <Link to={{ name: "landing" }} className="btn btn-outline btn-small">Till butiken</Link>
+        <Link to={{ name: "search", q: "" }} className="btn btn-outline btn-small">Till butiken</Link>
       </div>
     );
   }

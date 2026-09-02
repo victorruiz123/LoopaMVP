@@ -34,6 +34,7 @@ import { loopaIdFor } from "./loopaId.js";
 import { cutoutOf, jobByLoopaId, publicCardFor } from "./publicCard.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
 import { handleAffar, handleAffarPublic } from "./affar/routes.js";
+import { handleEfterlysning, handleEfterlysningPublic } from "./efterlysning/routes.js";
 import { store as affarStore } from "./affar/store.js";
 import { attachScan } from "./affar/scan.js";
 import { syncFromJobs } from "./butik/inventory.js";
@@ -899,6 +900,18 @@ const server = http.createServer(async (req, res) => {
       }
 
       /**
+       * Efterlysningens publika halva: tolka en mening, se ett direktsvep, läsa bevisremsan.
+       *
+       * Utanför grinden med flit. Köparen ska se att vi hittar saker INNAN de bestämt sig om oss —
+       * att kräva ett konto för att få veta om tjänsten fungerar är att be om betalning före
+       * leverans. Att SPARA kräver däremot konto: en bevakning åt någon vi inte kan nå är ett löfte
+       * vi inte kan hålla.
+       */
+      if (segments[1] === "efterlysning") {
+        if (await handleEfterlysningPublic(segments.slice(2), req, res)) return;
+      }
+
+      /**
        * EN grind framför hela /api.
        *
        * Tidigare krävde ingen av de här vägarna något alls — nyckeln skyddade bara /v1/condition.
@@ -934,6 +947,12 @@ const server = http.createServer(async (req, res) => {
        */
       if (segments[1] === "affar") {
         if (await handleAffar(segments.slice(2), req, res, { userId: identity.id, email: identity.email })) return;
+        return sendJson(res, 404, { error: "Not found" });
+      }
+
+      /** Efterlysningens kontobundna halva: spara, lista, ändra, pausa, förnya. */
+      if (segments[1] === "efterlysning") {
+        if (await handleEfterlysning(segments.slice(2), req, res, { userId: identity.id, email: identity.email })) return;
         return sendJson(res, 404, { error: "Not found" });
       }
 
@@ -1018,6 +1037,24 @@ const server = http.createServer(async (req, res) => {
         return await handleDamageAction(segments[2], segments[4], req, res);
       }
       }
+    }
+
+    /**
+     * /butik → /kop, permanent.
+     *
+     * Köpsidan flyttade. Butikens rot var ingången till köpsidan i tidigare versioner, och den
+     * adressen står i delade länkar, bokmärken och sökresultat — en 301 är det enda svaret som tar
+     * dem alla med sig, och den enda som talar om för en sökmotor att flytta värdet över.
+     *
+     * BARA ROTEN. /butik/kategori/…, /butik/objekt/… och resten av katalogen ligger kvar där de är:
+     * de är fortfarande sina egna sidor och har sina egna länkar.
+     *
+     * En sökning under roten (?q=) tas ändå av butiken — den som söker vill bläddra i lagret, inte
+     * beskriva något vi ska leta upp.
+     */
+    if ((url.pathname === "/butik" || url.pathname === "/butik/") && !url.searchParams.get("q")) {
+      res.writeHead(301, { Location: "/kop" });
+      return res.end();
     }
 
     // Allt som inte är API är UI. Ligger bygget inte där svarar vi som förut, med 404 i JSON — det

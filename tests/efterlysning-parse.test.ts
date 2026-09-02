@@ -89,6 +89,47 @@ test("nätet hittar inget att fylla i när meningen inte säger något", () => {
   assert.deepEqual(fillHardFields({}, "en snygg fåtölj"), {});
 });
 
+// ─── färg och material ──────────────────────────────────────────────────────
+//
+// Kom till efter pris och mått, av ett annat skäl: sammanfattningen förblev ärlig när "grön" föll
+// bort, men köparen som skrev "grön" och fick sex soffor utan färgkrav hade ändå inte blivit hörd.
+
+test("färg och material fylls i när tolkningen tappar dem", () => {
+  const f = fillHardFields({}, "grön sammetssoffa max 6000 kr");
+  assert.deepEqual(f.colors, ["grön"]);
+  assert.deepEqual(f.materials, ["sammet"]);
+  assert.equal(f.maxPriceSek, 6000);
+});
+
+test("färger böjs — 'mörkblått' är blå", () => {
+  assert.deepEqual(fillHardFields({}, "en soffa i mörkblått tyg").colors, ["blå"]);
+  assert.deepEqual(fillHardFields({}, "gult skinn").colors, ["gul"]);
+  assert.deepEqual(fillHardFields({}, "ljusblå matta").colors, ["blå"]);
+});
+
+test("men en färg sitter inte i vilken sammansättning som helst", () => {
+  // "vitrinskåp" är inte vitt. Färgord tar böjningsändelser, inte fogar.
+  assert.equal(fillHardFields({}, "ett vitrinskåp i ek").colors, undefined);
+});
+
+test("ett kort träslag måste stå som eget ord eller före en möbeldel", () => {
+  assert.deepEqual(fillHardFields({}, "ekbord max 160 cm").materials, ["ek"]);
+  assert.equal(fillHardFields({}, "ekonomiskt matbord").materials, undefined);
+});
+
+test("'bok' och 'al' är inte med i listan alls", () => {
+  // Båda är riktiga träslag och båda är för dyra att ha med: "bokhylla" är inte gjord av bok och
+  // "alltid" är inte gjort av al.
+  assert.deepEqual(fillHardFields({}, "vit bokhylla i björk").materials, ["björk"]);
+  assert.equal(fillHardFields({}, "alltid trevligt med en soffa").materials, undefined);
+});
+
+test("ett mått är inget pris, ens med ett gränsord framför", () => {
+  // "ekbord max 160 cm" läste bordets bredd som dess pristak innan spärren fanns.
+  assert.equal(fillHardFields({}, "ekbord max 160 cm").maxPriceSek, undefined);
+  assert.equal(fillHardFields({}, "ekbord för 4000 kr").maxPriceSek, 4000);
+});
+
 // ─── följdfrågorna ──────────────────────────────────────────────────────────
 
 test("bara fält som ändrar matchningen frågas om", () => {

@@ -21,6 +21,7 @@ import { publicInviteOf } from "./state.js";
 import { joinAsSeller, prefillFor, syncScanState, verifiedCardFor } from "./scan.js";
 import { acceptPrice, actionsFor, counterPrice, declineDeal, openPriceRound, PriceError } from "./price.js";
 import { deliveryQuote } from "../butik/delivery.js";
+import { feesFor } from "./fees.js";
 import { categoryLabel } from "../butik/catalog.js";
 import type { Deal } from "./types.js";
 import { readFile } from "node:fs/promises";
@@ -88,6 +89,20 @@ function dealFor(deal: Deal, viewer: "buyer" | "seller"): unknown {
   if (viewer === "seller") return base;
   return {
     ...base,
+    /**
+     * Hela uppdelningen, redan på kortet — INNAN säljaren bjuds in.
+     *
+     * Säljaren får sitt fulla pris; vår ersättning ligger på köparens sida och ska stå framme från
+     * början. En köpare som upptäcker avgifter efter att ha dragit in en säljare i en affär har
+     * blivit lurad, hur rimliga avgifterna än är. Se fees.ts.
+     *
+     * Räknas på det ÖVERENSKOMNA priset när det finns, annars det begärda: före prisrundan är det
+     * begärda priset det enda tal som finns, och en total utan tal är ingen upplysning.
+     */
+    avgifter: feesFor(
+      deal.agreedPriceSek ?? deal.submission?.askingPriceSek ?? null,
+      deal.buyerPostalCode ?? null,
+    ),
     inviteToken: deal.inviteToken,
     assessment: deal.assessment,
     submission: deal.submission ? { ...deal.submission, imagePaths: deal.submission.imagePaths.length } : null,

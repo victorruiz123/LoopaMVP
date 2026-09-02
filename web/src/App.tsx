@@ -14,7 +14,9 @@ import AdminUserScreen from "./screens/AdminUserScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
 import ButikApp from "./butik/ButikApp";
+import KopApp from "./kop/KopApp";
 import { isButikPath } from "./butik/router";
+import { isKopPath } from "./kop/router";
 import AffarApp from "./affar/AffarApp";
 import { isAffarPath } from "./affar/router";
 import { legalDocFromPath } from "./lib/legal";
@@ -105,6 +107,15 @@ export default function App() {
   const butik = isButikPath(window.location.pathname);
 
   /**
+   * /kop — köpsidan.
+   *
+   * Prövas EFTER Trygg affär i ordningen nedan, för att `/kop/analysera` tillhör den routern sedan
+   * tidigare och redan finns i delade länkar. `isKopPath` undantar den vägen uttryckligen; ordningen
+   * här är bältet till de hängslena.
+   */
+  const kop = isKopPath(window.location.pathname);
+
+  /**
    * /kop/analysera, /a/:token, /affar/:id — Trygg affär.
    *
    * Läses här av samma skäl som butiken: det är ett vägval på adressen. Inbjudan (/a/:token) är den
@@ -117,6 +128,8 @@ export default function App() {
     <>
       {affar ? (
         <AffarApp />
+      ) : kop ? (
+        <KopApp />
       ) : butik ? (
         <ButikApp />
       ) : legalDoc ? (

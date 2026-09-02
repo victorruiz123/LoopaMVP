@@ -1,0 +1,16 @@
+h1: Beskriv möbeln du letar efter – vi hittar den åt dig.
+Trygg affär-block: 1
+bevisremsa (ska vara 0 utan data): 0
+avdelningar: Redan hittat något? | Nyinkommet hos oss
+följdfråga visas: ingen — specen var komplett
+spec: Soffor & fåtöljer · grön · sammet · max 6 000 kr · max b 220 cm
+rubrik: 6 som nästan stämmer
+lästa: Vi läste igenom 101 objekt.
+träffar: 6
+    HOS OSS NU — Inom pris och kategori — men färg framgår inte av annonsen.
+    HOS OSS NU — Inom pris och kategori — men färg, material framgår inte av annonsen.
+    HOS OSS NU — Inom pris och kategori — men färg, material framgår inte av annonsen.
+sparaknapp: 1
+Trygg affär-blocket leder till: /kop/analysera
+/butik landar på: /kop | status: 200
+fel: inga

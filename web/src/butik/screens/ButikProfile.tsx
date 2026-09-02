@@ -28,12 +28,12 @@ export default function ButikProfile() {
 
   // Profilen är personlig hela vägen — det finns ingenting att visa för den som inte är inloggad.
   if (!user) {
-    return <AuthScreen intent="account" onBack={() => navigate({ name: "landing" })} onDone={() => undefined} />;
+    return <AuthScreen intent="account" onBack={() => navigate({ name: "search", q: "" })} onDone={() => undefined} />;
   }
 
   return (
     <ProfileScreen
-      onBack={() => navigate({ name: "landing" })}
+      onBack={() => navigate({ name: "search", q: "" })}
       /* Säljverktygets kortvy finns inte här. Det publika kortet gör det, och det är samma möbel —
          möbeln som ligger i butiken nås dessutom på sin butiksadress, som är den köparen ser. */
       onOpenJob={(job) => {

@@ -91,3 +91,18 @@ sämre rankade, inte fel.
 fält där ett bortfall ger fel produkt. Nätet kostar noll modellanrop och går att läsa och testa.
 
 **Reversibelt:** en ren funktion (`backstop.ts`) som anropas på ett ställe i `parse()`.
+
+**Tillägg till #3 (färg och material):** Skarp körning genom den nya API-vägen visade att "grön" föll
+bort ur *"grön sammetssoffa max 6000 kr"* — sammanfattningen förblev ärlig (den nämnde ingen färg),
+men köparen som skrev "grön" och fick sex soffor utan färgkrav hade ändå inte blivit hörd. Nätet
+täcker därför även färg och material, ur slutna ordlistor.
+
+Tre fel hittades och rättades i den utvidgningen, alla i skarp körning:
+
+- `"ekbord max 160 cm"` → pristak 160 kr. Ett tal följt av en längdenhet är ett mått, inte ett pris.
+- `"grön sammetssoffa"` → inget material. Långa materialord måste få sitta i sammansättningar.
+- `"vitrinskåp"` → vit, och `"bokhylla"` → bok. Färgord tar böjningsändelser (t, tt, a, e), inte
+  fogar; korta träslag måste stå som eget ord eller före en möbeldel. "bok" och "al" ströks helt.
+
+Stil och epok lämnas åt modellen: "60-tal", "funkis", "lantligt" är en öppen mängd, och en ordlista
+över dem hade varit en gissning om vad folk säger snarare än en avläsning av vad de sa.

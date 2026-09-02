@@ -51,7 +51,7 @@ export default function OrderScreen({ id }: { id: string }) {
       <div className="butik-empty">
         <h3>Vi hittar inte ordern</h3>
         <p>{error}</p>
-        <Link to={{ name: "landing" }} className="btn btn-outline btn-small">Till butiken</Link>
+        <Link to={{ name: "search", q: "" }} className="btn btn-outline btn-small">Till butiken</Link>
       </div>
     );
   }

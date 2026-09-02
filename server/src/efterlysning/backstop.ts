@@ -5,11 +5,15 @@
  * överpröva. Modellen ser sammanhang som ett mönster aldrig kommer åt ("en tvåsitssoffa till
  * hallen"), och att låta regexen vinna hade bytt ett bra svar mot ett grovt.
  *
- * VARFÖR JUST DE HÄR TVÅ FÄLTEN. Pris och mått är efterlysningens HÅRDA gränser — de som aldrig får
- * brytas, ens i det generösa svepet. Tappas de visar vi möbler köparen inte har råd med eller inte
- * får in genom dörren, vilket är precis det fel matchningen finns för att undvika. Färg och stil är
- * mjuka: tappas de blir träffarna sämre rankade, inte fel. Mätt skarpt föll "max 6000 kr och högst
- * 220 cm bred" bort ur en mening där kategorin togs rätt.
+ * VILKA FÄLT OCH VARFÖR. Pris och mått först: de är de HÅRDA gränserna, de som aldrig får brytas, och
+ * tappas de visar vi möbler köparen inte har råd med eller inte får in genom dörren. Färg och
+ * material kom till efteråt, av ett annat skäl: mätt skarpt föll "grön" bort ur meningen "grön
+ * sammetssoffa max 6000 kr" två körningar av tre. Sammanfattningen förblev ärlig — den nämner bara
+ * det vi faktiskt filtrerar på — men köparen som skrev "grön" och fick sex soffor utan färgkrav har
+ * ändå inte blivit hörd.
+ *
+ * Stil och epok lämnas åt modellen. "60-tal", "funkis", "lantligt" är en öppen mängd, och en ordlista
+ * över dem hade varit en gissning om vad folk säger snarare än en avläsning av vad de sa.
  *
  * MÖNSTREN ÄR SNÄVA MED FLIT. "3-sits" är inte ett pris och "60-tal" är inte en bredd; ett generöst
  * mönster hade hittat båda. Varje tal måste bäras av ett ord som gör det till vad det är.
@@ -33,7 +37,17 @@ function toNumber(raw: string): number | null {
  */
 export function readMaxPrice(text: string): number | null {
   const t = text.toLowerCase();
-  const bounded = new RegExp(`(?:max(?:imalt)?|högst|upp till|under|budget(?:\\s*på)?|för)\\s*${NUM}\\s*(?:kr|:-|kronor)?`, "i");
+  /**
+   * Ett tal som följs av en LÄNGDENHET är ett mått, inte ett pris.
+   *
+   * Utan den spärren läste "ekbord max 160 cm" bordets bredd som dess pristak — gränsordet "max"
+   * bar talet, valutan var frivillig, och 160 låg inom det rimliga prisintervallet. Mätt skarpt.
+   */
+  const notLength = `(?!\\s*(?:cm|mm|centimeter|meter|m\\b))`;
+  const bounded = new RegExp(
+    `(?:max(?:imalt)?|högst|upp till|under|budget(?:\\s*på)?|för)\\s*${NUM}${notLength}\\s*(?:kr|:-|kronor)?`,
+    "i",
+  );
   const withCurrency = new RegExp(`${NUM}\\s*(?:kr\\b|:-|kronor)`, "i");
 
   for (const re of [bounded, withCurrency]) {
@@ -87,6 +101,68 @@ export function readMaxHeight(text: string): number | null {
   return readDimension(text, ["hög", "höjd", "högt", "höjden"]);
 }
 
+/**
+ * Färgord som folk faktiskt skriver om möbler.
+ *
+ * SLUTEN LISTA med flit. Ett öppet mönster ("ordet före 'soffa'") hade plockat "begagnad", "stor"
+ * och "fin" som färger. Sammansättningar fångas av matchningens delsträngsjämförelse: "mörkgrön"
+ * i en annons svarar på "grön" här, och tvärtom.
+ */
+const COLORS = [
+  "vit", "svart", "grå", "beige", "brun", "blå", "grön", "gul", "röd", "rosa",
+  "orange", "lila", "turkos", "petrol", "sand", "creme", "krämvit", "antracit",
+];
+
+/** Material likaså: en sluten lista över det möbler faktiskt är gjorda av. */
+const MATERIALS = [
+  "sammet", "tyg", "skinn", "läder", "ek", "björk", "furu", "teak", "valnöt",
+  "ask", "plywood", "rotting", "metall", "stål", "glas", "marmor", "linne", "bouclé",
+];
+/*
+ * "bok" och "al" är borta ur listan med flit. Båda är riktiga träslag och båda är för dyra att ha
+ * med: "bokhylla" är inte gjord av bok och "alltid" är inte gjort av al. En träffbild där var
+ * fjärde efterlysning får ett påhittat materialkrav är sämre än att missa de få som verkligen
+ * söker bok.
+ */
+
+/**
+ * Orden ur en mening. Sammansättningar räknas — men inte alla ord tål att sitta i en.
+ *
+ * TVÅ REGLER, och skillnaden går vid ordlängd. Ett långt ord som "sammet" eller "marmor" kan stå var
+ * som helst i en sammansättning utan att bli något annat: "sammetssoffa" är sammet, "ekbordsskiva"
+ * är ek. Ett kort ord kan det inte — "ek" sitter i "ekonomi", "al" i "alltid", "bok" i "bokning" —
+ * och de måste därför stå som eget ord eller först i en sammansättning vi kan känna igen.
+ *
+ * Mätt skarpt: utan sammansättningsregeln tappade "grön sammetssoffa" sitt material, och med en
+ * för generös regel blev "ekonomiskt matbord" ett bord i ek.
+ */
+const SHORT_WORD = 4;
+
+function wordsIn(text: string, vocabulary: string[], kind: "color" | "material"): string[] {
+  const t = text.toLowerCase();
+  const hits = vocabulary.filter((w) => {
+    let re: RegExp;
+    if (kind === "color") {
+      /**
+       * Färger böjs, de sitter inte i sammansättningar.
+       *
+       * "mörkblått" är blå; "vitrinskåp" är inte vitt. Skillnaden är att svenska färgord tar en
+       * handfull böjningsändelser — t, tt, a, e — och ingenting annat. Att i stället tillåta vilka
+       * bokstäver som helst efter ordet hade gjort varje vitrinskåp vitt.
+       */
+      re = new RegExp(`(?<![a-zåäö])(?:mörk|ljus|klar)?${w}(?:tt|t|a|e)?(?![a-zåäö])`, "i");
+    } else if (w.length >= SHORT_WORD) {
+      // Långt material: får inledas och följas fritt. "sammetssoffa" är sammet, "marmorbord" marmor.
+      re = new RegExp(`(?<![a-zåäö])[a-zåäö]{0,6}${w}`, "i");
+    } else {
+      // Kort material: eget ord, eller först i en sammansättning med en möbeldel efter sig.
+      re = new RegExp(`(?<![a-zåäö])${w}(?![a-zåäö])|(?<![a-zåäö])${w}(?=(?:bord|stol|skåp|säng|soffa|skiva|ben|fanér))`, "i");
+    }
+    return re.test(t);
+  });
+  return [...new Set(hits)];
+}
+
 /** Fyller luckorna i ett filter. Returnerar en kopia — anroparens filter rörs inte. */
 export function fillHardFields(filter: ProductFilter, text: string): ProductFilter {
   const out: ProductFilter = { ...filter };
@@ -107,6 +183,14 @@ export function fillHardFields(filter: ProductFilter, text: string): ProductFilt
   if (missing(out.maxHeightMm)) {
     const h = readMaxHeight(text);
     if (h !== null) out.maxHeightMm = h;
+  }
+  if (!out.colors?.length) {
+    const c = wordsIn(text, COLORS, "color");
+    if (c.length) out.colors = c;
+  }
+  if (!out.materials?.length) {
+    const m = wordsIn(text, MATERIALS, "material");
+    if (m.length) out.materials = m;
   }
   return out;
 }

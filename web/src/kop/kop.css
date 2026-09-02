@@ -1,0 +1,244 @@
+/* ==========================================================================
+   Köpsidan
+   ==========================================================================
+   Samma tokens som butiken. Formen är däremot köpsidans egen: här skriver man
+   en mening och får ett svar, medan butiken är ett rutnät man bläddrar i. */
+
+/* ---- hero: fältet är sidans hela ärende ---- */
+
+.kop-hero { padding: 40px 0 24px; }
+.kop-hero-title {
+  margin: 0 0 12px;
+  font-size: clamp(30px, 5.6vw, 52px); line-height: 1.05;
+  letter-spacing: -0.035em; font-weight: 700; color: var(--ink);
+  max-width: 18ch;
+}
+.kop-hero-title em { font-style: normal; color: var(--accent); }
+.kop-hero-lede {
+  margin: 0 0 26px; font-size: clamp(16px, 2vw, 19px);
+  color: var(--muted); line-height: 1.55; max-width: 52ch;
+}
+
+.kop-ask { display: flex; gap: 10px; align-items: stretch; max-width: 760px; flex-wrap: wrap; }
+.kop-ask-input {
+  flex: 1; min-width: 260px; resize: none;
+  padding: 16px 18px; border-radius: 18px;
+  border: 2px solid var(--border); background: var(--surface);
+  font: inherit; font-size: clamp(15px, 1.8vw, 17px); line-height: 1.45; color: var(--ink);
+  box-shadow: 0 10px 30px -22px hsl(var(--scrim) / 0.45);
+}
+.kop-ask-input:focus { outline: none; border-color: var(--accent); }
+.kop-ask-input::placeholder { color: var(--muted-soft); }
+.kop-ask-go {
+  flex: none; padding: 0 26px; border: none; border-radius: 14px;
+  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+}
+.kop-ask-go:hover:not(:disabled) { background: var(--accent-dark); }
+.kop-ask-go:disabled { opacity: 0.6; cursor: progress; }
+
+.kop-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.kop-example, .kop-chip {
+  padding: 7px 13px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface);
+  font-size: var(--fs-sm); color: var(--muted); font: inherit;
+}
+.kop-example:hover, .kop-chip:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+.kop-error { margin: 14px 0 0; color: var(--danger); font-size: var(--fs-md); }
+
+/* ---- följdfrågan ---- */
+
+.kop-fraga {
+  margin-top: 22px; padding: 22px; max-width: 620px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.kop-fraga-rakn {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.kop-fraga h3 { margin: 6px 0 14px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.kop-fraga-val { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.kop-fraga-eget { display: flex; gap: 8px; }
+.kop-fraga-eget input {
+  flex: 1; min-width: 0; height: 42px; padding: 0 12px;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--field); font: inherit;
+}
+.kop-fraga-eget input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.kop-fraga-eget button {
+  flex: none; padding: 0 16px; border: none; border-radius: var(--r);
+  background: var(--ink); color: var(--bg); font-weight: 600; cursor: pointer;
+}
+.kop-skip {
+  margin-top: 10px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); color: var(--muted-soft); text-decoration: underline;
+}
+
+/* ---- specen: kontraktet köparen bekräftar ---- */
+
+.kop-spec {
+  margin-top: 22px; padding: 22px; max-width: 720px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.kop-spec-compact {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px;
+}
+.kop-spec-head h3 { margin: 0 0 4px; font-size: var(--fs-md); color: var(--muted-soft); font-weight: 700; }
+.kop-spec-line { margin: 0; font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
+.kop-spec-grid {
+  display: grid; gap: 12px; margin: 18px 0 0;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+.kop-spec-grid label { display: grid; gap: 4px; }
+.kop-spec-grid span {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.kop-spec-grid input, .kop-spec-grid select {
+  height: 42px; padding: 0 10px; font: inherit; color: var(--ink);
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--field);
+}
+.kop-spec-grid input:focus, .kop-spec-grid select:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.kop-spec-note { margin: 16px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+.kop-spec-actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
+.kop-spec-go {
+  padding: 12px 22px; border: none; border-radius: 12px; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700;
+}
+.kop-spec-go:disabled { opacity: 0.6; cursor: progress; }
+.kop-spec-edit {
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-md); color: var(--muted); text-decoration: underline;
+}
+
+/* ---- träffarna ---- */
+
+.kop-traffar { margin-top: 30px; }
+.kop-traffar-head h2 { margin: 0 0 4px; font-size: clamp(20px, 2.8vw, 28px); letter-spacing: -0.02em; }
+.kop-traffar-lasta { margin: 0 0 18px; font-size: var(--fs-sm); color: var(--muted-soft); }
+.kop-notis, .kop-tomt {
+  margin: 0 0 16px; padding: 14px 16px; border-radius: var(--r-lg);
+  background: var(--field); color: var(--muted); font-size: var(--fs-md); line-height: 1.5;
+}
+.kop-traff-lista {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+}
+.kop-traff { display: grid; gap: 6px; align-content: start; }
+.kop-traff-kalla {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.kop-traff-kalla-live { color: var(--green-dark); }
+.kop-traff-kalla-incoming { color: var(--accent-ink); }
+.kop-traff-kalla-extern { color: var(--muted-soft); }
+.kop-traff-passform { margin: 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.45; }
+.kop-traff-exakt { color: var(--green-dark); font-weight: 600; }
+.kop-prognos {
+  margin: 20px 0 0; padding: 14px 18px; border-radius: var(--r-lg);
+  background: var(--accent-light); color: var(--accent-ink); font-size: var(--fs-md);
+}
+
+/* ---- sparandet: konverteringsögonblicket ---- */
+
+.kop-save {
+  margin-top: 26px; padding: 22px; border-radius: var(--r-lg);
+  background: var(--ink); color: var(--on-dark-strong);
+}
+.kop-save-text h3 { margin: 0 0 6px; font-size: var(--fs-lg); color: #fff; }
+.kop-save-text p { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.5; }
+.kop-save-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.kop-save-area {
+  flex: 1; min-width: 180px; height: 46px; padding: 0 14px; font: inherit;
+  border-radius: var(--r); border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08); color: #fff;
+}
+.kop-save-area::placeholder { color: var(--on-dark-faint); }
+.kop-save-area:focus { outline: none; border-color: var(--accent); }
+.kop-save-go {
+  flex: none; height: 46px; padding: 0 22px; border: none; border-radius: var(--r);
+  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+}
+.kop-save-hint { margin: 10px 0 0; font-size: var(--fs-sm); color: var(--on-dark); }
+.kop-saved {
+  margin-top: 26px; padding: 16px 20px; border-radius: var(--r-lg);
+  background: var(--green-light); color: var(--green-dark); font-size: var(--fs-md);
+}
+
+/* ---- Trygg affär-blocket: förstklassig ingång, inte en länk ---- */
+
+.kop-trygg {
+  margin-top: 34px; padding: 26px;
+  border-radius: var(--r-lg); background: var(--surface);
+  border: 2px solid var(--ink);
+}
+.kop-trygg-text h2 { margin: 0 0 6px; font-size: clamp(20px, 2.6vw, 26px); letter-spacing: -0.02em; }
+.kop-trygg-lead { margin: 0 0 4px; font-size: var(--fs-lg); color: var(--ink); line-height: 1.45; }
+.kop-trygg-sub { margin: 0 0 18px; font-size: var(--fs-md); color: var(--muted-soft); }
+.kop-trygg-field {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px solid var(--border); border-radius: 14px; padding: 6px 6px 6px 14px; background: var(--field);
+}
+.kop-trygg-field:focus-within { border-color: var(--accent); background: var(--surface); }
+.kop-trygg-icon { opacity: 0.5; flex: none; }
+.kop-trygg-field input {
+  flex: 1; min-width: 0; height: 46px; padding: 0; border: none; background: transparent;
+  font: inherit; font-size: var(--fs-field); color: var(--ink);
+}
+.kop-trygg-field input:focus { outline: none; }
+.kop-trygg-field button {
+  flex: none; height: 46px; padding: 0 20px; border: none; border-radius: 10px; cursor: pointer;
+  background: var(--ink); color: var(--bg); font-size: var(--fs-md); font-weight: 700; white-space: nowrap;
+}
+.kop-trygg-hint { margin: 10px 2px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+
+/* ---- bevisremsan ---- */
+
+.kop-bevis { margin-top: 30px; }
+.kop-bevis-lista {
+  list-style: none; margin: 0; padding: 0;
+  display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
+}
+.kop-bevis-lista::-webkit-scrollbar { display: none; }
+.kop-bevis-post {
+  flex: none; padding: 12px 16px; border-radius: 999px;
+  background: var(--field); font-size: var(--fs-sm); white-space: nowrap;
+}
+.kop-bevis-uppfylld { background: var(--green-light); }
+.kop-bevis-vad { font-weight: 600; color: var(--ink); }
+.kop-bevis-nar { color: var(--muted); margin-left: 8px; }
+
+.kop-feed-lede { margin: -6px 0 14px; font-size: var(--fs-md); color: var(--muted); max-width: 56ch; }
+
+/* ---- mina efterlysningar ---- */
+
+.kop-mina { padding: 30px 0 0; }
+.kop-mina-head h1 { margin: 0 0 6px; font-size: clamp(24px, 3.4vw, 34px); letter-spacing: -0.025em; }
+.kop-mina-head p { margin: 0 0 24px; color: var(--muted); font-size: var(--fs-lg); }
+.kop-mina-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.kop-mina-rad {
+  display: flex; gap: 14px; align-items: flex-start; justify-content: space-between;
+  padding: 18px 20px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.kop-mina-vilande { opacity: 0.62; }
+.kop-mina-body h3 { margin: 0 0 4px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.kop-mina-status { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+.kop-mina-somnar { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--accent-ink); }
+.kop-mina-somnar button {
+  margin-left: 8px; padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; color: var(--accent); text-decoration: underline;
+}
+.kop-mina-knappar { display: flex; gap: 8px; flex: none; }
+.kop-mina-knappar button {
+  padding: 8px 14px; border-radius: var(--r); cursor: pointer; font: inherit; font-size: var(--fs-sm);
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink);
+}
+.kop-mina-bort { color: var(--danger) !important; }
+.kop-mina-tom { padding: 30px; text-align: center; background: var(--field); border-radius: var(--r-lg); }
+
+@media (max-width: 640px) {
+  .kop-hero { padding: 24px 0 18px; }
+  .kop-ask-go { width: 100%; height: 48px; }
+  .kop-trygg { padding: 20px; }
+  .kop-trygg-field { flex-wrap: wrap; }
+  .kop-trygg-field button { width: 100%; }
+  .kop-mina-rad { flex-direction: column; }
+}

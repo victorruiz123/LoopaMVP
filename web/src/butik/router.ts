@@ -15,7 +15,6 @@ import { useEffect, useState } from "react";
 export const BUTIK_ROOT = "/butik";
 
 export type ButikRoute =
-  | { name: "landing" }
   | { name: "category"; slug: string }
   | { name: "brand"; slug: string }
   | { name: "product"; id: string }
@@ -40,7 +39,11 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   const params = new URLSearchParams(search);
   if (rest === "") {
     const q = params.get("q");
-    return q ? { name: "search", q } : { name: "landing" };
+    // Roten är inte längre en egen sida: köpsidan bor på /kop. En sökning behåller däremot butiken —
+    // den som söker vill bläddra i lagret, inte beskriva något vi ska leta upp.
+    // Roten 301:as till /kop av servern. Skulle den ändå nås — en gammal bokmärkt adress i en
+    // klient som redan kört — visas hela lagret i stället för en sida som inte längre finns.
+    return { name: "search", q: q ?? "" };
   }
   const [head, tail] = rest.split("/");
   if (head === "kategori" && tail) return { name: "category", slug: decodeURIComponent(tail) };
@@ -49,12 +52,13 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   if (head === "order" && tail) return { name: "order", id: decodeURIComponent(tail) };
   if (head === "sok") return { name: "search", q: params.get("q") ?? "" };
   if (head === "profil") return { name: "profile" };
-  return { name: "landing" };
+  // Okänd väg under /butik: hela lagret. En död länk till en borttagen kategori ska landa i
+  // butiken, inte i ingenting.
+  return { name: "search", q: "" };
 }
 
 export function butikHref(route: ButikRoute): string {
   switch (route.name) {
-    case "landing": return BUTIK_ROOT;
     case "category": return `${BUTIK_ROOT}/kategori/${encodeURIComponent(route.slug)}`;
     case "brand": return `${BUTIK_ROOT}/marke/${encodeURIComponent(route.slug)}`;
     case "product": return `${BUTIK_ROOT}/objekt/${encodeURIComponent(route.id)}`;
