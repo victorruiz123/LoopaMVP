@@ -1,0 +1,17 @@
+ℹ tests 9
+ℹ pass 9
+
+Bevisen som räknas (tests/efterlysning-fortur.test.ts):
+
+  UTGÅNGEN FÖRTUR SLÄPPER — även om ingen städat
+      Klockan prövas vid varje läsning, inte i ett städjobb som kan ha uteblivit.
+      publishBlocked("LP-C", nu + 2h) === false utan att expireDue någonsin körts.
+
+  städningen är BOKFÖRING — grinden släppte redan innan den kördes
+      Samma sak, uttryckt åt andra hållet: expireDue finns för att historiken ska
+      skilja "gick ut" från "köparen agerade", inte för att öppna grinden.
+
+  butikens tillståndsmaskin är ORÖRD
+      ALLOWED_TRANSITIONS.draft === ["live"]. Ingen väg draft -> reserved.
+      Ändras det har någon flyttat in förturen i maskinen, och då gäller inte
+      bevisen ovan längre.

@@ -69,7 +69,7 @@ export async function allProducts(): Promise<Product[]> {
  * uppe på Tradera — där HAR säljaren tryckt på publicera, och butiken är samma beslut i en annan
  * kanal. Utan det undantaget hade butiken startat tom trots ett lager på 105 varor.
  */
-export async function syncFromJobs(): Promise<{ enrolled: number; published: number; withdrawn: number }> {
+export async function syncFromJobs(): Promise<{ enrolled: number; published: number; withdrawn: number; held: number }> {
   const jobs = await listJobs();
   const records = new Map((await store().all()).map((r) => [r.id, r]));
   let enrolled = 0;
@@ -89,6 +89,8 @@ export async function syncFromJobs(): Promise<{ enrolled: number; published: num
    * pågår, och den upphör inte för att beskrivningen blev sämre.
    */
   const ready = new Set<string>();
+  /** Möbler som hölls tillbaka av en förtur i det här varvet. Släpps av sig själva när den går ut. */
+  let held = 0;
 
   for (const job of jobs) {
     const product = jobToProduct(job, "draft");
@@ -101,6 +103,22 @@ export async function syncFromJobs(): Promise<{ enrolled: number; published: num
     }
     const current = records.get(loopaId) ?? (await store().get(loopaId));
     if (job.tradera?.status === "published" && current?.state === "draft") {
+      /**
+       * Förturen grindar publiceringen — men kan aldrig stoppa den.
+       *
+       * En köpare som efterlyst just den här möbeln får ett dygn på sig innan den går ut publikt.
+       * Grinden ligger HÄR och inte i tillståndsmaskinen: möbeln står kvar som `draft` hela tiden,
+       * och förturen är en post vid sidan om som slutar gälla av sig själv när klockan går ut. Se
+       * efterlysning/fortur.ts för varför.
+       *
+       * Faller uppslagningen publicerar vi. En missad artighet är ett mindre fel än en möbel som
+       * aldrig kommer ut.
+       */
+      const { publishBlocked } = await import("../efterlysning/fortur.js");
+      if (await publishBlocked(loopaId)) {
+        held += 1;
+        continue;
+      }
       await publish(loopaId, { kind: "seller", userId: job.ownerId ?? null });
       published += 1;
     }
@@ -135,7 +153,7 @@ export async function syncFromJobs(): Promise<{ enrolled: number; published: num
     }
   }
 
-  return { enrolled, published, withdrawn };
+  return { enrolled, published, withdrawn, held };
 }
 
 // ---------------------------------------------------------------------------
