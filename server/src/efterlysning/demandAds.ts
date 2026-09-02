@@ -19,6 +19,7 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
+import { categoryNoun } from "../butik/catalog.js";
 import { demandDashboard, type DemandRow } from "./wall.js";
 
 /** Minsta omättade efterfrågan innan ett utkast är värt någons tid att läsa. */
@@ -110,26 +111,8 @@ function keyOf(r: Pick<DemandAd, "categorySlug" | "brand" | "priceBand">): strin
  * pinsam den tionde, och den tionde är den som körs med budget mot en publik som aldrig hört talas
  * om oss. Mallarna nedan är tråkiga och sanna, vilket är rätt ordning på de två.
  */
-/**
- * Kategorin i ENTAL, för en rubrik som frågar efter EN möbel.
- *
- * Katalogens etiketter är plural ("Soffor & fåtöljer") eftersom de står över ett rutnät. En rubrik
- * som lyder "Har du en soffor & fåtöljer?" är svenska ingen skriver, och en annons som inte kan
- * skriva sin egen rubrik inger inget förtroende för att kunna sälja någons möbel.
- */
-const SINGULAR: Record<string, string> = {
-  "soffor-fatoljer": "soffa eller fåtölj",
-  "bord": "bord",
-  "stolar": "stol",
-  "forvaring": "hylla eller byrå",
-  "sangar": "säng",
-  "skrivbord-kontor": "skrivbord",
-  "belysning": "lampa",
-  "ovrigt": "möbel",
-};
-
 function copyFor(r: DemandRow): { headline: string; body: string } {
-  const noun = (r.categorySlug && SINGULAR[r.categorySlug]) || "möbel";
+  const noun = categoryNoun(r.categorySlug);
   const vad = [r.brand, noun].filter(Boolean).join(" ");
   const vantar = r.unmet === 1 ? "En köpare väntar" : `${r.unmet} köpare väntar`;
   return {

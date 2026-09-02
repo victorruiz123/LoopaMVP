@@ -181,3 +181,23 @@ kunna hitta på ett skäl.
 - Rubriken löd *"Har du en soffor & fåtöljer?"* — katalogens etiketter är plural eftersom de står
   över ett rutnät. En annons som inte kan skriva sin egen rubrik inger inget förtroende för att
   kunna sälja någons möbel.
+
+---
+
+## 8. Ental och plural: samma fel tre gånger
+
+Katalogens etiketter är plural ("Soffor & fåtöljer", "Stolar") eftersom de står som rubriker över ett
+rutnät. Tre gånger under bygget hamnade de i en mening som handlar om EN möbel, och tre gånger gick
+felet ut i skarp körning innan det syntes:
+
+- *"Har du en soffor & fåtöljer?"* — annonsutkastets rubrik
+- *"innehåller troligen din stolar"* — tömningsbrevets ämnesrad
+- *"ca 22 st stol"* — rättningen av det förra, som gick för långt åt andra hållet
+
+**Beslut:** `categoryNoun(slug)` bor i `butik/catalog.ts` bredvid `categoryLabel`, och båda formerna
+används där de hör hemma: ental för "din stol", plural för "ca 22 stolar", och ental igen när antalet
+är ett.
+
+**Varför det hör hemma i katalogen:** annonsutkasten och tömningsbreven är två filer som aldrig läser
+varandra. En lokal ordlista i vardera hade gett två listor som glider isär — och den som lägger till
+en kategori ska inte behöva veta att det finns två ställen till att uppdatera.

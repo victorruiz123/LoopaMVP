@@ -33,6 +33,29 @@ export function categoryBySlug(slug: string): Category | undefined {
   return BY_SLUG.get(slug);
 }
 
+/**
+ * Kategorin i ENTAL, för meningar som handlar om EN möbel.
+ *
+ * Etiketterna ovan är plural eftersom de står över ett rutnät. "Har du en soffor & fåtöljer?" och
+ * "innehåller troligen din stolar" är svenska ingen skriver — och båda meningarna hann gå ut i
+ * skarp körning innan den här funktionen fanns. Den bor i katalogen så att annonsutkasten och
+ * tömningsbreven läser samma ord.
+ */
+const NOUNS: Record<string, string> = {
+  "soffor-fatoljer": "soffa eller fåtölj",
+  "bord": "bord",
+  "stolar": "stol",
+  "forvaring": "hylla eller byrå",
+  "sangar": "säng",
+  "skrivbord-kontor": "skrivbord",
+  "belysning": "lampa",
+  "ovrigt": "möbel",
+};
+
+export function categoryNoun(slug: string | null | undefined): string {
+  return (slug && NOUNS[slug]) || "möbel";
+}
+
 export function categoryLabel(slug: string): string {
   return BY_SLUG.get(slug)?.label ?? "Övrigt";
 }

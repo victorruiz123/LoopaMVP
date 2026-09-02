@@ -1028,6 +1028,31 @@ const server = http.createServer(async (req, res) => {
           if (!ad) return sendJson(res, 404, { error: "Utkastet finns inte." });
           return sendJson(res, 200, { annons: ad });
         }
+        /**
+         * Tömningar: en känd hämtning matchas mot öppna efterlysningar innan något besiktigats.
+         *
+         * Breven lovar ett BESKED, inte en möbel — se clearance.ts. Läggs upp för hand av den som
+         * bokat tömningen; vi har ingen väg in i någons flyttlista.
+         */
+        if (segments[2] === "tomningar" && req.method === "GET") {
+          const t = await import("./efterlysning/clearance.js");
+          return sendJson(res, 200, { tomningar: await t.list() });
+        }
+        if (segments[2] === "tomningar" && req.method === "POST") {
+          const t = await import("./efterlysning/clearance.js");
+          const body = await readJsonBody<{ namn?: string; hamtas?: string; besked?: string; poster?: unknown[] }>(req);
+          if (!body.namn || !body.hamtas || !Array.isArray(body.poster) || body.poster.length === 0) {
+            return sendJson(res, 400, { error: "namn, hamtas och minst en post krävs." });
+          }
+          const c = await t.create({
+            name: body.namn.slice(0, 120),
+            pickupDate: body.hamtas.slice(0, 10),
+            verdictDate: body.besked?.slice(0, 10),
+            expected: body.poster as never,
+          });
+          const skickade = await t.notifyForClearance(c);
+          return sendJson(res, 201, { tomning: c, notiser: skickade.length });
+        }
         return sendJson(res, 404, { error: "Not found" });
       }
 

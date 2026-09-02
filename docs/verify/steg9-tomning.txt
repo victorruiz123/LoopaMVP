@@ -1,0 +1,18 @@
+tömning: kontorstömningen på Kungsholmen | hämtas: 2026-09-08 | besked: 2026-09-09
+notiser: 1 (av 2 efterlysningar — sängen matchar inte)
+
+=== 2026-09-02T19-34-53-020Z__tomning__kopare@example.com.txt ===
+  Till: kopare@example.com
+  Ämne: En tömning nästa vecka innehåller troligen din stol
+  Sort: tomning
+  Skrivet: 2026-09-02T19:34:53.019Z
+  
+  Du efterlyste: Stolar · max 1 200 kr · max b 55 cm
+  
+  Vi hämtar kontorstömningen på Kungsholmen den 2026-09-08. Enligt listan ska den innehålla ca 22 st stol.
+  
+  Vi vet inte skicket förrän vi sett dem. Du får besked den 2026-09-09 — då vet vi om något passar dig.
+  
+  Din efterlysning: https://app.loopa.nu/kop/mina-efterlysningar#802148cb-aa40-47a4-aeba-a2c708f4308d
+
+pulsens tömningsräknare: 1

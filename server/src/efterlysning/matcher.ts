@@ -107,15 +107,19 @@ export async function runRound(): Promise<RoundResult> {
 }
 
 /** Livscykelbreven, i den ordning som gör att en somnad inte får en påminnelse. */
-export async function runLifecycle(): Promise<{ expired: number; pulse: number; deadline: number; renewal: number; forturExpired: number }> {
+export async function runLifecycle(): Promise<{ expired: number; pulse: number; deadline: number; renewal: number; forturExpired: number; tomningar: number }> {
   // Städar utgångna förturer först. Grinden släpper redan av sig själv (se `alive`); det här är
   // bokföring, så att historiken skiljer en utgången förtur från en köparen agerade på.
   const forturExpired = await fortur.expireDue();
   const expired = await expireOverdue();
   const renewal = await runRenewalReminders();
   const deadline = await runDeadlineValve();
+  // Tömningarna FÖRE pulsen: ett tömningsbesked är ett livstecken, och pulsen ska inte skicka ett
+  // andra brev samma vecka om köparen redan hört av oss.
+  const { runClearanceMatching } = await import("./clearance.js");
+  const tomningar = await runClearanceMatching();
   const pulse = await runPulse();
-  return { expired, pulse: pulse.sent, deadline: deadline.sent, renewal: renewal.sent, forturExpired };
+  return { expired, pulse: pulse.sent, deadline: deadline.sent, renewal: renewal.sent, forturExpired, tomningar };
 }
 
 export function startEfterlysningSweeper(): void {
