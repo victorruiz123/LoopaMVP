@@ -3230,3 +3230,97 @@ body:has(.screen-camera) .consent { display: none; }
   .proto-sweep { display: none; }
   .proto-van { left: 100%; }
 }
+
+/* ---- köparens ingång på startsidan ----
+   Startsidan är säljverktyget. Den här rutan är den ANDRA riktningen — någon som hittat en möbel
+   någon annanstans och vill köpa den tryggt — och den ska därför läsa som ett eget erbjudande, inte
+   som ännu ett fält i märkessökningen. Nedtonad mot märkeslistan: säljvägen är fortfarande sidans
+   huvudsak, och den som kommit hit för att sälja ska inte behöva scrolla förbi ett köperbjudande. */
+.home-buy {
+  margin: 0 0 14px;
+  padding: 14px;
+  border-radius: var(--r-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+.home-buy-text { display: block; margin-bottom: 10px; }
+.home-buy-text strong { display: block; font-size: var(--fs-base); font-weight: 650; }
+.home-buy-text span { display: block; margin-top: 2px; font-size: var(--fs-sm); color: var(--muted); line-height: 1.45; }
+.home-buy-row { display: flex; gap: 8px; }
+.home-buy-input {
+  flex: 1; min-width: 0; min-height: var(--tap); padding: 0 12px;
+  font-size: var(--fs-field); color: var(--ink);
+  background: var(--field); border: 1px solid transparent; border-radius: var(--r);
+}
+.home-buy-input::placeholder { color: var(--muted-soft); }
+.home-buy-input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.home-buy-go {
+  flex: none; min-height: var(--tap); padding: 0 18px; border: none; cursor: pointer;
+  border-radius: var(--r); background: var(--ink); color: #fff;
+  font-size: var(--fs-md); font-weight: 650;
+}
+.home-buy-go:active { opacity: 0.85; }
+
+/* ── Handeln i profilen: siffror, affärer och köp ─────────────────────────────
+   Egna klasser och inte .profile-stat: rutnätet här har sex tal och inte två, och raderna är
+   länkar med två kolumner i stället för listrader med en miniatyr. Att sträcka de gamla
+   klasserna över båda hade gjort varje framtida ändring till en fråga om vilken skärm som menas. */
+
+.trade-stats {
+  display: grid; gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+}
+.trade-stat {
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 14px 16px; box-shadow: var(--shadow-card);
+}
+.trade-stat-value {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.trade-stat-label {
+  margin-top: 2px; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.trade-stat-hint { margin-top: 4px; font-size: var(--fs-2xs); color: var(--muted); }
+
+.trade-list { list-style: none; margin: 0 0 8px; padding: 0; display: grid; gap: 8px; }
+.trade-row {
+  display: flex; gap: 12px; align-items: flex-start; width: 100%;
+  background: var(--surface); border-radius: var(--r-lg); padding: 14px 16px;
+  box-shadow: var(--shadow-card); text-decoration: none; color: inherit;
+}
+.trade-row:hover { box-shadow: var(--shadow-card-hover, var(--shadow-card)); }
+.trade-row-thumb {
+  width: 56px; height: 56px; border-radius: var(--r-md, 10px); object-fit: cover;
+  background: var(--surface-2, #eee); flex: none;
+}
+.trade-row-body { display: grid; gap: 3px; min-width: 0; flex: 1; }
+.trade-row-title { font-weight: 600; color: var(--ink); }
+.trade-row-status { font-size: var(--fs-sm); color: var(--muted); line-height: 1.4; }
+.trade-row-meta { font-size: var(--fs-2xs); color: var(--muted-soft); }
+.trade-row-card, .trade-row-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
+
+.trade-chip {
+  font-size: var(--fs-2xs); font-weight: 600; padding: 3px 8px; border-radius: 999px;
+  background: var(--surface-2, #f0efec); color: var(--muted);
+}
+.trade-chip-grade { background: var(--ink); color: var(--surface); }
+.trade-chip-do { background: var(--accent-soft, #ffe6de); color: var(--accent, #e2552b); }
+
+.trade-row-side { display: grid; gap: 6px; justify-items: end; flex: none; text-align: right; }
+.trade-row-amount { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.trade-badge {
+  font-size: var(--fs-2xs); font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+/* Tre toner, tre betydelser: något väntar på DIG, något är klart, något blev inte av. */
+.trade-badge-vantar { background: var(--accent, #e2552b); color: #fff; }
+.trade-badge-klar { background: var(--surface-2, #f0efec); color: var(--muted); }
+.trade-badge-dod { background: var(--surface-2, #f0efec); color: var(--muted-soft); }
+
+/* Butikens lägen på en annonsrad, i samma stil som säljlägena bredvid dem. */
+.card-row-sale-shop-live { color: var(--accent, #e2552b); }
+.card-row-sale-shop-reserved { color: var(--muted); }
+.card-row-sale-shop-sold, .card-row-sale-shop-delivered { color: var(--muted-soft); }
+.card-row-sale-shop-returned { color: var(--muted-soft); }

@@ -1,0 +1,35 @@
+# Prismotorn. Lyssnar med flit BARA på 127.0.0.1 — den ska aldrig gå att nå utifrån,
+# bara från Node-servern på samma maskin. Samma regel som deploy/cloudflared/config.yml
+# beskriver, fast upprätthållen här i stället för av en brandvägg.
+
+[Unit]
+Description=Loopa prismotor (FastAPI) pa 127.0.0.1:8000
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=opc
+Group=opc
+WorkingDirectory=/opt/loopa/Price_engine/Price_engine
+
+# Datan ligger utanfor repot: master.parquet ar 136 MB och gitignorerad.
+Environment=PRICE_ENGINE_DATA=/opt/loopa-data
+# Skadeavdragen PA — samma flagga som npm run price:dev satter lokalt.
+Environment=PRICE_ENGINE_DAMAGE=1
+
+ExecStart=/opt/loopa/Price_engine/Price_engine/.venv/bin/python -m uvicorn price_engine.api:app --host 127.0.0.1 --port 8000
+
+# Uppstarten laser 1,5M annonser i minnet. Fran fardig cache tar det ~30 s; maste den
+# byggas om — vilket bara hander nar master.parquet byts ut — tog det 303 s matt pa den
+# har maskinen. Restart=always med 10 s paus racker for bada fallen.
+Restart=always
+RestartSec=10
+
+# Loggar gar till journald, inte till en fil. Forsta forsoket skrev till
+# /opt/loopa-data/logs/*.log och foll pa "Failed to set up standard output: Permission
+# denied" — SELinux later inte systemd oppna en fil med /opt-etikett. Journald loser
+# bade det och rotationen. Las med: journalctl -u <tjanst> -f
+
+[Install]
+WantedBy=multi-user.target

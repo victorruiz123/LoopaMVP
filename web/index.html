@@ -24,6 +24,12 @@
          tegelorange som appen. SVG:n skalar till varje storlek utan en egen fil per mått. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
+    <!-- Manifestet gör appen installerbar, och det är förutsättningen för share_target: en delning
+         från Blocket-appen landar på /kop/analysera med annonsens adress ifylld. Fungerar BARA när
+         appen lagts till på hemskärmen — i en vanlig flik finns ingen delningsmeny att vara mål för,
+         och därför går fältet alltid att fylla i för hand. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+
     <title>Loopa – Sälj din möbel</title>
     <meta
       name="description"

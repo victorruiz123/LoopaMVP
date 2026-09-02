@@ -1,6 +1,12 @@
 /**
  * Omslaget: säljarens egen möbel, fri från rummet den råkade stå i.
  *
+ * ARKITEKTUREN ÄNDRADES 2026-09-01, och den gamla beskrivningen nedan stämde inte längre.
+ * Silhuetten kom förut från Gemini. Den vägen levererade aldrig: masken kom tillbaka som
+ * COCO-liknande RLE eller som ett korrekt PNG-huvud följt av skräp, underkändes tyst, och noll av
+ * 172 jobb fick ett urklipp under hela tiden funktionen påstods fungera. Silhuetten räknas nu
+ * lokalt av U2Net (se segment.ts); Gemini svarar bara på vilken möbel bilden handlar om.
+ *
  * Kortet bar förut tillverkarens katalogbild — en NY exemplar av modellen. Den svarar snabbt på
  * "vad är det här?" och lika snabbt fel på "vad är det jag köper?": en fläckfri studiosoffa ovanför
  * ett pris som gäller en tio år gammal. Ett kort som annars räknar upp varje skråma har då det
@@ -34,6 +40,7 @@ import path from "node:path";
 import sharp from "sharp";
 import { callGeminiStructured, type ImagePart } from "../gemini.js";
 import { loadImageAsBase64 } from "../imageUtils.js";
+import { scoreFrame, segmentToMask, segmenterAvailable } from "./segment.js";
 import type { CoverCutout } from "../types.js";
 
 /** Omslagets sida i pixlar. Kvadratiskt, som varje produktbild i varje butik. */
@@ -106,6 +113,55 @@ export interface Box {
  * ändå (säljarens bildruta som den är), och ett halvt urklipp är sämre än inget: en soffa med ett
  * avklippt ben mot vitt ser trasig ut på ett sätt ett vardagsrumsfoto aldrig gör.
  */
+/**
+ * Väljer den bildruta som duger bäst som produktbild.
+ *
+ * Skild från `resolveCoverImageId` (cover.ts) med flit — de svarar på olika frågor. Den väljer den
+ * ruta som visar SKICKET bäst, vilket ofta är en närbild på en skada, och det är rätt för
+ * skickrapporten. Den här väljer den som visar MÖBELN bäst, vilket är rätt för ett omslag.
+ *
+ * Går att göra först nu: att poängsätta sex bildrutor kostade ett modellanrop styck när silhuetten
+ * kom från Gemini, alltså en halv minut per jobb. Lokalt kostar det en sekund per ruta, och då är
+ * det billigare att titta på alla än att gissa på en.
+ *
+ * Faller poängsättningen används rutan anroparen pekade ut — omslaget blir sämre valt, aldrig
+ * uteblivet.
+ */
+/**
+ * Lägsta produktbildspoäng ett omslag får byggas på.
+ *
+ * MÄTT, inte satt på känsla. Över de 65 varor som ligger i butiken är bästa bildrutans poäng som
+ * mest 0,83 och medianen 0,705. Vid 0,7 får 40 av 65 ett urklipp; vid 0,5 får 48, men då kommer
+ * närbilderna med — ett armstöd mot vitt, en halv soffa — och de ser SÄMRE ut än katalogbilden de
+ * ersätter. Ett rumsfoto döljer dålig beskärning; vit botten skriker ut den.
+ *
+ * Under gränsen byggs inget urklipp, och kortet visar katalogbilden som förut. Det är ett medvetet
+ * val att hellre visa en ny exemplar av modellen än en oläslig bild av den rätta.
+ */
+const MIN_COVER_SCORE = Number(process.env.COVER_MIN_SCORE ?? 0.7);
+
+export async function pickCoverFrame(
+  dir: string,
+  candidates: Array<{ id: string; path: string }>,
+): Promise<{ id: string; path: string } | null> {
+  let best: { id: string; path: string } | null = null;
+  let bestScore = 0;
+  for (const c of candidates) {
+    try {
+      const score = await scoreFrame(path.join(dir, "originals", c.path));
+      if (score && score.score > bestScore) {
+        bestScore = score.score;
+        best = c;
+      }
+    } catch {
+      // En bildruta som inte går att läsa är inte ett skäl att låta bli att välja bland de andra.
+    }
+  }
+  // Null betyder "ingen ruta här duger som produktbild", inte "något gick fel". Anroparen ska då
+  // låta bli att bygga ett omslag — inte falla tillbaka på en ruta vi just underkänt.
+  return bestScore >= MIN_COVER_SCORE ? best : null;
+}
+
 export async function buildCover(
   jobId: string,
   dir: string,
@@ -119,31 +175,52 @@ export async function buildCover(
   const height = meta.height ?? 0;
   if (!width || !height) return null;
 
-  const part = await loadImageAsBase64(src);
-  const segmented = await segment(part);
-  if (!segmented) return null;
-
-  const box = pixelBox(segmented.box_2d, width, height);
-  if (!box) return null;
-
-  /**
-   * Är masken pixlar, eller är den påhittad?
-   *
-   * Kontrollen finns för att det felet en gång var OSYNLIGT. En hallucinerad base64 bär rätt PNG-huvud,
-   * går igenom `Buffer.from(..., "base64")` utan att klaga, och dör först långt ner i sharp — där
-   * felet såg ut som "masken underkänd", alltså exakt som en ärligt dålig silhuett. Skillnaden mellan
-   * "modellen såg fel" och "modellen skrev skräp" är hela skillnaden mellan att justera en tröskel och
-   * att bygga om anropet, och den ska stå i loggen.
-   */
-  const maskBytes = maskBuffer(segmented.mask);
-  try {
-    await sharp(maskBytes).metadata();
-  } catch {
-    console.warn(
-      `[omslag] ${jobId.slice(0, 8)} masken är inte en bild (${maskBytes.length} byte) — modellen svarade text, inte pixlar`,
-    );
+  if (!(await segmenterAvailable())) {
+    console.info(`[omslag] ${jobId.slice(0, 8)} ingen segmenteringsmodell — se server/models/`);
     return null;
   }
+
+  /**
+   * TVÅ SIGNALER, EN FRÅGA VAR.
+   *
+   * Gemini svarar på VILKEN möbel bilden handlar om (`box_2d`), och det gör den pålitligt. U2Net
+   * svarar på var möbelns kant går, och det gör den varje gång. Tidigare fick Gemini båda frågorna,
+   * och den andra kunde den inte: masken kom tillbaka som RLE eller som ett hallucinerat PNG-huvud,
+   * underkändes tyst, och noll av 172 jobb fick ett urklipp.
+   *
+   * Var för sig räcker ingen av dem. En ram är inte en silhuett — beskuret sitter golvet och halva
+   * rummet kvar. Och en silhuett utan ram vet inte vilket föremål som säljs: på en skarp bildruta
+   * klippte U2Net ut soffan tillsammans med soffbordet, mattan och en stol, eftersom de nuddar
+   * varandra i bild och därmed är EN form. Snittet mellan de två är möbeln.
+   */
+  /**
+   * SILHUETTEN FÖRST, ramen sedan — och bara den första är ett krav.
+   *
+   * U2Net körs lokalt och svarar på en sekund. Gemini-anropet är en FÖRBÄTTRING: det säger vilken
+   * möbel bilden handlar om, vilket behövs när flera föremål nuddar varandra och därför bildar en
+   * enda form. Men det anropet tajmar ut ibland — mätt: ett av tre jobb, 39,5 s innan det gav upp.
+   *
+   * Ordningen här gör att ett sådant utfall kostar en sämre beskärning i stället för hela omslaget.
+   * Föll ramen används masken som den är, och möbeln har då redan skiljts från allt den INTE
+   * nuddar (se keepLargestBlob). Att låta ett valfritt anrop fälla en lokal förmåga vore att bygga
+   * in någon annans drifttid i vår.
+   */
+  const fullMask = await segmentToMask(src);
+  if (!fullMask) {
+    console.info(`[omslag] ${jobId.slice(0, 8)} segmenteringen gav ingen mask`);
+    return null;
+  }
+
+  const part = await loadImageAsBase64(src);
+  const segmented = await segment(part);
+  const box = (segmented && pixelBox(segmented.box_2d, width, height)) || { left: 0, top: 0, width, height };
+  if (!segmented) {
+    console.info(`[omslag] ${jobId.slice(0, 8)} ingen ram från modellen — hela masken används`);
+  }
+
+  // Masken beskärs till ramen innan den lämnas vidare: buildAlpha lägger den på sin plats i en
+  // annars svart duk, så allt utanför möbelns ram faller bort av sig självt.
+  const maskBytes = await sharp(fullMask).extract(box).png().toBuffer();
 
   const cover = await composeCutout(src, maskBytes, box, width, height);
   if (!cover) {
@@ -155,9 +232,9 @@ export async function buildCover(
   await sharp(cover).toFile(path.join(dir, "cover", "cover.jpg"));
 
   console.info(
-    `[omslag] ${jobId.slice(0, 8)} urklipp=${segmented.label || "möbel"} ms=${Date.now() - startedAt}`,
+    `[omslag] ${jobId.slice(0, 8)} urklipp=${segmented?.label || "möbel"} ms=${Date.now() - startedAt}`,
   );
-  return { sourceImageId: imageId, label: segmented.label || null, createdAt: new Date().toISOString() };
+  return { sourceImageId: imageId, label: segmented?.label || null, createdAt: new Date().toISOString() };
 }
 
 /**
@@ -184,12 +261,6 @@ export async function composeCutout(
   return await compose(src, alpha, width, height, bounds);
 }
 
-/** Masken kommer som "data:image/png;base64,…" ur modellen och som rena bytes ur ett test. */
-function maskBuffer(mask: string): Buffer {
-  const base64 = mask.includes(",") ? mask.slice(mask.indexOf(",") + 1) : mask;
-  return Buffer.from(base64, "base64");
-}
-
 /**
  * Silhuetten från modellen. Ett anrop, inga omförsök utöver wrapperns egna — omslaget är inte kritiskt.
  *
@@ -201,9 +272,12 @@ function maskBuffer(mask: string): Buffer {
  * 2 743 byte, alltså inga pixlar alls. Masken underkändes varje gång, felet svaldes, och kortet föll
  * tillbaka på säljarens bildruta. Noll av 193 jobb fick ett urklipp.
  *
- * Utan schema svarar modellen i sitt EGNA maskformat i stället: en lista med `box_2d`, `mask` och
- * `label`, där masken är en riktig PNG. Formatet är det efterbehandlingen redan väntade sig — bara
- * anropet var fel, aldrig aritmetiken efter det.
+ * Utan schema svarar modellen i sitt EGNA maskformat: en lista med `box_2d`, `mask` och `label`.
+ *
+ * DET LÖSTE INTE MASKEN, vilket den här kommentaren tidigare påstod. Mätt 2026-09-01 mot tre skarpa
+ * jobb utan schema: två svarade med RLE (`i^V13a010?K01O1000…` — inget `size`-fält, och summan av
+ * körningarna motsvarar ingen rimlig bildyta), det tredje med `iVBORw0KGgoAAA…` som avkodar till
+ * ingenting. Bara RAMEN var någonsin användbar, och det är det enda som läses härifrån i dag.
  */
 async function segment(part: ImagePart): Promise<Segmentation | null> {
   let raw: unknown;
@@ -218,9 +292,17 @@ async function segment(part: ImagePart): Promise<Segmentation | null> {
         "Output a JSON list of segmentation masks where each entry contains the 2D bounding box " +
         'in the key "box_2d", the segmentation mask in key "mask", and the text label in the key "label".',
       images: [part],
-      // Masken ÄR upplösningen: en silhuett räknad ur en nedskalad bild tappar stolsben.
-      resolution: "high",
-      primaryTimeoutMs: 30_000,
+      /**
+       * Låg upplösning och kort tid, för frågan är nu en annan.
+       *
+       * Anropet bad förut om en MASK, och då var upplösningen hela saken — en silhuett räknad ur en
+       * nedskalad bild tappar stolsben. Nu läses bara ramen, och en ram runt den möbel bilden handlar
+       * om syns lika bra i en mindre bild. Tiden är kapad av samma skäl: det här är en förbättring av
+       * ett urklipp som redan finns, och ett urklipp ska inte vänta en halv minut på den.
+       */
+      resolution: "low",
+      primaryTimeoutMs: 12_000,
+      fallbackTimeoutMs: 10_000,
     });
     raw = data;
   } catch {
@@ -230,7 +312,9 @@ async function segment(part: ImagePart): Promise<Segmentation | null> {
   const list = Array.isArray(raw) ? raw : raw && typeof raw === "object" ? [raw] : [];
   const candidates = list.filter(
     (d): d is Segmentation =>
-      !!d && typeof d === "object" && typeof (d as Segmentation).mask === "string" && Array.isArray((d as Segmentation).box_2d),
+      // Masken KRÄVS inte längre. Den kommer från U2Net; det enda som behövs härifrån är ramen, och
+      // ett svar utan mask är därför ett fullgott svar.
+      !!d && typeof d === "object" && Array.isArray((d as Segmentation).box_2d),
   );
   if (!candidates.length) return null;
 

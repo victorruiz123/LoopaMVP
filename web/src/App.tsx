@@ -13,6 +13,10 @@ import AdminScreen from "./screens/AdminScreen";
 import AdminUserScreen from "./screens/AdminUserScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
+import ButikApp from "./butik/ButikApp";
+import { isButikPath } from "./butik/router";
+import AffarApp from "./affar/AffarApp";
+import { isAffarPath } from "./affar/router";
 import { legalDocFromPath } from "./lib/legal";
 import LegalScreen from "./screens/LegalScreen";
 import CookieConsent from "./components/CookieConsent";
@@ -90,9 +94,32 @@ export default function App() {
    */
   const legalDoc = legalDocFromPath(window.location.pathname);
 
+  /**
+   * /butik/** — köpsidan.
+   *
+   * Läses här av samma skäl som kortet och de juridiska sidorna: valet mellan butik och säljflöde är
+   * ett vägval på adressen. Till skillnad från dem har butiken en EGEN router inuti sig (se
+   * butik/router.ts) — den har många adresser som ska gå att dela och backa i, medan säljflödet
+   * medvetet inte har någon.
+   */
+  const butik = isButikPath(window.location.pathname);
+
+  /**
+   * /kop/analysera, /a/:token, /affar/:id — Trygg affär.
+   *
+   * Läses här av samma skäl som butiken: det är ett vägval på adressen. Inbjudan (/a/:token) är den
+   * enda sidan i produkten en okänd person når utan konto, och den måste därför ligga FÖRE varje
+   * inloggningsgrind — precis som det publika kortet gör.
+   */
+  const affar = isAffarPath(window.location.pathname);
+
   return (
     <>
-      {legalDoc ? (
+      {affar ? (
+        <AffarApp />
+      ) : butik ? (
+        <ButikApp />
+      ) : legalDoc ? (
         <LegalScreen doc={legalDoc} />
       ) : publicId ? (
         <PublicCardScreen initialId={publicId} />
@@ -157,6 +184,25 @@ function FlowApp() {
    * det flöde hela ändringen finns för att hålla ihop. Anropen bär sin token från klienten, inte
    * härifrån, så uppladdningen påverkas inte av att React ligger efter.
    */
+  /**
+   * Affären säljaren kom hit från (Trygg affär), läst ur adressen EN gång.
+   *
+   * Säljaren landar på `/?affar=<id>` från inbjudan. Id:t hålls i en ref och inte i skärmens
+   * tillstånd, för det överlever hela flödet — märke, filmning, inloggning, uppladdning — och ska
+   * inte behöva bäras vidare av varje skärmbyte. Det används på två ställen: förifyllningen på
+   * startsidan, och märkningen av jobbet vid uppladdningen.
+   *
+   * Adressen städas efteråt så att en omladdning mitt i flödet inte startar om från inbjudan.
+   */
+  const dealId = useRef<string | null>(null);
+  if (dealId.current === null) {
+    const fromUrl = new URLSearchParams(window.location.search).get("affar");
+    if (fromUrl) {
+      dealId.current = fromUrl;
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }
+
   const hadAccount = useRef(false);
   useEffect(() => {
     if (user) {
@@ -182,6 +228,7 @@ function FlowApp() {
       return (
         <HomeScreen
           key={homeKey.current}
+          dealId={dealId.current}
           onStartScan={(identity) => setScreen({ name: "capture", identity })}
           onOpenJob={(jobId) => setScreen({ name: "result", jobId })}
           // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
@@ -223,6 +270,7 @@ function FlowApp() {
     case "starting":
       return (
         <StartingJob
+          dealId={dealId.current}
           identity={screen.identity}
           shots={screen.shots}
           onStarted={(jobId) =>
@@ -321,10 +369,10 @@ function FlowApp() {
           onOpenAdmin={() => setScreen({ name: "admin" })}
           // Profilen öppnar kortet, inte fyndlistan: det är annonsen som sparats, och vägen
           // tillbaka till skicket finns kvar inifrån det.
-          onOpenJob={async (jobId) => {
-            const job = await getJob(jobId);
-            if (job.result) setScreen({ name: "listing", jobId, result: job.result, loopaId: job.loopaId });
-            else setScreen({ name: "result", jobId });
+          onOpenJob={async (row) => {
+            const job = await getJob(row.id);
+            if (job.result) setScreen({ name: "listing", jobId: row.id, result: job.result, loopaId: job.loopaId });
+            else setScreen({ name: "result", jobId: row.id });
           }}
         />
       );
@@ -377,12 +425,20 @@ function BuildingListing() {
 function StartingJob({
   identity,
   shots,
+  dealId,
   onStarted,
   onBack,
   onNeedsLogin,
 }: {
   identity: FurnitureIdentity;
   shots: CapturedShot[];
+  /**
+   * Affären skanningen tillhör, när säljaren kommit hit via en inbjudan (Trygg affär).
+   *
+   * Följer med ända hit och inte bara till startsidan: märkningen måste sitta på jobbet från
+   * skapandet, annars är skanningen publik i glappet — se createJob.
+   */
+  dealId: string | null;
   onStarted: (jobId: string) => void;
   onBack: () => void;
   /** Sessionen bar inte hela vägen. Bilderna ligger kvar — säljaren ska logga in, inte filma om. */
@@ -404,7 +460,7 @@ function StartingJob({
   useEffect(() => {
     if (startedAttempt.current === attempt) return;
     startedAttempt.current = attempt;
-    createJob(shots, identity)
+    createJob(shots, identity, dealId)
       .then(({ jobId }) => onStarted(jobId))
       .catch((err) => {
         /**

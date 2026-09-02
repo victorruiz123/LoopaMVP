@@ -573,6 +573,21 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     const marked = { ...listing, improving };
     if (job.result) job.result.listing = marked;
     else job.pendingListing = marked;
+    /**
+     * ETT ANNONSHÄRLETT JOBB BLIR KLART HÄR, och ingen annanstans.
+     *
+     * Köparens jobb har ingen besiktning (`skipGrading` i jobCreate.ts), och det är besiktningen som
+     * anropar `completeJob` för ett säljarjobb. Utan den här raden nådde jobbet aldrig ett slutläge:
+     * annonsen låg färdig på skärmen medan jobbet stod kvar i `identifying` — och fyra minuter efter
+     * att köparen klistrat in länken fällde `watchJobDeadline` en analys som varit klar hela tiden,
+     * med "Analysen tog längre än 240 s och avbröts". Varje köparanalys dog så, inte bara de sena.
+     *
+     * Först vid `improving: false`: dessförinnan kan ett omförsök fortfarande fylla i måtten, och
+     * klienten slutar polla när jobbet är klart.
+     */
+    if (job.adDerived && !improving) {
+      job.progress = { stage: "done", message: "Analysen är klar." };
+    }
     await persist(job);
   };
 

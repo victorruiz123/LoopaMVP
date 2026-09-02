@@ -556,6 +556,33 @@ export interface ConditionJob {
    * jobb från före stegen ska inte börja sjunka av sig självt.
    */
   priceLadder?: PriceLadder | null;
+  /**
+   * Affären jobbet tillhör, när det är en skanning inuti ett affärsrum (Trygg affär).
+   *
+   * SATT = JOBBET ÄR PRIVAT. Ett affärsjobb får inte hamna i Butik och inte bli läsbart på
+   * /c/LP-XXXX-XXXX: det är en besiktning beställd av en köpare för en enskild affär, inte en annons.
+   * Två ställen läser fältet och det är inte en tillfällighet att det är just de två:
+   *
+   *   - butik/inventory.ts `syncFromJobs` — som annars skriver in VARJE jobb med betyg, pris och
+   *     märke i butikslagret. En affärsskanning uppfyller alla tre.
+   *   - publicCard.ts `publicCardFor` — som annars ger varje jobb med en annons ett publikt kort.
+   *
+   * Osatt betyder vanligt säljarjobb, vilket är allt som fanns före Trygg affär.
+   */
+  dealId?: string | null;
+  /**
+   * Jobbet är byggt på NÅGON ANNANS annonsbilder, inte på ett filmat varv (Trygg affär, köparens
+   * analys).
+   *
+   * SATT = JOBBET ÄR PRIVAT, av samma skäl som `dealId` och genom samma två portar. Men märkningen
+   * är en egen, för den betyder något annat: `dealId` säger "tillhör en affär", det här säger
+   * "underlaget är inte vårt". Ett sådant jobb existerar innan någon affär gör det — köparen har
+   * ännu inte skapat konto — och skulle utan markören hamna i Butik som en vara vi aldrig sett.
+   *
+   * Det påverkar också hur resultatet FÅR PRESENTERAS: kortet är detsamma, men det är byggt på
+   * bilder säljaren valt, ofta just för att slitaget inte syns. Se PreliminaryFrame i klienten.
+   */
+  adDerived?: boolean;
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

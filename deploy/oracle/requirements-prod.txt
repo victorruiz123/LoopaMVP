@@ -1,0 +1,37 @@
+# Prismotorns beroenden I DRIFT — en delmängd av Price_engine/requirements.txt.
+#
+# Skillnaden mot utvecklingsuppsättningen är torch, ultralytics, faiss-cpu och
+# transformers. De behövs bara för bildvägen, och bildvägen är AV: server/src/pricing.ts
+# skickar ingen bild om inte PRICE_ENGINE_USE_IMAGE=1, och förvärmningen i api.py är
+# inlindad i try/except och loggar en varning i stället för att fälla uppstarten.
+# Vinsten är ~3 GB installation och ~200 s uppstart (YOLO- och DINOv2-vikterna plus
+# det första forward-passet).
+#
+# PyYAML står här men INTE i requirements.txt, och det är en riktig lucka och inte en
+# dubblett: type_system/grouping.py:80 importerar yaml utan try/except, och vocab()
+# ligger på inläsningsvägen via assign_cells. Lokalt råkar det fungera för att
+# ultralytics drar in PyYAML transitivt — tas torch-paketen bort utan den här raden
+# dör motorn vid uppstart med ModuleNotFoundError.
+#
+# Utelämnat med flit:
+#   openai      Bara variant.py (bildklassning) och vision_layer (formlagret). Båda av.
+#               damage_pricing.py gör inga modellanrop — den slår i tabell.
+#   openpyxl    Läser .xlsx. Driftdatan är master.parquet.
+#   pytest      Testberoende.
+#   numpy<2     Pinnen fanns för torch 2.2 på Python 3.9. Utan torch, och på 3.12,
+#               finns inget skäl att hålla kvar den.
+
+# Pandas är PINNAD, inte >=2.2 som i utvecklingsfilen. `pandas>=2.2` hämtar 3.0 i dag,
+# och 3.0 gör två ändringar som går rakt in i prissättningen: strängkolumner blir en egen
+# dtype i stället för `object`, och copy-on-write är på. Hela benchmarkuppsättningen är
+# mätt på 2.3.3, och en tyst skillnad i ett prissvar är dyrare än en pinne som måste höjas
+# för hand. Höj den medvetet, med en mätning, inte genom att den råkar följa med.
+pandas==2.3.3
+
+fastapi>=0.115
+uvicorn>=0.30
+pyarrow>=17
+numpy>=1.26,<3
+PyYAML>=6.0
+pillow>=10.0
+python-dotenv>=1.0

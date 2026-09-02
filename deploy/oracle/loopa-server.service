@@ -1,0 +1,35 @@
+# Node-servern: serverar bade UI:t och /api, sa det finns bara ett ursprung att peka
+# tunneln pa. BIND_HOST lamnas till sitt forval 127.0.0.1 — cloudflared nar den lokalt,
+# och ingen port behover oppnas i Oracles brandvagg.
+#
+# Hemligheterna laser server.ts sjalv ur server/.env (process.loadEnvFile, server.ts:7),
+# darfor ingen EnvironmentFile har. Filen ska ha chmod 600 och agas av opc.
+
+[Unit]
+Description=Loopa skickmotor (Node) pa 127.0.0.1:8799
+After=network-online.target loopa-price-engine.service
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=opc
+Group=opc
+WorkingDirectory=/opt/loopa/server
+
+Environment=NODE_ENV=production
+Environment=PORT=8799
+
+# tsx direkt i stallet for `npm start`: ett processled mindre, och signaler nar fram till
+# servern utan att npm star i vagen vid omstart.
+ExecStart=/opt/loopa/server/node_modules/.bin/tsx src/server.ts
+
+Restart=always
+RestartSec=5
+
+# Loggar gar till journald, inte till en fil. Forsta forsoket skrev till
+# /opt/loopa-data/logs/*.log och foll pa "Failed to set up standard output: Permission
+# denied" — SELinux later inte systemd oppna en fil med /opt-etikett. Journald loser
+# bade det och rotationen. Las med: journalctl -u <tjanst> -f
+
+[Install]
+WantedBy=multi-user.target

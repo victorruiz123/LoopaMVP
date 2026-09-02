@@ -132,24 +132,70 @@ export async function updateProgress(id: string, progress: JobProgress): Promise
 }
 
 /**
+ * Så länge ett jobb får stå och vänta på ett SVAR innan vi ger upp om det.
+ *
+ * Väntan på en människa är inte en hängning, men den kan inte vara oändlig heller: varje levande
+ * jobb håller en timer i processen, och en köpare som stänger fliken mitt i märkesfrågan ska inte
+ * lämna den kvar för alltid. En halvtimme är gott om tid för den som byter flik för att läsa
+ * annonsen och kort nog att inte samla på sig övergivna jobb.
+ */
+const HUMAN_WAIT_MAX_MS = 30 * 60_000;
+
+/**
+ * Står jobbet stilla för att VI väntar på en människa?
+ *
+ * Gäller BARA annonshärledda jobb, och det är hela poängen med avgränsningen: köparens jobb har
+ * ingen besiktning som körs i bakgrunden (`skipGrading`), så i de här två lägena arbetar ingenting
+ * alls — jobbet står och väntar på ett svar. Säljarens jobb ser likadant ut på skärmen men har
+ * skickbedömningen igång bakom sig, och den ska klockan fortsätta binda.
+ *
+ * De två lägena är samma två frågor säljaren får: vilket märke, och vilken modell.
+ */
+function waitingForAPerson(job: ConditionJob): boolean {
+  if (!job.adDerived) return false;
+  if (job.identityStatus === "needs_selection") return true;
+  return !job.identityStatus && !job.identity?.brand;
+}
+
+/**
  * Vaktar HELA jobbet. Löser ut oavsett fas och oavsett hur många omförsök som pågår.
+ *
+ * KLOCKAN MÄTER VÅRT ARBETE, INTE ANVÄNDARENS BETÄNKETID. Köparens väg genom en inklistrad annons
+ * stannar två gånger och väntar på ett svar, och där startas klockan om i stället för att fälla
+ * jobbet — den som funderar en stund på vilken av fyra modeller som är rätt har inte råkat ut för en
+ * hängning. Väntan är ändå bunden av `HUMAN_WAIT_MAX_MS`.
  *
  * Returnerar en funktion som avbryter vakten när jobbet blir klart av sig självt.
  */
 export function watchJobDeadline(id: string, ms: number): () => void {
-  const timer = setTimeout(() => {
-    void (async () => {
-      const job = jobs.get(id) ?? (await getJob(id));
-      if (!job) return;
-      if (job.progress.stage === "done" || job.progress.stage === "error") return;
-      const msg = `Analysen tog längre än ${Math.round(ms / 1000)} s och avbröts. Bildrutorna finns kvar — försök igen.`;
-      console.warn(`[deadline] ${id.slice(0, 8)} överskred ${Math.round(ms / 1000)}s i fas ${job.progress.stage}`);
-      job.error = msg;
-      job.progress = { stage: "error", message: msg };
-      if (job.identityStatus === "identifying") job.identityStatus = "unavailable";
-      await persist(job);
-    })();
-  }, ms);
+  const startedAt = Date.now();
+  let timer: ReturnType<typeof setTimeout>;
+  const arm = () => {
+    timer = setTimeout(() => {
+      void (async () => {
+        const job = jobs.get(id) ?? (await getJob(id));
+        if (!job) return;
+        if (job.progress.stage === "done" || job.progress.stage === "error") return;
+
+        const waited = Date.now() - startedAt;
+        if (waitingForAPerson(job) && waited < HUMAN_WAIT_MAX_MS) {
+          console.info(`[deadline] ${id.slice(0, 8)} väntar på svar sedan ${Math.round(waited / 1000)}s — klockan startas om`);
+          arm();
+          return;
+        }
+
+        const msg = waitingForAPerson(job)
+          ? "Analysen låg och väntade på ett svar för länge och stängdes. Klistra in länken igen."
+          : `Analysen tog längre än ${Math.round(ms / 1000)} s och avbröts. Bildrutorna finns kvar — försök igen.`;
+        console.warn(`[deadline] ${id.slice(0, 8)} överskred ${Math.round(ms / 1000)}s i fas ${job.progress.stage}`);
+        job.error = msg;
+        job.progress = { stage: "error", message: msg };
+        if (job.identityStatus === "identifying") job.identityStatus = "unavailable";
+        await persist(job);
+      })();
+    }, ms);
+  };
+  arm();
   return () => clearTimeout(timer);
 }
 

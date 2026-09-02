@@ -505,6 +505,23 @@ export interface JobSummary {
   listingTitle: string | null;
   /** Försäljningen, när säljaren lagt ut möbeln. null = sparad, men aldrig utlagd. */
   sale: JobSale | null;
+  /**
+   * Möbelns läge i Loopa Butik. Null = aldrig inlagd där.
+   *
+   * Skilt från `sale`, som bara känner till Tradera. En möbel kan ligga i vår egen butik utan att
+   * någonsin ha lagts ut på en marknadsplats, och det är två olika svar på "säljs den just nu".
+   */
+  shop: JobShopState | null;
+}
+
+/** Vad butiken vet om möbeln — läge, när den lades in, och när och var den såldes. */
+export interface JobShopState {
+  state: "draft" | "live" | "reserved" | "sold" | "delivered" | "returned";
+  listedAt: string;
+  soldAt: string | null;
+  soldChannel: "butik" | "tradera" | null;
+  /** Priset som gällde när den reserverades. Null tills någon lagt den i kassan. */
+  priceSek: number | null;
 }
 
 // ---- adminpanelen (GET /api/admin/users) ----

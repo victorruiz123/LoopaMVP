@@ -1,0 +1,267 @@
+/* ==========================================================================
+   Trygg affär
+   ==========================================================================
+   Samma tokens som resten av appen (web/src/styles.css). Formen är närmast
+   butikens, men smalare: det här är sidor man LÄSER — ett erbjudande, en
+   bedömning, en status — inte ett rutnät man bläddrar i. En spalt hela vägen,
+   också på stora skärmar, med ett läsmått som håller raderna hanterbara. */
+
+.affar { min-height: 100dvh; background: var(--bg); color: var(--ink); }
+
+.affar-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) var(--safe-right) 10px var(--safe-left);
+  border-bottom: 1px solid var(--border);
+}
+.affar-logo { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
+.affar-logo span { color: var(--accent); }
+.affar-bar-link { font-size: var(--fs-md); font-weight: 600; color: var(--accent); text-decoration: none; }
+
+.affar-page { max-width: 680px; margin: 0 auto; padding: 0 var(--safe-left) 60px; }
+
+.affar-hero { padding: 30px 0 20px; }
+.affar-hero h1 { margin: 8px 0 10px; font-size: clamp(26px, 6vw, 40px); line-height: 1.1; letter-spacing: -0.02em; }
+.affar-hero p { margin: 0; font-size: var(--fs-lg); color: var(--muted); line-height: 1.5; }
+.affar-geo {
+  display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent-ink);
+  font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+.affar-card {
+  background: var(--surface); border-radius: var(--r-xl); padding: 22px;
+  box-shadow: var(--shadow-card); margin: 0 0 18px;
+}
+.affar-card h2 { margin: 0 0 14px; font-size: 20px; letter-spacing: -0.01em; }
+.affar-card h3 { margin: 18px 0 8px; font-size: var(--fs-lg); }
+.affar-cta { background: var(--ink); color: #fff; }
+.affar-cta h2 { color: #fff; }
+.affar-cta p, .affar-cta .affar-hint { color: var(--on-dark-strong); }
+.affar-cta .affar-label { color: var(--on-dark); }
+.affar-cta .affar-input { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.2); color: #fff; }
+.affar-cta .affar-input::placeholder { color: var(--on-dark-faint); }
+
+/* ---- formulär ---- */
+.affar-label {
+  display: block; margin: 18px 0 6px;
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; color: var(--muted);
+}
+.affar-input {
+  width: 100%; min-height: var(--tap); padding: 11px 14px;
+  font-size: var(--fs-field); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+}
+.affar-input:focus { outline: none; border-color: var(--accent); }
+.affar-textarea { min-height: 110px; resize: vertical; line-height: 1.5; font-family: inherit; }
+.affar-input-short { max-width: 200px; }
+.affar-hint { margin: 8px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+.affar-error { color: var(--danger-dark); font-size: var(--fs-md); margin: 12px 0 0; line-height: 1.5; }
+.affar-actions { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.affar-card .btn { margin-top: 16px; }
+.affar-actions .btn { margin-top: 0; }
+
+/*
+  En länk som ser ut som en knapp måste också BETE sig som en.
+
+  `.btn` i styles.css sätter ingen display — den skrevs för <button>, som är inline-block av sig
+  själv. En <a class="btn"> blir därför `display: inline`, och en inline-ruta höjer inte radhöjden:
+  knappen på säljarens landningssida lade sig rakt ovanpå stycket ovanför. Regeln gäller bara inuti
+  Trygg affär, så inget annat i appen ändrar utseende av den här raden.
+*/
+.affar a.btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  text-decoration: none; text-align: center;
+}
+.affar a.btn-primary { width: 100%; }
+
+/* ---- uppladdade annonsbilder ---- */
+.affar-uploads { display: flex; flex-wrap: wrap; gap: 10px; }
+.affar-thumb { position: relative; width: 84px; height: 84px; border-radius: var(--r); overflow: hidden; background: var(--field); }
+.affar-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.affar-thumb button {
+  position: absolute; top: 3px; right: 3px; width: 24px; height: 24px; border: none; cursor: pointer;
+  border-radius: 50%; background: rgba(20,17,13,0.68); color: #fff; font-size: 15px; line-height: 1;
+}
+.affar-add {
+  width: 84px; height: 84px; border-radius: var(--r); cursor: pointer;
+  border: 1px dashed var(--border); background: transparent; color: var(--muted);
+  font-size: var(--fs-sm);
+}
+.affar-add:active { background: var(--surface-pressed); }
+
+/* ---- den preliminära bedömningen ----
+   Gul ram, inte vit. Skillnaden mot det verifierade kortet ska synas innan man läst en rad. */
+.affar-prelim {
+  background: var(--amber-light); border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
+  border-radius: var(--r-xl); padding: 22px; margin: 0 0 18px;
+}
+.affar-prelim-head { margin-bottom: 12px; }
+.affar-prelim-tag {
+  display: inline-block; padding: 4px 10px; border-radius: 999px;
+  background: var(--amber); color: #fff;
+  font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+.affar-prelim-basis { margin: 8px 0 0; font-size: var(--fs-md); color: var(--amber-ink); line-height: 1.45; }
+.affar-prelim-name { margin: 10px 0 8px; font-size: 22px; letter-spacing: -0.01em; }
+.affar-prelim-note { margin: 0 0 8px; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); }
+.affar-prelim-confidence { margin: 0 0 14px; font-size: var(--fs-md); color: var(--amber-ink); font-weight: 600; line-height: 1.45; }
+
+.affar-price {
+  padding: 12px 14px; border-radius: var(--r); font-size: var(--fs-base); font-weight: 600; line-height: 1.5;
+  background: var(--surface); margin: 0 0 14px;
+}
+.affar-price-under { color: var(--green-dark); }
+.affar-price-inom { color: var(--ink-soft); }
+.affar-price-over { color: var(--danger-dark); }
+
+.affar-flags { background: var(--surface); border-radius: var(--r); padding: 14px; margin: 0 0 14px; }
+.affar-flags h3 { margin: 0 0 8px; font-size: var(--fs-lg); color: var(--danger-dark); }
+.affar-flags ul { margin: 0; padding-left: 18px; }
+.affar-flags li { font-size: var(--fs-md); line-height: 1.5; margin-bottom: 6px; }
+
+.affar-block { margin-top: 16px; }
+.affar-list { margin: 0; padding-left: 18px; }
+.affar-list li { font-size: var(--fs-base); line-height: 1.55; margin-bottom: 8px; }
+.affar-questions li { display: flex; gap: 10px; align-items: baseline; justify-content: space-between; }
+.affar-copy-mini {
+  flex: none; border: 1px solid var(--border); background: var(--surface); color: var(--muted);
+  border-radius: var(--r-xs); padding: 3px 9px; font-size: var(--fs-xs); cursor: pointer;
+}
+.affar-copy-mini:active { background: var(--surface-pressed); }
+
+.affar-facts { display: flex; flex-wrap: wrap; gap: 20px; margin: 16px 0 0; padding-top: 14px; border-top: 1px solid color-mix(in srgb, var(--amber) 30%, transparent); }
+.affar-facts dt { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--amber-ink); font-weight: 700; }
+.affar-facts dd { margin: 4px 0 0; font-size: var(--fs-lg); font-weight: 700; }
+
+/* ---- meddelandet till säljaren ---- */
+.affar-message { font-size: var(--fs-base); line-height: 1.55; min-height: 150px; }
+
+/* ---- tidslinjen ---- */
+.affar-status { margin: 0 0 16px; font-size: var(--fs-lg); font-weight: 600; line-height: 1.45; }
+.affar-timeline { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.affar-step { display: flex; align-items: center; gap: 10px; font-size: var(--fs-md); color: var(--muted-soft); padding: 5px 0; }
+.affar-step-dot {
+  width: 22px; height: 22px; flex: none; border-radius: 50%;
+  border: 1.5px solid var(--border); background: var(--surface);
+  display: flex; align-items: center; justify-content: center; font-size: 12px; color: #fff;
+}
+.affar-step-done { color: var(--ink); font-weight: 600; }
+.affar-step-done .affar-step-dot { background: var(--green); border-color: var(--green); }
+
+/* ---- säljarens sida ---- */
+.affar-steps { margin: 0; padding: 0; list-style: none; counter-reset: affar; display: grid; gap: 18px; }
+.affar-steps li { counter-increment: affar; padding-left: 40px; position: relative; }
+.affar-steps li::before {
+  content: counter(affar); position: absolute; left: 0; top: 0;
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center; font-size: var(--fs-xs); font-weight: 700;
+}
+.affar-steps strong { display: block; font-size: var(--fs-lg); margin-bottom: 3px; }
+.affar-steps span { font-size: var(--fs-md); color: var(--muted); line-height: 1.5; }
+
+.affar-faq dt { font-weight: 650; font-size: var(--fs-base); margin-top: 14px; }
+.affar-faq dt:first-child { margin-top: 0; }
+.affar-faq dd { margin: 4px 0 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.5; }
+
+/* ---- huvudboken ---- */
+.affar-log { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.affar-log li { display: flex; gap: 12px; font-size: var(--fs-md); line-height: 1.45; }
+.affar-log time { flex: none; color: var(--muted-soft); font-variant-numeric: tabular-nums; min-width: 11ch; }
+.affar-expiry { text-align: center; margin: 0 0 18px; }
+
+.affar-skeleton {
+  height: 220px; border-radius: var(--r-xl); margin: 24px 0;
+  background: var(--skeleton); background-size: 400% 100%; animation: affar-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes affar-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .affar-skeleton { animation: none; } }
+
+/* ---- det verifierade kortet ----
+   Grönt mot det preliminäras gula. Skillnaden ska synas på en meter: det gula är vad vi TRODDE om
+   någon annans annonsbilder, det gröna är vad vi FANN när möbeln filmades. */
+.affar-verified {
+  background: var(--surface); border: 1px solid color-mix(in srgb, var(--green) 30%, transparent);
+  border-radius: var(--r-xl); padding: 22px; margin: 0 0 18px; box-shadow: var(--shadow-card);
+}
+.affar-verified-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 12px; }
+.affar-verified-tag {
+  display: inline-block; padding: 4px 11px; border-radius: 999px;
+  background: var(--green); color: #fff;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.02em;
+}
+.affar-verified-date { font-size: var(--fs-sm); color: var(--muted); }
+.affar-verified-name { margin: 6px 0 12px; font-size: 22px; letter-spacing: -0.01em; }
+.affar-verified-grade strong { font-size: var(--fs-lg); display: block; margin-bottom: 4px; }
+.affar-verified-grade p { margin: 0 0 6px; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); }
+.affar-verified-foot { border-top: 1px solid var(--border); padding-top: 12px; margin-top: 16px; }
+
+.affar-defects { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.affar-defects li {
+  display: grid; grid-template-columns: 1fr auto; gap: 4px 10px; align-items: baseline;
+  padding: 10px 12px; background: var(--field); border-radius: var(--r);
+}
+.affar-defect-part { font-weight: 650; font-size: var(--fs-md); }
+.affar-defect-desc { grid-column: 1 / -1; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
+.affar-sev { font-size: var(--fs-2xs); font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--surface); color: var(--muted); }
+.affar-sev-S3, .affar-sev-S4 { background: var(--amber-light); color: var(--amber-ink); }
+
+.affar-measures { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px 20px; margin: 0; }
+.affar-measures dt { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; }
+.affar-measures dd { margin: 3px 0 0; font-size: var(--fs-lg); font-weight: 700; }
+
+/* ---- prisrundan ---- */
+.affar-price-round { border: 1px solid color-mix(in srgb, var(--accent) 28%, transparent); }
+.affar-amount { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 10px; }
+.affar-amount-value { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; }
+.affar-amount-by { font-size: var(--fs-sm); color: var(--muted); }
+.affar-rationale {
+  margin: 0 0 14px; padding: 12px 14px; border-radius: var(--r);
+  background: var(--field); font-size: var(--fs-base); line-height: 1.55;
+}
+.affar-accepted { color: var(--green-dark); font-weight: 600; }
+.affar-counter { margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); }
+.affar-field-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.affar-field-row .btn { margin-top: 0; }
+
+/* Förklaringen när hämtningen inte gick. Gul, inte röd: det är inte ett fel utan en omväg. */
+.affar-fallback {
+  background: var(--amber-light); color: var(--amber-ink);
+  padding: 11px 13px; border-radius: var(--r); margin: 14px 0 0; font-weight: 600;
+}
+
+/* ---- annonskortet för en möbel köparen hittat ----
+   Kortet inuti är IDENTISKT med säljarens (ListingView). Ramen är skillnaden: gul kant och en rad
+   som säger vad underlaget är. Säljarens kort bygger på ett filmat varv; det här på bilder säljaren
+   valt till sin annons. Lika detaljerat, inte lika sant. */
+.affar-adcard {
+  border: 1px solid color-mix(in srgb, var(--amber) 45%, transparent);
+  border-radius: var(--r-xl); padding: 14px; margin: 0 0 18px;
+  background: var(--amber-light);
+}
+.affar-adcard-head { margin-bottom: 12px; padding: 4px 6px 0; }
+.affar-adcard .listing { background: var(--surface); border-radius: var(--r-lg); }
+.affar-adcard-thin { background: var(--surface); border-radius: var(--r-lg); padding: 18px; }
+.affar-adcard-thin h3 { margin: 0 0 6px; font-size: var(--fs-lg); }
+.affar-adcard-thin p { margin: 0 0 8px; font-size: var(--fs-base); line-height: 1.55; }
+
+/* Faktarutorna på köparens pris- och annonssida: samma ljusa yta som resten, inte kortets gula. */
+.affar-facts-light { border-top-color: var(--border); }
+.affar-facts-light dt { color: var(--muted); }
+.affar-est { font-size: var(--fs-xs); color: var(--muted-soft); font-weight: 500; }
+
+/* Annonsens egen bild på köparens annonssida. Bredvid — inte i — faktarutan: bilden är säljarens
+   påstående om möbeln, och rutan under är vårt. Håller sitt eget bildförhållande så att en stående
+   mobilbild inte blir en meterhög kolumn. */
+.affar-photo { margin: 0 0 16px; }
+.affar-photo img {
+  display: block;
+  width: 100%;
+  max-height: 420px;
+  object-fit: cover;
+  border-radius: var(--r-lg, 18px);
+  background: var(--surface-2, #eee);
+}
+.affar-photo figcaption { margin-top: 8px; font-size: var(--fs-sm); color: var(--muted); }
+
+/* Säljarens citerade annonstext. Radbrytningarna är säljarens egna och ska stå kvar. */
+.affar-quote { margin: 0; line-height: 1.6; white-space: pre-wrap; }

@@ -1,7 +1,8 @@
 import { createReadStream } from "node:fs";
-import { stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import type { ServerResponse } from "node:http";
 import path from "node:path";
+import { injectSeo, seoFor } from "./butik/seo.js";
 
 /**
  * Serverar det byggda UI:t.
@@ -49,11 +50,35 @@ export async function distExists(): Promise<boolean> {
  * Sant om svaret skickades. Falskt betyder att vägen inte fanns — anroparen får själv avgöra vad
  * det innebär.
  */
-export async function serveStatic(pathname: string, res: ServerResponse): Promise<boolean> {
+export async function serveStatic(pathname: string, res: ServerResponse, search = ""): Promise<boolean> {
   const direct = await fileAt(pathname);
   // Enkelsidig app: allt som inte är en fil är en vy, och vyer renderas av index.html.
   const file = direct ?? (await fileAt("/index.html"));
   if (!file) return false;
+
+  /**
+   * Butikens sidor får sitt huvud ifyllt innan de skickas.
+   *
+   * Bara butiken, och bara när skalet är det som serveras: säljflödets skärmar ska ingen hitta via
+   * en sökmotor, och en riktig fil ska serveras som den är. Faller uppslaget skickas skalet orört —
+   * en trasig titel får aldrig bli en trasig sida. Se butik/seo.ts.
+   */
+  if (!direct && pathname.startsWith("/butik")) {
+    try {
+      const head = await seoFor(pathname, search);
+      if (head) {
+        const html = injectSeo(await readFile(file, "utf-8"), head);
+        res.setHeader("Content-Type", TYPES[".html"]);
+        res.setHeader("X-Content-Type-Options", "nosniff");
+        res.setHeader("Cache-Control", "no-cache");
+        res.writeHead(200);
+        res.end(html);
+        return true;
+      }
+    } catch (err) {
+      console.warn("[butik] kunde inte bygga sidhuvudet:", err instanceof Error ? err.message : err);
+    }
+  }
 
   const ext = path.extname(file).toLowerCase();
   res.setHeader("Content-Type", TYPES[ext] ?? "application/octet-stream");

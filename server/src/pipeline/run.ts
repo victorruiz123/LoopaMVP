@@ -11,7 +11,7 @@ import { needsVerification, verifyFindings } from "./verify.js";
 import { dedupeDamages } from "./dedup.js";
 import { gradeCondition } from "./grade.js";
 import { coverFirst, pickCoverImageId } from "./cover.js";
-import { buildCover } from "./cutout.js";
+import { buildCover, pickCoverFrame } from "./cutout.js";
 
 /**
  * Runs the full ConditionInput -> ConditionResult pipeline. AT MOST 2 Gemini calls: one main inspection
@@ -254,9 +254,19 @@ export async function runConditionGrading(
  * modell som inte svarar tar med sig hela skickbedömningen, för en bild kortet klarar sig utan.
  */
 function startCover(jobId: string, dir: string, images: CapturedImage[], coverImageId: string | null): void {
-  const image = coverFirst(images, coverImageId)[0];
-  if (!image || !COVER_CUTOUT_ENABLED) return;
-  void buildCover(jobId, dir, image.id, image.path)
+  if (!images.length || !COVER_CUTOUT_ENABLED) return;
+  /**
+   * Omslagsrutan väljs på möbelns synlighet, inte på skickets.
+   *
+   * `coverImageId` väljer den ruta som visar SKADORNA bäst — rätt för skickrapporten, fel för ett
+   * omslag: en närbild på ett armstöd säger ingenting om vilken möbel som säljs. pickCoverFrame
+   * poängsätter varje ruta lokalt (en sekund styck) och tar den där möbeln är hel i bild. Faller
+   * den används jobbets egen ruta.
+   */
+  void pickCoverFrame(dir, images)
+    // Null = ingen bildruta duger som produktbild. Då blir det inget omslag, och kortet visar
+    // katalogbilden — hellre en ny exemplar av modellen än en oläslig bild av den rätta.
+    .then((image) => (image ? buildCover(jobId, dir, image.id, image.path) : null))
     .then(async (cutout) => {
       if (!cutout) return;
       const job = getJobSync(jobId);

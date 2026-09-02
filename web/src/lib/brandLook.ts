@@ -13,6 +13,13 @@ import type { CSSProperties } from "react";
  *
  * Bara märken vars identitet är entydig står i tabellen. Resten får en varm neutral ur Loopas egen
  * palett — en gissad husfärg är värre än ingen, eftersom den ser lika säker ut som en riktig.
+ *
+ * MIO, SITS, SWEDESE OCH EM HOME tillkom när butiken började visa märken som stora brickor på
+ * förstasidan: de fyra är de vi faktiskt har lager av, och en rad där bara IKEA hade en färg läste
+ * som fyra tomma rutor. Tonerna är INTE nya bedömningar utan hämtade ur brandTheme.ts, som redan
+ * bär projektets curerade ton per märke (mio rött, swedese grönt, sits neutralt, em home brunt) —
+ * översatta till den här filens starkare vokabulär. Savo och Sweef står kvar utan färg, för om dem
+ * säger ingenting i projektet något, och regeln ovan gäller dem precis som förut.
  */
 
 /** Hur märket sätter sitt namn. Styr vikt, spärr och versalisering — märkets typografiska tonfall. */
@@ -42,6 +49,7 @@ const LOOKS: Record<string, BrandLook> = {
   ikea: { bg: "#0058a3", fg: "#ffda1a", type: "heavy" },
   jysk: { bg: "#00509e", fg: PAPER, type: "heavy" },
   chilli: { bg: "#d81f26", fg: PAPER, type: "heavy" },
+  mio: { bg: "#b23a3a", fg: PAPER, type: "heavy" },
 
   // Designhusen — svart på papper, vid spärr. Deras identitet ÄR frånvaron av färg.
   hay: { bg: PAPER, fg: INK, type: "wide", ring: true },
@@ -53,6 +61,7 @@ const LOOKS: Record<string, BrandLook> = {
   artek: { bg: PAPER, fg: INK, type: "wide", ring: true },
   "west elm": { bg: INK, fg: PAPER, type: "wide" },
   bolia: { bg: PAPER, fg: INK, type: "wide", ring: true },
+  sits: { bg: PAPER, fg: "#3f3b35", type: "wide", ring: true },
   "string furniture": { bg: PAPER, fg: INK, type: "wide", ring: true },
   "herman miller": { bg: INK, fg: PAPER, type: "wide" },
   stressless: { bg: "#2b2b2b", fg: PAPER, type: "wide" },
@@ -64,6 +73,10 @@ const LOOKS: Record<string, BrandLook> = {
   "carl malmsten": { bg: "#4a3f2f", fg: "#f4ece0", type: "serif" },
   "bruno mathsson": { bg: "#4a3f2f", fg: "#f4ece0", type: "serif" },
   "arne jacobsen": { bg: "#2a2723", fg: "#f2ede2", type: "serif" },
+  swedese: { bg: "#3d4634", fg: "#f2ede2", type: "serif" },
+
+  // Övrigt med känd hållning.
+  "em home": { bg: "#8a6b45", fg: "#f7f3ee", type: "plain" },
 };
 
 /**

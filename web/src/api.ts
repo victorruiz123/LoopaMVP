@@ -93,11 +93,20 @@ export interface CapturedShot {
 export async function createJob(
   images: CapturedShot[],
   identity: FurnitureIdentity | null,
+  /**
+   * Affären skanningen tillhör (Trygg affär), när säljaren kommit hit via en inbjudan.
+   *
+   * Måste följa med VID SKAPANDET, inte sättas efteråt: fältet är det som håller jobbet utanför
+   * Butik och utanför det publika kortet (se ConditionJob.dealId), och ett jobb som märks i efterhand
+   * har hunnit vara publikt däremellan. Servern kontrollerar att anroparen faktiskt är affärens
+   * säljare innan den godtar id:t.
+   */
+  dealId: string | null = null,
 ): Promise<{ jobId: string; imageCount: number }> {
   const res = await authFetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null }),
+    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null, dealId }),
   });
   return json(res);
 }

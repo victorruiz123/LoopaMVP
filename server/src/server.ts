@@ -9,6 +9,7 @@ try {
   // no .env file yet — GEMINI_API_KEY must be set some other way, checked below.
 }
 import { createJob, failOrphanedJobs, getJob, getJobSync, jobDir, listJobs, ownerIdOf, persist, getDebugTrace, watchJobDeadline } from "./jobStore.js";
+import { createConditionJob, readIdentity, type CreateJobBody } from "./jobCreate.js";
 import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
@@ -31,6 +32,12 @@ import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
 import { cutoutOf, jobByLoopaId, publicCardFor } from "./publicCard.js";
+import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
+import { handleAffar, handleAffarPublic } from "./affar/routes.js";
+import { store as affarStore } from "./affar/store.js";
+import { attachScan } from "./affar/scan.js";
+import { syncFromJobs } from "./butik/inventory.js";
+import { startButikSweeper } from "./butik/sweeper.js";
 import { bearerToken } from "./supabaseAuth.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
@@ -87,35 +94,6 @@ async function readJsonBody<T>(req: IncomingMessage, maxBytes: number = MAX_BODY
   return JSON.parse(raw) as T;
 }
 
-interface CreateJobBody {
-  productContext?: string | null;
-  /** Brand + model as the seller typed them. Optional: grading works without them, pricing does not. */
-  brand?: string | null;
-  model?: string | null;
-  /** Already curated by the client: selected video frames + any manual photos. No server-side selection. */
-  images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual" }>;
-}
-
-/**
- * Märket räcker för att starta. Modellen letar systemet upp ur bilderna.
- *
- * Tidigare krävdes modellnamnet, skrivet för hand, innan något kunde börja — och identifieringen låg
- * sist i flödet, där den ibland kom fram till att säljaren angett fel möbel efter att skick och pris
- * redan räknats på den. Nu är ordningen den omvända: märke in, bilder in, modell fram, sedan resten.
- */
-function readIdentity(body: { brand?: string | null; model?: string | null }): FurnitureIdentity | null {
-  const brand = body.brand?.trim() || null;
-  const model = body.model?.trim() || "";
-  if (!brand && !model) return null;
-  return { brand, model };
-}
-
-/**
- * The one place a finished report is recomputed after the seller changes the findings. Grade and price
- * are refreshed together, from the same damage list, so the two halves of the report cannot drift
- * apart — the failure mode where a rejected damage disappears from the grade but is still deducted
- * from the price.
- */
 async function regradeAndReprice(job: ConditionJob): Promise<void> {
   if (!job.result) return;
   job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
@@ -137,83 +115,6 @@ async function coverImageBase64(job: ConditionJob): Promise<string | null> {
 /**
  * The one place a job is created. Both the local web UI and the public API go through this, so the API
  * cannot drift from what the app does — "exactly the same pipeline" is structural, not a promise.
- */
-async function createConditionJob(
-  body: CreateJobBody,
-  ownerId: string | null = null,
-): Promise<{ jobId: string; imageCount: number } | { error: string }> {
-  if (!Array.isArray(body.images) || body.images.length === 0) {
-    return { error: "At least one image is required" };
-  }
-  const identity = readIdentity(body);
-  const job = await createJob(body.productContext ?? null, identity, ownerId);
-  const dir = jobDir(job.id);
-  const originalsDir = path.join(dir, "originals");
-  await mkdir(originalsDir, { recursive: true });
-
-  const limited = body.images.slice(0, MAX_IMAGES_PER_JOB);
-  const images: CapturedImage[] = [];
-  for (let i = 0; i < limited.length; i++) {
-    const { dataUrl, viewLabel, source } = limited[i];
-    const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl);
-    if (!match) continue;
-    const [, mimeType, base64] = match;
-    const ext = mimeType === "image/png" ? "png" : "jpg";
-    const filename = `img_${i}.${ext}`;
-    const abs = path.join(originalsDir, filename);
-    await writeFile(abs, Buffer.from(base64, "base64"));
-    const { width, height } = await getImageDimensions(abs);
-    images.push({
-      id: randomUUID(),
-      viewLabel: viewLabel ?? null,
-      source: source ?? "manual",
-      width,
-      height,
-      path: filename,
-      capturedAt: new Date().toISOString(),
-    });
-  }
-
-  if (images.length === 0) return { error: "No valid images were decoded" };
-
-  job.images = images;
-  await persist(job);
-
-  // EN klocka för hela jobbet, startad här. Den enda gräns som binder oavsett fas och oavsett hur
-  // många omförsök som pågår i något av spåren.
-  const stopDeadline = watchJobDeadline(job.id, JOB_DEADLINE_MS);
-  void (async () => {
-    for (;;) {
-      await new Promise((r) => setTimeout(r, 1000));
-      const current = await getJob(job.id);
-      if (!current || current.progress.stage === "done" || current.progress.stage === "error") break;
-    }
-    stopDeadline();
-  })();
-
-  // Två spår, parallellt. Besiktningen behöver inte modellen och identifieringen behöver inte
-  // betyget — de delar bara bildrutorna. Kedjade hade de lagt sina tider ovanpå varandra.
-  void runConditionGrading(job.id, images, body.productContext ?? null, identity);
-  if (identity?.brand && !identity.model) {
-    job.identityStatus = "identifying";
-    await persist(job);
-    void runIdentify(job.id, identity.brand, images);
-  } else if (identity?.model) {
-    // Säljaren angav modellen själv — hoppa identifieringen, gå direkt till annons och pris.
-    job.identityStatus = "resolved";
-    await persist(job);
-    void finalizeWithModel(job.id, { kind: "manual", manualModel: identity.model });
-  }
-  return { jobId: job.id, imageCount: images.length };
-}
-
-/**
- * Price for a brand + model, with no job and no photos behind it.
- *
- * The price engine never needed the walkaround: it searches an ad corpus on the name, and the damage
- * list is a deduction applied afterwards. So this answer exists the moment the seller has typed the
- * two fields — which is why the app asks for it while they are still filming, and why the price is on
- * screen before the inspection has finished its first Gemini call.
  */
 async function handlePreliminaryPrice(req: IncomingMessage, res: ServerResponse) {
   const body = await readJsonBody<{ brand?: string | null; model?: string | null }>(req);
@@ -247,8 +148,31 @@ function handleCreateSession(req: IncomingMessage, res: ServerResponse, identity
 async function handleCreateJob(req: IncomingMessage, res: ServerResponse, identity: Identity) {
   // Ägaren avgörs HÄR, vid uppladdningen, och aldrig senare. En annons som får sin profil
   // efteråt är en annons som kan hamna i fel — filmningen och kontot hör ihop från början.
-  const out = await createConditionJob(await readJsonBody<CreateJobBody>(req), identity.id);
+  const body = await readJsonBody<CreateJobBody>(req);
+
+  /**
+   * En skanning får bara knytas till en affär av affärens EGEN säljare.
+   *
+   * Utan kontrollen kan vem som helst skicka med ett `dealId` och därmed dels göra sitt eget jobb
+   * osynligt i butiken, dels hänga en besiktning på någon annans affär. Prövningen sker här och inte
+   * i affärsmodulen därför att det är här jobbet skapas — och märkningen måste sitta från början.
+   */
+  let dealId: string | null = null;
+  if (body.dealId) {
+    const deal = await affarStore().get(body.dealId);
+    if (!deal || deal.sellerId !== identity.id) {
+      return sendJson(res, 403, { error: "Du är inte säljare i den affären." });
+    }
+    dealId = deal.id;
+  }
+
+  const out = await createConditionJob(body, identity.id, dealId);
   if ("error" in out) return sendJson(res, 400, out);
+
+  // Affären får veta vilket jobb som är dess. Skanningen är igång; tillståndsbytet till `scanned`
+  // sker när besiktningen är klar — se attachScan.
+  if (dealId) await attachScan(dealId, out.jobId, identity.id);
+
   sendJson(res, 202, out);
 }
 
@@ -580,6 +504,31 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
   // Jobb från före omslagsvalet får sitt uträknat här, en gång, och sparat. Utan det behåller de sin
   // första bildruta som miniatyr — den som ofta är svart.
   await Promise.all(jobs.map((j) => resolveCoverImageId(j)));
+  /**
+   * Butikens läge per möbel, slaget upp en gång för hela listan.
+   *
+   * `sale` nedan är TRADERA och bara Tradera — den sattes när "Sälj med Loopa" byggdes. Loopa Butik
+   * kom efteråt och har sitt eget lager (butik/store.ts), och utan den här uppslagningen kunde
+   * profilen inte skilja en möbel som ligger ute i vår egen butik från en som bara är sparad. Det är
+   * den enda frågan en säljare öppnar profilen för att få svar på.
+   */
+  const shopByJob = new Map<string, { state: string; listedAt: string; soldAt: string | null; soldChannel: string | null; priceSek: number | null }>();
+  try {
+    const { store: butikStore } = await import("./butik/store.js");
+    for (const r of await butikStore().all()) {
+      if (r.jobId) {
+        shopByJob.set(r.jobId, {
+          state: r.state,
+          listedAt: r.listedAt,
+          soldAt: r.soldAt,
+          soldChannel: r.soldChannel,
+          priceSek: r.reservedPriceSek,
+        });
+      }
+    }
+  } catch {
+    // Utan butikslager är varje jobb bara en sparad annons, som förut. Profilen ska inte falla på det.
+  }
   sendJson(
     res,
     200,
@@ -610,6 +559,8 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
         // aldrig lagts ut. Profilen skiljer på de två: en möbel som säljs just nu är inte en sparad
         // annons, den ligger ute hos köparna.
         sale: j.tradera ? { status: j.tradera.status, url: j.tradera.url } : null,
+        // Loopa Butiks eget läge. Null = möbeln har aldrig lagts in i butiken.
+        shop: shopByJob.get(j.id) ?? null,
       };
     }),
   );
@@ -908,6 +859,46 @@ const server = http.createServer(async (req, res) => {
       }
 
       /**
+       * Butiken, före grinden och med flit.
+       *
+       * Rutnätet, kategorierna och produktsidorna ÄR den publika ingången: de ska gå att nå av en
+       * sökmotor och av någon som aldrig hört talas om oss. Allt som kräver ett konto — reservation,
+       * kassa, bevakningar — ligger kvar innanför grinden och prövar inloggningen för sig.
+       */
+      if (segments[1] === "butik") {
+        // Läsande vägar: rutnätet, produktsidan, kategorierna, leveransbeskedet.
+        if (await handleButikRequest(segments.slice(2), req, res, url)) return;
+        /**
+         * Stripes webhook, också utanför grinden.
+         *
+         * Stripe har inget konto hos oss och kan inte logga in. Den bevisar sig i stället med en
+         * signatur över den råa kroppen, vilket är ett starkare bevis än en inloggning: bara den som
+         * har vår webhook-hemlighet kan skriva den. Se parseWebhook.
+         */
+        if (segments[2] === "webhook") {
+          if (await handleButikWrite(segments.slice(2), req, res, null)) return;
+        }
+        // AI-tolkningen av en sökning: publik av samma skäl som rutnätet — att söka efter en soffa
+        // ska inte kräva ett konto.
+        if (segments[2] === "tolka") {
+          if (await handleButikWrite(segments.slice(2), req, res, null)) return;
+        }
+      }
+
+      /**
+       * Trygg affär, den publika halvan.
+       *
+       * `tolka` bedömer en annons utan att skapa något — köparen ska få se vad vi kan säga innan de
+       * skapar konto. `inbjudan/:token` är säljarens vy, där token ÄR åtkomsten: en säljare som fått
+       * en länk i Blockets chatt ska kunna läsa erbjudandet utan att registrera sig först.
+       */
+      if (segments[1] === "affar") {
+        if (await handleAffarPublic(segments.slice(2), req, res)) return;
+        // Allt annat under /api/affar faller igenom till grinden nedan.
+        // Allt annat under /api/butik faller igenom till grinden nedan.
+      }
+
+      /**
        * EN grind framför hela /api.
        *
        * Tidigare krävde ingen av de här vägarna något alls — nyckeln skyddade bara /v1/condition.
@@ -922,6 +913,28 @@ const server = http.createServer(async (req, res) => {
 
       if (segments[1] === "session" && segments.length === 2 && req.method === "POST") {
         return handleCreateSession(req, res, identity);
+      }
+
+      /**
+       * Butikens kontobundna vägar: kassan, ordern, returen.
+       *
+       * Innanför grinden med flit — en order ska ha en ägare, och en retur ska gå att knyta till
+       * den som köpte. Bläddrandet ligger kvar utanför; se ovan.
+       */
+      if (segments[1] === "butik") {
+        const who = { userId: identity.id, email: identity.email };
+        if (await handleButikOrderRead(segments.slice(2), req, res, who)) return;
+        if (await handleButikWrite(segments.slice(2), req, res, who)) return;
+        return sendJson(res, 404, { error: "Not found" });
+      }
+
+      /**
+       * Affärsrummet. Bara köparen och säljaren, och rollen prövas per affär inne i hanteraren —
+       * inte här: vem som är vem beror på affären, inte på anropet.
+       */
+      if (segments[1] === "affar") {
+        if (await handleAffar(segments.slice(2), req, res, { userId: identity.id, email: identity.email })) return;
+        return sendJson(res, 404, { error: "Not found" });
       }
 
       /**
@@ -1009,7 +1022,7 @@ const server = http.createServer(async (req, res) => {
 
     // Allt som inte är API är UI. Ligger bygget inte där svarar vi som förut, med 404 i JSON — det
     // är läget i utveckling, där sidan kommer från vite.
-    if (req.method === "GET" && (await serveStatic(url.pathname, res))) return;
+    if (req.method === "GET" && (await serveStatic(url.pathname, res, url.search))) return;
 
     sendJson(res, 404, { error: "Not found" });
   } catch (err) {
@@ -1035,6 +1048,19 @@ void failOrphanedJobs().then((n) => {
 // Prisstegen lever i den här processen. Den är avstängd av sig själv när Tradera inte är
 // konfigurerat — utan konto finns ingen annons att sänka priset på.
 startPriceLadderScheduler();
+
+/**
+ * Butiken lär känna lagret vid uppstart: varje besiktigat och prissatt jobb får en post, och det som
+ * redan ligger uppe på Tradera går live även här. Se syncFromJobs.
+ */
+void syncFromJobs().then(({ enrolled, published, withdrawn }) => {
+  if (enrolled || published || withdrawn) {
+    console.info(`[butik] ${enrolled} varor infogade, ${published} publicerade, ${withdrawn} tillbakadragna`);
+  }
+});
+
+// Släpper reservationer som gått ut. Utan den låser en avbruten utcheckning möbeln för alltid.
+startButikSweeper();
 
 server.listen(PORT, BIND_HOST, () => {
   console.log(`[condition-grading-server] listening on http://${BIND_HOST}:${PORT}`);

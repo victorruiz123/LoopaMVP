@@ -1,0 +1,650 @@
+/* ==========================================================================
+   Loopa Butik
+   ==========================================================================
+   Samma tokens som resten av appen (se web/src/styles.css) — cremevit botten,
+   vita kort, tegelorange accent, iOS-radier. Ingen egen palett: den som klickar
+   sig från säljverktyget till butiken ska inte byta färgvärld på vägen.
+
+   Formen är däremot butikens egen. Säljflödet är EN sak i taget på en skärm man
+   håller i handen; butiken är ett rutnät man bläddrar i. Därför riktiga kolumner,
+   riktiga bilder och en filterrad som får ta plats — men fortfarande mobilen först:
+   de flesta som bläddrar efter en soffa gör det i telefonen. */
+
+.butik { min-height: 100dvh; background: var(--bg); color: var(--ink); }
+
+/* ---- topprad ---- */
+.butik-bar {
+  position: sticky; top: 0; z-index: 30;
+  display: flex; align-items: center; gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) var(--safe-right) 10px var(--safe-left);
+  background: color-mix(in srgb, var(--bg) 92%, transparent);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--border);
+}
+.butik-logo {
+  font-size: 26px; line-height: 1; font-weight: 700; letter-spacing: -0.02em;
+  color: var(--ink); text-decoration: none; flex: none;
+}
+.butik-logo span { color: var(--accent); }
+.butik-search { flex: 1; min-width: 0; position: relative; }
+.butik-search input {
+  width: 100%; height: var(--tap); padding: 0 14px 0 38px;
+  font-size: var(--fs-field); color: var(--ink);
+  background: var(--field); border: 1px solid transparent; border-radius: var(--r);
+}
+.butik-search input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+.butik-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted-soft); pointer-events: none; }
+.butik-bar-sell {
+  flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 14px;
+  border-radius: var(--r); background: var(--accent); color: #fff;
+  font-size: var(--fs-md); font-weight: 600; text-decoration: none; white-space: nowrap;
+}
+.butik-bar-sell:active { opacity: 0.82; }
+@media (max-width: 640px) { .butik-bar-sell-long { display: none; } }
+@media (min-width: 641px) { .butik-bar-sell-short { display: none; } }
+
+.butik-main { max-width: 1180px; margin: 0 auto; padding: 0 var(--safe-left) 64px; }
+
+/* ---- hero ---- */
+.butik-hero { padding: 34px 0 26px; }
+.butik-hero h1 {
+  margin: 0 0 10px; font-size: clamp(30px, 7vw, 52px); line-height: 1.05;
+  letter-spacing: -0.03em; font-weight: 700;
+}
+.butik-hero h1 em { font-style: normal; color: var(--accent); }
+.butik-hero p { margin: 0; font-size: var(--fs-lg); color: var(--muted); max-width: 46ch; line-height: 1.5; }
+.butik-geo {
+  display: inline-flex; align-items: center; gap: 6px; margin-bottom: 14px;
+  padding: 5px 11px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent-ink);
+  font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+}
+
+/* ---- kategoribrickor ---- */
+.butik-tiles { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 26px 0; }
+@media (min-width: 640px) { .butik-tiles { grid-template-columns: repeat(4, 1fr); } }
+.butik-tile {
+  display: flex; flex-direction: column; justify-content: space-between; gap: 8px;
+  min-height: 92px; padding: 14px; text-decoration: none;
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
+  color: var(--ink); transition: transform 120ms ease;
+}
+.butik-tile:active { transform: scale(0.98); }
+.butik-tile-name { font-weight: 650; font-size: var(--fs-base); line-height: 1.25; }
+.butik-tile-count { font-size: var(--fs-xs); color: var(--muted-soft); }
+.butik-tile-empty { opacity: 0.55; }
+
+/* ---- sektioner ---- */
+.butik-section { margin: 40px 0 0; }
+.butik-section-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.butik-section-head h2 { margin: 0; font-size: 21px; letter-spacing: -0.01em; }
+.butik-section-head a { font-size: var(--fs-md); color: var(--accent); text-decoration: none; font-weight: 600; }
+
+/* ---- rutnät ---- */
+.butik-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+@media (min-width: 700px) { .butik-grid { grid-template-columns: repeat(3, 1fr); gap: 16px; } }
+@media (min-width: 1000px) { .butik-grid { grid-template-columns: repeat(4, 1fr); } }
+
+.butik-card {
+  display: flex; flex-direction: column; text-decoration: none; color: inherit;
+  background: var(--surface); border-radius: var(--r-lg); overflow: hidden;
+  box-shadow: var(--shadow-card); transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.butik-card:active { transform: scale(0.985); }
+@media (hover: hover) { .butik-card:hover { box-shadow: var(--shadow-raised); } }
+.butik-card-media {
+  position: relative; aspect-ratio: 4 / 3; background: var(--field);
+  display: flex; align-items: center; justify-content: center; overflow: hidden;
+}
+.butik-card-media img { width: 100%; height: 100%; object-fit: cover; display: block; }
+/* Katalogbilder ligger mot vitt och ska inte beskäras som ett foto. */
+.butik-card-media img.contain { object-fit: contain; padding: 8px; }
+.butik-card-body { padding: 11px 12px 13px; display: flex; flex-direction: column; gap: 5px; flex: 1; }
+.butik-card-brand { font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.07em; color: var(--muted-soft); font-weight: 700; }
+.butik-card-title {
+  font-size: var(--fs-base); font-weight: 600; line-height: 1.3; margin: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+.butik-card-foot { margin-top: auto; padding-top: 6px; display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.butik-price { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.01em; }
+.butik-price-was { font-size: var(--fs-xs); color: var(--muted-soft); text-decoration: line-through; }
+.butik-save { font-size: var(--fs-2xs); font-weight: 700; color: var(--green-dark); background: var(--green-light); padding: 2px 6px; border-radius: var(--r-xs); }
+
+/* ---- märken på kortet ---- */
+.butik-badge {
+  position: absolute; top: 8px; left: 8px; z-index: 2;
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 4px 8px; border-radius: 999px;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.01em;
+}
+.butik-badge-loopa { background: var(--ink); color: #fff; }
+.butik-badge-tradera { background: rgba(255,255,255,0.94); color: var(--ink-soft); border: 1px solid var(--border); }
+.butik-badge-sold { background: var(--danger-dark); color: #fff; }
+.butik-card-meta { font-size: var(--fs-xs); color: var(--muted); display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.butik-card-meta .sep { color: var(--border); }
+.butik-dim { font-variant-numeric: tabular-nums; }
+
+/* auktionsrad */
+.butik-auction { font-size: var(--fs-xs); color: var(--amber-ink); background: var(--amber-light); padding: 3px 7px; border-radius: var(--r-xs); font-weight: 600; }
+
+/* ---- filter ---- */
+.butik-filterbar {
+  position: sticky; top: calc(var(--tap) + 21px + env(safe-area-inset-top)); z-index: 20;
+  display: flex; gap: 8px; overflow-x: auto; padding: 12px 0;
+  background: var(--bg); scrollbar-width: none; -ms-overflow-style: none;
+}
+.butik-filterbar::-webkit-scrollbar { display: none; }
+.butik-chip {
+  flex: none; min-height: 38px; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0 13px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--surface); color: var(--ink-soft);
+  font-size: var(--fs-md); font-weight: 600; cursor: pointer; white-space: nowrap;
+}
+.butik-chip:active { background: var(--surface-pressed); }
+.butik-chip-on { background: var(--ink); color: #fff; border-color: var(--ink); }
+.butik-chip-count { opacity: 0.6; font-weight: 500; }
+
+.butik-sheet-backdrop {
+  position: fixed; inset: 0; z-index: 60; background: hsl(var(--scrim) / 0.42);
+  display: flex; align-items: flex-end; justify-content: center;
+}
+@media (min-width: 700px) { .butik-sheet-backdrop { align-items: center; } }
+.butik-sheet {
+  width: 100%; max-width: 560px; max-height: 88dvh; overflow-y: auto;
+  background: var(--surface); border-radius: var(--r-xl) var(--r-xl) 0 0;
+  padding: 8px var(--safe-left) calc(16px + env(safe-area-inset-bottom));
+}
+@media (min-width: 700px) { .butik-sheet { border-radius: var(--r-xl); } }
+.butik-sheet-grip { width: 38px; height: 4px; border-radius: 2px; background: var(--border); margin: 8px auto 14px; }
+.butik-sheet h3 { margin: 0 0 4px; font-size: var(--fs-title); }
+.butik-field { margin: 18px 0; }
+.butik-field > label, .butik-field-label {
+  display: block; margin-bottom: 8px;
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; color: var(--muted);
+}
+.butik-field-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.butik-input {
+  flex: 1; min-width: 0; height: var(--tap); padding: 0 12px;
+  font-size: var(--fs-field); border: 1px solid var(--border); border-radius: var(--r);
+  background: var(--surface); color: var(--ink);
+}
+.butik-input:focus { outline: none; border-color: var(--accent); }
+.butik-toggle { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: var(--tap); }
+.butik-toggle-text { font-size: var(--fs-base); font-weight: 600; }
+.butik-toggle-hint { font-size: var(--fs-sm); color: var(--muted); font-weight: 400; }
+.butik-sheet-actions { position: sticky; bottom: 0; background: var(--surface); padding: 12px 0 4px; display: flex; gap: 10px; border-top: 1px solid var(--border); }
+
+/* ---- notiser och tomma lägen ---- */
+.butik-notice {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px; margin: 14px 0; border-radius: var(--r);
+  background: var(--amber-light); color: var(--amber-ink); font-size: var(--fs-md); line-height: 1.45;
+}
+.butik-empty { text-align: center; padding: 54px 20px; }
+.butik-empty h3 { margin: 0 0 8px; font-size: var(--fs-title); }
+.butik-empty p { margin: 0 auto 20px; color: var(--muted); max-width: 40ch; line-height: 1.5; }
+.butik-empty-actions { display: flex; flex-direction: column; gap: 10px; align-items: center; }
+@media (min-width: 560px) { .butik-empty-actions { flex-direction: row; justify-content: center; } }
+
+/* ---- förtroenderad ---- */
+.butik-trust { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
+.butik-trust-item {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 13px; border-radius: var(--r); background: var(--surface);
+  font-size: var(--fs-md); font-weight: 600; box-shadow: var(--shadow-card);
+}
+.butik-trust-item svg { flex: none; color: var(--green); }
+
+.butik-explainer { background: var(--surface); border-radius: var(--r-xl); padding: 24px; box-shadow: var(--shadow-card); margin: 40px 0; }
+.butik-explainer h2 { margin: 0 0 6px; font-size: 22px; letter-spacing: -0.01em; }
+.butik-explainer > p { margin: 0 0 20px; color: var(--muted); line-height: 1.5; max-width: 56ch; }
+.butik-steps { display: grid; gap: 16px; }
+@media (min-width: 700px) { .butik-steps { grid-template-columns: repeat(3, 1fr); gap: 24px; } }
+.butik-step-n {
+  width: 26px; height: 26px; border-radius: 50%; background: var(--accent); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); font-weight: 700; margin-bottom: 9px;
+}
+.butik-step h4 { margin: 0 0 4px; font-size: var(--fs-lg); }
+.butik-step p { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.5; }
+
+/* ---- säljuppmaning ---- */
+.butik-sell {
+  display: flex; flex-direction: column; gap: 14px; align-items: flex-start;
+  background: var(--ink); color: #fff; border-radius: var(--r-xl); padding: 26px; margin: 40px 0;
+}
+@media (min-width: 700px) { .butik-sell { flex-direction: row; align-items: center; justify-content: space-between; } }
+.butik-sell h3 { margin: 0 0 6px; font-size: 21px; letter-spacing: -0.01em; }
+.butik-sell p { margin: 0; color: var(--on-dark-strong); line-height: 1.5; max-width: 52ch; }
+.butik-sell-btn {
+  flex: none; display: inline-flex; align-items: center; gap: 8px; min-height: var(--tap);
+  padding: 0 20px; border-radius: var(--r); background: var(--accent); color: #fff;
+  font-size: var(--fs-lg); font-weight: 650; text-decoration: none;
+}
+.butik-sell-btn:active { opacity: 0.85; }
+
+/* ---- paginering ---- */
+.butik-more { display: flex; justify-content: center; margin: 30px 0; }
+.butik-count { text-align: center; color: var(--muted); font-size: var(--fs-md); margin: 18px 0 0; }
+
+/* ---- skelett ---- */
+.butik-skeleton { border-radius: var(--r-lg); background: var(--skeleton); background-size: 400% 100%; animation: butik-shimmer 1.4s ease-in-out infinite; }
+.butik-skeleton-card { aspect-ratio: 4 / 3; }
+@keyframes butik-shimmer { 0% { background-position: 100% 0; } 100% { background-position: 0 0; } }
+@media (prefers-reduced-motion: reduce) { .butik-skeleton { animation: none; } }
+
+/* ---- AI-sökningen: "beskriv vad du söker" ----
+   Får väga tyngre än topplistens sökruta, för den kan mer: en mening i stället för ord. */
+.butik-ai { margin: 8px 0 30px; }
+.butik-ai-label {
+  display: block; margin-bottom: 10px;
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.08em;
+  font-weight: 700; color: var(--muted);
+}
+.butik-ai-form { display: flex; gap: 8px; align-items: stretch; }
+.butik-ai-input {
+  flex: 1; min-width: 0; min-height: 54px; padding: 0 16px;
+  font-size: var(--fs-field); color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--border); border-radius: var(--r-lg);
+  box-shadow: var(--shadow-card);
+}
+.butik-ai-input::placeholder { color: var(--muted-soft); }
+.butik-ai-input:focus { outline: none; border-color: var(--accent); }
+.butik-ai-go {
+  flex: none; min-height: 54px; padding: 0 22px; border: none; cursor: pointer;
+  border-radius: var(--r-lg); background: var(--ink); color: #fff;
+  font-size: var(--fs-lg); font-weight: 650;
+}
+.butik-ai-go:disabled { background: var(--field); color: var(--muted-soft); cursor: not-allowed; }
+.butik-ai-go:not(:disabled):active { opacity: 0.85; }
+.butik-ai-examples { display: flex; gap: 8px; margin-top: 10px; overflow-x: auto; scrollbar-width: none; }
+.butik-ai-examples::-webkit-scrollbar { display: none; }
+.butik-ai-example {
+  flex: none; padding: 7px 12px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: transparent; color: var(--muted);
+  font-size: var(--fs-sm); white-space: nowrap;
+}
+.butik-ai-example:active { background: var(--surface-pressed); }
+
+/* ---- märkesbrickorna ----
+   Plattan bär MÄRKETS färg och bokstavsform (se brandLook.ts); raden under bär Loopas. */
+.butik-brands { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 700px) { .butik-brands { grid-template-columns: repeat(3, 1fr); gap: 14px; } }
+@media (min-width: 1000px) { .butik-brands { grid-template-columns: repeat(4, 1fr); } }
+
+.butik-brand-tile { display: flex; flex-direction: column; gap: 7px; text-decoration: none; color: inherit; }
+.butik-brand-plate {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  aspect-ratio: 16 / 10; padding: 12px; text-align: center;
+  border-radius: var(--r-lg); overflow: hidden;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.butik-brand-tile:active .butik-brand-plate { transform: scale(0.98); }
+@media (hover: hover) { .butik-brand-tile:hover .butik-brand-plate { box-shadow: var(--shadow-raised); } }
+.butik-brand-name {
+  font-size: clamp(15px, 3.6vw, 22px); line-height: 1.1;
+  max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* "secondhand" står i Loopas röst under märkets namn — aldrig i märkets egen typografi, för det är
+   vårt ord om deras möbler, inte deras om sina. */
+.butik-brand-sub {
+  font-size: var(--fs-2xs); font-weight: 500; letter-spacing: 0.1em;
+  text-transform: lowercase; font-family: inherit;
+}
+.butik-brand-count { font-size: var(--fs-xs); color: var(--muted-soft); padding-left: 2px; }
+
+/* ---- tolkningsraden ovanför träffarna ---- */
+.butik-reading {
+  display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+  padding: 12px 14px; margin: 0 0 16px; border-radius: var(--r);
+  background: var(--surface); box-shadow: var(--shadow-card);
+  font-size: var(--fs-md); line-height: 1.45;
+}
+.butik-reading-tag {
+  font-size: var(--fs-2xs); text-transform: uppercase; letter-spacing: 0.07em;
+  font-weight: 700; color: var(--accent-ink); background: var(--accent-light);
+  padding: 3px 8px; border-radius: 999px;
+}
+
+/* ==========================================================================
+   Produktsidan
+   ==========================================================================
+   Två spalter på skärmar som har plats: vänster är vad möbeln ÄR (bild, skick,
+   beskrivning), höger är vad man GÖR (köp, mått, frågor). "Får den plats?"
+   ligger under båda — den är sista frågan innan köp och behöver hela bredden.
+
+   Mobilen får en spalt, och då är ordningen den som står i JSX:en: bild, skick,
+   beskrivning, köp, mått, frågor. Köpsektionen hamnar alltså EFTER skicket på en
+   telefon, vilket är rätt ordning där — man scrollar sig igenom möbeln och möter
+   knappen när man läst klart. */
+
+.butik-pdp-head { padding: 26px 0 18px; }
+.butik-pdp-head h1 {
+  margin: 6px 0 0; font-size: clamp(24px, 5vw, 38px); line-height: 1.1;
+  letter-spacing: -0.02em; font-weight: 700;
+}
+
+.butik-pdp { display: grid; gap: 22px; align-items: start; }
+@media (min-width: 900px) {
+  .butik-pdp { grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.85fr); gap: 30px; }
+}
+.butik-pdp-main, .butik-pdp-side { display: grid; gap: 18px; align-content: start; min-width: 0; }
+/*
+  Lådan ÄR rutnätsobjektet, och det är hela poängen.
+  
+  Först var den `display: contents`, vilket lät sektionen inuti bli objektet i stället — och då
+  hamnade `order` på ett element som rutnätet inte ser. Ordningen på mobilen blev då DOM-ordningen,
+  med priset sist av allt. Lådan är därför en vanlig block-låda: den syns inte, men den går att
+  flytta.
+*/
+.butik-slot { min-width: 0; }
+.butik-slot:empty { display: none; }
+
+/*
+  EN SPALT: spalterna löses upp och delarna ordnas om.
+
+  Det finns inget "till höger om bilden" på en telefon, och den naturliga tolkningen är "direkt
+  efter den". Utan omordningen hamnar priset efter hela skickrapporten och beskrivningen — långt
+  under vecket i en butik där priset är det man scrollar för att hitta.
+
+  Ordningen blir: bild, köp, skick, beskrivning, mått, frågor.
+*/
+@media (max-width: 899px) {
+  .butik-pdp-main, .butik-pdp-side { display: contents; }
+  .butik-pdp { grid-template-columns: 1fr; }
+  .butik-slot-cover     { order: 1; }
+  .butik-slot-buy       { order: 2; }
+  .butik-slot-condition { order: 3; }
+  .butik-slot-about     { order: 4; }
+  .butik-slot-specs     { order: 5; }
+  .butik-slot-chat      { order: 6; }
+}
+
+/* Köpsektionen följer med när man scrollar förbi bilden — den är sidans syfte. Bara på stora
+   skärmar: en klistrad ruta på en telefon äter halva vyn. */
+@media (min-width: 900px) {
+  .butik-pdp-side { position: sticky; top: calc(var(--tap) + 30px); }
+}
+
+/* Kortets egna lådor ska inte lägga sig i butikens rutnät. `only` sätter listing-bare, och då blir
+   sektionerna syskon här i stället för barn i kortets kolumn.
+
+   TVÅ KLASSER I SELEKTORN, inte en: `.listing` är själv ett tvåspaltsrutnät på datorvyn (styles.css),
+   och en ensam `.listing-bare` har samma specificitet — då avgör källordningen, och styles.css lastas
+   sist. Utfallet var att kortet behöll sin egen grid inuti butikens: bilden och texten trängdes i
+   334 px var, mitt i en spalt på 686. */
+.butik-pdp .listing.listing-bare,
+.butik-pdp .listing-facts.listing-bare { display: contents; }
+
+.butik-buybox {
+  background: var(--surface); border-radius: var(--r-xl); padding: 20px;
+  box-shadow: var(--shadow-card);
+}
+.butik-buybox-price { display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin-bottom: 14px; }
+.butik-buybox .butik-trust { margin: 0 0 4px; }
+.butik-buybox .butik-trust-item { box-shadow: none; background: var(--field); font-size: var(--fs-sm); padding: 7px 11px; }
+/* Köpblocket ligger redan i en vit ruta — dess inre paneler ska inte ha en egen till. */
+.butik-buybox .butik-explainer { box-shadow: none; background: transparent; padding: 0; margin: 14px 0 0; }
+.butik-buybox .butik-explainer h2 { display: none; }
+.butik-buybox-note { font-size: var(--fs-md); color: var(--muted); line-height: 1.5; margin: 12px 0 0; }
+.butik-buybox-note-warn { color: var(--amber-ink); }
+
+/* Kortets sektioner i butikens spalter: samma vita kort som resten av butiken. */
+.butik-pdp .listing-block, .butik-pdp .listing-cover-block {
+  background: var(--surface); border-radius: var(--r-xl); padding: 20px;
+  box-shadow: var(--shadow-card); margin: 0;
+}
+.butik-pdp .listing-cover-block { padding: 14px; }
+.butik-pdp .listing-chat { margin: 0; }
+
+/* ---- "hittat en möbel någon annanstans?" ----
+   Mörk mot sidans creme: det är ett annat erbjudande än att bläddra i lagret, och skillnaden ska
+   synas utan att den skriker. Ligger mellan AI-sökningen och märkena — efter det man kom för, före
+   det man bläddrar i. */
+.butik-elsewhere {
+  background: var(--ink); color: #fff; border-radius: var(--r-xl);
+  padding: 22px; margin: 0 0 30px;
+}
+.butik-elsewhere-text h2 { margin: 0 0 6px; font-size: 20px; letter-spacing: -0.01em; }
+.butik-elsewhere-text p { margin: 0 0 14px; font-size: var(--fs-md); color: var(--on-dark-strong); line-height: 1.5; max-width: 54ch; }
+.butik-elsewhere-form { display: flex; gap: 8px; flex-wrap: wrap; }
+.butik-elsewhere-input {
+  flex: 1; min-width: 200px; min-height: var(--tap); padding: 0 14px;
+  font-size: var(--fs-field); color: #fff;
+  background: rgba(255,255,255,0.09); border: 1px solid rgba(255,255,255,0.22); border-radius: var(--r);
+}
+.butik-elsewhere-input::placeholder { color: var(--on-dark-faint); }
+.butik-elsewhere-input:focus { outline: none; border-color: var(--accent); background: rgba(255,255,255,0.14); }
+.butik-elsewhere-go {
+  flex: none; min-height: var(--tap); padding: 0 20px; border: none; cursor: pointer;
+  border-radius: var(--r); background: var(--accent); color: #fff;
+  font-size: var(--fs-md); font-weight: 650;
+}
+.butik-elsewhere-go:disabled { background: rgba(255,255,255,0.14); color: var(--on-dark-faint); cursor: not-allowed; }
+.butik-elsewhere-go:not(:disabled):active { opacity: 0.85; }
+.butik-elsewhere-hint { margin: 10px 0 0; font-size: var(--fs-sm); color: var(--on-dark); }
+
+/* Profilen i toppraden. Dämpad bredvid säljknappen med flit: den ena är produktens uppmaning, den
+   andra är vägen tillbaka till det man redan gjort — och de ska inte konkurrera om samma blick. */
+.butik-bar-profile {
+  flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 12px;
+  border-radius: var(--r); color: var(--ink); text-decoration: none;
+  font-size: var(--fs-md); font-weight: 600; white-space: nowrap;
+}
+.butik-bar-profile:hover { background: var(--surface-2, #f0efec); }
+
+/* ==========================================================================
+   Förstasidan: fältet först, resan sedan, lagret efter
+   ==========================================================================
+   Rutan för en inklistrad annons låg förut som ett mörkt inslag mitt i sidan. Den är produktens
+   kärna och har flyttats överst — och då räcker inte en ruta, den behöver bära hela ärendet. */
+
+.hero { padding: 40px 0 30px; }
+.hero-title {
+  margin: 0 0 14px;
+  font-size: clamp(32px, 6.4vw, 60px); line-height: 1.03;
+  letter-spacing: -0.035em; font-weight: 700; color: var(--ink);
+}
+.hero-title em { font-style: normal; color: var(--accent); }
+.hero-lede {
+  margin: 0 0 26px; font-size: clamp(16px, 2vw, 19px); line-height: 1.55;
+  color: var(--muted); max-width: 56ch;
+}
+
+.hero-form { max-width: 720px; }
+.hero-label {
+  display: block; margin-bottom: 8px;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+
+/* Fältet är en enda yta med ikon, input och knapp inuti — inte tre kontroller bredvid varandra.
+   En sammanhållen ruta läser som "här skriver man", vilket är hela poängen med sidan. */
+.hero-field {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 18px; padding: 8px 8px 8px 16px;
+  box-shadow: 0 10px 30px -20px hsl(var(--scrim) / 0.45);
+  transition: border-color 120ms ease, box-shadow 120ms ease;
+}
+.hero-field:focus-within {
+  border-color: var(--accent);
+  box-shadow: 0 12px 34px -18px hsl(var(--scrim) / 0.5);
+}
+.hero-field-icon { font-size: 18px; line-height: 1; opacity: 0.55; flex: none; }
+
+/* Överskriver den mörka varianten som rutan hade när den låg på svart botten. */
+.hero .hero-input.butik-elsewhere-input {
+  flex: 1; min-width: 0; height: 52px; padding: 0;
+  background: transparent; border: none; color: var(--ink);
+  font-size: clamp(15px, 1.8vw, 17px);
+}
+.hero .hero-input.butik-elsewhere-input::placeholder { color: var(--muted-soft); }
+.hero .hero-input.butik-elsewhere-input:focus { outline: none; background: transparent; }
+
+.hero .hero-go.butik-elsewhere-go {
+  flex: none; height: 52px; padding: 0 22px; border-radius: 12px;
+  background: var(--accent); color: #fff; border: none;
+  font-size: var(--fs-md); font-weight: 700; white-space: nowrap; cursor: pointer;
+}
+.hero .hero-go.butik-elsewhere-go:not(:disabled):hover { background: var(--accent-dark); }
+
+.hero-note { margin: 10px 2px 0; font-size: var(--fs-sm); color: var(--muted); }
+
+/* De tre raderna under fältet. Etiketterna i orange bär betydelsen — "Aldrig:" är den rad folk
+   letar efter utan att fråga. */
+.hero-next {
+  list-style: none; margin: 26px 0 0; padding: 0;
+  display: grid; gap: 10px; max-width: 720px;
+}
+.hero-next li {
+  font-size: var(--fs-md); color: var(--muted); line-height: 1.5;
+  padding-left: 16px; border-left: 2px solid var(--border);
+}
+.hero-next b { color: var(--accent-ink); font-weight: 700; }
+
+/* Smala upprepningen längst ned. */
+.hero-compact {
+  padding: 26px; margin-top: 40px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.hero-title-compact {
+  margin: 0 0 16px; font-size: clamp(19px, 2.6vw, 25px); line-height: 1.25; letter-spacing: -0.02em;
+}
+.hero-compact .hero-form { max-width: none; }
+.hero-compact .hero-field { border-width: 1px; box-shadow: none; }
+
+/* ---- Så går det till ---- */
+
+.how { margin-top: 52px; }
+.how-head { max-width: 60ch; margin-bottom: 26px; }
+.how-head h2 {
+  margin: 0 0 8px; font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -0.025em; font-weight: 700;
+}
+.how-head p { margin: 0; font-size: var(--fs-lg); color: var(--muted); line-height: 1.5; }
+
+.how-phase-label {
+  display: inline-block; margin-bottom: 12px;
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.how-steps {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+.how-step {
+  background: var(--surface); border-radius: var(--r-lg); padding: 20px;
+  border: 1px solid var(--border);
+}
+.how-step-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; margin-bottom: 12px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent-ink);
+  font-size: var(--fs-sm); font-weight: 700;
+}
+.how-step h3 { margin: 0 0 6px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.how-step p { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.5; }
+
+/* Gränsen mellan gratis och affär. Ritad som en linje med en etikett i mitten, för att den ÄR en
+   gräns — inte ytterligare en rubrik. */
+.how-divider {
+  display: flex; align-items: center; gap: 14px;
+  margin: 26px 0; color: var(--accent-ink);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+}
+.how-divider::before, .how-divider::after {
+  content: ""; flex: 1; height: 1px; background: var(--border);
+}
+
+.how-foot {
+  margin: 22px 0 0; padding: 16px 20px;
+  background: var(--accent-light); color: var(--accent-ink);
+  border-radius: var(--r-lg); font-size: var(--fs-md); line-height: 1.5;
+}
+
+/* ---- Lagret, efter förklaringen ---- */
+
+.shelf-intro { margin-top: 56px; padding-top: 32px; border-top: 1px solid var(--border); }
+.shelf-intro h2 {
+  margin: 0 0 8px; font-size: clamp(24px, 3.4vw, 34px);
+  letter-spacing: -0.025em; font-weight: 700;
+}
+.shelf-intro p { margin: 0 0 6px; font-size: var(--fs-lg); color: var(--muted); max-width: 58ch; line-height: 1.5; }
+
+@media (max-width: 640px) {
+  .hero { padding: 26px 0 22px; }
+  .hero-field { flex-wrap: wrap; padding: 10px; gap: 10px; }
+  .hero .hero-input.butik-elsewhere-input { flex-basis: 100%; height: 46px; padding: 0 6px; }
+  .hero .hero-go.butik-elsewhere-go { flex: 1; }
+  .hero-field-icon { display: none; }
+}
+
+/* ---- hero: två spalter på skärm, en i telefonen ---- */
+
+@media (min-width: 900px) {
+  .hero:not(.hero-compact) {
+    display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(320px, 0.85fr);
+    gap: 48px; align-items: start;
+  }
+  .hero-main { min-width: 0; }
+}
+
+/* Exempelkortet: annonsen som den var, och samma möbel efter oss. Skillnaden ÄR produkten. */
+.hero-preview { position: relative; margin-top: 28px; }
+@media (min-width: 900px) { .hero-preview { margin-top: 6px; } }
+
+.hero-preview-tag {
+  /* Innanför kortet, inte hängande ovanför det: överst på sidan sitter en klistrad topprad, och en
+     bricka som stack upp ur kortet hamnade delvis bakom den. */
+  position: absolute; top: 12px; right: 14px; z-index: 2;
+  padding: 3px 10px; border-radius: 999px;
+  background: var(--ink); color: var(--bg);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.hero-preview-pair { display: grid; gap: 0; }
+.hero-preview-card {
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+  padding: 18px 20px;
+}
+.hero-preview-card h3 {
+  margin: 0 0 12px; font-size: var(--fs-md); font-weight: 700; letter-spacing: 0.01em;
+}
+.hero-preview-card dl { margin: 0; display: grid; gap: 9px; }
+/* 96px räckte inte för "MARKNADSVÄRDE" — etiketten gick rakt in i beloppet. Kolumnen är satt
+   efter det längsta ordet, och under 420px staplas etikett över värde i stället. */
+.hero-preview-card dl > div { display: grid; grid-template-columns: 124px 1fr; gap: 10px; align-items: baseline; }
+.hero-preview-card dt {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.05em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+.hero-preview-card dd { margin: 0; font-size: var(--fs-md); color: var(--ink); line-height: 1.35; }
+
+/* Den övre är blek med flit: det är vad man har idag, och den ska se ut som lite. */
+.hero-preview-before { background: var(--field); border-color: transparent; }
+.hero-preview-before dd { color: var(--muted); }
+
+.hero-preview-arrow {
+  justify-self: center; margin: -8px 0 -8px; z-index: 1;
+  width: 30px; height: 30px; border-radius: 999px;
+  display: grid; place-items: center;
+  background: var(--accent); color: #fff; font-size: 15px; font-weight: 700;
+  box-shadow: 0 0 0 5px var(--bg);
+}
+
+.hero-preview-after { box-shadow: 0 18px 40px -28px hsl(var(--scrim) / 0.5); }
+.hero-preview-check { color: var(--green); }
+.hero-preview-foot {
+  margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--border);
+  font-size: var(--fs-sm); color: var(--muted); line-height: 1.45;
+}
+
+@media (max-width: 420px) {
+  .hero-preview-card dl > div { grid-template-columns: 1fr; gap: 2px; }
+}
+
+@media (max-width: 640px) {
+  .how-step { padding: 16px; }
+  .hero-preview-card dl > div { grid-template-columns: 118px 1fr; }
+}

@@ -29,6 +29,9 @@ const COVER_TIMEOUT_MS = 12_000;
  * något konto hos oss. Det publika svaret bär mindre (se server/src/publicCard.ts) — men det ska vara
  * SAMMA kort, inte en förenklad kopia som kan börja säga något annat.
  */
+/** Kortets delar, var för sig. Se `only` nedan. */
+export type ListingSection = "cover" | "specs" | "condition" | "about" | "chat";
+
 export default function ListingView({
   card,
   identity,
@@ -40,6 +43,8 @@ export default function ListingView({
   productImage,
   cover,
   loopaId,
+  hideHeader = false,
+  only,
 }: ListingViewData & {
   /**
    * Kortets publika ID. Enda extra propen, och den finns bara för chatten: den frågar servern på
@@ -50,6 +55,32 @@ export default function ListingView({
    * en ruta som svarar 404.
    */
   loopaId?: string;
+  /**
+   * Vilka delar som ska ritas, och i vilken ordning anroparen vill ha dem.
+   *
+   * Kortet är en färdig sida på /c/LP-… och i säljflödet — där ritas allt, i den ordning som står
+   * nedan. Butikens produktsida behöver samma delar men utspridda i två kolumner, med köpsektionen
+   * och måtten emellan. Utan det här hade den fått en egen kopia av skickrapporten, och då finns
+   * möbelns skick beskrivet på två ställen som kan glida isär — vilket är precis det kortet finns
+   * för att förhindra.
+   *
+   * Utelämnat = allt, i kortets egen ordning. Anges `only` faller layoutlådorna bort (se
+   * `listing-bare`) så att delarna blir syskon i anroparens rutnät.
+   */
+  only?: ListingSection[];
+  /**
+   * Utelämnar kortets egen rubrik och prisruta.
+   *
+   * Finns för butikens produktsida, som ÄR det här kortet men med ett köp runt omkring: den visar
+   * märke, namn och pris i sin egen ingress ovanför, med en köpknapp intill. Utan flaggan står
+   * möbelns namn och pris två gånger på samma sida, och de två prisrutorna dessutom med olika ord —
+   * "2 633 kr" i butiken och "Marknadsvärde för skicket" här. Två priser på samma möbel är en fråga
+   * köparen inte ska behöva ställa.
+   *
+   * Falskt överallt annars: säljarens eget kort och det publika kortet på /c/LP-XXXX-XXXX har ingen
+   * ingress ovanför sig och måste bära sin rubrik själva.
+   */
+  hideHeader?: boolean;
 }) {
   const t = useT();
   const [selected, setSelected] = useState<string | null>(null);
@@ -126,9 +157,13 @@ export default function ListingView({
   const now = price?.status === "ok" ? price.default : null;
   const discount = retail && now && retail > now ? Math.round((1 - now / retail) * 100) : null;
 
+  const show = (section: ListingSection) => !only || only.includes(section);
+
   return (
-    <article className="listing">
-      {shown && (
+    // `listing-bare` gör lådorna genomskinliga för layouten (display: contents), så delarna hamnar
+    // direkt i anroparens rutnät i stället för i kortets egen kolumn.
+    <article className={only ? "listing listing-bare" : "listing"}>
+      {show("cover") && shown && (
         /* Bilden och dess härkomst är EN sak, och hålls ihop av ett element: på datorvyn är
            kolumnen ett rutnät, och två syskon hade lagt bildtexten i en egen rad långt under. */
         <div className="listing-cover-block">
@@ -175,7 +210,11 @@ export default function ListingView({
         </div>
       )}
 
-      <div className="listing-facts">
+      <div className={only ? "listing-facts listing-bare" : "listing-facts"}>
+        {/* `only` betyder exakt de delar som räknas upp — rubriken och prisrutan är inga av dem.
+            Utan villkoret ritade butikens produktsida namnet och priset en gång per anropad sektion:
+            fem rubriker och fem priser på samma möbel. */}
+        {!hideHeader && !only && (
         <header className="listing-head">
           {brand && (
             <div className="listing-brand" style={brandTypeStyle(brandLook(brand).type)}>
@@ -187,7 +226,9 @@ export default function ListingView({
             {[card.identity.category, card.identity.variant].filter(Boolean).join(" · ") || "—"}
           </p>
         </header>
+        )}
 
+        {!hideHeader && !only && (
         <div className="listing-price">
           <div className="listing-price-row">
             <span className="listing-price-now">{now !== null ? formatSek(now) : "Inget prisförslag"}</span>
@@ -214,8 +255,9 @@ export default function ListingView({
               : (price?.unavailableReason ?? t("Prismotorn kunde inte nås."))}
           </p>
         </div>
+        )}
 
-        {card.attributes.length > 0 && (
+        {show("specs") && card.attributes.length > 0 && (
           <section className="listing-block">
             <h3>{t("Specifikationer")}</h3>
             <dl className="listing-specs">
@@ -240,6 +282,7 @@ export default function ListingView({
           </section>
         )}
 
+        {show("condition") && (
         <section className="listing-block">
           <h3>{t("Skickrapport")}</h3>
           <div className="listing-condition-head">
@@ -298,17 +341,20 @@ export default function ListingView({
             <p className="listing-pin-note">{t("Punkterna i bilden har samma nummer som listan.")}</p>
           )}
         </section>
+        )}
 
+        {show("about") && (
         <section className="listing-block">
           <h3>{t("Om möbeln")}</h3>
           <div className="listing-title-line">{card.listing.title}</div>
           <p className="card-listing-body">{card.listing.description}</p>
           {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
         </section>
+        )}
 
         {/* Sist, efter allt som går att läsa. Frågor uppstår när man läst skicket och beskrivningen —
             en chatt placerad före dem hade bjudit in till att fråga om det som stod två rader ned. */}
-        {loopaId && (
+        {show("chat") && loopaId && (
           <ListingChat
             loopaId={loopaId}
             name={name}

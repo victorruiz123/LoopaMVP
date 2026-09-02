@@ -103,6 +103,8 @@ interface CacheEntry {
   data: unknown;
   tokensUsed: number;
   modelUsed: string;
+  /** När svaret skrevs. Saknas på poster från före `cacheMaxAgeMs` fanns — de räknas som färska. */
+  cachedAt?: number;
 }
 
 async function readCache(key: string): Promise<CacheEntry | null> {
@@ -158,6 +160,11 @@ export async function callGeminiStructured<T>(opts: {
   resolution?: "low" | "medium" | "high";
   primaryTimeoutMs?: number;
   fallbackTimeoutMs?: number;
+  /**
+   * Hur gammalt ett cachat svar får vara. Utelämnat = för alltid, vilket är förvalet och rätt för
+   * besiktningen. Se resonemanget vid `tooOld` nedan.
+   */
+  cacheMaxAgeMs?: number;
 }): Promise<GeminiCallResult<T>> {
   const resolution = opts.resolution ?? "high";
   // Keyed per MODEL. The key has to be computed before the call, when it is not yet known which model
@@ -168,7 +175,19 @@ export async function callGeminiStructured<T>(opts: {
   const cacheKeyFor = (model: string) =>
     hashCall(`${model}:${resolution}`, opts.systemPrompt, opts.userPrompt, opts.responseSchema ?? {}, opts.images);
   const cached = await readCache(cacheKeyFor(GEMINI_MODEL));
-  if (cached && cached.modelUsed === GEMINI_MODEL) {
+  /**
+   * Ett cachat svar kan vara för gammalt för att återanvändas.
+   *
+   * Cachen är byggd för besiktningen, där återspelning är hela poängen: samma bildrutor ska ge samma
+   * bedömning, för alltid. För butikens sökruta är den avvägningen omvänd. Modellen varierar mellan
+   * körningar, och en tolkning som råkade bli tunn — "svart barstol i trä under 1000 kr" som bara
+   * kategori — frystes då som svaret på den frågan för all framtid. Anropare som inte bryr sig
+   * lämnar fältet och får den gamla, permanenta cachen.
+   */
+  const tooOld =
+    opts.cacheMaxAgeMs !== undefined &&
+    (cached?.cachedAt === undefined || Date.now() - cached.cachedAt > opts.cacheMaxAgeMs);
+  if (cached && cached.modelUsed === GEMINI_MODEL && !tooOld) {
     return { data: cached.data as T, tokensUsed: cached.tokensUsed, cached: true, purpose: opts.purpose, modelUsed: cached.modelUsed, latencyMs: 0 };
   }
 
@@ -238,6 +257,6 @@ export async function callGeminiStructured<T>(opts: {
       `json_chars=${text.length}`,
   );
 
-  await writeCache(cacheKeyFor(modelUsed), { data, tokensUsed, modelUsed });
+  await writeCache(cacheKeyFor(modelUsed), { data, tokensUsed, modelUsed, cachedAt: Date.now() });
   return { data, tokensUsed, cached: false, purpose: opts.purpose, modelUsed, latencyMs };
 }

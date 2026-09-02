@@ -1,0 +1,31 @@
+# Cloudflare-tunneln for app.loopa.nu, flyttad fran utvecklingsdatorn till servern.
+#
+# Det ar SAMMA tunnel som deploy/cloudflared/config.yml beskriver — samma id, samma
+# CNAME i zonen — bara kord fran ett annat stalle. Darfor behovdes ingen ny inloggning
+# och ingen DNS-andring: credentials-filen kopierades over, och app.loopa.nu pekar redan
+# pa tunnel-id:t.
+#
+# VIKTIGT: en tunnel kan koras pa flera stallen samtidigt, och Cloudflare lastbalanserar
+# da mellan dem. Kors den lokala kvar pa Macen hamnar halva trafiken dar, och sidan gar
+# ner nar locket stangs — vilket ar precis det vi flyttade harifran. Stoppa den lokala.
+
+[Unit]
+Description=Cloudflare-tunnel for app.loopa.nu
+After=network-online.target loopa-server.service
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=opc
+Group=opc
+ExecStart=/usr/local/bin/cloudflared --config /home/opc/.cloudflared/config.yml --no-autoupdate tunnel run
+
+Restart=always
+RestartSec=5
+
+# Tunneln kopplar upp sig UTIFRAN och in. Inga inkommande portar oppnas, varken i
+# Oracles security list eller i firewalld — samma egenskap som gjorde att vi slapp rora
+# brandvaggen over huvud taget.
+
+[Install]
+WantedBy=multi-user.target

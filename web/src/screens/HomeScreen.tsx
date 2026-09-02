@@ -35,12 +35,20 @@ export default function HomeScreen({
   onOpenJob,
   onOpenProfile,
   onOpenLookup,
+  dealId,
 }: {
   onStartScan: (identity: FurnitureIdentity) => void;
   onOpenJob: (jobId: string) => void;
   onOpenProfile: () => void;
   /** Slå upp en publik annons på dess Loopa-ID — ikonen i topplisten. */
   onOpenLookup: () => void;
+  /**
+   * Affären säljaren kom hit från (Trygg affär), när de klickat "Filma möbeln" i sitt affärsrum.
+   *
+   * Startsidan hämtar då förifyllningen och hoppar över märkesvalet: säljaren har redan skrivit
+   * märket i sin egen annons, och att be dem göra om det är att be dem bevisa något de just visat.
+   */
+  dealId?: string | null;
 }) {
   const t = useT();
   const { profile, user, loading } = useAuth();
@@ -48,6 +56,28 @@ export default function HomeScreen({
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [query, setQuery] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+
+  /**
+   * Förifyllningen från affären, hämtad en gång.
+   *
+   * Går rakt in i filmningen när märket är känt: säljaren kom hit för att filma sin möbel, inte för
+   * att välja märke ur en lista. Faller anropet står startsidan kvar som vanligt — förifyllningen är
+   * en genväg, inte en grind.
+   */
+  useEffect(() => {
+    if (!dealId || loading || !user) return;
+    let live = true;
+    void import("../affar/api")
+      .then(({ fetchDeal }) => fetchDeal(dealId))
+      .then((r) => {
+        if (!live) return;
+        const p = r.prefill;
+        if (p?.brand) onStartScan({ brand: p.brand, model: p.model ?? "" });
+      })
+      .catch(() => undefined);
+    return () => { live = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dealId, loading, user]);
 
   /**
    * Listan är säljarens egen och hämtas bara när det finns en säljare.

@@ -121,6 +121,19 @@ function listingOf(job: ConditionJob) {
  * annonstext, bara ett skick utan möbel att hänga det på. Då är rätt svar att ID:t inte finns.
  */
 export function publicCardFor(job: ConditionJob): PublicCard | null {
+  /**
+   * Ett affärsjobb har inget publikt kort.
+   *
+   * Kortet är publikt för att en Tradera-annons bär ett Loopa-ID som vem som helst ska kunna slå upp.
+   * En skanning inuti ett affärsrum har ingen annons och ingen publik motpart — den beställdes av en
+   * köpare för en enskild affär. Att ge den ett publikt kort vore att lägga ut någons hem-möbel,
+   * mått och skador på en gissbar adress.
+   *
+   * Detsamma gäller `adDerived`: en analys av någon annans annons är varken vår möbel eller vår
+   * annons, och den ska inte gå att slå upp av någon som gissar ett ID.
+   */
+  if (job.dealId || job.adDerived) return null;
+
   const listing = listingOf(job);
   if (listing?.status !== "ok" || !listing.result) return null;
 

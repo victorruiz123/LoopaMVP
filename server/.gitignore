@@ -1,3 +1,8 @@
 node_modules/
 data/
 .env
+
+# Segmenteringsmodellerna. u2net.onnx är 168 MB — över GitHubs 100 MB-gräns per fil, och Git LFS
+# löser det inte (samma resonemang som ML-korpusen i rotens .gitignore). Hämtas med
+# scripts/fetch-models.sh, som kör på samma vikter varje gång via en kontrollsumma.
+models/
