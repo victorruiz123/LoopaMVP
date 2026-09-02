@@ -157,3 +157,27 @@ varken det högsta eller ett snitt, eftersom båda hade överdrivit någons budg
 
 **Effekt:** samma ändring förbättrar både integriteten och säljargumentet. "2 köpare söker detta" är
 starkare än två rader med en var.
+
+---
+
+## 7. Annonstexten skrivs i kod, inte av en modell
+
+**Beslut:** Efterfrågeannonsernas rubrik och brödtext byggs ur mallar i `demandAds.ts`.
+
+**Varför:** en annons är Loopas ord i offentligheten, körd med budget mot en publik som aldrig hört
+talas om oss. En genererad mening blir bra nio gånger av tio och pinsam den tionde — och den tionde
+är den som kostar pengar. Mallarna är tråkiga och sanna, vilket är rätt ordning på de två.
+
+Detsamma gäller `fitNote` i matchningen (se #2): meningar som förklarar ett systembeslut får inte
+kunna hitta på ett skäl.
+
+**Tre fel funna i skarp körning av generatorn:**
+
+- Panelen grupperade fortfarande på prisband, så två köpare av samma String-hylla (4 000 och 4 500 kr)
+  fick `unmet: 1` var — under tröskeln för ett utkast. Efterfrågan fanns men delades sönder av en
+  indelning som inte handlar om vad folk söker. Samma rättelse som på väggen (#6).
+- `utm_campaign` bar `%C2%A0` mitt i sig, från prisbandets hårda mellanslag. Giltigt, oläsligt i
+  varje rapport parametern dyker upp i.
+- Rubriken löd *"Har du en soffor & fåtöljer?"* — katalogens etiketter är plural eftersom de står
+  över ett rutnät. En annons som inte kan skriva sin egen rubrik inger inget förtroende för att
+  kunna sälja någons möbel.

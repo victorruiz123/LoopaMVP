@@ -1,0 +1,30 @@
+=== generering ===
+  { created: 2, skipped: 0 }
+
+=== kön ===
+
+  [draft] omättade: 3 | budgetförslag: 750 kr | målgrupp: Stockholms län
+  RUBRIK: Har du en String förvaring?
+  TEXT:   3 köpare väntar på en sådan i Stockholm. Sälj den på tre minuter: filma ett varv med mobilen, så besiktigar vi den, sätter priset och hämtar hem den. Du behöver inte skriva en annons.
+  UTM:    utm_source=loopa&utm_medium=efterfragan&utm_campaign=forvaring-string-upp-till-3-000-kr
+
+  [draft] omättade: 2 | budgetförslag: 500 kr | målgrupp: Stockholms län
+  RUBRIK: Har du en soffor & fåtöljer?
+  TEXT:   2 köpare väntar på en sådan i Stockholm. Sälj den på tre minuter: filma ett varv med mobilen, så besiktigar vi den, sätter priset och hämtar hem den. Du behöver inte skriva en annons.
+  UTM:    utm_source=loopa&utm_medium=efterfragan&utm_campaign=soffor-fatoljer-upp-till-5-000-kr
+
+=== godkänn en, kasta en ===
+  godkända: 1 | kastade: 1
+
+=== exporten (det som klistras in för hand) ===
+rubrik;text;malgrupp;budget_sek;kategori;marke;prisband;omattade;utm
+"Har du en String förvaring?";"3 köpare väntar på en sådan i Stockholm. Sälj den på tre minuter: filma ett varv med mobilen, så besiktigar vi den, sätter priset och hämtar hem den. Du behöver inte skriva en annons.";"Stockholms län";"750";"forvaring";"String";"upp till 3 000 kr";"3";"utm_source=loopa&utm_medium=efterfragan&utm_campaign=forvaring-string-upp-till-3-000-kr"
+
+=== grindarna ===
+  publicering påslagen: false
+  markPublished på godkänd med flaggan av: null
+
+=== läckagekontroll ===
+  e-post: läcker inte
+  anteckning: läcker inte
+  stadsdel: läcker inte

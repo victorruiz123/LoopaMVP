@@ -991,6 +991,43 @@ const server = http.createServer(async (req, res) => {
           }
           return sendJson(res, 200, { rader: rows });
         }
+        /**
+         * Efterfrågeannonserna: godkännandekön.
+         *
+         * ALDRIG AUTONOMT. Utkasten genereras ur omättad efterfrågan och läggs i kö; en människa
+         * godkänner, ändrar eller kastar. Publicering via API ligger bakom DEMAND_ADS_PUBLISH och är
+         * av — och även påslagen kräver den ett godkännande först. En annons är Loopas ord i
+         * offentligheten, på en budget som är riktiga pengar.
+         */
+        if (segments[2] === "demand-ads" && req.method === "GET") {
+          const ads = await import("./efterlysning/demandAds.js");
+          const state = url.searchParams.get("state") as never;
+          const rows = await ads.list(state || undefined);
+          if (url.searchParams.get("format") === "csv") {
+            res.writeHead(200, {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": 'attachment; filename="efterfragan-annonser.csv"',
+            });
+            return res.end(ads.toCsv(rows.filter((a) => a.state === "approved")));
+          }
+          return sendJson(res, 200, { annonser: rows, publiceringPa: ads.publishingEnabled() });
+        }
+        if (segments[2] === "demand-ads" && segments[3] === "generera" && req.method === "POST") {
+          const ads = await import("./efterlysning/demandAds.js");
+          return sendJson(res, 200, await ads.generateDrafts());
+        }
+        if (segments[2] === "demand-ads" && segments.length === 4 && req.method === "POST") {
+          const ads = await import("./efterlysning/demandAds.js");
+          const body = await readJsonBody<{ beslut?: string; rubrik?: string; text?: string }>(req);
+          if (body.beslut !== "approved" && body.beslut !== "rejected") {
+            return sendJson(res, 400, { error: "beslut måste vara approved eller rejected." });
+          }
+          const ad = await ads.decide(segments[3], body.beslut, identity.email ?? identity.id, {
+            headline: body.rubrik, body: body.text,
+          });
+          if (!ad) return sendJson(res, 404, { error: "Utkastet finns inte." });
+          return sendJson(res, 200, { annons: ad });
+        }
         return sendJson(res, 404, { error: "Not found" });
       }
 

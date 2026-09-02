@@ -159,9 +159,17 @@ export async function demandDashboard(): Promise<DemandRow[]> {
   const matches = await store.allMatches();
   const withMatch = new Set(matches.map((m) => m.efterlysningId));
 
+  /**
+   * Grupperas som väggen, och UTAN prisbandet.
+   *
+   * Samma rättelse som där, och den behövdes här av ett annat skäl: två köpare av samma String-hylla
+   * med 4 000 och 4 500 kr i tak hamnade i skilda band och fick `unmet: 1` var — under tröskeln för
+   * ett annonsutkast. Efterfrågan fanns, men delades sönder av en indelning som inte handlar om vad
+   * folk söker.
+   */
   const groups = new Map<string, Efterlysning[]>();
   for (const e of open) {
-    const key = [e.filter.categorySlug ?? "", (e.filter.brands ?? [])[0] ?? "", priceBand(e.filter.maxPriceSek) ?? ""].join("|");
+    const key = [e.filter.categorySlug ?? "", (e.filter.brands ?? [])[0] ?? ""].join("|");
     groups.set(key, [...(groups.get(key) ?? []), e]);
   }
 
@@ -176,7 +184,10 @@ export async function demandDashboard(): Promise<DemandRow[]> {
         categorySlug: first.filter.categorySlug ?? null,
         categoryLabel: first.filter.categorySlug ? categoryLabel(first.filter.categorySlug) : null,
         brand: (first.filter.brands ?? [])[0] ?? null,
-        priceBand: priceBand(first.filter.maxPriceSek),
+        // Gruppens lägsta tak, av samma skäl som på väggen: överdriv aldrig någons budget.
+        priceBand: priceBand(
+          rows.map((r) => r.filter.maxPriceSek).filter((v): v is number => typeof v === "number").sort((a, b) => a - b)[0] ?? null,
+        ),
         count: rows.length,
         medianWaitDays: waits[Math.floor(waits.length / 2)] ?? 0,
         // Omättad efterfrågan: de som väntat utan att vi hittat något alls. Det är den listan som
