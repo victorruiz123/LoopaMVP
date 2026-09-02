@@ -1,0 +1,66 @@
+
+Soffa, max 5 000 kr, max 210 cm
+  lästa objekt: 101 | tradera: ok | 419 ms
+  kandidater: 6
+    [loopa_live/exact] Sits Anna — 150 kr
+        Uppfyller allt du bad om.
+    [loopa_live/exact] Swedese Lamino — 150 kr
+        Uppfyller allt du bad om.
+    [loopa_live/exact] Swedese Lamino — 150 kr
+        Uppfyller allt du bad om.
+    [loopa_live/exact] IKEA STRANDMON — 150 kr
+        Uppfyller allt du bad om.
+    [loopa_live/exact] Swedese Lamino — 150 kr
+        Uppfyller allt du bad om.
+    [loopa_live/exact] Sits Impulse — 150 kr
+        Uppfyller allt du bad om.
+  prognos: (döljs — ingen historik än)
+
+Grön sammetssoffa, max 4 000 kr
+  lästa objekt: 101 | tradera: ok | 234 ms
+  kandidater: 6
+    [loopa_live/near] IKEA STRANDMON — 150 kr
+        Inom pris och kategori — men färg framgår inte av annonsen.
+    [loopa_live/near] Sits Anna — 150 kr
+        Inom pris och kategori — men färg, material framgår inte av annonsen.
+    [loopa_live/near] Mio Madison Lux — 150 kr
+        Inom pris och kategori — men färg, material framgår inte av annonsen.
+    [loopa_live/near] Mio Friday — 150 kr
+        Inom pris och kategori — men färg, material framgår inte av annonsen.
+    [loopa_live/near] Sits Impulse — 150 kr
+        Inom pris och kategori — men färg, material framgår inte av annonsen.
+    [loopa_live/near] IKEA EKTORP — 1000 kr
+        Inom pris och kategori — men färg, material framgår inte av annonsen.
+  prognos: (döljs — ingen historik än)
+
+String-hylla i valnöt, max 4 000 kr
+  lästa objekt: 69 | tradera: ok | 298 ms
+  kandidater: 4
+    [tradera/near] STRING vägghylla / anslagstavla i metall — 199 kr
+        Inom pris och kategori — men material framgår inte av annonsen.
+    [tradera/near] Stringhylla i massivt trä — 265 kr
+        Inom pris och kategori — men material framgår inte av annonsen.
+    [tradera/near] Stringgavlar (String) 75x20 — 700 kr
+        Inom pris och kategori — men material framgår inte av annonsen.
+    [tradera/near] String golvgavel beige — 700 kr
+        Inom pris och kategori — men material framgår inte av annonsen.
+  prognos: (döljs — ingen historik än)
+
+Matbord, max 3 000 kr, max 160 cm
+  lästa objekt: 77 | tradera: ok | 77 ms
+  kandidater: 6
+    [tradera/near] Vintage Bord Satsbord Soffbord i Trä med Hyl — 50 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+    [tradera/near] Soffbord med marmormönstrad glasskiva — 100 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+    [tradera/near] Vitt soffbord i trä med underliggande hylla  — 150 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+    [tradera/near] Svart marmorbord — 160 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+    [tradera/near] Soffbord — 265 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+    [tradera/near] Snyggt soffbord i Alanda-stil (glas och svar — 400 kr
+        Inom pris och kategori — men stil, bredden framgår inte av annonsen.
+  prognos: (döljs — ingen historik än)
+
+Inga hårda gränser bröts i något svep.

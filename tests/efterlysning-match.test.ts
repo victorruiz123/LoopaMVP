@@ -58,11 +58,30 @@ test("för bred fälls även om allt annat stämmer perfekt", () => {
   assert.equal(evaluate(want(), p, "loopa_live", true), null);
 });
 
-test("ETT SAKNAT MÅTT fäller möbeln när köparen satt en gräns", () => {
-  // Strängare än det ser ut, med flit: den som mätt sin nisch till 215 cm ska inte få en soffa vars
-  // bredd vi inte känner till. Att gissa åt köparen är vad hela produkten finns för att slippa.
+test("ETT SAKNAT MÅTT fäller möbeln i strikt läge — notiser gissar aldrig", () => {
+  // Vi väcker aldrig någon för en möbel vi inte vet får plats.
   const p = sofa({ dimensions: { widthMm: null, depthMm: 900, heightMm: 850, seatHeightMm: null } });
+  assert.equal(evaluate(want(), p, "tradera", false), null);
+});
+
+test("men i direktsvepet blir det en ärlig nära-träff, inte en tom skärm", () => {
+  // Mätt skarpt: "matbord, max 160 cm" gav NOLL kandidater, eftersom nästan ingen Tradera-annons
+  // anger bredd. Se DECISIONS.md #1 — okänt är varken inom eller över.
+  const p = sofa({ dimensions: { widthMm: null, depthMm: 900, heightMm: 850, seatHeightMm: null } });
+  const c = evaluate(want(), p, "tradera", true);
+  assert.equal(c?.kind, "near");
+  assert.match(c!.fitNote, /bredden framgår inte av annonsen/);
+});
+
+test("ett saknat mått är inte ett BROTT — bara okänt", () => {
+  const p = sofa({ dimensions: { widthMm: null, depthMm: 900, heightMm: 850, seatHeightMm: null } });
+  assert.equal(violatesHard(want(), p), null, "inget bevisat brott");
+});
+
+test("ett för STORT mått är fortfarande ett brott, i båda lägena", () => {
+  const p = sofa({ dimensions: { widthMm: 2101, depthMm: 900, heightMm: 850, seatHeightMm: null } });
   assert.equal(violatesHard(want(), p), "för bred");
+  assert.equal(evaluate(want(), p, "tradera", true), null);
 });
 
 test("utan gräns spelar ett saknat mått ingen roll", () => {
@@ -82,6 +101,29 @@ test("fel färg är en nära-träff, inte ett nej", () => {
   const c = evaluate(e, sofa({ color: "blå" }), "tradera", true);
   assert.equal(c?.kind, "near");
   assert.match(c!.fitNote, /blå, inte grön/);
+});
+
+test("OKÄND färg påstås inte vara fel färg", () => {
+  // "inte grön" om en annons utan färguppgift är ett påstående om möbeln på en grund vi inte har.
+  const e = want({ filter: { ...want().filter, colors: ["grön"] } });
+  const c = evaluate(e, sofa({ color: null }), "tradera", true);
+  assert.match(c!.fitNote, /färg framgår inte av annonsen/);
+  assert.doesNotMatch(c!.fitNote, /inte grön/);
+});
+
+test("märket läses ur rubriken när fältet är tomt", () => {
+  // Mätt skarpt: "STRING vägghylla" fick etiketten "inte String". Se DECISIONS.md #2.
+  const e = want({ filter: { categorySlug: "soffor-fatoljer", brands: ["String"] } });
+  const c = evaluate(e, sofa({ brand: null, title: "STRING vägghylla i metall" }), "tradera", true);
+  assert.doesNotMatch(c!.fitNote, /inte String/);
+});
+
+test("ett känt fel rankas före en lucka", () => {
+  // Den som skrivit "grön" ska få en soffa vars färg inte står FÖRE en som bevisligen är blå.
+  const e = want({ filter: { ...want().filter, colors: ["grön"] } });
+  const wrong = evaluate(e, sofa({ id: "a", color: "blå" }), "tradera", true)!;
+  const unknown = evaluate(e, sofa({ id: "b", color: null }), "tradera", true)!;
+  assert.ok(unknown.rank < wrong.rank);
 });
 
 test("men bara när vi letar generöst — notiser släpper aldrig igenom en nära-träff", () => {
@@ -142,6 +184,8 @@ test("inom samma källa går exakt före nära", () => {
 test("stiltaggar kan bara ranka, aldrig fälla", () => {
   const e = want({ styleTags: ["60-tal"] });
   const c = evaluate(e, sofa(), "tradera", true);
-  assert.equal(c?.kind, "near", "stilen saknas -> nära");
+  assert.equal(c?.kind, "near", "stilen syns inte i texten -> nära");
   assert.ok(c, "men den fälls inte");
+  // Och den påstås inte vara fel stil: stil står aldrig i ett fält, så frånvaro är inte bevis.
+  assert.match(c!.fitNote, /framgår inte/);
 });

@@ -252,12 +252,30 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const inflight = new Map<string, Promise<Product[]>>();
 
-function buildRequest(opts: { categoryId: number; words?: string | null; page: number; perPage: number }): string {
+function buildRequest(opts: {
+  categoryId: number;
+  words?: string | null;
+  page: number;
+  perPage: number;
+  /**
+   * Köparens pristak, nedskjutet i SOAP-anropet i stället för filtrerat efteråt.
+   *
+   * Fälten fanns redan i kroppen men stod som `xsi:nil`. Skillnaden är inte kosmetisk: en sökning
+   * som lämnar tillbaka 24 träffar över taket ger noll användbara kandidater, medan samma sökning
+   * med taket satt ger 24 vi kan visa. För en efterlysning med "max 4 000 kr" är det skillnaden
+   * mellan ett tomt direktsvep och ett fullt.
+   */
+  maxPriceSek?: number | null;
+}): string {
+  const priceMax =
+    opts.maxPriceSek && opts.maxPriceSek > 0
+      ? `<PriceMaximum>${Math.round(opts.maxPriceSek)}</PriceMaximum>`
+      : `<PriceMaximum xsi:nil="true"/>`;
   return `<SearchAdvanced xmlns="${NS}"><request>
   <SearchWords>${escapeXml(opts.words ?? "")}</SearchWords>
   <CategoryId>${opts.categoryId}</CategoryId>
   <SearchInDescription>false</SearchInDescription>
-  <PriceMinimum xsi:nil="true"/><PriceMaximum xsi:nil="true"/>
+  <PriceMinimum xsi:nil="true"/>${priceMax}
   <BidsMinimum xsi:nil="true"/><BidsMaximum xsi:nil="true"/>
   <ZipCode></ZipCode>
   <CountyId>${STOCKHOLM_COUNTY_ID}</CountyId>
@@ -278,8 +296,13 @@ async function searchCategory(
   words: string | null,
   perPage: number,
   knownBrands: string[],
+  maxPriceSek: number | null = null,
 ): Promise<Product[]> {
-  const xml = await callSoap("SearchAdvanced", buildRequest({ categoryId, words, page: 1, perPage }), AbortSignal.timeout(8000));
+  const xml = await callSoap(
+    "SearchAdvanced",
+    buildRequest({ categoryId, words, page: 1, perPage, maxPriceSek }),
+    AbortSignal.timeout(8000),
+  );
   const blocks = xml.split("<Items>").slice(1);
   const products: Product[] = [];
   for (const block of blocks) {
@@ -345,6 +368,45 @@ export async function searchTradera(words: string, knownBrands: string[], perPag
   const products = await searchCategory(0, words, perPage, knownBrands);
   cache.set(key, { at: Date.now(), products });
   return products;
+}
+
+/**
+ * Sökning för EN efterlysning: rätt kategorier, köparens pristak, köparens ord.
+ *
+ * Skild från `searchTradera` som söker hela trädet på fri text. En efterlysning har en kategori, och
+ * att söka "grön sammetssoffa" över hela Tradera ger lampor och tavlor med gröna soffor på. Här
+ * frågas de kategorier som faktiskt svarar mot slugen, en i taget och sekventiellt — parallella
+ * anrop mot ett API med anropstak är ett bra sätt att bli avstängd.
+ *
+ * Pristaket skjuts ned i anropet. Utan det kan hela svaret ligga över köparens gräns, och ett
+ * direktsvep som lovar "aldrig noll" hade blivit noll av just den anledningen.
+ */
+export async function searchForCategory(
+  categorySlug: string | null,
+  words: string | null,
+  knownBrands: string[],
+  maxPriceSek: number | null = null,
+  perCategory = 12,
+): Promise<Product[]> {
+  const sources = categorySlug
+    ? CATEGORY_SOURCES.filter((c) => c.slug === categorySlug)
+    : CATEGORY_SOURCES;
+  // Okänd slug: sök hela trädet på orden i stället för att svara tomt.
+  const ids = sources.length > 0 ? sources.map((c) => c.id) : [0];
+
+  const all: Product[] = [];
+  const failures: string[] = [];
+  for (const id of ids) {
+    try {
+      all.push(...(await searchCategory(id, words, perCategory, knownBrands, maxPriceSek)));
+    } catch (err) {
+      failures.push(`${id}: ${err instanceof Error ? err.message : err}`);
+    }
+  }
+  if (all.length === 0 && failures.length === ids.length) {
+    throw new TraderaSearchError(`Alla kategorisökningar föll. Första: ${failures[0]}`);
+  }
+  return [...new Map(all.map((p) => [p.id, p])).values()];
 }
 
 /** Bara för tester och för en påtvingad omhämtning. */
