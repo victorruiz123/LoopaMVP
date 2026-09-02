@@ -1,0 +1,105 @@
+--- ett matchningsvarv (strikt) ---
+  3 bevakningar svepta, 3 notiser
+
+--- livscykeln ---
+  puls: 0 | deadline: 0 | förnyelse: 1 | somnade: 0
+
+--- inkorgen ---
+  [fornyelse] Din efterlysning somnar snart
+      → https://app.loopa.nu/kop/mina-efterlysningar#629e84c3-ff15-414d-b5ef-a046b2b203d1
+  [match] 6 nya träffar på din efterlysning
+      → https://app.loopa.nu/kop/mina-efterlysningar#629e84c3-ff15-414d-b5ef-a046b2b203d1
+  [match] 6 nya träffar på din efterlysning
+      → https://app.loopa.nu/kop/mina-efterlysningar#c12d562b-be38-4df3-8e56-2cb93d1872dd
+  [match] 6 nya träffar på din efterlysning
+      → https://app.loopa.nu/kop/mina-efterlysningar#6bebe69b-168f-4a6c-b70d-c57c45757e5c
+
+--- breven i /outbox ---
+
+=== 2026-09-02T19-14-58-926Z__match__kopare@example.com.txt ===
+  Till: kopare@example.com
+  Ämne: 6 nya träffar på din efterlysning
+  Sort: match
+  Skrivet: 2026-09-02T19:14:58.926Z
+  
+  Du efterlyste: Soffa · max 5 000 kr
+  
+  • Sits Anna — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • Swedese Lamino — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • Swedese Lamino — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA STRANDMON — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • Mio Madison Lux — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA Ektorp — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  
+  Se dem här: https://app.loopa.nu/kop/mina-efterlysningar#6bebe69b-168f-4a6c-b70d-c57c45757e5c
+  
+  Vill du inte längre leta? Pausa eller ta bort efterlysningen på samma sida.
+
+=== 2026-09-02T19-14-59-007Z__match__kopare@example.com.txt ===
+  Till: kopare@example.com
+  Ämne: 6 nya träffar på din efterlysning
+  Sort: match
+  Skrivet: 2026-09-02T19:14:59.007Z
+  
+  Du efterlyste: Matbord · max 3 000 kr
+  
+  • Vintage Bord Satsbord Soffbord i Trä med Hylla — 50 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  • Vitt soffbord i trä med underliggande hylla hylla. — 150 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  • Svart marmorbord — 160 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  • Soffbord — 265 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  • TORD BJÖRKLUND. FÄLLBORD, "BOGEN sidobord / avlastningsbord — 399 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  • Snyggt soffbord i Alanda-stil (glas och svart metall) – 80x80 cm — 400 kr (Säljs via Tradera)
+    Uppfyller allt du bad om.
+  
+  Se dem här: https://app.loopa.nu/kop/mina-efterlysningar#c12d562b-be38-4df3-8e56-2cb93d1872dd
+  
+  Vill du inte längre leta? Pausa eller ta bort efterlysningen på samma sida.
+
+=== 2026-09-02T19-14-59-095Z__match__kopare@example.com.txt ===
+  Till: kopare@example.com
+  Ämne: 6 nya träffar på din efterlysning
+  Sort: match
+  Skrivet: 2026-09-02T19:14:59.095Z
+  
+  Du efterlyste: Stolar · max 1 500 kr
+  
+  • IKEA NORDVIKEN — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA NORDVIKEN — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA NORDVIKEN — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA ROSENTORP — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA TONSTAD — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  • IKEA HAUGA — 150 kr (Hos oss nu)
+    Uppfyller allt du bad om.
+  
+  Se dem här: https://app.loopa.nu/kop/mina-efterlysningar#629e84c3-ff15-414d-b5ef-a046b2b203d1
+  
+  Vill du inte längre leta? Pausa eller ta bort efterlysningen på samma sida.
+
+=== 2026-09-02T19-14-59-097Z__fornyelse__kopare@example.com.txt ===
+  Till: kopare@example.com
+  Ämne: Din efterlysning somnar snart
+  Sort: fornyelse
+  Skrivet: 2026-09-02T19:14:59.097Z
+  
+  Din efterlysning: Stolar · max 1 500 kr
+  
+  Vi har läst igenom 77 objekt åt dig.
+  Om 6 dagar slutar vi automatiskt, om du inte säger till.
+  
+  Förny med ett klick: https://app.loopa.nu/kop/mina-efterlysningar#629e84c3-ff15-414d-b5ef-a046b2b203d1

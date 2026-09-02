@@ -17,6 +17,7 @@ import { parse, followUps, applyAnswer, summarize, type ParsedSpec } from "./par
 import { sweep } from "./sweep.js";
 import type { Efterlysning } from "./types.js";
 import { EXPIRY_DAYS } from "./types.js";
+import { inbox, markRead } from "./notify.js";
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -186,6 +187,25 @@ export async function handleEfterlysning(
       area: (body.omrade ?? "").trim().slice(0, 40) || null,
     });
     json(res, 201, { efterlysning: row, dagar: EXPIRY_DAYS });
+    return true;
+  }
+
+  /**
+   * GET /api/efterlysning/inkorg — notiserna.
+   *
+   * PRIMÄR KANAL, inte ett komplement till brevet. Den når mottagaren oavsett om en
+   * e-postleverantör är vald, ligger kvar, går att läsa om, och pekar rakt in i den efterlysning
+   * som orsakade den.
+   */
+  if (segments[0] === "inkorg" && req.method === "GET") {
+    json(res, 200, { notiser: await inbox(user.userId) });
+    return true;
+  }
+
+  if (segments[0] === "inkorg" && req.method === "POST") {
+    const body = await readBody<{ ids?: string[] }>(req);
+    await markRead(user.userId, body.ids ?? []);
+    json(res, 200, { ok: true });
     return true;
   }
 

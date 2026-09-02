@@ -35,6 +35,8 @@ import { cutoutOf, jobByLoopaId, publicCardFor } from "./publicCard.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
 import { handleAffar, handleAffarPublic } from "./affar/routes.js";
 import { handleEfterlysning, handleEfterlysningPublic } from "./efterlysning/routes.js";
+import { startEfterlysningSweeper } from "./efterlysning/matcher.js";
+import { migrateBevakningar } from "./efterlysning/migrate.js";
 import { store as affarStore } from "./affar/store.js";
 import { attachScan } from "./affar/scan.js";
 import { syncFromJobs } from "./butik/inventory.js";
@@ -1098,6 +1100,19 @@ void syncFromJobs().then(({ enrolled, published, withdrawn }) => {
 
 // Släpper reservationer som gått ut. Utan den låser en avbruten utcheckning möbeln för alltid.
 startButikSweeper();
+
+/**
+ * Efterlysningarna: migrering en gång, sedan sveparen.
+ *
+ * Migreringen körs vid VARJE uppstart och är byggd för det — den hoppar över rader som redan har en
+ * efterlysning och flyttar undan den gamla filen först när något faktiskt flyttats. Att köra den en
+ * gång manuellt hade betytt att en miljö som deployas innan någon kommit ihåg det tappar sina
+ * bevakningar tyst.
+ */
+void migrateBevakningar()
+  .then((r) => { if (r.migrated) console.info(`[efterlysning] migrerade ${r.migrated} bevakningar`); })
+  .catch((err) => console.warn("[efterlysning] migreringen föll:", err));
+startEfterlysningSweeper();
 
 server.listen(PORT, BIND_HOST, () => {
   console.log(`[condition-grading-server] listening on http://${BIND_HOST}:${PORT}`);

@@ -106,3 +106,34 @@ Tre fel hittades och rättades i den utvidgningen, alla i skarp körning:
 
 Stil och epok lämnas åt modellen: "60-tal", "funkis", "lantligt" är en öppen mängd, och en ordlista
 över dem hade varit en gissning om vad folk säger snarare än en avläsning av vad de sa.
+
+---
+
+## 4. Notiser utan e-postleverantör: inkorgen är primär kanal
+
+**Läge:** Projektet har ingen e-postavsändare — varken paket, nyckel eller avsändaradress.
+
+**Beslut:** In-app-inkorgen är den primära kanalen, inte ett komplement till brevet. Brevet är en
+påminnelse om inkorgen. Två adaptrar bakom samma gränssnitt: `file` (förval) skriver färdigrenderade
+brev till `/outbox`, `none` gör ingenting och säger det.
+
+**Varför inkorgen först:** den når mottagaren oavsett vilket beslut som fattas om leverantör, den
+ligger kvar, går att läsa om, och kan peka rakt in i den efterlysning som orsakade den. Ett system
+byggt kring brevet hade stått stilla tills någon valt leverantör.
+
+**En okänd `EMAIL_PROVIDER` faller till `file` och loggar det.** Att kasta hade stoppat en hel
+pulskörning för en felstavad miljövariabel; att tyst falla till `none` hade tappat breven.
+
+---
+
+## 5. Två textfel funna genom att läsa breven i /outbox
+
+Verifieringen är att mappen går att läsa. Den läsningen hittade två fel som inga tester fångade:
+
+**Deadline-brevet motsade sig själv.** Det skrev *"Inget stämmer helt, men de här är närmast"* ovanför
+en lista där varje rad löd *"Uppfyller allt du bad om"* — och köparen hade redan fått en träffnotis om
+exakt samma möbler. Ventilen tiger nu när de exakta träffarna redan är notifierade om, och byter
+rubrik när det ändå finns exakta.
+
+**Förnyelsebrevet skrev "bevakat den i 0 dagar".** Sant men läser som ett fel. Under ett dygn säger
+brevet vad vi gjort i stället för hur länge vi gjort det.
