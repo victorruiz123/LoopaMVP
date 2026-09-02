@@ -970,6 +970,27 @@ const server = http.createServer(async (req, res) => {
         if (segments[2] === "users" && segments.length === 5 && segments[4] === "jobs" && req.method === "GET") {
           return await handleAdminUserJobs(segments[3], res);
         }
+        /**
+         * Efterfrågepanelen: öppen efterfrågan per kategori, märke och prisband.
+         *
+         * Styr intaget och annonsutkasten. Rankad på OMÄTTAD efterfrågan — de som väntat utan att vi
+         * hittat något alls — för det är den listan som säger vad vi ska be folk filma.
+         *
+         * Ingen köparidentitet, av samma skäl som på den publika väggen. Panelen behöver veta VAD
+         * som söks, aldrig av vem.
+         */
+        if (segments[2] === "efterfragan" && req.method === "GET") {
+          const { demandDashboard, toCsv } = await import("./efterlysning/wall.js");
+          const rows = await demandDashboard();
+          if (url.searchParams.get("format") === "csv") {
+            res.writeHead(200, {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": 'attachment; filename="efterfragan.csv"',
+            });
+            return res.end(toCsv(rows));
+          }
+          return sendJson(res, 200, { rader: rows });
+        }
         return sendJson(res, 404, { error: "Not found" });
       }
 

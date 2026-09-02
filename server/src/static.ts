@@ -57,13 +57,16 @@ export async function serveStatic(pathname: string, res: ServerResponse, search 
   if (!file) return false;
 
   /**
-   * Butikens sidor får sitt huvud ifyllt innan de skickas.
+   * Sidor som ska gå att hitta får sitt huvud ifyllt innan de skickas.
    *
-   * Bara butiken, och bara när skalet är det som serveras: säljflödets skärmar ska ingen hitta via
-   * en sökmotor, och en riktig fil ska serveras som den är. Faller uppslaget skickas skalet orört —
-   * en trasig titel får aldrig bli en trasig sida. Se butik/seo.ts.
+   * TVÅ ADRESSRYMDER: butiken (möbler till salu) och efterlysningsväggen (möbler folk söker). Den
+   * andra kom till med köpsidan och är minst lika viktig för sökmotorer — "sökes string hylla
+   * stockholm" är en fråga folk ställer, och varje kategori är en sida som svarar.
+   *
+   * Säljflödets skärmar ska ingen hitta via en sökmotor, och en riktig fil serveras som den är.
+   * Faller uppslaget skickas skalet orört — en trasig titel får aldrig bli en trasig sida.
    */
-  if (!direct && pathname.startsWith("/butik")) {
+  if (!direct && (pathname.startsWith("/butik") || pathname.startsWith("/efterlyses"))) {
     try {
       const head = await seoFor(pathname, search);
       if (head) {

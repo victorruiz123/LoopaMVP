@@ -18,6 +18,7 @@ import { sweep } from "./sweep.js";
 import type { Efterlysning } from "./types.js";
 import { EXPIRY_DAYS } from "./types.js";
 import { inbox, markRead } from "./notify.js";
+import { demandCountFor, demandDashboard, toCsv, wall } from "./wall.js";
 
 function json(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { "Content-Type": "application/json; charset=utf-8" });
@@ -107,6 +108,39 @@ export async function handleEfterlysningPublic(
       lasta: result.scanned,
       traderaDegraded: result.traderaDegraded,
       prognos: result.forecast,
+    });
+    return true;
+  }
+
+  /**
+   * GET /api/efterlysning/vagg — den publika efterlysningsväggen.
+   *
+   * PUBLIK och riktad till SÄLJARE. Aggregerad och anonym: två personer som söker samma hylla blir
+   * en rad, vilket både skyddar dem och är ett starkare säljargument än två rader. Se wall.ts för
+   * de tre reglerna som håller köparen oidentifierbar.
+   */
+  if (segments[0] === "vagg" && req.method === "GET") {
+    const url = new URL(req.url ?? "/", "http://x");
+    json(res, 200, { poster: await wall(url.searchParams.get("kategori")) });
+    return true;
+  }
+
+  /**
+   * GET /api/efterlysning/efterfragan?kategori=&marke=&pris= — säljarkroken.
+   *
+   * Svarar med ETT ANTAL och ingenting annat. En säljare som ser "någon i Vasastan söker en grön
+   * sammetssoffa max 6 000" vet både var köparen bor och vad de har råd med — en förhandlings-
+   * position vi gett bort gratis.
+   */
+  if (segments[0] === "efterfragan" && req.method === "GET") {
+    const url = new URL(req.url ?? "/", "http://x");
+    const pris = Number(url.searchParams.get("pris"));
+    json(res, 200, {
+      antal: await demandCountFor({
+        categorySlug: url.searchParams.get("kategori"),
+        brand: url.searchParams.get("marke"),
+        priceSek: Number.isFinite(pris) && pris > 0 ? pris : null,
+      }),
     });
     return true;
   }

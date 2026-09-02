@@ -16,7 +16,7 @@
  * det som syns under den halvsekund appen startar — därför är det riktig text, inte nyckelord.
  */
 
-import { brandSlug, CATEGORIES, categoryBySlug } from "./catalog.js";
+import { brandSlug, CATEGORIES, categoryBySlug, categoryLabel } from "./catalog.js";
 import { allProducts, productById } from "./inventory.js";
 import type { Product } from "./types.js";
 
@@ -120,6 +120,37 @@ function productJsonLd(p: Product): string {
 
 /** Sidhuvudet för en adress under /butik, eller null när adressen inte är butikens. */
 export async function seoFor(pathname: string, search: string): Promise<SeoHead | null> {
+  /**
+   * Efterlysningsväggen, renderad per kategori.
+   *
+   * "sökes string hylla stockholm" är en fråga folk faktiskt ställer, och varje kategori är en egen
+   * sida som svarar på den. Sidan vänder sig till SÄLJARE — den som söker efter att sälja något ska
+   * hitta hit — och kroppen listar riktig, anonymiserad efterfrågan så att en robot ser innehåll
+   * och inte en tom app.
+   *
+   * INGEN KÖPARIDENTITET, av samma skäl som på väggen själv: raderna kommer ur `wall()`, som redan
+   * aggregerat bort dem.
+   */
+  if (pathname === "/efterlyses" || pathname.startsWith("/efterlyses/")) {
+    const slug = pathname.slice("/efterlyses".length).replace(/^\/+|\/+$/g, "") || null;
+    const { wall } = await import("../efterlysning/wall.js");
+    const rows = await wall(slug);
+    const label = slug ? categoryLabel(slug) : null;
+    const what = label ? label.toLowerCase() : "möbler";
+    return {
+      title: label ? `Sökes: ${label.toLowerCase()} i Stockholm – ${SITE}` : `Sökes just nu i Stockholm – ${SITE}`,
+      description: `Riktiga köpare i Stockholm som söker ${what}. Har du en i förrådet? Filma den på tre minuter — Loopa besiktigar, prissätter och hämtar hem den.`,
+      canonical: `${baseUrl()}${pathname}`,
+      // Tom vägg = ingenting att indexera. Bättre än en sida som lovar efterfrågan och visar noll.
+      noindex: rows.length === 0,
+      body:
+        `<h1>Sökes: ${esc(what)} i Stockholm</h1>` +
+        `<p>Riktiga köpare som väntar. Har du en av dem? Sälj den med Loopa.</p>` +
+        `<ul>${rows.map((r) => `<li>${esc(r.title)}${r.area ? ` – ${esc(r.area)}` : ""}</li>`).join("")}</ul>` +
+        `<ul>${CATEGORIES.map((c) => `<li><a href="/efterlyses/${c.slug}">Sökes: ${esc(c.label.toLowerCase())}</a></li>`).join("")}</ul>`,
+    };
+  }
+
   // Grinden först. Utan den blev "/" till rest === "" och fick butikens landningssidehuvud —
   // säljverktygets förstasida hade då presenterat sig som en möbelbutik för varje sökmotor.
   if (pathname !== "/butik" && !pathname.startsWith("/butik/")) return null;

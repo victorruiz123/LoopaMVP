@@ -1,0 +1,24 @@
+=== Den publika väggen (allt en främling får se) ===
+
+{"key":"forvaring|String|valnöt|upp till 4 000 kr","title":"Sökes: String förvaring i valnöt, upp till 4 000 kr","categorySlug":"forvaring","categoryLabel":"Förvaring","area":"Södermalm","waitingDays":0,"count":2}
+{"key":"soffor-fatoljer||grön|upp till 6 000 kr","title":"Sökes: soffor & fåtöljer i grön, upp till 6 000 kr","categorySlug":"soffor-fatoljer","categoryLabel":"Soffor & fåtöljer","area":"Vasastan","waitingDays":0,"count":1}
+{"key":"soffor-fatoljer||grön|upp till 5 000 kr","title":"Sökes: soffor & fåtöljer i grön, upp till 5 000 kr","categorySlug":"soffor-fatoljer","categoryLabel":"Soffor & fåtöljer","area":"Kungsholmen","waitingDays":0,"count":1}
+{"key":"bord|||upp till 2 500 kr","title":"Sökes: bord, upp till 2 500 kr","categorySlug":"bord","categoryLabel":"Bord","area":null,"waitingDays":0,"count":1}
+
+=== Adminpanelen: rankad på omättad efterfrågan ===
+
+kategori;marke;prisband;antal;median_vantetid_dagar;omattade
+Förvaring;String;upp till 4 000 kr;2;0;2
+Soffor & fåtöljer;;upp till 6 000 kr;1;0;1
+Soffor & fåtöljer;;upp till 5 000 kr;1;0;1
+Bord;;upp till 2 500 kr;1;0;1
+
+=== Säljarkroken ===
+  String-hylla 3 000 kr → 2 köpare
+  String-hylla 9 000 kr → 0 köpare (över taket)
+  IKEA-hylla 1 000 kr  → 0 köpare (fel märke)
+
+=== Läckagekontroll ===
+  e-post: läcker inte
+  anteckning: läcker inte
+  användar-id: läcker inte

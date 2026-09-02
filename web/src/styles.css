@@ -3324,3 +3324,10 @@ body:has(.screen-camera) .consent { display: none; }
 .card-row-sale-shop-reserved { color: var(--muted); }
 .card-row-sale-shop-sold, .card-row-sale-shop-delivered { color: var(--muted-soft); }
 .card-row-sale-shop-returned { color: var(--muted-soft); }
+
+/* Säljarkroken: anonymiserad efterfrågan ovanför annonsen. Dämpad — den ska uppmuntra, inte skrika. */
+.demand-hook {
+  margin: 0 0 12px; padding: 12px 16px; border-radius: var(--r-lg);
+  background: var(--accent-light); color: var(--accent-ink);
+  font-size: var(--fs-md); line-height: 1.5;
+}

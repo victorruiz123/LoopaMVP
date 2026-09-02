@@ -137,3 +137,23 @@ rubrik när det ändå finns exakta.
 
 **Förnyelsebrevet skrev "bevakat den i 0 dagar".** Sant men läser som ett fel. Under ett dygn säger
 brevet vad vi gjort i stället för hur länge vi gjort det.
+
+---
+
+## 6. Väggen får aldrig överdriva en köpares budget
+
+**Upptäckt:** Två fel, båda i samma mekanism, båda funna genom att köra väggen på riktig data.
+
+**Först:** prisbandet la 4 000 kr i spannet *"upp till 6 000 kr"*. Det överdriver köparens budget för
+varje säljare som läser väggen — en förhandlingsposition given bort gratis, av precis det system som
+finns för att inte ge bort något om köparen. Banden avrundas nu **nedåt**, alltid: 500 kr upp till
+tretusen, tusen däröver. En köpare får hellre framstå som snålare än de är; det kostar dem ingenting,
+medan motsatsen kostar pengar.
+
+**Sedan:** med bandet i grupperingsnyckeln hamnade två köpare av samma gröna soffa på **skilda rader**
+— den ena 5 500 kr, den andra 6 000 — med var sin stadsdel. Två sådana rader pekar ut mer än en rad
+med två. Priset ingår därför inte längre i nyckeln, och gruppen bär det **lägsta** taket i sig:
+varken det högsta eller ett snitt, eftersom båda hade överdrivit någons budget.
+
+**Effekt:** samma ändring förbättrar både integriteten och säljargumentet. "2 köpare söker detta" är
+starkare än två rader med en var.

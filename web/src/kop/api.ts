@@ -122,3 +122,28 @@ export function fornya(id: string): Promise<{ efterlysning: Efterlysning }> {
 export function bevis(): Promise<{ uppfyllda: Array<{ vad: string; dagar: number }>; efterfragan: Array<{ vad: string; antal: number }> }> {
   return publicJson("/api/efterlysning/bevis");
 }
+
+export interface WallItem {
+  key: string;
+  title: string;
+  categorySlug: string | null;
+  categoryLabel: string | null;
+  area: string | null;
+  waitingDays: number;
+  count: number;
+}
+
+/** Efterlysningsväggen. Publik och anonym — se wall.ts för reglerna. */
+export function vagg(kategori?: string | null): Promise<{ poster: WallItem[] }> {
+  const q = kategori ? `?kategori=${encodeURIComponent(kategori)}` : "";
+  return publicJson(`/api/efterlysning/vagg${q}`);
+}
+
+/** Hur många som efterlyst en möbel som den här. Ett antal, aldrig mer. */
+export function efterfragan(signals: { kategori?: string | null; marke?: string | null; pris?: number | null }): Promise<{ antal: number }> {
+  const q = new URLSearchParams();
+  if (signals.kategori) q.set("kategori", signals.kategori);
+  if (signals.marke) q.set("marke", signals.marke);
+  if (signals.pris) q.set("pris", String(signals.pris));
+  return publicJson(`/api/efterlysning/efterfragan?${q.toString()}`);
+}

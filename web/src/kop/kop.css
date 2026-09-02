@@ -242,3 +242,29 @@
   .kop-trygg-field button { width: 100%; }
   .kop-mina-rad { flex-direction: column; }
 }
+
+/* ---- efterlysningsväggen ---- */
+
+.vagg { padding: 30px 0 0; }
+.vagg-head { max-width: 62ch; margin-bottom: 26px; }
+.vagg-head h1 { margin: 0 0 8px; font-size: clamp(26px, 4vw, 40px); letter-spacing: -0.03em; line-height: 1.1; }
+.vagg-head p { margin: 0; font-size: var(--fs-lg); color: var(--muted); line-height: 1.55; }
+.vagg-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.vagg-post {
+  display: flex; gap: 16px; align-items: center; justify-content: space-between; flex-wrap: wrap;
+  padding: 20px 22px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.vagg-post h2 { margin: 0 0 4px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.vagg-post-meta { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+.vagg-post-cta {
+  flex: none; padding: 11px 18px; border-radius: var(--r);
+  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; text-decoration: none;
+}
+.vagg-post-cta:hover { background: var(--accent-dark); }
+.vagg-tom { padding: 24px; background: var(--field); border-radius: var(--r-lg); color: var(--muted); }
+.vagg-kategorier {
+  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
+  margin-top: 30px; padding-top: 20px; border-top: 1px solid var(--border);
+  font-size: var(--fs-sm); color: var(--muted-soft);
+}
+.vagg-kategorier a { color: var(--muted); }

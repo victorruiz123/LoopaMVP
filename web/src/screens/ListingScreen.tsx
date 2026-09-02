@@ -7,6 +7,7 @@ import SellWithLoopa from "../components/SellWithLoopa";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 import { coverUrl, imageUrl } from "../api";
+import DemandHook from "../kop/components/DemandHook";
 
 /**
  * Säljarens vy av sin annons.
@@ -74,6 +75,12 @@ export default function ListingScreen({
         </section>
       ) : (
         <>
+          {/* Anonymiserad efterfrågan. Döljer sig själv vid noll — se DemandHook. */}
+          <DemandHook
+            kategori={card.identity.category ?? null}
+            marke={card.identity.brand ?? null}
+            pris={card.pricing.suggestedPriceSek ?? null}
+          />
           <ListingView
             card={card}
             identity={result.identity}

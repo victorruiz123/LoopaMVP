@@ -4,6 +4,7 @@ import "./kop.css";
 import { useKopRoute } from "./router";
 import BuyLanding from "./screens/BuyLanding";
 import MinaEfterlysningar from "./screens/MinaEfterlysningar";
+import DemandWall from "./screens/DemandWall";
 import ButikChrome from "../butik/components/Chrome";
 
 /**
@@ -17,8 +18,9 @@ export default function KopApp() {
   const route = useKopRoute();
 
   useEffect(() => {
-    document.title = route.name === "mina"
-      ? "Dina efterlysningar – Loopa"
+    document.title =
+      route.name === "mina" ? "Dina efterlysningar – Loopa"
+      : route.name === "vagg" ? "Sökes just nu i Stockholm – Loopa"
       : "Beskriv möbeln du letar efter – Loopa";
   }, [route]);
 
@@ -26,6 +28,7 @@ export default function KopApp() {
     <ButikChrome>
       {route.name === "landing" && <BuyLanding />}
       {route.name === "mina" && <MinaEfterlysningar />}
+      {route.name === "vagg" && <DemandWall kategori={route.kategori} />}
     </ButikChrome>
   );
 }
