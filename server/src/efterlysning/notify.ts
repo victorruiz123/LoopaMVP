@@ -27,6 +27,7 @@ import { sender, type Letter } from "../notify/outbox.js";
 import * as store from "./store.js";
 import type { Candidate } from "./match.js";
 import type { Efterlysning, MatchSource } from "./types.js";
+import { nabar } from "./types.js";
 import { emit } from "./analytics.js";
 
 export type NoticeKind = "match" | "fortur" | "puls" | "deadline" | "fornyelse";
@@ -175,7 +176,8 @@ function matchBody(e: Efterlysning, hits: Candidate[]): { title: string; body: s
  * gått iväg. En avsändare som faller ska hellre ha missat ett brev än skicka samma brev varje minut.
  */
 export async function notifyMatches(e: Efterlysning, hits: Candidate[]): Promise<Notice | null> {
-  if (!e.userId || hits.length === 0) return null;
+  // Utan väg att nå personen finns inget att skicka. Se `nabar` — konto ELLER e-post duger.
+  if (!nabar(e) || hits.length === 0) return null;
 
   const fresh = hits.filter((h) => !e.notifiedProductIds.includes(h.product.id));
   if (fresh.length === 0) return null;
@@ -183,7 +185,14 @@ export async function notifyMatches(e: Efterlysning, hits: Candidate[]): Promise
   await store.markNotified(e.id, fresh.map((h) => h.product.id));
 
   const { title, body } = matchBody(e, fresh);
-  const notice = await push({
+  /**
+   * Inkorgen är personlig och slås upp på konto.
+   *
+   * En efterlysning som bara har en e-postadress får därför sitt besked som BREV och ingen rad i
+   * inkorgen — vilket är den kanal personen valde när de skrev sin adress i stället för att skapa
+   * ett konto. Att lägga notisen på en tom sträng hade gjort den synlig för fel personer.
+   */
+  const notice = e.userId ? await push({
     userId: e.userId,
     efterlysningId: e.id,
     kind: "match",
@@ -192,7 +201,7 @@ export async function notifyMatches(e: Efterlysning, hits: Candidate[]): Promise
     href: deepLink(e),
     productIds: fresh.map((h) => h.product.id),
     source: fresh[0].source,
-  });
+  }) : null;
 
   emit("notification_sent", {
     kind: "match", source: fresh[0].source, antal: fresh.length,

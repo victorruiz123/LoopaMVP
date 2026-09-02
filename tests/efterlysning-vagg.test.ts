@@ -88,9 +88,20 @@ test("en pausad efterlysning står inte på väggen", async () => {
   assert.equal((await wall("sangar")).length, 0);
 });
 
-test("en osparad efterlysning (utan konto) står inte heller där", async () => {
-  await store.create(spec({ userId: null, filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
-  assert.equal((await wall("belysning")).length, 0);
+test("en efterlysning UTAN VÄG ATT NÅ NÅGON står inte där", async () => {
+  // Direktsvepets anonyma utkast: varken konto eller e-post. Ingen att bevaka åt, alltså ingen
+  // efterfrågan att annonsera. Se `nabar` i types.ts.
+  await store.create(spec({ userId: null, email: null, filter: { categorySlug: "ovrigt", maxPriceSek: 500 } }));
+  assert.equal((await wall("ovrigt")).length, 0);
+});
+
+test("men en e-postefterlysning ÄR efterfrågan och står där", async () => {
+  // Fångaren på /kop tar bara en adress. Kravet var alltid "en väg att nå personen", inte "ett
+  // konto" — och efterfrågan är efterfrågan oavsett hur köparen registrerade sig.
+  await store.create(spec({ userId: null, email: "fangad@example.com", filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
+  const rader = await wall("belysning");
+  assert.equal(rader.length, 1);
+  assert.doesNotMatch(JSON.stringify(rader[0]), /fangad@example\.com/, "adressen lämnar aldrig systemet");
 });
 
 // ─── panelen ────────────────────────────────────────────────────────────────
@@ -134,9 +145,9 @@ test("samma sak i olika prisklass blir EN rad, med det lägsta taket", async () 
   // Med bandet i grupperingsnyckeln hamnade två köpare av samma gröna soffa på skilda rader — den
   // ena med 5 500 kr och den andra med 6 000 — och två rader med var sin stadsdel pekar ut mer än
   // en rad med två.
-  await store.create(spec({ userId: "g1", area: "Vasastan", filter: { categorySlug: "belysning", colors: ["grön"], maxPriceSek: 6000 } }));
-  await store.create(spec({ userId: "g2", area: "Kungsholmen", filter: { categorySlug: "belysning", colors: ["grön"], maxPriceSek: 5500 } }));
-  const rader = await wall("belysning");
+  await store.create(spec({ userId: "g1", area: "Vasastan", filter: { categorySlug: "sangar", colors: ["grön"], maxPriceSek: 6000 } }));
+  await store.create(spec({ userId: "g2", area: "Kungsholmen", filter: { categorySlug: "sangar", colors: ["grön"], maxPriceSek: 5500 } }));
+  const rader = (await wall("sangar")).filter((r) => r.count > 1);
   assert.equal(rader.length, 1, "en rad, inte två");
   assert.equal(rader[0].count, 2);
   assert.match(rader[0].title, /upp till 5\s000 kr/, "det lägsta taket, aldrig det högsta");

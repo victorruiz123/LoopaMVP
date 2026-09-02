@@ -201,3 +201,78 @@ används där de hör hemma: ental för "din stol", plural för "ca 22 stolar", 
 **Varför det hör hemma i katalogen:** annonsutkasten och tömningsbreven är två filer som aldrig läser
 varandra. En lokal ordlista i vardera hade gett två listor som glider isär — och den som lägger till
 en kategori ska inte behöva veta att det finns två ställen till att uppdatera.
+
+---
+
+## 9. En efterlysning utan konto, men med e-post
+
+**Konflikt:** Efterlysningsfångaren på /kop tar kategori, maxpris och **e-post** — inget konto. Men
+modellen från steg 1 kräver `userId`, och alla sju konsumenter (sveparen, pulsen, väggen, panelen,
+tömningarna) filtrerar på just det fältet. En e-postefterlysning hade sparats och sedan aldrig
+bevakats av någon.
+
+**Beslut:** Kravet är inte ett konto — det är **en väg att nå personen**. Filtret byts från
+`e.userId` till `nabar(e)`, som är sant när `userId` **eller** `email` finns.
+
+**Varför:** motivet bakom kravet var alltid "en bevakning åt någon vi inte kan nå är ett löfte vi
+inte kan hålla". En e-postadress uppfyller det motivet lika bra som ett konto. Att kräva konto för
+en enrads-formulär hade dessutom flyttat konverteringen till fel ställe: sidan finns för att fånga en
+avsikt, inte för att värva medlemmar.
+
+**Följder, alla avsiktliga:**
+
+- **Inkorgen** kräver fortfarande konto — den är personlig och slås upp på `userId`. En
+  e-postefterlysning når mottagaren via brev, vilket är den kanal de valde.
+- **Väggen** tar med dem: efterfrågan är efterfrågan oavsett hur köparen registrerades, och raderna
+  är ändå anonymiserade.
+- **Ägarkontrollen** är oförändrad. `forUser` och `remove` slår fortfarande på `userId`, så en
+  e-postefterlysning går inte att lista eller radera via kontovägarna. Den som senare skapar ett
+  konto med samma adress kopplas inte automatiskt — det vore en gissning om identitet.
+
+---
+
+## 10. SVG och CSS i stället för Lottie
+
+**Beslut:** Fyrscensanimationen på /kop är SVG med CSS-animation, inte Lottie.
+
+**Varför:** `lottie-web` är ~300 kB som måste laddas innan något rör sig — på en sida vars uttalade
+krav är att LCP ska vara heron och att animationen ska lazy-laddas. Repot har dessutom noll
+körtidsberoenden i webben, och ett bibliotek för en enda animation är en ny sorts sak att underhålla.
+
+**Bytbarheten finns kvar**, som briefen kräver: varje scen är en egen komponent i
+`web/src/kop/animation/`, och illustrationerna är rena `<svg>`-block utan logik. Att byta scen 2 mot
+en riktig illustration är att skriva över en fil.
+
+Skulle Lottie ändå väljas senare är scenerna redan avgränsade en och en, och `<LottiePlayer>` kan
+ersätta `<Scen2>` utan att röra tidslinjen.
+
+---
+
+## 11. Chatten togs bort från /kop, men parsern lever
+
+**Beslut:** `EfterlysningChat` och dess kort (`SpecCard`, `TraffLista`) är raderade — sidan har inget
+LLM-anrop längre. Serverns tolkning (`efterlysning/parse.ts`, `backstop.ts`, det utökade
+`interpretQuery`) och dess vägar ligger kvar orörda.
+
+**Varför inte radera allt:** koden kostar ingenting när den inte anropas, den är testad, och den
+lösta uppgiften — svenska till ett `ProductFilter` med skyddsnät för de hårda fälten — är inte
+knuten till en chatt. Butikens AI-sökning använder samma väg redan i dag. Att riva ut den hade
+kastat bort ett arbete som fungerar för att en av två ingångar ändrades.
+
+**Vad som ÄR borta:** varje anrop från köpsidan. Den laddar inget, väntar på inget och kan inte
+kosta en modellkörning.
+
+---
+
+## 12. Två filer ägde `.hero`
+
+**Upptäckt:** Den nya heron blev tvåspaltig på desktop — underrubriken hamnade bredvid rubriken i
+stället för under. Orsaken var en kvarglömd regel i `butik.css` från butikens avvecklade
+landningssida: `@media (min-width: 900px) { .hero { display: grid; ... } }`.
+
+**Beslut:** 216 rader döda regler (`.hero*`, `.hero-preview*`, `.how*`, `.shelf-intro`) borttagna ur
+`butik.css`, med en kommentar kvar på platsen om varför.
+
+**Lärdomen är värd raden:** två stilmallar som äger samma klassnamn är en fälla som gillras i tysthet
+och löser ut långt senare, i en annan fil, för någon annan. Köpsidans egna klasser heter numera
+`hero-*` bara i `kop.css`, och butiken har inga kvar.

@@ -16,6 +16,7 @@ import * as store from "./store.js";
 import { mayNotify, notifyMatches } from "./notify.js";
 import { expireOverdue, runDeadlineValve, runPulse, runRenewalReminders } from "./pulse.js";
 import type { Candidate } from "./match.js";
+import { nabar } from "./types.js";
 import { deepLink, push, sendLetter } from "./notify.js";
 import * as fortur from "./fortur.js";
 import { emit } from "./analytics.js";
@@ -39,7 +40,7 @@ export interface RoundResult {
  * har ingen brådska: ingen väntar på svaret medan den kör.
  */
 export async function runRound(): Promise<RoundResult> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   let notified = 0;
 
   for (const e of open) {
@@ -69,7 +70,15 @@ export async function runRound(): Promise<RoundResult> {
        * inte att ta — någon annan hann först — skickas notisen ändå, men utan förturslöfte: att
        * lova något vi inte kan hålla är värre än att inte lova.
        */
-      const inkommande = toSend.filter((c) => c.source === "loopa_incoming");
+      /**
+       * FÖRTUR KRÄVER ETT KONTO, till skillnad från notiser.
+       *
+       * En reservation är ett anspråk på en bestämd möbel som ska gå att lösa in i kassan, och
+       * kassan känner igen ett konto — inte en e-postadress i en formulärrad. En e-postefterlysning
+       * får därför beskedet som vanlig notis, utan förturslöfte: att lova något vi inte kan hålla
+       * är värre än att inte lova.
+       */
+      const inkommande = e.userId ? toSend.filter((c) => c.source === "loopa_incoming") : [];
       for (const c of inkommande) {
         const hold = await fortur.reserve({ productId: c.product.id, efterlysningId: e.id, userId: e.userId! });
         if (!hold) continue;

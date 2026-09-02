@@ -21,6 +21,7 @@ import { sweep } from "./sweep.js";
 import * as store from "./store.js";
 import { deepLink, lastOf, push, sendLetter } from "./notify.js";
 import type { Efterlysning } from "./types.js";
+import { nabar } from "./types.js";
 import { emit } from "./analytics.js";
 
 const WEEK_MS = 7 * 24 * 3600_000;
@@ -59,7 +60,7 @@ export interface PulseResult {
  * två brev samma vecka är ett för många.
  */
 export async function runPulse(now = Date.now()): Promise<PulseResult> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   let sent = 0;
   let skipped = 0;
 
@@ -84,10 +85,13 @@ export async function runPulse(now = Date.now()): Promise<PulseResult> {
       `Ändra eller pausa: ${deepLink(e)}`,
     ].join("\n");
 
-    await push({
-      userId: e.userId!, efterlysningId: e.id, kind: "puls",
-      title, body, href: deepLink(e), productIds: [], source: null,
-    });
+    // Inkorgen är personlig; en e-postefterlysning får bara brevet. Se notifyMatches.
+    if (e.userId) {
+      await push({
+        userId: e.userId, efterlysningId: e.id, kind: "puls",
+        title, body, href: deepLink(e), productIds: [], source: null,
+      });
+    }
     pulseMarkers.set(e.id, e.scannedCount);
     emit("pulse_sent", { efterlysning: e.id, lasta: lasta, tomningar: e.scannedClearances });
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "puls" });
@@ -149,11 +153,13 @@ export async function runDeadlineValve(now = Date.now()): Promise<PulseResult> {
       "Säg till om något duger, så tar vi det därifrån.",
     ].join("\n");
 
-    await push({
-      userId: e.userId!, efterlysningId: e.id, kind: "deadline",
-      title, body, href: deepLink(e),
-      productIds: three.map((c) => c.product.id), source: three[0].source,
-    });
+    if (e.userId) {
+      await push({
+        userId: e.userId, efterlysningId: e.id, kind: "deadline",
+        title, body, href: deepLink(e),
+        productIds: three.map((c) => c.product.id), source: three[0].source,
+      });
+    }
     emit("deadline_valve_sent", { efterlysning: e.id, kandidater: three.length, baraNara });
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "deadline" });
     sent += 1;
@@ -168,7 +174,7 @@ export async function runDeadlineValve(now = Date.now()): Promise<PulseResult> {
  * köpare som fortfarande letar tappas för att nittio dagar gick.
  */
 export async function runRenewalReminders(now = Date.now()): Promise<PulseResult> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   let sent = 0;
   let skipped = 0;
 
@@ -191,10 +197,12 @@ export async function runRenewalReminders(now = Date.now()): Promise<PulseResult
       `Förny med ett klick: ${deepLink(e)}`,
     ].join("\n");
 
-    await push({
-      userId: e.userId!, efterlysningId: e.id, kind: "fornyelse",
-      title, body, href: deepLink(e), productIds: [], source: null,
-    });
+    if (e.userId) {
+      await push({
+        userId: e.userId, efterlysningId: e.id, kind: "fornyelse",
+        title, body, href: deepLink(e), productIds: [], source: null,
+      });
+    }
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "fornyelse" });
     sent += 1;
   }

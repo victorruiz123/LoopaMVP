@@ -51,6 +51,14 @@ const ZONES: Array<DeliveryZone & { prefixes: string[] }> = [
   },
 ];
 
+/**
+ * Zonernas avgifter, i stigande ordning.
+ *
+ * Finns som en egen export för att köpsidan lovar "frakt från 495 kr" och den siffran måste komma
+ * härifrån. Skriven en gång till i en komponent hade den en dag sagt något annat än kassan gör.
+ */
+export const ZONE_FEES: readonly number[] = ZONES.map((z) => z.feeSek).sort((a, b) => a - b);
+
 /** Bara siffrorna. "112 23", "11223" och "112-23" är samma postnummer. */
 export function normalizePostal(raw: string): string {
   return raw.replace(/\D/g, "").slice(0, 5);

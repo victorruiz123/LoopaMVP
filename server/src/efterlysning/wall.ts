@@ -19,6 +19,7 @@
 import { categoryLabel } from "../butik/catalog.js";
 import * as store from "./store.js";
 import type { Efterlysning } from "./types.js";
+import { nabar } from "./types.js";
 
 /** En rad på den publika väggen. Allt som står här får en främling se. */
 export interface WallItem {
@@ -95,7 +96,7 @@ function groupKey(e: Efterlysning): string {
  * med `count: 2` — vilket både skyddar dem och är ett STARKARE säljargument än två rader.
  */
 export async function wall(categorySlug?: string | null): Promise<WallItem[]> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   const groups = new Map<string, { rows: Efterlysning[] }>();
 
   for (const e of open) {
@@ -155,7 +156,7 @@ export interface DemandRow {
 }
 
 export async function demandDashboard(): Promise<DemandRow[]> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   const matches = await store.allMatches();
   const withMatch = new Set(matches.map((m) => m.efterlysningId));
 
@@ -221,7 +222,7 @@ export async function demandCountFor(signals: {
   brand: string | null;
   priceSek: number | null;
 }): Promise<number> {
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   return open.filter((e) => {
     if (e.filter.categorySlug && e.filter.categorySlug !== signals.categorySlug) return false;
     if (e.filter.brands?.length) {

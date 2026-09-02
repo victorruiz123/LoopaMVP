@@ -121,6 +121,58 @@ function productJsonLd(p: Product): string {
 /** Sidhuvudet för en adress under /butik, eller null när adressen inte är butikens. */
 export async function seoFor(pathname: string, search: string): Promise<SeoHead | null> {
   /**
+   * Köpsidan: sidans enda brödtext, renderad server-side.
+   *
+   * Titeln siktar på det folk faktiskt söker efter — "köpa begagnade möbler tryggt stockholm" — och
+   * kroppen bär de tre frågorna som strukturerad FAQ. Samma tre frågor och samma svar som sidan
+   * visar; att indexera något annat än det besökaren möter är att lova en sak i sökresultatet och
+   * hålla en annan.
+   *
+   * Priset skrivs INTE här. Serviceavgiften och zonpriserna bor i koden som räknar dem, och en
+   * hårdkodad siffra i ett sökresultat är den som blir kvar längst efter att den slutat stämma.
+   */
+  if (pathname === "/kop" || pathname === "/kop/") {
+    const { SERVICE_FEE_SEK } = await import("../affar/fees.js");
+    const { ZONE_FEES } = await import("./delivery.js");
+    const frakt = Math.min(...ZONE_FEES);
+    const svar: Array<[string, string]> = [
+      [
+        "Hur funkar det?",
+        "Du klistrar in länken till en annons du hittat. Vi läser den och säger vilken modell det är, vad den mäter och vad den är värd. Vill du gå vidare får du en färdig text att skicka säljaren — vi hör aldrig av oss till dem själva. Säljaren filmar möbeln på tre minuter, vi granskar den och sätter ett pris efter skicket. Sedan betalar du, vi hämtar hos säljaren och bär in hos dig.",
+      ],
+      [
+        "Vad kostar det?",
+        `Möbelns pris går oavkortat till säljaren. Ovanpå det betalar du ${SERVICE_FEE_SEK} kr i serviceavgift och frakten, från ${frakt} kr beroende på zon i Stockholms län. Hela uppdelningen står på kortet innan du bjuder in säljaren.`,
+      ],
+      [
+        "Vad händer om möbeln inte stämmer?",
+        "Pengarna hålls hos oss tills möbeln står hos dig. Är den inte som granskningen visade får du dem tillbaka. Det är därför vi granskar innan du betalar och inte efter.",
+      ],
+    ];
+    return {
+      title: "Köpa begagnade möbler tryggt i Stockholm – Loopa",
+      description:
+        `Hittat en möbel på Blocket, Marketplace eller Tradera? Loopa granskar den, håller pengarna tills du godkänt och kör hem den. Serviceavgift ${SERVICE_FEE_SEK} kr, frakt från ${frakt} kr i Stockholms län.`,
+      canonical: `${baseUrl()}/kop`,
+      jsonLd: JSON.stringify({
+        "@context": "https://schema.org",
+        "@type": "FAQPage",
+        mainEntity: svar.map(([q, a]) => ({
+          "@type": "Question",
+          name: q,
+          acceptedAnswer: { "@type": "Answer", text: a },
+        })),
+      }),
+      body:
+        `<h1>Hittat en möbel? Köp den tryggt.</h1>` +
+        `<p>Vi granskar, betalar säkert och kör hem den. Fungerar med Blocket, Facebook Marketplace och Tradera.</p>` +
+        `<h2>Vanliga frågor</h2>` +
+        svar.map(([q, a]) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join("") +
+        `<p><a href="/butik/sok">Se våra granskade möbler</a></p>`,
+    };
+  }
+
+  /**
    * Efterlysningsväggen, renderad per kategori.
    *
    * "sökes string hylla stockholm" är en fråga folk faktiskt ställer, och varje kategori är en egen

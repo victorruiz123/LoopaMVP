@@ -113,6 +113,23 @@ export async function handleButikRequest(
 
   // GET /api/butik/leverans?postnummer=11223 — zon, pris och tider. Publik: den ska gå att fråga
   // innan man loggar in, annars är leveransbeskedet gömt bakom en inloggning man inte gjort än.
+  /**
+   * GET /api/butik/avgifter — vad ett köp via Loopa kostar utöver möbeln.
+   *
+   * FINNS FÖR ATT SIFFRORNA INTE SKA HÅRDKODAS I KLIENTEN. Serviceavgiften bor i affar/fees.ts och
+   * fraktzonerna i delivery.ts; en siffra skriven en gång till i en React-komponent är en siffra som
+   * en dag säger något annat än kassan gör — och just den sidan lovar "inga överraskningar".
+   */
+  if (segments[0] === "avgifter" && segments.length === 1) {
+    const { SERVICE_FEE_SEK } = await import("../affar/fees.js");
+    const { ZONE_FEES } = await import("./delivery.js");
+    return json(res, 200, {
+      serviceavgiftSek: SERVICE_FEE_SEK,
+      fraktFranSek: Math.min(...ZONE_FEES),
+      fraktTillSek: Math.max(...ZONE_FEES),
+    }), true;
+  }
+
   if (segments[0] === "leverans" && segments.length === 1) {
     json(res, 200, { ...deliveryQuote(url.searchParams.get("postnummer") ?? ""), checkoutConfigured: checkoutConfigured() });
     return true;

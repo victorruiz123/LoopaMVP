@@ -120,6 +120,20 @@ export const HARD_FIELDS = ["categorySlug", "maxPriceSek", "maxWidthMm", "maxDep
 /** Dagar innan en efterlysning somnar av sig själv. Förnyas med ett klick ur påminnelsen. */
 export const EXPIRY_DAYS = 90;
 
+/**
+ * Går den här personen att nå?
+ *
+ * KRAVET ÄR INTE ETT KONTO — det är en väg att höra av sig. En bevakning åt någon vi inte kan nå är
+ * ett löfte vi inte kan hålla, och det motivet uppfylls lika bra av en e-postadress som av ett
+ * konto. Fångaren på /kop tar just en adress och inget mer.
+ *
+ * Läses av sveparen, pulsen, väggen, panelen och tömningarna — alla ställen som förut frågade efter
+ * `userId` och därmed hade tigit ihjäl varje e-postefterlysning.
+ */
+export function nabar(e: Pick<Efterlysning, "userId" | "email">): boolean {
+  return !!e.userId || !!e.email?.trim();
+}
+
 /** Bara `exact` får väcka en notis. Nära-träffar samlas till veckans digest. */
 export function notifiable(kind: MatchKind): boolean {
   return kind === "exact";

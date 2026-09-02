@@ -1,44 +1,47 @@
-import EfterlysningChat from "../components/EfterlysningChat";
-import TryggAffarBlock from "../components/TryggAffarBlock";
-import ProofStrip from "../components/ProofStrip";
-import { ProductStrip } from "../../butik/components/ProductGrid";
-import { Link, SellCta } from "../../butik/components/Bits";
+import { lazy, Suspense } from "react";
+import Hero from "../components/Hero";
+import Saljpunkter from "../components/Saljpunkter";
+import Utbudsrad from "../components/Utbudsrad";
+import Prisarlighet from "../components/Prisarlighet";
+import Efterlysningsfangare from "../components/Efterlysningsfangare";
+import StickyCta from "../components/StickyCta";
+import { SellCta } from "../../butik/components/Bits";
 
 /**
- * Köpsidan. Hierarkin ÄR produkten.
+ * Köpsidan. Ett jobb: på under tio sekunder få någon att förstå att en möbel de hittat någon
+ * annanstans kan köpas riskfritt och köras hem.
  *
- * En köpare har exakt två tillstånd, och sidan svarar på båda i den ordning de är värda för oss:
+ * ORDNINGEN ÄR ETT ARGUMENT som byggs upp i tur och ordning:
  *
- *   1. LETAR FORTFARANDE  → efterlysningen. Överst, som sidans hela ärende. Det är den vi vill lära
- *      folk att göra: den fungerar oberoende av hur stort vårt lager är, och varje sparad
- *      efterlysning är ett påstående om efterfrågan vi kan agera på.
- *   2. HAR REDAN HITTAT   → Trygg affär. Direkt under, visuellt lika stark och med fältet inne i
- *      blocket. Den vägen konverterar bäst tidigt — köparen har redan bestämt sig om möbeln och
- *      behöver bara oss — och den behandlas därför som en förstklassig ingång, inte en textlänk.
+ *   hero          vad du kan göra, och fältet att göra det i — sidans LCP
+ *   animationen   hur det går till, VISAT och inte beskrivet
+ *   säljpunkter   vad du slipper
+ *   utbudet       att vi har egna möbler också (döljs om de är för få)
+ *   priset        vad det kostar, plus sidans enda brödtext
+ *   fångaren      för den som inte hittat något än
+ *   sälj-CTA      andra sidan av loopen
  *
- * Sedan bevis, sedan lagret, sedan sälj-CTA:n. Bevisremsan ritar ingenting utan riktig data.
+ * ANIMATIONEN LAZY-LADDAS. Den ligger under vecket, och heron ska målas utan att vänta på en enda
+ * byte av något annat.
  */
+const SaFunkarDet = lazy(() => import("../animation/SaFunkarDet"));
+
 export default function BuyLanding() {
   return (
     <>
-      <EfterlysningChat />
+      <Hero />
 
-      <TryggAffarBlock />
+      <Suspense fallback={<div className="funkar-plats" aria-hidden="true" />}>
+        <SaFunkarDet />
+      </Suspense>
 
-      <ProofStrip />
-
-      <section className="butik-section">
-        <div className="butik-section-head">
-          <h2>Nyinkommet hos oss</h2>
-          <Link to={{ name: "search", q: "" }}>Visa allt →</Link>
-        </div>
-        <p className="kop-feed-lede">
-          Granskade möbler som står hos oss just nu — filmade, genomgångna och prissatta efter skick.
-        </p>
-        <ProductStrip query={{ onlyLoopa: true, sortering: "nyinkommet" }} limit={8} />
-      </section>
-
+      <Saljpunkter />
+      <Utbudsrad />
+      <Prisarlighet />
+      <Efterlysningsfangare />
       <SellCta />
+
+      <StickyCta />
     </>
   );
 }

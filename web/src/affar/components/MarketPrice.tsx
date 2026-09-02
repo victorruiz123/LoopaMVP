@@ -1,5 +1,6 @@
 import type { GeneratedListing } from "../../types";
 import { marketValue, verdictFor } from "../marketValue";
+import Stegrad from "../../kop/animation/Stegrad";
 
 /**
  * Marknadspriset, ur köparens synvinkel.
@@ -32,7 +33,8 @@ export default function MarketPrice({
   return (
     <div className="affar-page">
       <header className="affar-hero">
-        <span className="affar-geo">Steg 3 av 4</span>
+        {/* Samma fyra ikoner som köpsidans animation. Se kop/animation/Stegrad.tsx. */}
+        <Stegrad nu={3} />
         <h1>Är priset rimligt?</h1>
         <p>Vi jämför det säljaren begär med vad liknande möbler faktiskt säljs för.</p>
       </header>

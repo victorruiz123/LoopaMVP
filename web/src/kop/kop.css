@@ -1,143 +1,290 @@
 /* ==========================================================================
    Köpsidan
    ==========================================================================
-   Samma tokens som butiken. Formen är däremot köpsidans egen: här skriver man
-   en mening och får ett svar, medan butiken är ett rutnät man bläddrar i. */
+   Samma tokens som butiken. Formen är sidans egen: här ska en besökare på under
+   tio sekunder förstå en sak, och det görs med en rubrik, ett fält och fyra
+   bilder som rör sig — inte med text. */
 
-/* ---- specen: kontraktet köparen bekräftar ---- */
+/* ---- hero: sidans LCP ---- */
 
-.kop-spec {
-  margin-top: 22px; padding: 22px; max-width: 720px;
+.hero { padding: 44px 0 30px; }
+.hero-rubrik {
+  margin: 0 0 12px;
+  font-size: clamp(34px, 7vw, 62px); line-height: 1.02;
+  letter-spacing: -0.035em; font-weight: 700; color: var(--ink);
+}
+.hero-rubrik em { font-style: normal; color: var(--accent); }
+.hero-sub {
+  margin: 0 0 28px; font-size: clamp(17px, 2.2vw, 21px);
+  color: var(--muted); line-height: 1.5; max-width: 40ch;
+}
+
+.hero-form { max-width: 720px; }
+.hero-falt {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 2px solid var(--border);
+  border-radius: 18px; padding: 8px 8px 8px 18px;
+  box-shadow: 0 12px 34px -24px hsl(var(--scrim) / 0.45);
+  transition: border-color 120ms ease;
+}
+.hero-falt:focus-within { border-color: var(--accent); }
+.hero-falt-fel { border-color: var(--danger); }
+.hero-falt input {
+  flex: 1; min-width: 0; height: 56px; padding: 0; border: none; background: transparent;
+  font: inherit; font-size: clamp(16px, 1.9vw, 18px); color: var(--ink);
+}
+.hero-falt input:focus { outline: none; }
+.hero-falt input::placeholder { color: var(--muted-soft); }
+.hero-go {
+  flex: none; height: 56px; padding: 0 26px; border: none; border-radius: 12px; cursor: pointer;
+  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
+  white-space: nowrap;
+}
+.hero-go:hover { background: var(--accent-dark); }
+
+/* Felet hjälper. Ton, inte färgstyrka: en röd ram räcker som signal. */
+.hero-fel { margin: 10px 2px 0; font-size: var(--fs-md); color: var(--danger-dark); line-height: 1.5; max-width: 58ch; }
+.hero-hjalp { margin: 12px 2px 0; font-size: var(--fs-md); color: var(--muted); }
+.hero-lank-knapp {
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; color: var(--accent-ink); text-decoration: underline;
+}
+
+/* Källorna som ren igenkänning — text, inte deras varumärkesfiler. */
+.hero-kallor {
+  list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px;
+  margin: 22px 0 0; padding: 0;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--muted-soft);
+  letter-spacing: 0.01em;
+}
+.hero-kallor li { display: flex; align-items: center; gap: 8px; }
+.hero-kallor li::before {
+  content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--muted-soft); opacity: 0.55;
+}
+.hero-kallor li:first-child::before { display: none; }
+
+/* ---- animationen ---- */
+
+/* Reserverar höjden innan komponenten laddats, så sidan inte hoppar. */
+.funkar-plats { min-height: 320px; }
+
+.funkar { margin: 12px 0 44px; }
+.funkar-scen {
+  display: grid; gap: 14px; justify-items: center;
+  padding: 26px 20px 20px;
+  /* Smalare än sidan: illustrationen ska dominera rutan, inte simma i den. */
+  max-width: 720px; margin: 0 auto;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
 }
-.kop-spec-compact {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 18px;
-}
-.kop-spec-head h3 { margin: 0 0 4px; font-size: var(--fs-md); color: var(--muted-soft); font-weight: 700; }
-.kop-spec-line { margin: 0; font-size: var(--fs-lg); font-weight: 600; color: var(--ink); }
-.kop-spec-grid {
-  display: grid; gap: 12px; margin: 18px 0 0;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-}
-.kop-spec-grid label { display: grid; gap: 4px; }
-.kop-spec-grid span {
-  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em;
-  text-transform: uppercase; color: var(--muted-soft);
-}
-.kop-spec-grid input, .kop-spec-grid select {
-  height: 42px; padding: 0 10px; font: inherit; color: var(--ink);
-  border: 1px solid var(--border); border-radius: var(--r); background: var(--field);
-}
-.kop-spec-grid input:focus, .kop-spec-grid select:focus { outline: none; border-color: var(--accent); background: var(--surface); }
-.kop-spec-note { margin: 16px 0 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
-.kop-spec-actions { display: flex; gap: 10px; align-items: center; margin-top: 18px; flex-wrap: wrap; }
-.kop-spec-go {
-  padding: 12px 22px; border: none; border-radius: 12px; cursor: pointer;
-  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700;
-}
-.kop-spec-go:disabled { opacity: 0.6; cursor: progress; }
-.kop-spec-edit {
-  padding: 0; border: none; background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-md); color: var(--muted); text-decoration: underline;
-}
+.funkar-bild { width: 100%; max-width: 560px; color: var(--ink); }
+.scen-svg { width: 100%; height: auto; display: block; }
+.scen-text { font-size: 13px; font-weight: 700; fill: currentColor; }
+.scen-text-stor { font-size: 22px; }
 
-/* ---- träffarna ---- */
-
-.kop-traffar { margin-top: 30px; }
-.kop-traffar-head h2 { margin: 0 0 4px; font-size: clamp(20px, 2.8vw, 28px); letter-spacing: -0.02em; }
-.kop-traffar-lasta { margin: 0 0 18px; font-size: var(--fs-sm); color: var(--muted-soft); }
-.kop-notis, .kop-tomt {
-  margin: 0 0 16px; padding: 14px 16px; border-radius: var(--r-lg);
-  background: var(--field); color: var(--muted); font-size: var(--fs-md); line-height: 1.5;
+.funkar-text {
+  margin: 0; text-align: center;
+  font-size: clamp(18px, 2.4vw, 24px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink);
+  animation: funkar-in 420ms ease both;
 }
-.kop-traff-lista {
+@keyframes funkar-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.funkar-steg { list-style: none; display: flex; justify-content: center; gap: 10px; margin: 16px 0 0; padding: 0; }
+.funkar-steg button {
+  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--surface); border: 1px solid var(--border); color: var(--muted-soft);
+}
+.funkar-steg button:hover { color: var(--ink); }
+.funkar-steg .funkar-steg-nu { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+
+.funkar-kontroll {
+  display: flex; align-items: center; gap: 12px; justify-content: center;
+  margin-top: 14px; font-size: var(--fs-sm); color: var(--muted-soft);
+}
+.funkar-kontroll button {
+  padding: 5px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: var(--fs-sm);
+  background: transparent; border: 1px solid var(--border); color: var(--muted);
+}
+.funkar-linje { flex: 0 1 160px; height: 3px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.funkar-linje span {
+  display: block; height: 100%; width: 100%; background: var(--accent);
+  transform-origin: left; animation: funkar-fram linear both;
+}
+@keyframes funkar-fram { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Scenernas egna rörelser. Startas om av React-nyckeln på .funkar-bild. */
+.scen1-annons { animation: scen-tona 600ms ease both; }
+.scen1-finger { animation: scen1-tryck 1400ms 500ms ease-in-out both; }
+@keyframes scen1-tryck {
+  0% { transform: translate(20px, 26px); opacity: 0; }
+  40% { transform: none; opacity: 1; }
+  60% { transform: translateY(5px); }
+  100% { transform: none; opacity: 1; }
+}
+.scen2-skanner { animation: scen2-svep 2400ms 200ms ease-in-out both; }
+@keyframes scen2-svep { from { transform: translateX(30px); } to { transform: translateX(300px); } }
+.scen2-nal { opacity: 0; animation: scen-pop 400ms ease both; }
+.scen2-nal-1 { animation-delay: 900ms; }
+.scen2-nal-2 { animation-delay: 1500ms; }
+.scen2-stampel { opacity: 0; animation: scen2-stampla 500ms 2500ms ease both; }
+@keyframes scen2-stampla {
+  from { opacity: 0; transform: scale(1.3) rotate(-6deg); }
+  to { opacity: 1; transform: none; }
+}
+.scen3-pengar { animation: scen3-flyg 1200ms 200ms ease-in-out both; }
+@keyframes scen3-flyg {
+  0% { transform: translateX(-40px); opacity: 0; }
+  55% { transform: translateX(78px); opacity: 1; }
+  100% { transform: translateX(96px) scale(0.6); opacity: 0; }
+}
+.scen3-bock { opacity: 0; animation: scen-pop 400ms 1200ms ease both; }
+.scen4-bil { animation: scen4-kor 1600ms ease-out both; }
+@keyframes scen4-kor { from { transform: translateX(-140px); } to { transform: none; } }
+.scen4-mobel { opacity: 0; animation: scen-pop 500ms 1200ms ease both; }
+@keyframes scen-pop { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
+@keyframes scen-tona { from { opacity: 0; } to { opacity: 1; } }
+
+/* Stilla läget: fyra paneler bredvid varandra, ingen rörelse alls. */
+.funkar-paneler {
   list-style: none; margin: 0; padding: 0;
-  display: grid; gap: 16px; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
 }
-.kop-traff { display: grid; gap: 6px; align-content: start; }
-.kop-traff-kalla {
+.funkar-panel {
+  padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.funkar-panel p { margin: 10px 0 0; font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
+.funkar-nr { color: var(--accent); font-weight: 700; }
+.funkar-stilla .scen-svg,
+.funkar-stilla [class^="scen"] { animation: none !important; opacity: 1 !important; transform: none !important; }
+
+/* ---- tre säljpunkter ---- */
+
+.punkter {
+  display: grid; gap: 14px; margin-bottom: 44px;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+}
+.punkt { padding: 20px 22px; background: var(--field); border-radius: var(--r-lg); }
+.punkt h2 { margin: 0 0 4px; font-size: var(--fs-lg); letter-spacing: -0.015em; }
+.punkt p { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
+
+/* ---- utbudsraden ---- */
+
+.utbud { margin-bottom: 44px; }
+.utbud-huvud { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
+.utbud-huvud h2 { margin: 0; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
+.utbud-rad {
+  list-style: none; margin: 0; padding: 0 2px 6px; display: flex; gap: 12px;
+  overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin;
+}
+.utbud-rad > li { flex: 0 0 180px; scroll-snap-align: start; }
+.utbud-kort { display: grid; gap: 6px; text-decoration: none; color: inherit; }
+.utbud-bild {
+  display: block; aspect-ratio: 4 / 3; border-radius: var(--r-lg); overflow: hidden;
+  background: var(--field);
+}
+.utbud-bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.utbud-tom { display: block; width: 100%; height: 100%; }
+.utbud-titel { font-size: var(--fs-md); font-weight: 600; line-height: 1.3; }
+.utbud-rad-under { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.utbud-pris { font-weight: 700; }
+.utbud-skick { font-size: var(--fs-2xs); color: var(--muted-soft); }
+
+/* ---- prisärlighet och FAQ ---- */
+
+.pris { margin-bottom: 44px; }
+.pris-rad {
+  margin: 0 0 10px; padding: 16px 20px; border-radius: var(--r-lg);
+  background: var(--accent-light); color: var(--accent-ink);
+  font-size: var(--fs-lg); line-height: 1.5;
+}
+.pris-detalj { margin-bottom: 26px; }
+.pris-detalj summary { cursor: pointer; font-size: var(--fs-md); color: var(--muted); }
+.pris-detalj-kropp { padding: 14px 2px 0; max-width: 62ch; }
+.pris-detalj-kropp p { margin: 0 0 12px; font-size: var(--fs-md); color: var(--muted); line-height: 1.55; }
+.pris-lista { margin: 0 0 12px; display: grid; gap: 12px; }
+.pris-lista dt {
   font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--muted-soft); margin-bottom: 3px;
 }
-.kop-traff-kalla-live { color: var(--green-dark); }
-.kop-traff-kalla-incoming { color: var(--accent-ink); }
-.kop-traff-kalla-extern { color: var(--muted-soft); }
-.kop-traff-passform { margin: 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.45; }
-.kop-traff-exakt { color: var(--green-dark); font-weight: 600; }
-.kop-prognos {
-  margin: 20px 0 0; padding: 14px 18px; border-radius: var(--r-lg);
-  background: var(--accent-light); color: var(--accent-ink); font-size: var(--fs-md);
-}
+.pris-lista dd { margin: 0; font-size: var(--fs-md); color: var(--ink); line-height: 1.5; }
+.pris-fot { color: var(--muted-soft) !important; }
 
-/* ---- sparandet: konverteringsögonblicket ---- */
-
-.kop-save {
-  margin-top: 26px; padding: 22px; border-radius: var(--r-lg);
-  background: var(--ink); color: var(--on-dark-strong);
+.faq h2 { margin: 0 0 12px; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
+.faq ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.faq li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
+.faq button {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 16px 20px; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-lg); font-weight: 600; color: var(--ink); text-align: left;
 }
-.kop-save-text h3 { margin: 0 0 6px; font-size: var(--fs-lg); color: #fff; }
-.kop-save-text p { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.5; }
-.kop-save-row { display: flex; gap: 8px; flex-wrap: wrap; }
-.kop-save-area {
-  flex: 1; min-width: 180px; height: 46px; padding: 0 14px; font: inherit;
+.faq button span { color: var(--muted-soft); font-size: 20px; flex: none; }
+.faq li p { margin: 0; padding: 0 20px 18px; font-size: var(--fs-md); color: var(--muted); line-height: 1.6; max-width: 68ch; }
+
+/* ---- efterlysningsfångaren ---- */
+
+.fangare {
+  margin-bottom: 44px; padding: 26px;
+  background: var(--ink); color: var(--on-dark-strong); border-radius: var(--r-lg);
+}
+.fangare h2 { margin: 0 0 6px; font-size: clamp(19px, 2.5vw, 25px); color: #fff; letter-spacing: -0.02em; }
+.fangare > p { margin: 0 0 18px; font-size: var(--fs-md); line-height: 1.5; }
+.fangare-kompakt { margin-top: 16px; padding: 20px; }
+.fangare-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
+.fangare-form label { display: grid; gap: 5px; flex: 1 1 130px; }
+.fangare-epost { flex: 2 1 220px; }
+.fangare-form span {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--on-dark);
+}
+.fangare-form select, .fangare-form input {
+  height: 46px; padding: 0 12px; font: inherit; font-size: var(--fs-field);
   border-radius: var(--r); border: 1px solid rgba(255,255,255,0.18);
   background: rgba(255,255,255,0.08); color: #fff;
 }
-.kop-save-area::placeholder { color: var(--on-dark-faint); }
-.kop-save-area:focus { outline: none; border-color: var(--accent); }
-.kop-save-go {
-  flex: none; height: 46px; padding: 0 22px; border: none; border-radius: var(--r);
-  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
+.fangare-form select { appearance: none; }
+.fangare-form option { color: var(--ink); }
+.fangare-form input::placeholder { color: var(--on-dark-faint); }
+.fangare-form select:focus, .fangare-form input:focus { outline: none; border-color: var(--accent); }
+.fangare-form button {
+  flex: none; height: 46px; padding: 0 22px; border: none; border-radius: var(--r); cursor: pointer;
+  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
 }
-.kop-save-hint { margin: 10px 0 0; font-size: var(--fs-sm); color: var(--on-dark); }
-.kop-saved {
-  margin-top: 26px; padding: 16px 20px; border-radius: var(--r-lg);
-  background: var(--green-light); color: var(--green-dark); font-size: var(--fs-md);
-}
+.fangare-fel { margin: 12px 0 0; font-size: var(--fs-md); color: #ffb4a2; }
+.fangare-fot { margin: 12px 0 0; font-size: var(--fs-sm); color: var(--on-dark); }
 
-/* ---- Trygg affär-blocket: förstklassig ingång, inte en länk ---- */
+/* ---- sticky mini-CTA, bara på telefon ---- */
 
-.kop-trygg {
-  margin-top: 34px; padding: 26px;
-  border-radius: var(--r-lg); background: var(--surface);
-  border: 2px solid var(--ink);
+.sticky-cta { display: none; }
+@media (max-width: 720px) {
+  .sticky-cta {
+    display: block; position: fixed; z-index: 40;
+    left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom));
+    height: 52px; border: none; border-radius: 999px; cursor: pointer;
+    background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
+    box-shadow: 0 12px 30px -12px hsl(var(--scrim) / 0.55);
+    animation: sticky-in 240ms ease both;
+  }
 }
-.kop-trygg-text h2 { margin: 0 0 6px; font-size: clamp(20px, 2.6vw, 26px); letter-spacing: -0.02em; }
-.kop-trygg-lead { margin: 0 0 4px; font-size: var(--fs-lg); color: var(--ink); line-height: 1.45; }
-.kop-trygg-sub { margin: 0 0 18px; font-size: var(--fs-md); color: var(--muted-soft); }
-.kop-trygg-field {
-  display: flex; align-items: center; gap: 8px;
-  border: 1px solid var(--border); border-radius: 14px; padding: 6px 6px 6px 14px; background: var(--field);
-}
-.kop-trygg-field:focus-within { border-color: var(--accent); background: var(--surface); }
-.kop-trygg-icon { opacity: 0.5; flex: none; }
-.kop-trygg-field input {
-  flex: 1; min-width: 0; height: 46px; padding: 0; border: none; background: transparent;
-  font: inherit; font-size: var(--fs-field); color: var(--ink);
-}
-.kop-trygg-field input:focus { outline: none; }
-.kop-trygg-field button {
-  flex: none; height: 46px; padding: 0 20px; border: none; border-radius: 10px; cursor: pointer;
-  background: var(--ink); color: var(--bg); font-size: var(--fs-md); font-weight: 700; white-space: nowrap;
-}
-.kop-trygg-hint { margin: 10px 2px 0; font-size: var(--fs-sm); color: var(--muted); line-height: 1.5; }
+@keyframes sticky-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
 
-/* ---- bevisremsan ---- */
+/* ---- stegraden i Trygg affär ---- */
 
-.kop-bevis { margin-top: 30px; }
-.kop-bevis-lista {
-  list-style: none; margin: 0; padding: 0;
-  display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none;
+.stegrad {
+  list-style: none; margin: 0 0 14px; padding: 0;
+  display: flex; gap: 6px; flex-wrap: wrap; align-items: center;
 }
-.kop-bevis-lista::-webkit-scrollbar { display: none; }
-.kop-bevis-post {
-  flex: none; padding: 12px 16px; border-radius: 999px;
-  background: var(--field); font-size: var(--fs-sm); white-space: nowrap;
+.stegrad-steg { display: flex; align-items: center; gap: 7px; }
+.stegrad-steg:not(:last-child)::after {
+  content: ""; width: 14px; height: 1px; background: var(--border); margin-left: 3px;
 }
-.kop-bevis-uppfylld { background: var(--green-light); }
-.kop-bevis-vad { font-weight: 600; color: var(--ink); }
-.kop-bevis-nar { color: var(--muted); margin-left: 8px; }
-
-.kop-feed-lede { margin: -6px 0 14px; font-size: var(--fs-md); color: var(--muted); max-width: 56ch; }
+.stegrad-ikon {
+  width: 32px; height: 32px; border-radius: 999px; display: grid; place-items: center; flex: none;
+  border: 1px solid var(--border); background: var(--surface); color: var(--muted-soft);
+}
+.stegrad-text { display: none; font-size: var(--fs-sm); font-weight: 600; }
+.stegrad-nu .stegrad-ikon { background: var(--ink); border-color: var(--ink); color: var(--bg); }
+.stegrad-nu .stegrad-text { display: inline; color: var(--ink); }
+.stegrad-klar .stegrad-ikon { color: var(--green-dark); border-color: var(--green-light); background: var(--green-light); }
 
 /* ---- mina efterlysningar ---- */
 
@@ -164,15 +311,28 @@
 }
 .kop-mina-bort { color: var(--danger) !important; }
 .kop-mina-tom { padding: 30px; text-align: center; background: var(--field); border-radius: var(--r-lg); }
-
-@media (max-width: 640px) {
-  .kop-hero { padding: 24px 0 18px; }
-  .kop-ask-go { width: 100%; height: 48px; }
-  .kop-trygg { padding: 20px; }
-  .kop-trygg-field { flex-wrap: wrap; }
-  .kop-trygg-field button { width: 100%; }
-  .kop-mina-rad { flex-direction: column; }
+.kop-spec-go {
+  padding: 12px 22px; border: none; border-radius: 12px; cursor: pointer;
+  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700;
 }
+
+/* ---- inkorgen ---- */
+
+.inkorg { margin-bottom: 26px; }
+.inkorg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.inkorg-head h2 { margin: 0 0 10px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.inkorg-alla {
+  padding: 0; border: none; background: none; cursor: pointer;
+  font: inherit; font-size: var(--fs-sm); color: var(--muted); text-decoration: underline;
+}
+.inkorg-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.inkorg-post a {
+  display: flex; gap: 12px; align-items: baseline; justify-content: space-between;
+  padding: 12px 16px; border-radius: var(--r-lg); background: var(--field);
+  color: var(--muted); text-decoration: none; font-size: var(--fs-md);
+}
+.inkorg-olast a { background: var(--accent-light); color: var(--accent-ink); font-weight: 600; }
+.inkorg-tid { flex: none; font-size: var(--fs-2xs); opacity: 0.7; }
 
 /* ---- efterlysningsväggen ---- */
 
@@ -191,7 +351,6 @@
   flex: none; padding: 11px 18px; border-radius: var(--r);
   background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; text-decoration: none;
 }
-.vagg-post-cta:hover { background: var(--accent-dark); }
 .vagg-tom { padding: 24px; background: var(--field); border-radius: var(--r-lg); color: var(--muted); }
 .vagg-kategorier {
   display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
@@ -200,176 +359,15 @@
 }
 .vagg-kategorier a { color: var(--muted); }
 
-/* ---- inkorgen ---- */
-
-.inkorg { margin-bottom: 26px; }
-.inkorg-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.inkorg-head h2 { margin: 0 0 10px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
-.inkorg-alla {
-  padding: 0; border: none; background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-sm); color: var(--muted); text-decoration: underline;
-}
-.inkorg-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
-.inkorg-post a {
-  display: flex; gap: 12px; align-items: baseline; justify-content: space-between;
-  padding: 12px 16px; border-radius: var(--r-lg); background: var(--field);
-  color: var(--muted); text-decoration: none; font-size: var(--fs-md);
-}
-/* Oläst bär accenten. En läst notis ska synas men inte ropa. */
-.inkorg-olast a { background: var(--accent-light); color: var(--accent-ink); font-weight: 600; }
-.inkorg-tid { flex: none; font-size: var(--fs-2xs); opacity: 0.7; }
-/* ---- chatten: efterlysningen som ett samtal ------------------------------
-   Formen är en vanlig chatt — tråd som läses nedifrån, komponerare längst ned,
-   skrivindikator medan modellen tänker. Logiken under är ändå bunden: högst tre
-   följdfrågor och sedan ett kort man bekräftar. Se EfterlysningChat.tsx. */
-
-.chat {
-  display: flex; flex-direction: column;
-  max-width: 780px; margin: 0 auto; padding: 22px 0 0;
-  /*
-   * INTE full skärmhöjd.
-   *
-   * En chatt som fyller vyn trycker ned "Redan hittat något?" under vecket, och det blocket är
-   * köparens andra tillstånd — den vanligaste anledningen att komma hit tidigt. Rutan är därför
-   * precis så hög att samtalet har plats att börja, och växer sedan med tråden.
-   */
-  min-height: 340px;
-}
-
-/*
- * TRÅDEN RULLAR I SIG SJÄLV, inte med sidan.
- *
- * Komponeraren var först klistrad mot sidans scroll, och la sig då över sista bubblan — sticky
- * deltar i layouten men flyter över allt som rullar förbi under den. En chattpanel med egen
- * rullning löser det strukturellt: komponeraren ligger UNDER tråden och kan aldrig täcka den.
- *
- * Och det är dessutom rätt form. Sidan fortsätter under chatten med Trygg affär-blocket och lagret;
- * en tråd som växer utan gräns hade tryckt ned dem längre för varje replik.
- */
-.chat-trad {
-  flex: 1; display: flex; flex-direction: column; gap: 20px;
-  max-height: min(58dvh, 620px);
-  overflow-y: auto;
-  /* Sista bubblan ska inte klibba i underkanten. */
-  padding: 2px 2px 14px;
-  scrollbar-width: thin;
-}
-
-.chat-rad { display: flex; gap: 12px; align-items: flex-start; }
-.chat-rad-user { justify-content: flex-end; }
-.chat-innehall { display: grid; gap: 10px; min-width: 0; flex: 1; }
-
-/* Ordmärket som avatar. Loopa svarar, inte "en assistent". */
-.chat-avatar {
-  flex: none; width: 34px; height: 34px; border-radius: 999px;
-  display: grid; place-items: center; overflow: hidden;
-  background: var(--ink); color: var(--bg);
-  font-size: 9px; font-weight: 700; letter-spacing: -0.02em;
-}
-.chat-avatar i { color: var(--accent); font-style: normal; }
-
-.chat-bubbla {
-  max-width: 100%; padding: 13px 17px; border-radius: 18px;
-  background: var(--surface); border: 1px solid var(--border);
-  font-size: var(--fs-lg); line-height: 1.55; color: var(--ink);
-  white-space: pre-wrap; overflow-wrap: anywhere;
-}
-/* Användarens bubbla: fylld, högerställd, utan ram. Samma mönster som varje chattklient. */
-.chat-bubbla-user {
-  max-width: min(80%, 560px);
-  background: var(--ink); color: var(--bg); border-color: transparent;
-  border-bottom-right-radius: 6px;
-}
-.chat-rad-ai .chat-bubbla:first-child { border-bottom-left-radius: 6px; }
-
-/* Skrivindikatorn: tre prickar som andas. */
-.chat-skriver { display: inline-flex; gap: 5px; align-items: center; padding: 17px; }
-.chat-skriver span {
-  width: 7px; height: 7px; border-radius: 999px; background: var(--muted-soft);
-  animation: chat-puls 1.3s ease-in-out infinite;
-}
-.chat-skriver span:nth-child(2) { animation-delay: 0.18s; }
-.chat-skriver span:nth-child(3) { animation-delay: 0.36s; }
-@keyframes chat-puls {
-  0%, 60%, 100% { opacity: 0.28; transform: translateY(0); }
-  30% { opacity: 1; transform: translateY(-3px); }
-}
-@media (prefers-reduced-motion: reduce) {
-  .chat-skriver span { animation: none; opacity: 0.5; }
-}
-
-/* Snabbsvar under en fråga. Försvinner när frågan är besvarad. */
-.chat-snabbsvar { display: flex; flex-wrap: wrap; gap: 8px; }
-.chat-snabbsvar button {
-  padding: 9px 15px; border-radius: 999px; cursor: pointer; font: inherit;
-  font-size: var(--fs-md); color: var(--ink);
-  background: var(--surface); border: 1px solid var(--border);
-}
-.chat-snabbsvar button:hover { border-color: var(--accent); color: var(--accent-ink); }
-.chat-hoppa { color: var(--muted-soft) !important; }
-.chat-kvar { margin: -2px 0 0; font-size: var(--fs-sm); color: var(--muted-soft); }
-
-/* Spara-bubblan: samtalets enda utgående steg. */
-.chat-spara {
-  padding: 18px 20px; border-radius: 18px; border-bottom-left-radius: 6px;
-  background: var(--ink); color: var(--on-dark-strong);
-}
-.chat-spara p { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.55; }
-.chat-spara-rad { display: flex; gap: 8px; flex-wrap: wrap; }
-.chat-spara-rad input {
-  flex: 1; min-width: 170px; height: 44px; padding: 0 14px; font: inherit;
-  border-radius: var(--r); border: 1px solid rgba(255,255,255,0.18);
-  background: rgba(255,255,255,0.08); color: #fff;
-}
-.chat-spara-rad input::placeholder { color: var(--on-dark-faint); }
-.chat-spara-rad input:focus { outline: none; border-color: var(--accent); }
-.chat-spara-rad button {
-  flex: none; height: 44px; padding: 0 20px; border: none; border-radius: var(--r); cursor: pointer;
-  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
-}
-.chat-spara-hint { margin: 10px 0 0 !important; font-size: var(--fs-sm); color: var(--on-dark); }
-
-/* Startförslagen. Bara innan samtalet börjat. */
-.chat-forslag { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.chat-forslag button {
-  padding: 10px 15px; border-radius: 999px; cursor: pointer; font: inherit;
-  font-size: var(--fs-md); color: var(--muted);
-  background: var(--surface); border: 1px solid var(--border);
-}
-.chat-forslag button:hover { border-color: var(--accent); color: var(--accent-ink); }
-
-/* Komponeraren. Under tråden, alltid synlig, kan aldrig täcka en bubbla. */
-.chat-komponerare {
-  display: flex; gap: 8px; align-items: flex-end;
-  padding: 10px; margin-bottom: 4px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
-  box-shadow: 0 12px 34px -24px hsl(var(--scrim) / 0.5);
-}
-.chat-komponerare:focus-within { border-color: var(--accent); }
-.chat-komponerare textarea {
-  flex: 1; min-width: 0; resize: none; border: none; background: transparent;
-  padding: 10px 8px; font: inherit; font-size: var(--fs-lg); line-height: 1.5; color: var(--ink);
-  max-height: 132px; overflow-y: auto;
-}
-.chat-komponerare textarea:focus { outline: none; }
-.chat-komponerare textarea::placeholder { color: var(--muted-soft); }
-.chat-komponerare button {
-  flex: none; width: 40px; height: 40px; border: none; border-radius: 999px; cursor: pointer;
-  display: grid; place-items: center;
-  background: var(--accent); color: #fff;
-}
-.chat-komponerare button:disabled { background: var(--surface-sunk); color: var(--muted-soft); cursor: default; }
-.chat-komponerare button:not(:disabled):hover { background: var(--accent-dark); }
-
-.chat-fot { margin: 10px 0 26px; text-align: center; font-size: var(--fs-sm); color: var(--muted-soft); }
-
-/* Korten inuti tråden ska se ut som bubblor, inte som paneler bredvid samtalet. */
-.chat-innehall .kop-spec,
-.chat-innehall .kop-traffar { margin-top: 0; }
-.chat-innehall .kop-spec { border-bottom-left-radius: 6px; }
-
 @media (max-width: 640px) {
-  .chat { min-height: calc(100dvh - 120px); padding-top: 14px; }
-  .chat-bubbla { font-size: var(--fs-md); padding: 12px 15px; }
-  .chat-avatar { width: 28px; height: 28px; font-size: 8px; }
+  .hero { padding: 26px 0 22px; }
+  .hero-falt { flex-wrap: wrap; padding: 10px; }
+  .hero-falt input { flex-basis: 100%; height: 48px; padding: 0 6px; }
+  .hero-go { width: 100%; }
+  .funkar-scen { padding: 18px 14px 14px; }
+  .fangare { padding: 20px; }
+  .fangare-form label, .fangare-form button { flex-basis: 100%; }
+  .kop-mina-rad { flex-direction: column; }
+  /* Plats för den klistrade knappen. */
+  .butik-main { padding-bottom: 84px; }
 }

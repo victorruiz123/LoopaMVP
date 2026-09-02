@@ -26,6 +26,7 @@ import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 import { categoryLabel, categoryNoun } from "../butik/catalog.js";
 import * as store from "./store.js";
+import { nabar } from "./types.js";
 import { deepLink, lastOf, push, sendLetter } from "./notify.js";
 import { emit } from "./analytics.js";
 
@@ -147,7 +148,7 @@ export interface ClearanceNotice {
  */
 export async function notifyForClearance(c: Clearance, now = Date.now()): Promise<ClearanceNotice[]> {
   if (c.settled) return [];
-  const open = (await store.open()).filter((e) => e.userId);
+  const open = (await store.open()).filter(nabar);
   const sent: ClearanceNotice[] = [];
 
   for (const e of open) {
@@ -180,10 +181,12 @@ export async function notifyForClearance(c: Clearance, now = Date.now()): Promis
       `Din efterlysning: ${deepLink(e)}`,
     ].join("\n");
 
-    await push({
-      userId: e.userId!, efterlysningId: e.id, kind: "match",
-      title, body, href: deepLink(e), productIds: [], source: "loopa_incoming",
-    });
+    if (e.userId) {
+      await push({
+        userId: e.userId, efterlysningId: e.id, kind: "match",
+        title, body, href: deepLink(e), productIds: [], source: "loopa_incoming",
+      });
+    }
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "tomning" });
     // Räknas in i pulsens siffror: en genomgången tömning ÄR arbete gjort åt köparen.
     emit("clearance_notice_sent", { efterlysning: e.id, tomning: c.id, kategori: hit.categorySlug });

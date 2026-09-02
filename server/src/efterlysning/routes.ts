@@ -113,6 +113,46 @@ export async function handleEfterlysningPublic(
   }
 
   /**
+   * POST /api/efterlysning/enkel — fångaren på köpsidan.
+   *
+   * TRE FÄLT OCH INGEN MODELL. Kategori, maxpris, e-post. Ingen tolkning, inget LLM-anrop, ingen
+   * följdfråga — sidan finns för att fånga en avsikt hos någon som är på väg någon annanstans, och
+   * varje sekund den kostar är en avsikt som hinner rinna bort.
+   *
+   * PUBLIK OCH UTAN KONTO. E-postadressen ÄR vägen att nå personen, och det var alltid vad kravet
+   * handlade om (se `nabar` i types.ts). Att kräva ett konto för ett enrads-formulär hade flyttat
+   * konverteringen till fel ställe.
+   */
+  if (segments[0] === "enkel" && req.method === "POST") {
+    const body = await readBody<{ kategori?: string; maxpris?: number; epost?: string }>(req);
+    const epost = (body.epost ?? "").trim().toLowerCase();
+    // Snäll validering: felet ska hjälpa, inte skälla. Ett saknat @ är det enda vi kan veta säkert.
+    if (!epost || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(epost)) {
+      return json(res, 400, { error: "Skriv en e-postadress vi kan nå dig på." }), true;
+    }
+    const { CATEGORIES } = await import("../butik/catalog.js");
+    const kategori = CATEGORIES.find((c) => c.slug === body.kategori)?.slug ?? null;
+    if (!kategori) return json(res, 400, { error: "Välj vilken sorts möbel du letar efter." }), true;
+    const maxpris = Number(body.maxpris);
+    const row = await store.create({
+      userId: null,
+      email: epost.slice(0, 200),
+      filter: { categorySlug: kategori, maxPriceSek: Number.isFinite(maxpris) && maxpris > 0 ? Math.round(maxpris) : null },
+      styleTags: [], deadline: null, urgency: "none", note: null,
+      summary: summarize({
+        filter: { categorySlug: kategori, maxPriceSek: Number.isFinite(maxpris) && maxpris > 0 ? Math.round(maxpris) : null },
+        styleTags: [], deadline: null, urgency: "none", note: null, summary: "", aiUsed: false,
+      }),
+      // Egen märkning: varken chattad eller ifylld i det stora formuläret. Håller måttet på hur folk
+      // faktiskt skapar efterlysningar ärligt.
+      parseMethod: "form",
+      area: null,
+    });
+    json(res, 201, { efterlysning: { id: row.id, summary: row.summary }, dagar: EXPIRY_DAYS });
+    return true;
+  }
+
+  /**
    * GET /api/efterlysning/vagg — den publika efterlysningsväggen.
    *
    * PUBLIK och riktad till SÄLJARE. Aggregerad och anonym: två personer som söker samma hylla blir

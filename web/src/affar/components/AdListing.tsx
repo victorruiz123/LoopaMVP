@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { ConditionJob, GeneratedListing } from "../../types";
 import { track } from "../../butik/components/Bits";
 import { marketValue } from "../marketValue";
+import Stegrad from "../../kop/animation/Stegrad";
 
 /**
  * Annonssidan — det köparen tar med sig till säljaren.
@@ -49,7 +50,8 @@ export default function AdListing({
   return (
     <div className="affar-page">
       <header className="affar-hero">
-        <span className="affar-geo">Steg 4 av 4</span>
+        {/* Samma fyra ikoner som köpsidans animation. Se kop/animation/Stegrad.tsx. */}
+        <Stegrad nu={4} />
         <h1>{name}</h1>
         {askingPriceSek !== null && <p>Säljaren begär {SEK.format(askingPriceSek)} kr.</p>}
       </header>

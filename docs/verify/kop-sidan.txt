@@ -1,0 +1,24 @@
+h1: Hittat en möbel? Köp den tryggt.
+sub: Vi granskar, betalar säkert och kör hem den.
+fältet syns direkt: true
+källor: Blocket · Facebook Marketplace · Tradera
+säljpunkter: Slipp chansa | Slipp släpet | Slipp bli blåst
+prisraden: +200 kr serviceavgift + frakt från 495 kr (zonpris). Inga överraskningar.
+FAQ-frågor: 3
+utbudsraden: 12 kort
+fångaren: 1
+
+animationen laddad: true
+scentext: Vi granskar den åt dig
+stegikoner: 4
+pauskapp fungerar: true
+
+felmeddelande: Det där ser inte ut som en länk. Kopiera adressen från webbläsarens adressfält — eller ladda upp skärmbilder av annonsen, det går lika bra.
+fel (desktop): inga
+
+--- mobil ---
+sticky innan scroll: 0
+sticky efter scroll: Klistra in en annons ↑
+fel (mobil): inga
+
+händelser: desktop:hero_paste_start

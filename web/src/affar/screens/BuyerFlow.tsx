@@ -9,6 +9,8 @@ import AuthScreen from "../../screens/AuthScreen";
 import { useAuth } from "../../auth/AuthProvider";
 import { navigate } from "../router";
 import { fetchDelivery } from "../../butik/api";
+import Stegrad from "../../kop/animation/Stegrad";
+import Efterlysningsfangare from "../../kop/components/Efterlysningsfangare";
 
 /**
  * Köparens väg genom en inklistrad annons — SAMMA steg som säljaren går.
@@ -143,6 +145,17 @@ export default function BuyerFlow({
             Ladda upp skärmbilder i stället
           </button>
         </section>
+
+        {/*
+          UTVÄGEN, inte en återvändsgränd.
+          Den som just fick veta att vi inte kunde läsa deras annons ska mötas av något att göra. Samma
+          komponent som fotblocket på köpsidan — ett formulär som fungerar utan konto och utan tolkning.
+        */}
+        <Efterlysningsfangare
+          kompakt
+          rubrik="Ska vi hålla utkik i stället?"
+          ingress="Säg vad du letar efter, så hör vi av oss när något som stämmer dyker upp."
+        />
       </div>
     );
   }
@@ -274,7 +287,8 @@ function BrandStep({
   return (
     <div className="affar-page">
       <header className="affar-hero">
-        <span className="affar-geo">Steg 1 av 4</span>
+        {/* Delad stegrad — samma ikoner som köpsidan visar i rörelse. */}
+        <Stegrad nu={1} />
         <h1>Vilket märke är möbeln?</h1>
         <p>Annonsen säger det inte. Står det i texten hjälper det oss hitta rätt modell och pris.</p>
       </header>
