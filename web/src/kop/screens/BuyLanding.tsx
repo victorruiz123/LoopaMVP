@@ -1,4 +1,4 @@
-import EfterlysningInput from "../components/EfterlysningInput";
+import EfterlysningChat from "../components/EfterlysningChat";
 import TryggAffarBlock from "../components/TryggAffarBlock";
 import ProofStrip from "../components/ProofStrip";
 import { ProductStrip } from "../../butik/components/ProductGrid";
@@ -21,7 +21,7 @@ import { Link, SellCta } from "../../butik/components/Bits";
 export default function BuyLanding() {
   return (
     <>
-      <EfterlysningInput />
+      <EfterlysningChat />
 
       <TryggAffarBlock />
 

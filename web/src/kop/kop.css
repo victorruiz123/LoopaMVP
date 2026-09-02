@@ -4,75 +4,6 @@
    Samma tokens som butiken. Formen är däremot köpsidans egen: här skriver man
    en mening och får ett svar, medan butiken är ett rutnät man bläddrar i. */
 
-/* ---- hero: fältet är sidans hela ärende ---- */
-
-.kop-hero { padding: 40px 0 24px; }
-.kop-hero-title {
-  margin: 0 0 12px;
-  font-size: clamp(30px, 5.6vw, 52px); line-height: 1.05;
-  letter-spacing: -0.035em; font-weight: 700; color: var(--ink);
-  max-width: 18ch;
-}
-.kop-hero-title em { font-style: normal; color: var(--accent); }
-.kop-hero-lede {
-  margin: 0 0 26px; font-size: clamp(16px, 2vw, 19px);
-  color: var(--muted); line-height: 1.55; max-width: 52ch;
-}
-
-.kop-ask { display: flex; gap: 10px; align-items: stretch; max-width: 760px; flex-wrap: wrap; }
-.kop-ask-input {
-  flex: 1; min-width: 260px; resize: none;
-  padding: 16px 18px; border-radius: 18px;
-  border: 2px solid var(--border); background: var(--surface);
-  font: inherit; font-size: clamp(15px, 1.8vw, 17px); line-height: 1.45; color: var(--ink);
-  box-shadow: 0 10px 30px -22px hsl(var(--scrim) / 0.45);
-}
-.kop-ask-input:focus { outline: none; border-color: var(--accent); }
-.kop-ask-input::placeholder { color: var(--muted-soft); }
-.kop-ask-go {
-  flex: none; padding: 0 26px; border: none; border-radius: 14px;
-  background: var(--accent); color: #fff; font-size: var(--fs-md); font-weight: 700; cursor: pointer;
-}
-.kop-ask-go:hover:not(:disabled) { background: var(--accent-dark); }
-.kop-ask-go:disabled { opacity: 0.6; cursor: progress; }
-
-.kop-examples { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
-.kop-example, .kop-chip {
-  padding: 7px 13px; border-radius: 999px; cursor: pointer;
-  border: 1px solid var(--border); background: var(--surface);
-  font-size: var(--fs-sm); color: var(--muted); font: inherit;
-}
-.kop-example:hover, .kop-chip:hover { border-color: var(--accent); color: var(--accent-ink); }
-
-.kop-error { margin: 14px 0 0; color: var(--danger); font-size: var(--fs-md); }
-
-/* ---- följdfrågan ---- */
-
-.kop-fraga {
-  margin-top: 22px; padding: 22px; max-width: 620px;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
-}
-.kop-fraga-rakn {
-  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em;
-  text-transform: uppercase; color: var(--muted-soft);
-}
-.kop-fraga h3 { margin: 6px 0 14px; font-size: var(--fs-lg); letter-spacing: -0.01em; }
-.kop-fraga-val { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
-.kop-fraga-eget { display: flex; gap: 8px; }
-.kop-fraga-eget input {
-  flex: 1; min-width: 0; height: 42px; padding: 0 12px;
-  border: 1px solid var(--border); border-radius: var(--r); background: var(--field); font: inherit;
-}
-.kop-fraga-eget input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
-.kop-fraga-eget button {
-  flex: none; padding: 0 16px; border: none; border-radius: var(--r);
-  background: var(--ink); color: var(--bg); font-weight: 600; cursor: pointer;
-}
-.kop-skip {
-  margin-top: 10px; padding: 0; border: none; background: none; cursor: pointer;
-  font: inherit; font-size: var(--fs-sm); color: var(--muted-soft); text-decoration: underline;
-}
-
 /* ---- specen: kontraktet köparen bekräftar ---- */
 
 .kop-spec {
@@ -287,3 +218,158 @@
 /* Oläst bär accenten. En läst notis ska synas men inte ropa. */
 .inkorg-olast a { background: var(--accent-light); color: var(--accent-ink); font-weight: 600; }
 .inkorg-tid { flex: none; font-size: var(--fs-2xs); opacity: 0.7; }
+/* ---- chatten: efterlysningen som ett samtal ------------------------------
+   Formen är en vanlig chatt — tråd som läses nedifrån, komponerare längst ned,
+   skrivindikator medan modellen tänker. Logiken under är ändå bunden: högst tre
+   följdfrågor och sedan ett kort man bekräftar. Se EfterlysningChat.tsx. */
+
+.chat {
+  display: flex; flex-direction: column;
+  max-width: 780px; margin: 0 auto; padding: 22px 0 0;
+  /*
+   * INTE full skärmhöjd.
+   *
+   * En chatt som fyller vyn trycker ned "Redan hittat något?" under vecket, och det blocket är
+   * köparens andra tillstånd — den vanligaste anledningen att komma hit tidigt. Rutan är därför
+   * precis så hög att samtalet har plats att börja, och växer sedan med tråden.
+   */
+  min-height: 340px;
+}
+
+/*
+ * TRÅDEN RULLAR I SIG SJÄLV, inte med sidan.
+ *
+ * Komponeraren var först klistrad mot sidans scroll, och la sig då över sista bubblan — sticky
+ * deltar i layouten men flyter över allt som rullar förbi under den. En chattpanel med egen
+ * rullning löser det strukturellt: komponeraren ligger UNDER tråden och kan aldrig täcka den.
+ *
+ * Och det är dessutom rätt form. Sidan fortsätter under chatten med Trygg affär-blocket och lagret;
+ * en tråd som växer utan gräns hade tryckt ned dem längre för varje replik.
+ */
+.chat-trad {
+  flex: 1; display: flex; flex-direction: column; gap: 20px;
+  max-height: min(58dvh, 620px);
+  overflow-y: auto;
+  /* Sista bubblan ska inte klibba i underkanten. */
+  padding: 2px 2px 14px;
+  scrollbar-width: thin;
+}
+
+.chat-rad { display: flex; gap: 12px; align-items: flex-start; }
+.chat-rad-user { justify-content: flex-end; }
+.chat-innehall { display: grid; gap: 10px; min-width: 0; flex: 1; }
+
+/* Ordmärket som avatar. Loopa svarar, inte "en assistent". */
+.chat-avatar {
+  flex: none; width: 34px; height: 34px; border-radius: 999px;
+  display: grid; place-items: center; overflow: hidden;
+  background: var(--ink); color: var(--bg);
+  font-size: 9px; font-weight: 700; letter-spacing: -0.02em;
+}
+.chat-avatar i { color: var(--accent); font-style: normal; }
+
+.chat-bubbla {
+  max-width: 100%; padding: 13px 17px; border-radius: 18px;
+  background: var(--surface); border: 1px solid var(--border);
+  font-size: var(--fs-lg); line-height: 1.55; color: var(--ink);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+/* Användarens bubbla: fylld, högerställd, utan ram. Samma mönster som varje chattklient. */
+.chat-bubbla-user {
+  max-width: min(80%, 560px);
+  background: var(--ink); color: var(--bg); border-color: transparent;
+  border-bottom-right-radius: 6px;
+}
+.chat-rad-ai .chat-bubbla:first-child { border-bottom-left-radius: 6px; }
+
+/* Skrivindikatorn: tre prickar som andas. */
+.chat-skriver { display: inline-flex; gap: 5px; align-items: center; padding: 17px; }
+.chat-skriver span {
+  width: 7px; height: 7px; border-radius: 999px; background: var(--muted-soft);
+  animation: chat-puls 1.3s ease-in-out infinite;
+}
+.chat-skriver span:nth-child(2) { animation-delay: 0.18s; }
+.chat-skriver span:nth-child(3) { animation-delay: 0.36s; }
+@keyframes chat-puls {
+  0%, 60%, 100% { opacity: 0.28; transform: translateY(0); }
+  30% { opacity: 1; transform: translateY(-3px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .chat-skriver span { animation: none; opacity: 0.5; }
+}
+
+/* Snabbsvar under en fråga. Försvinner när frågan är besvarad. */
+.chat-snabbsvar { display: flex; flex-wrap: wrap; gap: 8px; }
+.chat-snabbsvar button {
+  padding: 9px 15px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-size: var(--fs-md); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.chat-snabbsvar button:hover { border-color: var(--accent); color: var(--accent-ink); }
+.chat-hoppa { color: var(--muted-soft) !important; }
+.chat-kvar { margin: -2px 0 0; font-size: var(--fs-sm); color: var(--muted-soft); }
+
+/* Spara-bubblan: samtalets enda utgående steg. */
+.chat-spara {
+  padding: 18px 20px; border-radius: 18px; border-bottom-left-radius: 6px;
+  background: var(--ink); color: var(--on-dark-strong);
+}
+.chat-spara p { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.55; }
+.chat-spara-rad { display: flex; gap: 8px; flex-wrap: wrap; }
+.chat-spara-rad input {
+  flex: 1; min-width: 170px; height: 44px; padding: 0 14px; font: inherit;
+  border-radius: var(--r); border: 1px solid rgba(255,255,255,0.18);
+  background: rgba(255,255,255,0.08); color: #fff;
+}
+.chat-spara-rad input::placeholder { color: var(--on-dark-faint); }
+.chat-spara-rad input:focus { outline: none; border-color: var(--accent); }
+.chat-spara-rad button {
+  flex: none; height: 44px; padding: 0 20px; border: none; border-radius: var(--r); cursor: pointer;
+  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
+}
+.chat-spara-hint { margin: 10px 0 0 !important; font-size: var(--fs-sm); color: var(--on-dark); }
+
+/* Startförslagen. Bara innan samtalet börjat. */
+.chat-forslag { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.chat-forslag button {
+  padding: 10px 15px; border-radius: 999px; cursor: pointer; font: inherit;
+  font-size: var(--fs-md); color: var(--muted);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.chat-forslag button:hover { border-color: var(--accent); color: var(--accent-ink); }
+
+/* Komponeraren. Under tråden, alltid synlig, kan aldrig täcka en bubbla. */
+.chat-komponerare {
+  display: flex; gap: 8px; align-items: flex-end;
+  padding: 10px; margin-bottom: 4px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 22px;
+  box-shadow: 0 12px 34px -24px hsl(var(--scrim) / 0.5);
+}
+.chat-komponerare:focus-within { border-color: var(--accent); }
+.chat-komponerare textarea {
+  flex: 1; min-width: 0; resize: none; border: none; background: transparent;
+  padding: 10px 8px; font: inherit; font-size: var(--fs-lg); line-height: 1.5; color: var(--ink);
+  max-height: 132px; overflow-y: auto;
+}
+.chat-komponerare textarea:focus { outline: none; }
+.chat-komponerare textarea::placeholder { color: var(--muted-soft); }
+.chat-komponerare button {
+  flex: none; width: 40px; height: 40px; border: none; border-radius: 999px; cursor: pointer;
+  display: grid; place-items: center;
+  background: var(--accent); color: #fff;
+}
+.chat-komponerare button:disabled { background: var(--surface-sunk); color: var(--muted-soft); cursor: default; }
+.chat-komponerare button:not(:disabled):hover { background: var(--accent-dark); }
+
+.chat-fot { margin: 10px 0 26px; text-align: center; font-size: var(--fs-sm); color: var(--muted-soft); }
+
+/* Korten inuti tråden ska se ut som bubblor, inte som paneler bredvid samtalet. */
+.chat-innehall .kop-spec,
+.chat-innehall .kop-traffar { margin-top: 0; }
+.chat-innehall .kop-spec { border-bottom-left-radius: 6px; }
+
+@media (max-width: 640px) {
+  .chat { min-height: calc(100dvh - 120px); padding-top: 14px; }
+  .chat-bubbla { font-size: var(--fs-md); padding: 12px 15px; }
+  .chat-avatar { width: 28px; height: 28px; font-size: 8px; }
+}
