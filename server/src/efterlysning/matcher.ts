@@ -18,6 +18,7 @@ import { expireOverdue, runDeadlineValve, runPulse, runRenewalReminders } from "
 import type { Candidate } from "./match.js";
 import { deepLink, push, sendLetter } from "./notify.js";
 import * as fortur from "./fortur.js";
+import { emit } from "./analytics.js";
 
 const SWEEP_INTERVAL_MS = Number(process.env.EFTERLYSNING_SWEEP_MS ?? 3600_000);
 /** Livscykelbreven prövas var sjätte timme; de skickar sig själva bara när det är dags. */
@@ -72,6 +73,7 @@ export async function runRound(): Promise<RoundResult> {
       for (const c of inkommande) {
         const hold = await fortur.reserve({ productId: c.product.id, efterlysningId: e.id, userId: e.userId! });
         if (!hold) continue;
+        emit("fortur_reserved", { efterlysning: e.id, produkt: c.product.id, timmar: fortur.FORTUR_HOURS });
         const title = "Vi har hittat din möbel — du får se den först";
         const body = [
           `Du efterlyste: ${e.summary}`,
@@ -88,6 +90,7 @@ export async function runRound(): Promise<RoundResult> {
           title, body, href: deepLink(e), productIds: [c.product.id], source: "loopa_incoming",
         });
         if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "fortur" });
+        emit("fortur_notified", { efterlysning: e.id, produkt: c.product.id });
         await store.markNotified(e.id, [c.product.id]);
         notified += 1;
       }

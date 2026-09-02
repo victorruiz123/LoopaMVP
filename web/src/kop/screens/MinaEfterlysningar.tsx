@@ -3,6 +3,7 @@ import { andra, fornya, minaEfterlysningar, taBort, type Efterlysning } from "..
 import { useAuth } from "../../auth/AuthProvider";
 import AuthScreen from "../../screens/AuthScreen";
 import { kopNavigate } from "../router";
+import Inkorg from "../components/Inkorg";
 
 /**
  * Mina efterlysningar: pausa, ändra, förnya, ta bort.
@@ -38,6 +39,9 @@ export default function MinaEfterlysningar() {
         <h1>Dina efterlysningar</h1>
         <p>Vi letar åt dig tills du säger stopp — eller tills de somnar efter 90 dagar.</p>
       </header>
+
+      {/* Notiserna först: det är dem man kommer hit för när man klickat på ett brev. */}
+      <Inkorg />
 
       {rader === null && <div className="butik-skeleton" style={{ height: 120 }} />}
 

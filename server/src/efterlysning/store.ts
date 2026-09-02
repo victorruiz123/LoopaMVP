@@ -200,6 +200,9 @@ export async function markPurchased(efterlysningId: string, productId: string): 
     const row = list.find((m) => m.efterlysningId === efterlysningId && m.productId === productId);
     if (!row) return;
     row.purchasedAt = new Date().toISOString();
+    // Norra stjärnan: köp per sparad efterlysning. Utan den här raden går den inte att räkna.
+    const { emit } = await import("./analytics.js");
+    emit("purchase_from_efterlysning", { efterlysning: efterlysningId, produkt: productId, kalla: row.source });
     await flushMatches();
   });
 }

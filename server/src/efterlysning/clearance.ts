@@ -27,6 +27,7 @@ import { DATA_DIR } from "../jobStore.js";
 import { categoryLabel, categoryNoun } from "../butik/catalog.js";
 import * as store from "./store.js";
 import { deepLink, lastOf, push, sendLetter } from "./notify.js";
+import { emit } from "./analytics.js";
 
 export interface ExpectedItem {
   categorySlug: string;
@@ -185,6 +186,7 @@ export async function notifyForClearance(c: Clearance, now = Date.now()): Promis
     });
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "tomning" });
     // Räknas in i pulsens siffror: en genomgången tömning ÄR arbete gjort åt köparen.
+    emit("clearance_notice_sent", { efterlysning: e.id, tomning: c.id, kategori: hit.categorySlug });
     await store.recordSweep(e.id, 0, 1);
     sent.push({ efterlysningId: e.id, clearanceId: c.id, item: hit });
     void now;

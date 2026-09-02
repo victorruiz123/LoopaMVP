@@ -27,6 +27,7 @@ import { sender, type Letter } from "../notify/outbox.js";
 import * as store from "./store.js";
 import type { Candidate } from "./match.js";
 import type { Efterlysning, MatchSource } from "./types.js";
+import { emit } from "./analytics.js";
 
 export type NoticeKind = "match" | "fortur" | "puls" | "deadline" | "fornyelse";
 
@@ -193,6 +194,10 @@ export async function notifyMatches(e: Efterlysning, hits: Candidate[]): Promise
     source: fresh[0].source,
   });
 
+  emit("notification_sent", {
+    kind: "match", source: fresh[0].source, antal: fresh.length,
+    efterlysning: e.id, brev: e.email ? true : false,
+  });
   if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "match" });
   return notice;
 }

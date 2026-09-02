@@ -21,6 +21,7 @@ import { sweep } from "./sweep.js";
 import * as store from "./store.js";
 import { deepLink, lastOf, push, sendLetter } from "./notify.js";
 import type { Efterlysning } from "./types.js";
+import { emit } from "./analytics.js";
 
 const WEEK_MS = 7 * 24 * 3600_000;
 /** Så nära en deadline ventilen öppnar. Två veckor: nog för att hinna leta, kort nog att det bränner. */
@@ -88,6 +89,7 @@ export async function runPulse(now = Date.now()): Promise<PulseResult> {
       title, body, href: deepLink(e), productIds: [], source: null,
     });
     pulseMarkers.set(e.id, e.scannedCount);
+    emit("pulse_sent", { efterlysning: e.id, lasta: lasta, tomningar: e.scannedClearances });
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "puls" });
     sent += 1;
   }
@@ -152,6 +154,7 @@ export async function runDeadlineValve(now = Date.now()): Promise<PulseResult> {
       title, body, href: deepLink(e),
       productIds: three.map((c) => c.product.id), source: three[0].source,
     });
+    emit("deadline_valve_sent", { efterlysning: e.id, kandidater: three.length, baraNara });
     if (e.email) await sendLetter({ to: e.email, subject: title, body, kind: "deadline" });
     sent += 1;
   }

@@ -147,3 +147,24 @@ export function efterfragan(signals: { kategori?: string | null; marke?: string 
   if (signals.pris) q.set("pris", String(signals.pris));
   return publicJson(`/api/efterlysning/efterfragan?${q.toString()}`);
 }
+
+export interface Notice {
+  id: string;
+  efterlysningId: string;
+  kind: "match" | "fortur" | "puls" | "deadline" | "fornyelse";
+  title: string;
+  body: string;
+  href: string;
+  createdAt: string;
+  readAt: string | null;
+  source: string | null;
+}
+
+/** Inkorgen. PRIMÄR kanal — den når mottagaren oavsett om ett brev gick iväg. */
+export function inkorg(): Promise<{ notiser: Notice[] }> {
+  return authJson("/api/efterlysning/inkorg");
+}
+
+export function markeraLast(ids: string[]): Promise<{ ok: boolean }> {
+  return authJson("/api/efterlysning/inkorg", { method: "POST", body: JSON.stringify({ ids }) });
+}

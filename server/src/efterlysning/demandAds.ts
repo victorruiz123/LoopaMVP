@@ -21,6 +21,7 @@ import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 import { categoryNoun } from "../butik/catalog.js";
 import { demandDashboard, type DemandRow } from "./wall.js";
+import { emit } from "./analytics.js";
 
 /** Minsta omättade efterfrågan innan ett utkast är värt någons tid att läsa. */
 const MIN_UNMET = Number(process.env.DEMAND_ADS_MIN_UNMET ?? 2);
@@ -168,6 +169,7 @@ export async function generateDrafts(): Promise<{ created: number; skipped: numb
         editedHeadline: null,
         editedBody: null,
       });
+      emit("demand_ad_generated", { kategori: r.categorySlug, marke: r.brand, omattade: r.unmet });
       created += 1;
     }
     if (created) await flush();
@@ -199,6 +201,9 @@ export async function decide(
     ad.decidedBy = by;
     if (edits?.headline) ad.editedHeadline = edits.headline.slice(0, 120);
     if (edits?.body) ad.editedBody = edits.body.slice(0, 600);
+    if (decision === "approved") {
+      emit("demand_ad_approved", { annons: ad.id, kategori: ad.categorySlug, marke: ad.brand, utm: ad.utm });
+    }
     await flush();
     return ad;
   });

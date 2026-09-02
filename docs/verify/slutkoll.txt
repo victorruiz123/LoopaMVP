@@ -1,0 +1,15 @@
+=== /kop ===
+  h1: Beskriv möbeln du letar efter – vi hittar den åt dig.
+  träffar: 6
+  händelser: efterlysning_started, instant_match_shown
+
+=== /efterlyses ===
+  h1: Det här söker folk just nu
+  rader: 0
+  kategorilänkar: 8
+
+=== /butik (301) och katalogen ===
+  /butik → /kop
+  katalogen lever: true
+
+fel: inga
