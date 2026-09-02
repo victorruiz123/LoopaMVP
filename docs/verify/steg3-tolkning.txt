@@ -1,0 +1,45 @@
+
+"Jag letar efter en grön sammetssoffa, 3-sits, max 6000 kr och högst 220 cm bred"
+  tolkad: av modellen | 201 ms
+  sammanfattning: Soffor & fåtöljer · max 6 000 kr · max b 220 cm
+  filter: {"categorySlug":"soffor-fatoljer","maxPriceSek":6000,"maxWidthMm":2200}
+  stil: [] | deadline: - | brådska: none
+  anteckning: -
+  följdfrågor (0): inga
+
+"En String-hylla i valnöt till hallen, gärna 60-tal, upp till 4000"
+  tolkad: av modellen | 3 ms
+  sammanfattning: Förvaring · 60-tal · valnöt · max 4 000 kr
+  filter: {"categorySlug":"forvaring","maxPriceSek":4000,"materials":["valnöt"],"q":"String"}
+  stil: [60-tal] | deadline: - | brådska: none
+  anteckning: till hallen
+  följdfrågor (1): matt
+     Finns det ett mått som måste stämma? Förvaring är det vanligaste stället det går fel.
+
+"Behöver ett matbord innan jul, max 160 cm så det får plats, budget 3000"
+  tolkad: av modellen | 1 ms
+  sammanfattning: Bord · max 3 000 kr · max b 160 cm
+  filter: {"categorySlug":"bord","maxPriceSek":3000,"maxWidthMm":1600}
+  stil: [] | deadline: - | brådska: soon
+  anteckning: -
+  följdfrågor (0): inga
+
+"Något att sitta i"
+  tolkad: av modellen | 1 ms
+  sammanfattning: Allt i lagret
+  filter: {}
+  stil: [] | deadline: - | brådska: none
+  anteckning: -
+  följdfrågor (2): kategori, maxpris
+     Vilken sorts möbel är det?
+     Vad är din övre gräns?
+
+"En snygg fåtölj"
+  tolkad: av modellen | 1 ms
+  sammanfattning: Soffor & fåtöljer
+  filter: {"categorySlug":"soffor-fatoljer"}
+  stil: [] | deadline: - | brådska: none
+  anteckning: -
+  följdfrågor (2): maxpris, matt
+     Vad är din övre gräns?
+     Finns det ett mått som måste stämma? Soffor & fåtöljer är det vanligaste stället det går fel.

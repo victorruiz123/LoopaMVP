@@ -63,6 +63,11 @@ const GRADES: ConditionGrade[] = ["A", "B", "C", "D", "E", "F"];
 /** Modellens svar, innan något av det är betrott. */
 interface RawInterpretation {
   kategori?: string | null;
+  /* Fälten nedan fylls bara i efterlysningsläget — se `interpretQuery(..., { efterlysning: true })`. */
+  stil?: string[] | null;
+  deadline_dagar?: number | null;
+  bradska?: string | null;
+  anteckning?: string | null;
   marken?: string[] | null;
   sokord?: string | null;
   minpris?: number | null;
@@ -95,6 +100,44 @@ const SCHEMA = {
     sammanfattning: { type: Type.STRING, description: "En kort svensk mening om vad du förstod. Max 12 ord." },
   },
 } as const;
+
+/**
+ * Efterlysningens fyra extra fält.
+ *
+ * Läggs till SCHEMA i stället för att bli ett andra anrop: samma mening bär både filtret och
+ * brådskan, och att läsa den två gånger hade kostat två modellanrop för ett svar. Fälten är
+ * meningslösa för en sökruta — en sökning har ingen deadline — och skickas därför bara med när
+ * anroparen ber om dem.
+ */
+const EFTERLYSNING_FIELDS = {
+  stil: {
+    type: Type.ARRAY,
+    items: { type: Type.STRING },
+    description: "Stil- eller epokord som NÄMNS: '60-tal', 'funkis', 'skandinaviskt'. Tomt om inget.",
+  },
+  deadline_dagar: {
+    type: Type.NUMBER,
+    description: "Antal dagar tills möbeln behövs, om ett datum eller en tidsrymd nämns. Annars utelämnad.",
+  },
+  bradska: { type: Type.STRING, description: "none, soon eller urgent. Sätt urgent bara vid uttrycklig brådska." },
+  anteckning: { type: Type.STRING, description: "Ett önskemål som INTE ryms i fälten ovan, i köparens egna ord. Max 15 ord." },
+} as const;
+
+const EFTERLYSNING_SCHEMA = {
+  type: Type.OBJECT,
+  properties: { ...SCHEMA.properties, ...EFTERLYSNING_FIELDS },
+} as const;
+
+/** Extra regler för efterlysningsläget. Läggs sist i systemprompten. */
+const EFTERLYSNING_RULES = [
+  "",
+  "DET HÄR ÄR EN EFTERLYSNING, inte en sökning. Köparen beskriver något de vill ha men inte hittat.",
+  "- stil är ord om FORM eller EPOK, aldrig om färg eller material. 'grön sammet' är inte stil.",
+  "- deadline_dagar sätts bara när en tid nämns: 'innan jul', 'till nästa vecka', 'inom en månad'.",
+  "- bradska är urgent bara när köparen säger att det brådskar. Ett datum ensamt är soon.",
+  "- anteckning bär det som inte fick plats: 'måste gå in genom en smal dörr', 'helst avtagbar klädsel'.",
+  "  Skriv köparens ord, inte dina. Utelämna fältet hellre än att sammanfatta hela meningen igen.",
+].join("\n");
 
 function systemPrompt(brands: string[]): string {
   return [
@@ -251,18 +294,55 @@ function fallback(question: string): Interpretation {
   return { filter, query: toQuery(filter), summary: `Sökning: ${question.trim().slice(0, 60)}`, aiUsed: false };
 }
 
-export async function interpretQuery(question: string, brands: string[]): Promise<Interpretation> {
+/** Efterlysningens fyra extra fält, som de kommer ur tolkningen. Tomma i sökläget. */
+export interface EfterlysningExtras {
+  styleTags: string[];
+  deadlineDays: number | null;
+  urgency: "none" | "soon" | "urgent";
+  note: string | null;
+}
+
+export interface InterpretOptions {
+  /** Läs även stil, deadline, brådska och anteckning. Se EFTERLYSNING_FIELDS. */
+  efterlysning?: boolean;
+}
+
+/** Extras ur ett råsvar, prövade var för sig — ett dåligt fält får inte fälla de andra. */
+function validateExtras(raw: RawInterpretation): EfterlysningExtras {
+  const tags = (raw.stil ?? [])
+    .filter((t): t is string => typeof t === "string" && t.trim().length > 1)
+    .map((t) => t.trim().toLowerCase())
+    .slice(0, 5);
+  const days = typeof raw.deadline_dagar === "number" && raw.deadline_dagar > 0 && raw.deadline_dagar <= 365
+    ? Math.round(raw.deadline_dagar)
+    : null;
+  const urgency = raw.bradska === "urgent" || raw.bradska === "soon" ? raw.bradska : "none";
+  const note = typeof raw.anteckning === "string" && raw.anteckning.trim().length > 3
+    ? raw.anteckning.trim().slice(0, 200)
+    : null;
+  // En deadline utan uttryckt brådska är ändå brådska av det mildare slaget.
+  return { styleTags: tags, deadlineDays: days, urgency: days !== null && urgency === "none" ? "soon" : urgency, note };
+}
+
+export const EMPTY_EXTRAS: EfterlysningExtras = { styleTags: [], deadlineDays: null, urgency: "none", note: null };
+
+export async function interpretQuery(
+  question: string,
+  brands: string[],
+  opts: InterpretOptions = {},
+): Promise<Interpretation & { extras: EfterlysningExtras }> {
   const text = question.trim();
-  if (!text) return { filter: {}, query: {}, summary: "Hela lagret", aiUsed: false };
-  if (!aiSearchAvailable()) return fallback(text);
+  if (!text) return { filter: {}, query: {}, summary: "Hela lagret", aiUsed: false, extras: EMPTY_EXTRAS };
+  if (!aiSearchAvailable()) return { ...fallback(text), extras: EMPTY_EXTRAS };
 
   try {
     const result = await callGeminiStructured<RawInterpretation>({
-      purpose: "butik_search",
-      systemPrompt: systemPrompt(brands),
+      // Egen cachenyckel per läge: samma mening ger olika svar beroende på vilket schema som gällde.
+      purpose: opts.efterlysning ? "efterlysning_parse" : "butik_search",
+      systemPrompt: opts.efterlysning ? systemPrompt(brands) + EFTERLYSNING_RULES : systemPrompt(brands),
       userPrompt: text.slice(0, 400),
       images: [],
-      responseSchema: SCHEMA,
+      responseSchema: opts.efterlysning ? EFTERLYSNING_SCHEMA : SCHEMA,
       // Ingen bild, kort svar: en sökruta får inte kännas som en analys. Faller den, faller den fort.
       resolution: "low",
       // Första anropet efter en omstart betalar klientuppsättning och TLS och landade på 8 s; det
@@ -281,9 +361,12 @@ export async function interpretQuery(question: string, brands: string[]): Promis
        */
       cacheMaxAgeMs: 24 * 60 * 60 * 1000,
     });
-    return validate(result.data, brands);
+    return {
+      ...validate(result.data, brands),
+      extras: opts.efterlysning ? validateExtras(result.data) : EMPTY_EXTRAS,
+    };
   } catch (err) {
     console.warn("[butik] AI-tolkningen föll, faller tillbaka på ordmatchning:", err instanceof Error ? err.message : err);
-    return fallback(text);
+    return { ...fallback(text), extras: EMPTY_EXTRAS };
   }
 }

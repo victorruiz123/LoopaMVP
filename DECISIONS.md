@@ -69,3 +69,25 @@ sant här.
 
 **Effekt på rangordningen:** ett känt fel väger tyngre än ett okänt. Den som vet vad den vill ha ska
 få de belagda träffarna först.
+
+---
+
+## 3. Deterministiskt skyddsnät för de hårda fälten
+
+**Upptäckt:** Skarp körning av tolkningen. Meningen *"grön sammetssoffa, 3-sits, max 6000 kr och
+högst 220 cm bred"* gav bara `{categorySlug: "soffor-fatoljer"}` — pris, bredd, färg och material
+föll bort. Samma modell fick däremot både pris och bredd rätt på *"matbord innan jul, max 160 cm,
+budget 3000"*. Det är den variation `cacheMaxAgeMs`-kommentaren i aiSearch.ts redan beskriver.
+
+**Beslut:** Ett skyddsnät i kod som fyller i **pris och mått** när tolkningen lämnat dem tomma, läst
+med snäva mönster ur samma mening. Det får bara LÄGGA TILL — ett fält modellen fyllt i rörs aldrig.
+
+**Varför bara pris och mått:** de är efterlysningens hårda gränser, de som aldrig får brytas. Att
+tappa dem betyder att svepet visar möbler köparen inte kan köpa eller inte får plats med — precis
+det fel hela matchningen är byggd för att undvika. Färg och stil är mjuka: tappas de blir träffarna
+sämre rankade, inte fel.
+
+**Varför inte bara skärpa prompten:** en prompt kan bli bättre men aldrig garanterad, och det här är
+fält där ett bortfall ger fel produkt. Nätet kostar noll modellanrop och går att läsa och testa.
+
+**Reversibelt:** en ren funktion (`backstop.ts`) som anropas på ett ställe i `parse()`.
