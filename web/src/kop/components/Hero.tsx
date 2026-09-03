@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
 import { track } from "../../butik/components/Bits";
+import { useAuth } from "../../auth/AuthProvider";
+import { fragaOmInloggning } from "./LoggaInGrind";
 
 /**
  * Heron: en rad, ett fält, och vägen in i Trygg affär.
@@ -20,6 +22,7 @@ import { track } from "../../butik/components/Bits";
 const KALLOR = ["Blocket", "Facebook Marketplace", "Tradera"];
 
 export default function Hero() {
+  const { user } = useAuth();
   const [lank, setLank] = useState("");
   const [fel, setFel] = useState<string | null>(null);
   const [harBorjat, setHarBorjat] = useState(false);
@@ -39,7 +42,15 @@ export default function Hero() {
       return;
     }
     track("hero_submit", { host: säkerVärd(url) });
-    window.location.href = `/kop/analysera?url=${encodeURIComponent(url)}`;
+    /**
+     * Frågan om inloggning ställs HÄR, när avsikten är som starkast.
+     *
+     * Allt som följer — analysen, inbjudan, betalningen, leveransen — kräver ett konto ändå. Att
+     * fråga nu är vänligare än att fråga tre steg senare när någon redan lagt tid på det. Är man
+     * redan inne märks ingenting.
+     */
+    const ga = () => { window.location.href = `/kop/analysera?url=${encodeURIComponent(url)}`; };
+    if (fragaOmInloggning(!!user, "lank", ga)) ga();
   };
 
   return (
@@ -91,7 +102,8 @@ export default function Hero() {
             // dörren dit — den här sidan äger inte uppladdningen.
             if (!e.target.files?.length) return;
             track("hero_submit", { host: null, via: "skarmbilder" });
-            window.location.href = "/kop/analysera?bilder=1";
+            const ga = () => { window.location.href = "/kop/analysera?bilder=1"; };
+            if (fragaOmInloggning(!!user, "skarmbilder", ga)) ga();
           }}
         />
       </form>
@@ -100,6 +112,26 @@ export default function Hero() {
       <ul className="hero-kallor" aria-label="Fungerar med">
         {KALLOR.map((k) => <li key={k}>{k}</li>)}
       </ul>
+
+      {/*
+        DEN ANDRA VÄGEN, tydligt underordnad den första.
+        Sidan handlar om en möbel du hittat någon annanstans. Att vi också har ett eget lager är sant
+        och värt att säga — men det är ett "eller", och ska se ut som ett.
+      */}
+      <p className="hero-eller">
+        eller{" "}
+        <a
+          href="/butik/sok"
+          onClick={(e) => {
+            e.preventDefault();
+            track("leta_bland_produkter", {});
+            const ga = () => { window.location.href = "/butik/sok"; };
+            if (fragaOmInloggning(!!user, "bladdra", ga)) ga();
+          }}
+        >
+          leta bland produkter vi redan granskat →
+        </a>
+      </p>
     </section>
   );
 }

@@ -1,4 +1,5 @@
-import { useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
+import { useAuth } from "../../auth/AuthProvider";
 import { Link, SearchIcon, track } from "./Bits";
 import { navigate, useButikRoute } from "../router";
 
@@ -22,44 +23,92 @@ export default function ButikChrome({ children }: { children: ReactNode }) {
 
 function ButikBar() {
   const { route } = useButikRoute();
+  const { user, profile } = useAuth();
+  const [sokOppen, setSokOppen] = useState(false);
   const [q, setQ] = useState(route.name === "search" ? route.q : "");
+  const faltet = useRef<HTMLInputElement>(null);
+
+  const sok = () => {
+    track("search", { q });
+    navigate({ name: "search", q });
+    setSokOppen(false);
+  };
 
   return (
     <header className="butik-bar">
-      {/* Loggan går till KÖPSIDAN, inte till butikens rot: roten 301:as dit ändå. */}
+      {/* Ordmärket: orange, Poppins 800. Går till KÖPSIDAN — butikens rot 301:as dit ändå. */}
       <a href="/kop" className="butik-logo">loopa<span>.</span></a>
-      <form
-        className="butik-search"
-        role="search"
-        onSubmit={(e) => {
+
+      {/*
+        SÖKNINGEN ÄR EN KNAPP, inte ett fält.
+        Ett fullbrett fält i toppen sa att sidan handlar om att söka i vårt lager. Det gör den inte —
+        den handlar om en möbel besökaren hittat någon annanstans, och den saken ska äga blicken.
+        Fältet finns kvar, en knapptryckning bort.
+      */}
+      {sokOppen ? (
+        <form
+          className="butik-search butik-search-oppen"
+          role="search"
+          onSubmit={(e) => { e.preventDefault(); sok(); }}
+        >
+          <SearchIcon />
+          <input
+            ref={faltet}
+            type="search"
+            value={q}
+            autoFocus
+            onChange={(e) => setQ(e.target.value)}
+            onBlur={() => { if (!q.trim()) setSokOppen(false); }}
+            onKeyDown={(e) => { if (e.key === "Escape") setSokOppen(false); }}
+            placeholder="Sök möbel, märke eller modell"
+            aria-label="Sök i butiken"
+          />
+        </form>
+      ) : (
+        <button
+          type="button"
+          className="butik-bar-ikon"
+          aria-label="Sök"
+          onClick={() => { setSokOppen(true); requestAnimationFrame(() => faltet.current?.focus()); }}
+        >
+          <SearchIcon />
+        </button>
+      )}
+
+      <span className="butik-bar-fyll" />
+
+      {/*
+        PROFILEN ÄR EN RUND KNAPP med bild eller initial — eller "LOGGA IN" när ingen är inloggad.
+        Skillnaden är avsiktligt tydlig: en avatar säger "du är inne", en textknapp säger "du är
+        inte". En generisk gubbe hade sagt ingetdera.
+      */}
+      {user ? (
+        <Link to={{ name: "profile" }} className="butik-avatar" aria-label="Min profil">
+          {profile?.avatar_url
+            ? <img src={profile.avatar_url} alt="" />
+            : <span>{initial(profile?.full_name || profile?.username || user.email)}</span>}
+        </Link>
+      ) : (
+        <a className="butik-bar-logga-in" href="/kop?logga-in=1" onClick={(e) => {
           e.preventDefault();
-          track("search", { q });
-          navigate({ name: "search", q });
-        }}
-      >
-        <SearchIcon />
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Sök möbel, märke eller modell"
-          aria-label="Sök i butiken"
-        />
-      </form>
-      {/* Profilen ligger före säljknappen: den som redan handlat kommer tillbaka för att se sina
-          köp och affärer, och den vägen fanns inte alls förut — en betald order gick bara att nå
-          via adressen man fick efter kassan. */}
-      <Link to={{ name: "profile" }} className="butik-bar-profile">
-        <span className="butik-bar-sell-long">Min profil</span>
-        <span className="butik-bar-sell-short">Profil</span>
-      </Link>
-      {/* Säljvägen finns i toppraden på VARJE butikssida — det är köp↔sälj-slingans stadigaste plats. */}
+          window.dispatchEvent(new CustomEvent("loopa:logga-in", { detail: { anledning: "header" } }));
+        }}>
+          Logga in
+        </a>
+      )}
+
+      {/* Säljvägen finns i toppraden på VARJE sida — det är köp↔sälj-slingans stadigaste plats. */}
       <a className="butik-bar-sell" href="/" onClick={() => track("sell_cta_click", { from: "header" })}>
         <span className="butik-bar-sell-long">Sälj en möbel</span>
         <span className="butik-bar-sell-short">Sälj</span>
       </a>
     </header>
   );
+}
+
+/** Första bokstaven, versal. Namn före användarnamn före e-post — det mest personliga som finns. */
+function initial(namn: string | null | undefined): string {
+  return (namn ?? "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 function ButikFooter() {

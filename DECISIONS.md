@@ -276,3 +276,62 @@ landningssida: `@media (min-width: 900px) { .hero { display: grid; ... } }`.
 **Lärdomen är värd raden:** två stilmallar som äger samma klassnamn är en fälla som gillras i tysthet
 och löser ut långt senare, i en annan fil, för någon annan. Köpsidans egna klasser heter numera
 `hero-*` bara i `kop.css`, och butiken har inga kvar.
+
+---
+
+## 13. Fyllda former i stället för konturikoner
+
+**Beslut:** Både animationens scener och de fyra stegikonerna ritades om från tunna konturer till
+fyllda former med massa, mjuka radier och accentfärg.
+
+**Varför:** en soffa ritad som en konturikon läser som *symbolen för möbel*, inte som en möbel. Det
+språket hör hemma i en verktygsrad, där ikonen står bredvid ett ord som förklarar den. Här är bilden
+hela budskapet, och den har en halv sekund på sig.
+
+**Scenerna fick en egen palett.** Första försöket återanvände `--surface` och `--field`, som är
+gjorda för att ligga nästan omärkligt ovanpå varandra i ett gränssnitt — en soffa målad i dem
+försvann i kortet den stod på. Scenernas toner är samma familj men med verklig separation:
+möbelkroppen mörkare än kortet, dynorna ljusare än kroppen, accenten sparad till det som ska pekas ut.
+
+**Två fel funna genom att titta:**
+
+- Prisremsan i scen 2 låg bredvid soffan, krockade med armstödet och klipptes av ramens kant. Den
+  ligger nu ovanför, där det är tomt.
+- Det aktiva stegets ikon försvann i sin egen knapp: `:hover` mörknade ikonen även på det aktiva
+  steget, vars bakgrund redan är mörk. Det syntes bara i just det läge man alltid hamnar i —
+  markören ligger kvar på steget man nyss klickade på. Hovern gäller nu bara vilande steg.
+
+---
+
+## 14. Toppraden: sökknapp, rund profil, orange ordmärke
+
+**Sökfältet blev en knapp.** Ett fullbrett fält högst upp sa att sidan handlar om att söka i vårt
+lager. Det gör den inte — den handlar om en möbel besökaren hittat någon annanstans, och den saken
+ska äga blicken. Fältet finns kvar, ett tryck bort.
+
+**Profilen är en rund knapp med bild eller initial — eller "Logga in".** Skillnaden är avsiktligt
+tydlig: en avatar säger *du är inne*, en textknapp säger *du är inte*. En generisk gubbe hade sagt
+ingetdera.
+
+**Ordmärket är orange i Poppins 800**, samma snitt och vikt som säljverktygets `.app-wordmark`. Det
+är ett märke och ska se likadant ut var det står. Punkten är mörk nu när ordet självt bär färgen —
+två oranger bredvid varandra gjorde punkten osynlig.
+
+---
+
+## 15. Inloggning frågas, den krävs inte
+
+**Beslut:** Att klistra in en länk eller gå vidare till lagret öppnar en inloggningsruta ovanpå
+sidan. Den som redan är inne märker ingenting.
+
+**En fråga, inte en mur.** Sidorna bakom finns kvar: de är server-renderade, de indexeras, och en
+delad länk till en möbel öppnar möbeln. Att låsa in dem hade kostat både sökbarheten och den som
+klickat sig hit från en kompis.
+
+**Varför fråga alls:** allt som följer efter länken — analys, inbjudan, betalning, leverans — kräver
+ett konto ändå. Att fråga när avsikten är som starkast är vänligare än att fråga tre steg senare, när
+någon redan lagt tid på det.
+
+**Att veta:** det här gör /kop till en sida där de flesta möter en inloggningsruta. Konverteringen
+mäts av `logga_in_fraga` mot `hero_submit` — visar den att folk faller av vid rutan är beslutet
+enkelt att backa, eftersom grinden är ett enda anrop (`fragaOmInloggning`) på tre ställen.

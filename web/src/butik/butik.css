@@ -21,12 +21,33 @@
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--border);
 }
+/*
+ * Ordmärket: orange, Poppins 800.
+ *
+ * Samma snitt och samma vikt som säljverktygets `.app-wordmark` — det är ett märke och ska se
+ * likadant ut var det än står. Punkten är mörk i stället för orange nu när ordet självt bär färgen;
+ * två oranger bredvid varandra gjorde punkten osynlig.
+ */
 .butik-logo {
-  font-size: 26px; line-height: 1; font-weight: 700; letter-spacing: -0.02em;
-  color: var(--ink); text-decoration: none; flex: none;
+  font-family: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-size: 27px; line-height: 1; font-weight: 800; letter-spacing: -0.03em;
+  color: var(--accent); text-decoration: none; flex: none;
 }
-.butik-logo span { color: var(--accent); }
+.butik-logo span { color: var(--ink); }
+
+/* Sökningen: en ikonknapp som fäller ut ett fält. Se Chrome.tsx för varför. */
+.butik-bar-ikon {
+  flex: none; width: var(--tap); height: var(--tap); border-radius: var(--r);
+  display: grid; place-items: center; cursor: pointer;
+  background: transparent; border: 1px solid transparent; color: var(--muted);
+}
+.butik-bar-ikon:hover { background: var(--field); color: var(--ink); }
+/* Ikonen är absolut placerad inuti sökfältet. I knappen ska den bara vara en ikon. */
+.butik-bar-ikon .butik-search-icon { position: static; transform: none; color: inherit; }
+.butik-bar-fyll { flex: 1; }
+
 .butik-search { flex: 1; min-width: 0; position: relative; }
+.butik-search-oppen { max-width: 440px; }
 .butik-search input {
   width: 100%; height: var(--tap); padding: 0 14px 0 38px;
   font-size: var(--fs-field); color: var(--ink);
@@ -34,14 +55,38 @@
 }
 .butik-search input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
 .butik-search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted-soft); pointer-events: none; }
-.butik-bar-sell {
+
+/* Profilen: rund knapp med bild eller initial. */
+.butik-avatar {
+  flex: none; width: 40px; height: 40px; border-radius: 999px; overflow: hidden;
+  display: grid; place-items: center; text-decoration: none;
+  background: var(--ink); color: var(--bg);
+  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
+  border: 2px solid transparent;
+}
+.butik-avatar:hover { border-color: var(--accent); }
+.butik-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* Utloggad: ord, inte en gubbe. En avatar säger "du är inne", en textknapp säger motsatsen. */
+.butik-bar-logga-in {
   flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 14px;
+  border-radius: var(--r); border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink); text-decoration: none;
+  font-size: var(--fs-md); font-weight: 700; white-space: nowrap;
+}
+.butik-bar-logga-in:hover { border-color: var(--ink); }
+
+.butik-bar-sell {
+  flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 16px;
   border-radius: var(--r); background: var(--accent); color: #fff;
-  font-size: var(--fs-md); font-weight: 600; text-decoration: none; white-space: nowrap;
+  font-size: var(--fs-md); font-weight: 700; text-decoration: none; white-space: nowrap;
 }
 .butik-bar-sell:active { opacity: 0.82; }
-@media (max-width: 640px) { .butik-bar-sell-long { display: none; } }
-@media (min-width: 641px) { .butik-bar-sell-short { display: none; } }
+@media (max-width: 720px) {
+  .butik-bar-sell-long { display: none; }
+  .butik-search-oppen { position: absolute; left: 12px; right: 12px; max-width: none; z-index: 2; }
+}
+@media (min-width: 721px) { .butik-bar-sell-short { display: none; } }
 
 .butik-main { max-width: 1180px; margin: 0 auto; padding: 0 var(--safe-left) 64px; }
 

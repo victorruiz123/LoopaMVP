@@ -1,0 +1,14 @@
+loggan: {"farg":"rgb(228, 87, 46)","snitt":"Poppins","vikt":"800"}
+sökfält i headern: 0
+sökknapp i headern: 1
+profil utloggad: Logga in
+rund avatar: 0
+vänsterkanter: {"h1":146,"sub":146,"fält":146,"eller":146,"källor":146}
+linjerar: ja
+'leta bland produkter': leta bland produkter vi redan granskat →
+efter klick på sök: 1 fält
+inloggningsfråga vid länk: ja
+scener fångade: 4
+fel (desktop): inga
+mobil header — sökknapp: 1 | logga in: 1
+fel (mobil): inga

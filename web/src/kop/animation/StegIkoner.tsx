@@ -25,60 +25,70 @@ const bas = (size: number) => ({
   "aria-hidden": true as const,
 });
 
-const stroke = {
-  stroke: "currentColor",
-  strokeWidth: 2.2,
-  strokeLinecap: "round" as const,
-  strokeLinejoin: "round" as const,
-};
+/**
+ * FYLLDA FORMER, INTE KONTURER.
+ *
+ * Konturikoner läser som en verktygsrad. De här ska läsa som SAKER — en telefon, en soffa, ett
+ * kassaskåp, en bil — på den halvsekund en stegindikator får. Massa i stället för streck gör
+ * skillnaden, och ikonerna fungerar dessutom i 20 px, vilket tunna konturer sällan gör.
+ */
 
 /** Steg 1 — Du hittar den. En telefon med en annons på skärmen. */
 export function IkonHittar({ size = 32, className }: IkonProps) {
   return (
     <svg {...bas(size)} className={className}>
-      <rect x="14" y="5" width="20" height="38" rx="3.5" {...stroke} />
-      <rect x="18" y="11" width="12" height="9" rx="1.5" {...stroke} />
-      <path d="M18 25h12M18 30h8" {...stroke} />
-      <circle cx="24" cy="38" r="1.6" fill="currentColor" />
+      <rect x="13" y="4" width="22" height="40" rx="5" fill="currentColor" />
+      <rect x="16.5" y="9" width="15" height="26" rx="2.5" fill="#fff" opacity="0.95" />
+      <rect x="19" y="12" width="10" height="7" rx="1.6" fill="currentColor" opacity="0.42" />
+      <rect x="19" y="22" width="10" height="2" rx="1" fill="currentColor" opacity="0.42" />
+      <rect x="19" y="27" width="6.5" height="2" rx="1" fill="currentColor" opacity="0.42" />
+      <circle cx="24" cy="39.5" r="1.7" fill="#fff" opacity="0.9" />
     </svg>
   );
 }
 
-/** Steg 2 — Vi granskar. En soffa med en skanningslinje över sig. */
+/** Steg 2 — Vi granskar. En soffa med en skanningslinje. */
 export function IkonGranskar({ size = 32, className }: IkonProps) {
   return (
     <svg {...bas(size)} className={className}>
-      <path d="M8 30v-8a4 4 0 0 1 4-4h24a4 4 0 0 1 4 4v8" {...stroke} />
-      <path d="M6 30h36v7H6z" {...stroke} />
-      <path d="M11 37v3M37 37v3" {...stroke} />
-      <path d="M4 24h40" {...stroke} strokeDasharray="4 3" opacity="0.55" />
-      <circle cx="30" cy="26" r="2.4" {...stroke} />
+      <rect x="8" y="15" width="32" height="12" rx="5" fill="currentColor" />
+      <rect x="11" y="24" width="26" height="10" rx="3.5" fill="currentColor" opacity="0.55" />
+      <rect x="5" y="19" width="6" height="15" rx="3" fill="currentColor" />
+      <rect x="37" y="19" width="6" height="15" rx="3" fill="currentColor" />
+      <rect x="8" y="32" width="32" height="5" rx="2.4" fill="currentColor" />
+      <rect x="11" y="37" width="3" height="5" rx="1.5" fill="currentColor" />
+      <rect x="34" y="37" width="3" height="5" rx="1.5" fill="currentColor" />
+      <rect x="22.7" y="8" width="2.6" height="34" rx="1.3" fill="currentColor" opacity="0.35" />
     </svg>
   );
 }
 
-/** Steg 3 — Du betalar säkert. Ett kassaskåp med en bock. */
+/** Steg 3 — Du betalar säkert. Ett kassaskåp med en ratt. */
 export function IkonBetalar({ size = 32, className }: IkonProps) {
   return (
     <svg {...bas(size)} className={className}>
-      <rect x="7" y="9" width="34" height="30" rx="4" {...stroke} />
-      <circle cx="21" cy="24" r="7" {...stroke} />
-      <path d="M18 24l2.4 2.6L25 21" {...stroke} />
-      <path d="M34 19v10" {...stroke} />
+      <rect x="5" y="8" width="38" height="32" rx="6" fill="currentColor" />
+      <circle cx="20" cy="24" r="9.5" fill="#fff" opacity="0.95" />
+      <circle cx="20" cy="24" r="4" fill="currentColor" opacity="0.5" />
+      <rect x="19" y="13" width="2" height="6" rx="1" fill="currentColor" opacity="0.5" />
+      <rect x="19" y="29" width="2" height="6" rx="1" fill="currentColor" opacity="0.5" />
+      <rect x="34" y="19" width="3" height="10" rx="1.5" fill="#fff" opacity="0.75" />
     </svg>
   );
 }
 
-/** Steg 4 — Hemlevererad. En bil på väg mot en dörr. */
+/** Steg 4 — Hemlevererad. En skåpbil. */
 export function IkonLevererad({ size = 32, className }: IkonProps) {
   return (
     <svg {...bas(size)} className={className}>
-      <path d="M4 30V17h17v13" {...stroke} />
-      <path d="M21 21h8l6 6v3" {...stroke} />
-      <path d="M2 30h38" {...stroke} />
-      <circle cx="13" cy="34" r="3.4" {...stroke} />
-      <circle cx="31" cy="34" r="3.4" {...stroke} />
-      <path d="M44 38V22l-6-4" {...stroke} opacity="0.5" />
+      <rect x="3" y="14" width="24" height="18" rx="4" fill="currentColor" />
+      <path d="M27 19h7l6 7v6h-13z" fill="currentColor" opacity="0.72" />
+      <rect x="29.5" y="20.5" width="6" height="5" rx="1.4" fill="#fff" opacity="0.9" />
+      <circle cx="13" cy="35" r="4.6" fill="currentColor" />
+      <circle cx="13" cy="35" r="1.7" fill="#fff" />
+      <circle cx="33" cy="35" r="4.6" fill="currentColor" />
+      <circle cx="33" cy="35" r="1.7" fill="#fff" />
+      <rect x="2" y="38.5" width="44" height="2.4" rx="1.2" fill="currentColor" opacity="0.28" />
     </svg>
   );
 }

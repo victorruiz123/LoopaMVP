@@ -5,6 +5,7 @@ import Utbudsrad from "../components/Utbudsrad";
 import Prisarlighet from "../components/Prisarlighet";
 import Efterlysningsfangare from "../components/Efterlysningsfangare";
 import StickyCta from "../components/StickyCta";
+import LoggaInGrind from "../components/LoggaInGrind";
 import { SellCta } from "../../butik/components/Bits";
 
 /**
@@ -42,6 +43,7 @@ export default function BuyLanding() {
       <SellCta />
 
       <StickyCta />
+      <LoggaInGrind />
     </>
   );
 }
