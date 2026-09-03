@@ -1,7 +1,7 @@
 import { lazy, Suspense } from "react";
 import Hero from "../components/Hero";
 import Saljpunkter from "../components/Saljpunkter";
-import Utbudsrad from "../components/Utbudsrad";
+import Marken from "../components/Marken";
 import Prisarlighet from "../components/Prisarlighet";
 import Efterlysningsfangare from "../components/Efterlysningsfangare";
 import StickyCta from "../components/StickyCta";
@@ -37,7 +37,7 @@ export default function BuyLanding() {
       </Suspense>
 
       <Saljpunkter />
-      <Utbudsrad />
+      <Marken />
       <Prisarlighet />
       <Efterlysningsfangare />
       <SellCta />

@@ -1,0 +1,13 @@
+rubrik: Leta bland märken
+sökraden över brickorna: 1
+brickor: 5
+    IKEA — 41 granskade · 33 via Tradera
+    SITS — 14 granskade · 2 via Tradera
+    MIO — 4 granskade · 5 via Tradera
+    Swedese — 5 granskade
+
+efter 'sw': Swedese
+efter 'xyz': Inget märke heter så hos oss. Tryck på sök så letar vi i hela lagret i stället.
+
+klick på märke → inloggningsfråga: ja
+fel: inga

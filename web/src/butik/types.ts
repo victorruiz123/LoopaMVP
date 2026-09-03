@@ -90,6 +90,10 @@ export interface Category {
 export interface BrandFacet {
   brand: string;
   count: number;
+  /** Granskade möbler hos oss. Går att köpa i dag, med hemleverans. */
+  loopa?: number;
+  /** Annonser via Tradera. Någon annans möbel, som vi kan analysera och leverera. */
+  tradera?: number;
   /** Adressens form av namnet. Serversatt, så klienten inte behöver upprepa slugreglerna. */
   slug?: string;
 }

@@ -213,27 +213,55 @@
 .punkt h2 { margin: 0 0 4px; font-size: var(--fs-lg); letter-spacing: -0.015em; }
 .punkt p { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
 
-/* ---- utbudsraden ---- */
+/* ---- märkena ---- */
 
-.utbud { margin-bottom: 44px; }
-.utbud-huvud { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; margin-bottom: 14px; }
-.utbud-huvud h2 { margin: 0; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
-.utbud-rad {
-  list-style: none; margin: 0; padding: 0 2px 6px; display: flex; gap: 12px;
-  overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: thin;
+.marken { margin-bottom: 44px; }
+.marken-huvud { margin-bottom: 16px; }
+.marken-huvud h2 { margin: 0 0 6px; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
+.marken-huvud p { margin: 0; font-size: var(--fs-md); color: var(--muted); max-width: 58ch; line-height: 1.5; }
+
+/* Sökraden ligger ÖVER brickorna och filtrerar dem medan man skriver. */
+.marken-sok { display: flex; gap: 8px; margin-bottom: 16px; max-width: 480px; }
+.marken-sok input {
+  flex: 1; min-width: 0; height: 46px; padding: 0 16px; font: inherit; font-size: var(--fs-field);
+  color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r);
 }
-.utbud-rad > li { flex: 0 0 180px; scroll-snap-align: start; }
-.utbud-kort { display: grid; gap: 6px; text-decoration: none; color: inherit; }
-.utbud-bild {
-  display: block; aspect-ratio: 4 / 3; border-radius: var(--r-lg); overflow: hidden;
-  background: var(--field);
+.marken-sok input:focus { outline: none; border-color: var(--accent); }
+.marken-sok input::placeholder { color: var(--muted-soft); }
+.marken-sok button {
+  flex: none; height: 46px; padding: 0 20px; border: none; border-radius: var(--r); cursor: pointer;
+  background: var(--ink); color: var(--bg); font: inherit; font-size: var(--fs-md); font-weight: 700;
 }
-.utbud-bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.utbud-tom { display: block; width: 100%; height: 100%; }
-.utbud-titel { font-size: var(--fs-md); font-weight: 600; line-height: 1.3; }
-.utbud-rad-under { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; }
-.utbud-pris { font-weight: 700; }
-.utbud-skick { font-size: var(--fs-2xs); color: var(--muted-soft); }
+.marken-sok button:hover { background: var(--accent); color: #fff; }
+
+.marken-rutnat {
+  list-style: none; margin: 0; padding: 0;
+  display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.marken-bricka { display: grid; gap: 8px; text-decoration: none; color: inherit; }
+/* Märkets egen färg och bokstavsform. Namnet är deras; ramen är vår. */
+.marken-platta {
+  display: grid; place-items: center; aspect-ratio: 16 / 10;
+  border-radius: var(--r-lg); padding: 12px; text-align: center;
+  font-size: clamp(15px, 2vw, 19px); overflow: hidden;
+  transition: transform 120ms ease;
+}
+.marken-bricka:hover .marken-platta { transform: translateY(-2px); }
+.marken-antal { font-size: var(--fs-sm); color: var(--muted-soft); }
+/* Våra granskade väger tyngre i raden, och ser ut som det. */
+.marken-antal b { color: var(--green-dark); font-weight: 700; }
+
+.marken-tomt { padding: 20px; background: var(--field); border-radius: var(--r-lg); color: var(--muted); }
+.marken-skimmer {
+  display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+}
+.marken-skimmer span {
+  display: block; aspect-ratio: 16 / 10; border-radius: var(--r-lg);
+  background: var(--skeleton); background-size: 200% 100%; animation: marken-skim 1.4s linear infinite;
+}
+@keyframes marken-skim { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+@media (prefers-reduced-motion: reduce) { .marken-skimmer span { animation: none; } }
 
 /* ---- prisärlighet och FAQ ---- */
 

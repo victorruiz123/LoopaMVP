@@ -335,3 +335,28 @@ någon redan lagt tid på det.
 **Att veta:** det här gör /kop till en sida där de flesta möter en inloggningsruta. Konverteringen
 mäts av `logga_in_fraga` mot `hero_submit` — visar den att folk faller av vid rutan är beslutet
 enkelt att backa, eftersom grinden är ett enda anrop (`fragaOmInloggning`) på tre ställen.
+
+---
+
+## 16. Bläddra på märke, inte på "vårt utbud"
+
+**Beslut:** Produktraden "Eller köp direkt ur vårt granskade utbud" är ersatt av en märkessektion
+med en sökrad över brickorna.
+
+**Varför:** märket är hur folk faktiskt letar begagnade möbler. *"Finns det någon Lamino?"* är
+frågan; *"visa mig era nyinkomna"* är det inte. Åtta produktkort svarade på fel fråga — de visade
+vad vi råkade ha, inte vad någon sökte.
+
+**Båda källorna bakom varje bricka.** Ett klick ger märkets hela utbud: våra granskade möbler och
+Traderas annonser i samma rutnät. Märkessidan gjorde det redan; det som saknades var vägen dit.
+
+**Men antalen är DELADE på brickan** — "41 granskade · 33 via Tradera", aldrig "74". De två sakerna
+är olika mycket värda: en granskad möbel går att köpa i dag med hemleverans, en Tradera-annons är
+någon annans som vi kan analysera. Ett sammanslaget tal hade lånat vår granskning till annonser vi
+inte granskat.
+
+**Räkningen flyttades till `inventory.ts`** och fick tester. Talet på brickan är ett löfte om vad
+sidan bakom innehåller, och ett löfte som bara finns i en HTTP-hanterare går inte att pröva.
+
+**Sökraden filtrerar brickorna medan man skriver** och tar en till rutnätet när ordet inte är ett
+märke — den som skriver "Lamino" menar en modell, och ska inte mötas av tomhet.

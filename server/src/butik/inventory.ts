@@ -16,6 +16,7 @@ import { loopaIdFor } from "../loopaId.js";
 import { jobToProduct } from "./normalize.js";
 import { shopReadiness } from "./state.js";
 import { ensureRecord, publish, store, unpublish, type ButikRecord } from "./store.js";
+import { alla as allaOverstyrningar, tillampaPaProdukt } from "./overrides.js";
 import { fold } from "./catalog.js";
 import { notify, takePendingNotifications } from "./bevakningar.js";
 import { BROWSABLE_STATES, type BrowseResult, type Product, type ProductFilter, type SortKey } from "./types.js";
@@ -39,13 +40,21 @@ export function invalidate(): void {
 async function build(): Promise<Product[]> {
   const jobs = await listJobs();
   const records = new Map((await store().all()).map((r) => [r.id, r]));
+  /**
+   * Adminens rättelser läggs på sist, och hämtas EN gång för hela bygget.
+   *
+   * Ordningen är hela poängen: normalize.ts härleder ur besiktningen, och det en människa
+   * uttryckligen skrivit går före. Se butik/overrides.ts för varför de inte bor i jobbet.
+   */
+  const overstyrningar = await allaOverstyrningar();
   const products: Product[] = [];
 
   for (const job of jobs) {
     const loopaId = loopaIdFor(job.id);
     const record: ButikRecord | undefined = records.get(loopaId);
-    const product = jobToProduct(job, record?.state ?? "draft");
-    if (!product) continue;
+    const harlett = jobToProduct(job, record?.state ?? "draft");
+    if (!harlett) continue;
+    const product = tillampaPaProdukt(harlett, overstyrningar.get(loopaId));
     if (!shopReadiness(product).ready) continue;
     products.push(product);
   }
@@ -72,6 +81,9 @@ export async function allProducts(): Promise<Product[]> {
 export async function syncFromJobs(): Promise<{ enrolled: number; published: number; withdrawn: number; held: number }> {
   const jobs = await listJobs();
   const records = new Map((await store().all()).map((r) => [r.id, r]));
+  // Samma rättelser som bygget ovan: en möbel som blivit butiksfärdig FÖR att en admin fyllde i
+  // kategorin ska också skrivas in i lagret, inte bara visas i rutnätet.
+  const overstyrningar = await allaOverstyrningar();
   let enrolled = 0;
   let published = 0;
   let withdrawn = 0;
@@ -93,7 +105,8 @@ export async function syncFromJobs(): Promise<{ enrolled: number; published: num
   let held = 0;
 
   for (const job of jobs) {
-    const product = jobToProduct(job, "draft");
+    const harlett = jobToProduct(job, "draft");
+    const product = harlett && tillampaPaProdukt(harlett, overstyrningar.get(harlett.id));
     if (!product || !shopReadiness(product).ready) continue;
     ready.add(product.id);
     const loopaId = product.id;
@@ -327,6 +340,47 @@ export async function brandFacets(): Promise<Array<{ brand: string; count: numbe
     counts.set(p.brand, (counts.get(p.brand) ?? 0) + 1);
   }
   return [...counts].map(([brand, count]) => ({ brand, count })).sort((a, b) => b.count - a.count);
+}
+
+/**
+ * Märkena i ett sammanslaget lager, med antalet DELAT per källa.
+ *
+ * Brickan på köpsidan säger "41 granskade · 33 via Tradera" och inte "74", och skillnaden är ett
+ * löfte: en granskad möbel går att köpa i dag med hemleverans, en Tradera-annons är någon annans som
+ * vi kan analysera. Ett sammanslaget tal hade lånat vår granskning till annonser vi inte granskat.
+ *
+ * Ligger här och inte i routes.ts för att talen ÄR ett löfte om vad märkessidan innehåller, och ett
+ * löfte som bara finns i en HTTP-hanterare går inte att pröva.
+ */
+export interface MarkeFacet {
+  brand: string;
+  count: number;
+  loopa: number;
+  tradera: number;
+  slug: string;
+}
+
+export function brandFacetsMerged(items: Product[]): MarkeFacet[] {
+  const counts = new Map<string, { loopa: number; tradera: number }>();
+  for (const p of items) {
+    // Samma tillståndsregel som rutnätet: en bricka får bara räkna det man faktiskt kan gå till.
+    if (!p.brand || !BROWSABLE_STATES.includes(p.state)) continue;
+    const rad = counts.get(p.brand) ?? { loopa: 0, tradera: 0 };
+    if (p.source === "loopa") rad.loopa += 1;
+    else rad.tradera += 1;
+    counts.set(p.brand, rad);
+  }
+  return [...counts]
+    .map(([brand, n]) => ({
+      brand,
+      count: n.loopa + n.tradera,
+      loopa: n.loopa,
+      tradera: n.tradera,
+      slug: brand.toLowerCase().replace(/\s+/g, "-"),
+    }))
+    // Våra egna först inom samma storleksordning: en bricka med granskade möbler bakom sig är en
+    // bättre bricka att trycka på.
+    .sort((a, b) => b.count - a.count || b.loopa - a.loopa || a.brand.localeCompare(b.brand, "sv"));
 }
 
 /**

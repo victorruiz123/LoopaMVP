@@ -12,10 +12,11 @@ import { abandonCheckout, checkoutConfigured, CheckoutError, chooseSlot, fulfilP
 import { getOrder, orderByReference, ordersForUser, updateOrder } from "./orders.js";
 import { createBevakning, deleteBevakning, listBevakningar } from "./bevakningar.js";
 import { aiSearchAvailable, interpretQuery, rateLimited } from "./aiSearch.js";
-import { allProducts, applyFilter, brandFacets, categoryFacetsOf, productById } from "./inventory.js";
+import { allProducts, applyFilter, brandFacets, brandFacetsMerged, categoryFacetsOf, productById } from "./inventory.js";
 import { browse, mergedItems } from "./browse.js";
 import { CATEGORIES, categoryBySlug } from "./catalog.js";
 import { store } from "./store.js";
+import { avtryck, spara } from "../analys/store.js";
 import type { ConditionGrade } from "../types.js";
 import type { ProductFilter, SortKey } from "./types.js";
 
@@ -73,6 +74,23 @@ export function filterFromQuery(url: URL): ProductFilter {
   };
 }
 
+/** Sökrobotar räknas inte — en annons Googlebot hämtat är inte en annons någon sett. */
+const ROBOT = /bot|crawl|spider|slurp|facebookexternalhit|preview|monitor|curl|wget|headless/i;
+
+/**
+ * En sidvisning av produktsidan.
+ *
+ * Avtrycket är en hash av adress och webbläsarsträng med ett salt som byts vid varje omstart. Det
+ * finns bara för att kunna säga UNIKA visningar och lagras aldrig — se analys/store.ts.
+ */
+function raknaVisning(id: string, req: IncomingMessage): void {
+  const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+  if (ROBOT.test(ua)) return;
+  const vidare = req.headers["x-forwarded-for"];
+  const ip = (Array.isArray(vidare) ? vidare[0] : vidare)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+  void spara("annons_visning", id, {}, avtryck(ip, ua || null));
+}
+
 export async function handleButikRequest(
   segments: string[],
   req: IncomingMessage,
@@ -94,6 +112,14 @@ export async function handleButikRequest(
       json(res, 404, { error: "Varan finns inte." });
       return true;
     }
+    /**
+     * Visningen räknas HÄR, där produktsidan ändå hämtar sin data.
+     *
+     * Serverräknad och inte klientmätt: anropet sker en gång per öppnad produktsida, det kan inte
+     * påstås av en besökare, och det kräver varken kaka eller samtycke — se analys/store.ts.
+     * Väntas aldrig in; en mätning får inte ligga i vägen för svaret.
+     */
+    raknaVisning(product.id, req);
     // Huvudboken följer med: produktsidan ska kunna säga att möbeln är såld och när.
     const events = await store().events(product.id);
     json(res, 200, { product, events });
@@ -144,14 +170,9 @@ export async function handleButikRequest(
    */
   if (segments[0] === "marken" && segments.length === 1) {
     const { items } = await mergedItems();
-    const counts = new Map<string, number>();
-    for (const p of items) {
-      if (!p.brand || (p.state !== "live" && p.state !== "reserved")) continue;
-      counts.set(p.brand, (counts.get(p.brand) ?? 0) + 1);
-    }
-    const brands = [...counts]
-      .map(([brand, count]) => ({ brand, count, slug: brand.toLowerCase().replace(/\s+/g, "-") }))
-      .sort((a, b) => b.count - a.count || a.brand.localeCompare(b.brand, "sv"));
+    // Räkningen bor i inventory.ts: talen är ett löfte om vad märkessidan innehåller, och ett löfte
+    // som bara finns i en HTTP-hanterare går inte att pröva. Se brandFacetsMerged.
+    const brands = brandFacetsMerged(items);
     json(res, 200, { brands });
     return true;
   }
