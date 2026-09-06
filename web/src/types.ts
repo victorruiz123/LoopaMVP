@@ -282,6 +282,14 @@ export interface CardCover {
 export interface CoverCutout {
   sourceImageId: string;
   label: string | null;
+  /** Vem som räknade silhuetten: den köpta tjänsten eller den lokala modellen. null = före fältet fanns. */
+  /** Modellens namn ur registret (server/src/pipeline/bild/modeller.ts). Gamla kort bär "pixian"/"u2net". */
+  provider: string | null;
+  /** Kvalitetskontrollens dom, 0–1. Saknas på urklipp från före kontrollen fanns. */
+  qualityScore?: number;
+  /** Sant när omslaget inte får publiceras utan att en människa tittat. */
+  needsReview?: boolean;
+  anmarkningar?: string[];
   createdAt: string;
 }
 
@@ -555,13 +563,182 @@ export interface AdminUser {
 export type AdminDirectory = "service" | "profiles" | "jobs";
 
 export interface AdminUsers {
-  /** Bara konton som registrerade sig idag eller igår — det panelen finns för att visa. */
+  /** ALLA konton, nyast först och odaterade sist. Inget urval — se serverns listAccounts. */
   users: AdminUser[];
   directory: AdminDirectory;
-  /** Hur många konton som finns totalt, så vyn kan säga vad urvalet döljer. */
+  /** Antalet konton i listan. Samma som `users.length`; följer med för att vyn ska slippa räkna. */
   total: number;
-  /** Fönstrets början: igår 00:00, serverns lokala tid. */
-  since: string;
+}
+
+// ---- adminpanelen: annonserna (GET /api/admin/annonser) ----
+
+/**
+ * Vad en annons har varit med om. Speglar server/src/analys/store.ts.
+ *
+ * `visningar` räknas på servern där produktsidan och kortet ändå hämtas; `listvisningar` är
+ * exponeringar i ett rutnät och kommer från webbläsaren. De två blandas aldrig ihop — en möbel som
+ * synts tusen gånger i en lista är inte en möbel tusen personer tittat på.
+ */
+export interface AnnonsStatistik {
+  visningar: number;
+  unikaVisningar: number;
+  listvisningar: number;
+  klick: number;
+  kassor: number;
+  kop: number;
+  utgaende: number;
+  perHandelse: Record<string, number>;
+  forsta: string | null;
+  senaste: string | null;
+}
+
+export type AnnonsLage =
+  | "misslyckad"
+  | "pagaende"
+  | "utan-annons"
+  | "utkast"
+  | "live"
+  | "reserverad"
+  | "sald"
+  | "levererad"
+  | "returnerad";
+
+export interface AdminAnnonsRad {
+  id: string;
+  jobId: string;
+  ownerId: string | null;
+  createdAt: string;
+  lage: AnnonsLage;
+  state: "draft" | "live" | "reserved" | "sold" | "delivered" | "returned" | null;
+  titel: string;
+  brand: string | null;
+  model: string | null;
+  categorySlug: string | null;
+  imageUrl: string | null;
+  grade: string | null;
+  /** Vad som fattas innan möbeln får ligga i butiken. Tom lista = ingenting. */
+  saknas: string[];
+  overstyrd: boolean;
+  prisNu: number | null;
+  prisStart: number | null;
+  prisGolv: number | null;
+  prisForslag: number | null;
+  prisNy: number | null;
+  sankningar: number;
+  nextDropAt: string | null;
+  listedAt: string | null;
+  soldAt: string | null;
+  soldChannel: "butik" | "tradera" | null;
+  dagarUppe: number | null;
+  traderaStatus: "publishing" | "published" | "error" | null;
+  traderaItemId: number | null;
+  statistik: AnnonsStatistik;
+  /** Klick delat med visningar + listvisningar. Null när ingen sett annonsen. */
+  ctr: number | null;
+  ordrar: number;
+}
+
+export interface AnnonsOverstyrning {
+  id: string;
+  title?: string | null;
+  description?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  categorySlug?: string | null;
+  color?: string | null;
+  material?: string | null;
+  widthMm?: number | null;
+  depthMm?: number | null;
+  heightMm?: number | null;
+  seatHeightMm?: number | null;
+  retailPriceSek?: number | null;
+  imageUrl?: string | null;
+  note?: string | null;
+  updatedAt: string;
+  updatedBy: string | null;
+}
+
+/** En övergång i butikens huvudbok. Aldrig ändrad, bara tillagd. */
+export interface AnnonsHandelse {
+  id: string;
+  productId: string;
+  from: string | null;
+  to: string;
+  at: string;
+  actor: { kind: string; userId?: string | null; job?: string; itemId?: number | null };
+  note: string | null;
+}
+
+export interface AnnonsMatning {
+  event: string;
+  at: string;
+  annons: string | null;
+  props: Record<string, string | number | boolean>;
+}
+
+/** Butiksvaran som panelen visar den — samma projektion som rutnätet läser. */
+export interface AnnonsProdukt {
+  id: string;
+  title: string;
+  brand: string | null;
+  model: string | null;
+  categorySlug: string;
+  color: string | null;
+  material: string | null;
+  dimensions: { widthMm: number | null; depthMm: number | null; heightMm: number | null; seatHeightMm: number | null; estimated: boolean };
+  priceSek: number | null;
+  retailPriceSek: number | null;
+  imageUrl: string | null;
+  state: string;
+}
+
+export interface AdminAnnonsDetalj extends AdminAnnonsRad {
+  produkt: AnnonsProdukt | null;
+  /** Vad besiktningen härledde, före rättelserna. Det panelen jämför mot. */
+  harlett: AnnonsProdukt | null;
+  overstyrning: AnnonsOverstyrning | null;
+  annonstext: { title: string; description: string; conditionText: string } | null;
+  ladder: PriceLadder | null;
+  handelser: AnnonsHandelse[];
+  matningar: AnnonsMatning[];
+  ordrarRader: Array<{
+    id: string;
+    reference: string;
+    status: string;
+    priceSek: number;
+    deliveryFeeSek: number;
+    email: string | null;
+    createdAt: string;
+  }>;
+  progress: { stage: string; pct?: number } | null;
+  error: string | null;
+}
+
+export interface AdminAnnonser {
+  rader: AdminAnnonsRad[];
+  summering: {
+    antal: number;
+    live: number;
+    salda: number;
+    utanAnnons: number;
+    varde: number;
+    visningar: number;
+    klick: number;
+    medianDagarTillSald: number | null;
+  };
+}
+
+/** Ändringen panelen skickar. Utelämnat fält = rör inte; null = sätt till tomt. */
+export interface AnnonsAndring {
+  falt?: Record<string, string | number | null>;
+  prisNu?: number;
+  ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
+  lage?: "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
+  kanal?: "butik" | "tradera";
+  /** Kastar alla rättelser. Skilt från att sätta fälten till null — se server/src/adminAnnonser.ts. */
+  aterstall?: boolean;
+  /** Enskilda fält som ska följa besiktningen igen. Resten av rättelserna står kvar. */
+  aterstallFalt?: string[];
 }
 
 // ---- publik annons (GET /api/cards/:loopaId) ----
@@ -574,7 +751,16 @@ export interface AdminUsers {
 export type CardDamage = Pick<
   Damage,
   "id" | "type" | "part" | "semanticLocation" | "severity" | "impact" | "description"
->;
+> & {
+  /**
+   * Bildrutan skadan syns i, med markeringen och bildens mått.
+   *
+   * Null när inspektionen inte lämnade någon bevisruta — anmärkningen står kvar i listan ändå, för
+   * den är sann även utan foto. Måtten följer med för att markeringen är angiven i ANDELAR: en ruta
+   * ritad på en gissad bildproportion pekar ut ett ställe där skadan inte är.
+   */
+  bild: { url: string; mark: EvidenceMark; width: number; height: number } | null;
+};
 
 /** Priset som kortet visar det. `PriceEstimate` passar in här som den är. */
 export interface CardPrice {

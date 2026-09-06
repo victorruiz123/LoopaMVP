@@ -40,7 +40,8 @@ export default function LoggaInGrind() {
     <div className="grind" role="dialog" aria-modal="true" aria-label="Logga in">
       <div className="grind-ruta">
         <AuthScreen
-          intent="account"
+          inbaddad
+        intent="account"
           initialTab="signup"
           onDone={() => { setVisa(false); efterat?.(); }}
           onBack={() => setVisa(false)}

@@ -86,7 +86,8 @@ test("kategorisidan får en egen titel med orten i", async () => {
   assert.ok(head);
   assert.match(head.title, /stolar/i);
   assert.match(head.title, /Stockholm/);
-  assert.equal(head.noindex, undefined);
+  // Fältet sätts numera uttryckligen — en kategori med varor är indexerbar, en tom är det inte.
+  assert.ok(!head.noindex);
 });
 
 test("en okänd kategori får inget huvud alls — skalet skickas orört", async () => {
@@ -108,4 +109,89 @@ test("en möbel som inte finns markeras noindex i stället för att svara 200 me
 test("adresser utanför butiken rör inte skalet", async () => {
   assert.equal(await seoFor("/", ""), null);
   assert.equal(await seoFor("/butik/nagot-okant/x", ""), null);
+});
+
+
+// ─── Kroppen som länkgraf ───────────────────────────────────────────────────
+//
+// Det som avgör om en produktsida hittas är inte dess egen markering utan om något länkar till den
+// utan att JavaScript kört. Kategorisidan och märkessidan bar tidigare bara en rubrik: adresserna
+// fanns, men ingen väg gick dit. Testerna nedan låser fast att vägen finns.
+
+test("kategorisidan listar varorna som riktiga länkar", async () => {
+  const head = await seoFor("/butik/kategori/stolar", "");
+  assert.ok(head);
+  assert.match(head.body ?? "", /href="\/butik\/objekt\//, "utan produktlänkar hittar en robot aldrig till en möbel");
+});
+
+test("kategorisidan säger i strukturerad data att den ÄR en lista av produkter", async () => {
+  const head = await seoFor("/butik/kategori/stolar", "");
+  assert.ok(head?.jsonLd);
+  const grafer = JSON.parse(head.jsonLd);
+  const typer = (Array.isArray(grafer) ? grafer : [grafer]).map((g) => g["@type"]);
+  assert.ok(typer.includes("BreadcrumbList"));
+  assert.ok(typer.includes("ItemList"));
+});
+
+test("produktsidan bär brödsmulor OCH sin produktmarkering i samma tagg", async () => {
+  const { allProducts } = await import("../server/src/butik/inventory.js");
+  const vara = (await allProducts()).find((p) => p.source === "loopa" && p.state === "live");
+  if (!vara) return; // Tomt lager i den här körningen — inget att pröva mot.
+  const head = await seoFor(`/butik/objekt/${vara.id}`, "");
+  assert.ok(head?.jsonLd);
+  const grafer = JSON.parse(head.jsonLd);
+  assert.ok(Array.isArray(grafer), "två grafer ska ligga som en lista i en enda script-tagg");
+  const typer = grafer.map((g) => g["@type"]);
+  assert.ok(typer.includes("BreadcrumbList"));
+  assert.ok(typer.includes("Product"));
+});
+
+test("produktsidan länkar vidare till kategorin i stället för att bli en återvändsgränd", async () => {
+  const { allProducts } = await import("../server/src/butik/inventory.js");
+  const vara = (await allProducts()).find((p) => p.source === "loopa" && p.state === "live");
+  if (!vara) return;
+  const head = await seoFor(`/butik/objekt/${vara.id}`, "");
+  assert.match(head?.body ?? "", /href="\/butik\/kategori\//);
+});
+
+// ─── robots.txt och sitemap.xml ─────────────────────────────────────────────
+
+test("robots.txt släpper igenom produktbilderna innan den stänger API:t", async () => {
+  const { robotsTxt } = await import("../server/src/butik/sitemap.js");
+  // Bara direktiven. Kommentarraderna i filen NÄMNER "Disallow: /api/" när de förklarar varför
+  // ordningen spelar roll, och en rå indexOf hade läst förklaringen som regeln.
+  const direktiv = robotsTxt().split("\n").filter((r) => r.trim() && !r.trimStart().startsWith("#"));
+  const txt = robotsTxt();
+  // Ordningen ÄR regeln: Allow måste stå före Disallow för att bilderna ska nås. Blockeras de har
+  // varje möbel en trasig bild i sökresultatet, och Merchant Center avvisar varan.
+  assert.ok(
+    direktiv.indexOf("Allow: /api/cards/") < direktiv.indexOf("Disallow: /api/"),
+    "produktbilderna måste släppas igenom innan API:t stängs",
+  );
+  assert.match(txt, /^Sitemap: https?:\/\/\S+\/sitemap\.xml$/m);
+});
+
+test("sitemapen ber aldrig om indexering av en sida som säger noindex", async () => {
+  const { sitemapXml } = await import("../server/src/butik/sitemap.js");
+  const { allProducts } = await import("../server/src/butik/inventory.js");
+  const xml = await sitemapXml();
+  const salda = (await allProducts()).filter((p) => p.state === "sold" || p.state === "delivered");
+  for (const p of salda) {
+    assert.ok(!xml.includes(`/butik/objekt/${p.id}<`), `${p.id} är såld och ska inte stå i sitemapen`);
+  }
+});
+
+test("sitemapen listar bara våra egna möbler, inte Traderas annonser", async () => {
+  const { sitemapXml } = await import("../server/src/butik/sitemap.js");
+  const xml = await sitemapXml();
+  assert.ok(!xml.includes("tradera%3A"), "någon annans annons är inte vårt innehåll att be om indexering för");
+});
+
+test("sitemapen är välformad XML med bilderna på plats", async () => {
+  const { sitemapXml } = await import("../server/src/butik/sitemap.js");
+  const xml = await sitemapXml();
+  assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
+  assert.equal((xml.match(/<urlset/g) ?? []).length, 1);
+  assert.equal((xml.match(/<url>/g) ?? []).length, (xml.match(/<\/url>/g) ?? []).length);
+  assert.ok(xml.includes("/butik/kategori/"));
 });

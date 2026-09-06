@@ -49,6 +49,20 @@ export interface Product {
   dimensions: Dimensions;
   priceSek: number | null;
   retailPriceSek: number | null;
+  /**
+   * Prismotorns uppskattning av vad möbeln är värd BEGAGNAD — inte nypriset.
+   *
+   * Rabatten på kortet räknas mot `retailPriceSek` (vad en ny kostar, det köparen känner igen),
+   * medan sorteringens fyndpoäng räknas mot den här (vad just den här är värd). Två olika frågor,
+   * och att blanda ihop dem gör antingen varje begagnad möbel till ett jättefynd eller inget till.
+   */
+  estimatedValueSek: number | null;
+  /** Genomförda prissänkningar, äldst först. Kommer ur säljarens prisstege. */
+  priceHistory: Array<{ at: string; from: number; to: number }>;
+  /** När priset senast sänktes. Driver etiketten "Prissänkt" på kortet. */
+  priceDroppedAt: string | null;
+  imageCount: number;
+  hasMeasurements: boolean;
   imageUrl: string | null;
   /** Null för Tradera-varor. Det är den skillnaden kortet visar som "ej granskad". */
   condition: ProductCondition | null;

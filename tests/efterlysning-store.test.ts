@@ -21,7 +21,7 @@ const { migrateBevakningar } = await import("../server/src/efterlysning/migrate.
 
 const spec = (over = {}) => ({
   userId: "u1", email: "u@x.se",
-  filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000 },
+  filter: { categorySlug: "soffor", maxPriceSek: 5000 },
   styleTags: [], deadline: null, urgency: "none" as const, note: null,
   summary: "Soffor · max 5 000 kr", parseMethod: "form" as const, area: "Södermalm",
   ...over,

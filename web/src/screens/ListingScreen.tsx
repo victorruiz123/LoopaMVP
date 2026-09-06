@@ -1,4 +1,4 @@
-import type { CardCover, ConditionResult } from "../types";
+import type { CardCover, CardDamage, ConditionResult } from "../types";
 import { damageStands } from "../lib/damages";
 import { ArrowLeftIcon } from "../components/icons";
 import LoopaIdBlock from "../components/LoopaIdBlock";
@@ -6,7 +6,7 @@ import ListingView from "../components/ListingView";
 import SellWithLoopa from "../components/SellWithLoopa";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
-import { coverUrl, imageUrl } from "../api";
+import { imageUrl } from "../api";
 import DemandHook from "../kop/components/DemandHook";
 
 /**
@@ -86,7 +86,7 @@ export default function ListingScreen({
             identity={result.identity}
             grade={result.grade}
             price={result.price}
-            damages={result.damages.filter(damageStands)}
+            damages={saljarensSkador(result)}
             imageCount={result.images.length}
             reviewed={result.reviewed}
             productImage={result.productImage}
@@ -123,7 +123,32 @@ export default function ListingScreen({
  * av möbeln, och saknas det står katalogbilden kvar som kortets sista utväg.
  */
 function sellerCover(result: ConditionResult): CardCover | null {
-  if (result.coverCutout) return { url: coverUrl(result.jobId), kind: "cutout" };
+  /**
+   * Bildrutan, orörd — samma bild köparen ser, och i samma ordning: ListingView tar katalogbilden
+   * först och den här som reserv. Urklippet är avvecklat som omslag, se publicCard.ts.
+   */
   if (result.coverImageId) return { url: imageUrl(result.jobId, result.coverImageId), kind: "photo" };
   return null;
+}
+
+/**
+ * Skadorna med sina foton, för säljarens egen vy.
+ *
+ * Köparens kort får bilderna av servern (publicCard.ts) på en publik adress. Säljaren tittar på
+ * samma vy men är inloggad, och hämtar därför bildrutan på jobbets egen väg. Utan den här
+ * mappningen hade säljaren sett en skadelista utan foton medan köparen ser dem — och den som ska
+ * godkänna en skickrapport innan den publiceras är just den som mest behöver se vad som märkts ut.
+ */
+function saljarensSkador(result: ConditionResult): CardDamage[] {
+  const bilder = new Map(result.images.map((i) => [i.id, i]));
+  return result.damages.filter(damageStands).map((d) => {
+    const bevis = d.evidence.find((e) => bilder.has(e.imageId));
+    const bild = bevis ? bilder.get(bevis.imageId) : undefined;
+    return {
+      ...d,
+      bild: bevis && bild
+        ? { url: imageUrl(result.jobId, bevis.imageId), mark: bevis.mark, width: bild.width, height: bild.height }
+        : null,
+    };
+  });
 }

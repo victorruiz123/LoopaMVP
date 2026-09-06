@@ -2,6 +2,7 @@ import { useRef, useState, type ReactNode } from "react";
 import { useAuth } from "../../auth/AuthProvider";
 import { Link, SearchIcon, track } from "./Bits";
 import { navigate, useButikRoute } from "../router";
+import LoggaInGrind from "../../kop/components/LoggaInGrind";
 
 /**
  * Ramen kring köpsidan: topprad, innehåll, sidfot.
@@ -12,11 +13,24 @@ import { navigate, useButikRoute } from "../router";
  * kom till; ingenting i den ändrades på vägen.
  */
 export default function ButikChrome({ children }: { children: ReactNode }) {
+  /*
+   * `variant` fanns här för köpsidans skiss-läge ("butik-skiss": hela bredden, egen palett, en
+   * topprad utan sökikon). Den sidan är borttagen och ingen annan vy satte propen, så ramen har
+   * återigen bara ett utseende.
+   */
   return (
     <div className="butik">
       <ButikBar />
       <main className="butik-main">{children}</main>
       <ButikFooter />
+      {/*
+        Inloggningsfrågan hör till RAMEN, inte till en sida.
+        Toppradens "Logga in" står på varje sida under /kop och /butik och ber om inloggning med ett
+        fönsterhändelse. Låg lyssnaren bara på köpsidans landningssida — som den gjorde — hände
+        ingenting när knappen trycktes någon annanstans: klicket stoppades, och inget öppnades.
+        Här finns den överallt där knappen finns.
+      */}
+      <LoggaInGrind />
     </div>
   );
 }
@@ -36,8 +50,11 @@ function ButikBar() {
 
   return (
     <header className="butik-bar">
-      {/* Ordmärket: orange, Poppins 800. Går till KÖPSIDAN — butikens rot 301:as dit ändå. */}
-      <a href="/kop" className="butik-logo">loopa<span>.</span></a>
+      {/* Ordmärket: orange, Poppins 800. Går till STARTSIDAN, inte till lagret. Ett ordmärke är
+          vägen hem — samma sak som i Trygg affärs ram (affar/AffarApp.tsx) — och "hem" är sidan
+          som säger vad Loopa är, inte en lista med alla möbler. Vill man se hela lagret finns
+          sökningen bredvid. */}
+      <a href="/" className="butik-logo">loopa<span>.</span></a>
 
       {/*
         SÖKNINGEN ÄR EN KNAPP, inte ett fält.
@@ -89,7 +106,7 @@ function ButikBar() {
             : <span>{initial(profile?.full_name || profile?.username || user.email)}</span>}
         </Link>
       ) : (
-        <a className="butik-bar-logga-in" href="/kop?logga-in=1" onClick={(e) => {
+        <a className="butik-bar-logga-in" href="/butik?logga-in=1" onClick={(e) => {
           e.preventDefault();
           window.dispatchEvent(new CustomEvent("loopa:logga-in", { detail: { anledning: "header" } }));
         }}>

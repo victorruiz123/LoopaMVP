@@ -56,9 +56,9 @@ const MAX_RESULT_AGE_S = Math.round(CACHE_TTL_MS / 1000);
  * svarar "vad är DERAS annons".
  */
 const CATEGORY_SOURCES: Array<{ id: number; slug: string }> = [
-  { id: 302537, slug: "soffor-fatoljer" }, // Vardagsrum > Soffor
-  { id: 302538, slug: "soffor-fatoljer" }, // Vardagsrum > Fåtöljer
-  { id: 302539, slug: "soffor-fatoljer" }, // Vardagsrum > Soffgrupper
+  { id: 302537, slug: "soffor" }, // Vardagsrum > Soffor
+  { id: 302538, slug: "fatoljer" }, // Vardagsrum > Fåtöljer
+  { id: 302539, slug: "soffor" }, // Vardagsrum > Soffgrupper
   { id: 302540, slug: "bord" },            // Vardagsrum > Soffbord
   { id: 302532, slug: "stolar" },          // Matsal (Traderas enda stolkategori)
   { id: 302542, slug: "forvaring" },       // Vardagsrum > Bokhyllor
@@ -206,6 +206,20 @@ export function itemToProduct(block: string, knownBrands: string[]): Product | n
     id: `tradera:${id}`,
     source: "tradera",
     title,
+    /**
+     * De fyra fälten nedan är TOMMA för Tradera, och det är inte en lucka att fylla igen.
+     *
+     * Vi har ingen prisuppskattning på någon annans annons (ingen besiktning, inget skick att räkna
+     * på), ingen prisstege (deras säljare bestämmer sitt eget pris), och sökresultatet bär varken
+     * bildantal eller mått. Att gissa något av det hade gett Tradera-varor fyndpoäng och
+     * listningskvalitet de inte förtjänat — och de hade då kunnat sorteras före våra egna, som är de
+     * enda vi kan gå i god för.
+     */
+    estimatedValueSek: null,
+    priceHistory: [],
+    priceDroppedAt: null,
+    imageCount: 0,
+    hasMeasurements: false,
     brand: brandFromTitle(title, knownBrands),
     model: null,
     categorySlug: categorySlugFor(categoryId, title),

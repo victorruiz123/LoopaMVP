@@ -28,7 +28,7 @@ async function dealWithAssessment(): Promise<Deal> {
       submittedAt: new Date().toISOString(),
     },
     assessment: {
-      brand: "IKEA", model: "EKTORP", categorySlug: "soffor-fatoljer", categoryNoun: "soffa",
+      brand: "IKEA", model: "EKTORP", categorySlug: "soffor", categoryNoun: "soffa",
       grade: "C", gradeNote: "Ser sliten ut på bilderna.",
       observations: ["Fläck på höger armstöd", "Nedsutten sits"],
       confidence: "medium", marketLowSek: 1200, marketHighSek: 2000,

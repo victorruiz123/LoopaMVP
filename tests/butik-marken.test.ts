@@ -15,7 +15,7 @@ import type { Product } from "../server/src/butik/types.js";
 
 const vara = (over: Partial<Product> = {}): Product => ({
   id: Math.random().toString(36).slice(2), source: "loopa", title: "Soffa",
-  brand: "IKEA", model: null, categorySlug: "soffor-fatoljer", color: null, material: null,
+  brand: "IKEA", model: null, categorySlug: "soffor", color: null, material: null,
   dimensions: { widthMm: null, depthMm: null, heightMm: null, seatHeightMm: null },
   priceSek: 1000, retailPriceSek: null, imageUrl: null, condition: null,
   state: "live", listedAt: "2026-09-01T00:00:00Z", listedAtKnown: true,

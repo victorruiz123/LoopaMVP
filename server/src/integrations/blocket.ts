@@ -16,6 +16,7 @@
  */
 
 import { adImages, adTitle, composeAd, publicCardUrl, renderAdPlain, resolveAdPrice } from "../adContent.js";
+import { medRattelser } from "../butik/overrides.js";
 import { loopaIdFor } from "../loopaId.js";
 import type { ConditionJob } from "../types.js";
 
@@ -51,9 +52,11 @@ export interface BlocketState {
  * Samma tre krav som Tradera-publiceringen ställer — en annonstext, ett pris och minst en bild — och
  * med samma ord, för att det inte ska gå att tro att den ena vägen kan något den andra inte kan.
  */
-export async function blocketAdFor(job: ConditionJob): Promise<BlocketState> {
+export async function blocketAdFor(rajob: ConditionJob): Promise<BlocketState> {
   const blocked = (reason: string): BlocketState => ({ ad: null, blockedReason: reason });
 
+  // Rättad rubrik och text följer med hit också — samma port som Tradera-annonsen går genom.
+  const job = await medRattelser(rajob);
   const result = job.result;
   const card = result?.listing?.result ?? null;
   if (!result) return blocked("Analysen är inte klar än.");

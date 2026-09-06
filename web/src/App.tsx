@@ -11,6 +11,7 @@ import AuthScreen from "./screens/AuthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AdminScreen from "./screens/AdminScreen";
 import AdminUserScreen from "./screens/AdminUserScreen";
+import AdminAdScreen from "./screens/AdminAdScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
 import ButikApp from "./butik/ButikApp";
@@ -29,6 +30,7 @@ import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, type
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
+import type { AdminFlik } from "./screens/AdminScreen";
 
 type Screen =
   | { name: "home" }
@@ -49,12 +51,16 @@ type Screen =
   // `back` finns för att kortet numera nås från två håll: säljarens egen profil och adminpanelen.
   // Utan det landade en admin på skickvyn för någon annans möbel när de backade ur kortet.
   | { name: "listing"; jobId: string; result: ConditionResult; loopaId?: string; back?: Screen }
-  | { name: "lookup" }
   // Inloggningen utanför flödet: den som vill åt sin profil innan de filmat något.
   | { name: "login" }
   | { name: "profile" }
-  | { name: "admin" }
-  | { name: "adminUser"; user: AdminUser };
+  // `flik` bärs i skärmen och inte inuti panelen, för att vägen tillbaka från en annons ska landa i
+  // annonsfliken. Utan den hade varje besök i en annons kastat tillbaka en till förvalet.
+  | { name: "admin"; flik?: AdminFlik }
+  | { name: "adminUser"; user: AdminUser }
+  // Den enskilda annonsen, i redigeringsvyn. Nås ur panelens annonsflik, aldrig direkt — rollen
+  // prövas på servern vid varje anrop.
+  | { name: "adminAd"; loopaId: string };
 
 /**
  * Flödet: märke -> bilder -> VÄLJ MODELL -> specifikationer -> pris -> skick -> annons.
@@ -76,6 +82,35 @@ type Screen =
  * i bakgrunden och skärmen går rakt in i väntan på modellen — samma väg som en redan inloggad
  * säljare tar, utan kvittensskärm och utan ett extra tryck.
  */
+/**
+ * Adressen appen läser sitt vägval ur — som ett tillstånd, inte som en engångsläsning.
+ *
+ * VARFÖR EN LYSSNARE. Vägvalet i App nedan är fyra läsningar av `window.location.pathname` i
+ * renderkroppen, och en läsning som ingenting prenumererar på uppdateras aldrig. Undersidorna har
+ * egna routrar som byter adress med pushState följt av en PopStateEvent (butik/router.ts,
+ * kop/router.ts). Så länge en sådan navigering håller sig inom SIN app märks det inte — appen är
+ * redan monterad och har sin egen lyssnare.
+ *
+ * Den går sönder när navigeringen korsar gränsen mellan två av apparna, vilket toppradens
+ * profilknapp gör: den står i den delade ramen på /kop och pekar på /butik/profil. Adressen byttes,
+ * men App räknade aldrig om sitt vägval — KopApp satt kvar, fick en adress den inte känner igen och
+ * föll tillbaka på sin landningssida. Knappen såg död ut, och det var precis vad den var.
+ *
+ * popstate täcker båda hållen: webbläsarens bakåtknapp och de egna routrarnas pushState, som
+ * uttryckligen skickar samma händelse efter sig just för att kunna läsas här.
+ */
+function usePathname(): string {
+  const [pathname, setPathname] = useState(window.location.pathname);
+  useEffect(() => {
+    const las = () => setPathname(window.location.pathname);
+    window.addEventListener("popstate", las);
+    // Adressen kan ha hunnit bytas mellan första renderingen och att lyssnaren satt på plats.
+    las();
+    return () => window.removeEventListener("popstate", las);
+  }, []);
+  return pathname;
+}
+
 export default function App() {
   /**
    * /c/LP-XXXX-XXXX — det publika kortet, FÖRE inloggningen.
@@ -85,7 +120,9 @@ export default function App() {
    * Läses ur adressen en gång: appen har ingen router, och den här vägen har ingen väg vidare in i
    * flödet.
    */
-  const publicId = loopaIdFromPath(window.location.pathname);
+  const pathname = usePathname();
+
+  const publicId = loopaIdFromPath(pathname);
 
   /**
    * /integritetspolicy, /cookies, /villkor — utanför flödet, och före allt annat.
@@ -94,7 +131,7 @@ export default function App() {
    * router. De ligger FÖRE kortet i ordningen bara för att de är exakta adresser medan kortets är
    * ett mönster — inte för att de kan krocka.
    */
-  const legalDoc = legalDocFromPath(window.location.pathname);
+  const legalDoc = legalDocFromPath(pathname);
 
   /**
    * /butik/** — köpsidan.
@@ -104,7 +141,7 @@ export default function App() {
    * butik/router.ts) — den har många adresser som ska gå att dela och backa i, medan säljflödet
    * medvetet inte har någon.
    */
-  const butik = isButikPath(window.location.pathname);
+  const butik = isButikPath(pathname);
 
   /**
    * /kop — köpsidan.
@@ -113,7 +150,7 @@ export default function App() {
    * tidigare och redan finns i delade länkar. `isKopPath` undantar den vägen uttryckligen; ordningen
    * här är bältet till de hängslena.
    */
-  const kop = isKopPath(window.location.pathname);
+  const kop = isKopPath(pathname);
 
   /**
    * /kop/analysera, /a/:token, /affar/:id — Trygg affär.
@@ -122,7 +159,7 @@ export default function App() {
    * enda sidan i produkten en okänd person når utan konto, och den måste därför ligga FÖRE varje
    * inloggningsgrind — precis som det publika kortet gör.
    */
-  const affar = isAffarPath(window.location.pathname);
+  const affar = isAffarPath(pathname);
 
   return (
     <>
@@ -153,7 +190,7 @@ export default function App() {
  * frågar efter en roll. Listan är därför liten med flit — den är villkoret för att appen ska gå att
  * öppna utloggad, inte en uppräkning av undantag.
  */
-const OPEN_SCREENS = new Set<Screen["name"]>(["home", "capture", "signup", "login", "lookup"]);
+const OPEN_SCREENS = new Set<Screen["name"]>(["home", "capture", "signup", "login"]);
 
 /**
  * Bildkakan hämtas innan något som visar bilder ritas.
@@ -216,6 +253,25 @@ function FlowApp() {
     }
   }
 
+  /**
+   * `/?admin=1` öppnar adminpanelen direkt.
+   *
+   * Panelen har ingen egen adress — säljverktyget väljer skärm i tillstånd och saknar router med
+   * flit. Butikens profil behöver ändå en väg hit, och en frågeparameter läst en gång vid start är
+   * den minsta som inte kräver en router. Samma mönster som `?affar=` ovan, städas likadant.
+   *
+   * INGEN GRIND HÄR. Flaggan säger bara vilken skärm som ritas; panelens data ligger bakom
+   * /api/admin, som prövar rollen på varje anrop. Den som gissar adressen ser en tom panel.
+   */
+  const [openAdmin] = useState(() => {
+    const vill = new URLSearchParams(window.location.search).get("admin") === "1";
+    if (vill) window.history.replaceState({}, "", window.location.pathname);
+    return vill;
+  });
+  useEffect(() => {
+    if (openAdmin && isAdmin) setScreen({ name: "admin" });
+  }, [openAdmin, isAdmin]);
+
   const hadAccount = useRef(false);
   useEffect(() => {
     if (user) {
@@ -243,10 +299,8 @@ function FlowApp() {
           key={homeKey.current}
           dealId={dealId.current}
           onStartScan={(identity) => setScreen({ name: "capture", identity })}
-          onOpenJob={(jobId) => setScreen({ name: "result", jobId })}
           // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
           onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
-          onOpenLookup={() => setScreen({ name: "lookup" })}
         />
       );
     case "capture":
@@ -370,10 +424,6 @@ function FlowApp() {
         />
       );
     }
-    case "lookup":
-      // Uppslaget på ett Loopa-ID, samma skärm som den publika sidan — inifrån appen med en väg
-      // tillbaka. Kortet som visas kan vara vems som helst; det är vad publikt betyder.
-      return <PublicCardScreen onBack={goHome} />;
     case "profile":
       return (
         <ProfileScreen
@@ -390,7 +440,18 @@ function FlowApp() {
         />
       );
     case "admin":
-      return <AdminScreen onBack={() => setScreen({ name: "profile" })} onOpenUser={(u) => setScreen({ name: "adminUser", user: u })} />;
+      return (
+        <AdminScreen
+          flik={screen.flik}
+          onBack={() => setScreen({ name: "profile" })}
+          onOpenUser={(u) => setScreen({ name: "adminUser", user: u })}
+          onOpenAd={(rad) => setScreen({ name: "adminAd", loopaId: rad.id })}
+        />
+      );
+    case "adminAd":
+      return (
+        <AdminAdScreen loopaId={screen.loopaId} onBack={() => setScreen({ name: "admin", flik: "annonser" })} />
+      );
     case "adminUser": {
       const from = screen;
       return (

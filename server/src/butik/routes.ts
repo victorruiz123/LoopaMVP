@@ -57,7 +57,20 @@ export function filterFromQuery(url: URL): ProductFilter {
     q: q.get("q"),
     categorySlug: q.get("kategori"),
     brands: list(q.get("marke")),
-    onlyLoopa: q.get("kalla") === "loopa",
+    /**
+     * BARA LOOPA-VAROR, om ingen uttryckligen ber om något annat.
+     *
+     * Förvalet var tvärtom och det gick inte ihop med vad butiken lovar. Köpdelen bär en
+     * förtroenderad på varje kort — verifierat skick, hemleverans, pengarna hålls till leverans,
+     * pengarna tillbaka om det inte stämmer — och INGET av det gäller en Tradera-annons. De är
+     * någon annans möbel, oskickbedömd av oss, med budgivning i stället för pris, egen frakt och
+     * ingen retur till oss. Ligger de i samma rutnät är förtroenderaden osann på ungefär halva
+     * lagret, och då är den värdelös på hela.
+     *
+     * `?kalla=alla` släpper in dem igen. Kopplingen mot Tradera är kvar i koden — den behövs för
+     * publicering åt våra egna säljare — men den syns inte i butiken.
+     */
+    onlyLoopa: q.get("kalla") !== "alla",
     minPriceSek: num(q.get("minpris")),
     maxPriceSek: num(q.get("maxpris")),
     grades: grades?.length ? grades : null,

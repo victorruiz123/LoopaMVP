@@ -416,6 +416,7 @@ function InviteStep({
          den är säljarens — köparen har inte filmat någonting. Fliken öppnas ändå på registrering,
          för den som kommer hit är ny för oss. */
       <AuthScreen
+        inbaddad
         intent="account"
         initialTab="signup"
         onDone={() => { setNeedsAccount(false); void create(); }}

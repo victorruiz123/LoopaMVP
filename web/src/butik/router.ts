@@ -68,11 +68,32 @@ export function butikHref(route: ButikRoute): string {
   }
 }
 
+/**
+ * Märket som säger att steget i historiken är vårt.
+ *
+ * "Tillbaka" på profilen ska gå tillbaka till sidan man kom ifrån — köpsidan, en annons, ett
+ * sökresultat — och det enda som vet vilken av dem det var är webbläsarens historik. Men
+ * `history.back()` på en flik som ÖPPNATS på /butik/profil lämnar sajten, och det är inte en väg
+ * tillbaka utan en väg ut. Märket skiljer de två fallen åt: sitter det på adressen man står på la
+ * appen den där själv, och då finns något av vårt bakom den.
+ *
+ * Ligger i history.state, som webbläsaren behåller per steg och över en omladdning — en uppdaterad
+ * profilsida vet alltså fortfarande att den kom någonstans ifrån.
+ */
+const EGET_STEG = { loopa: true };
+
+/** Sant när adressen man står på pushades av appen, alltså när det finns ett eget steg bakom den. */
+export function harStegBakat(): boolean {
+  return (window.history.state as { loopa?: boolean } | null)?.loopa === true;
+}
+
 /** Bytet av sida. Pushar adressen och talar om för lyssnarna att den ändrats. */
 export function navigate(to: ButikRoute | string, opts: { replace?: boolean } = {}): void {
   const href = typeof to === "string" ? to : butikHref(to);
-  if (opts.replace) window.history.replaceState({}, "", href);
-  else window.history.pushState({}, "", href);
+  // Ett ersatt steg ärver det det ersätter: `replace` lägger inte till något i historiken, så det
+  // som låg bakom adressen före bytet ligger kvar bakom den efter.
+  if (opts.replace) window.history.replaceState(window.history.state, "", href);
+  else window.history.pushState(EGET_STEG, "", href);
   window.dispatchEvent(new PopStateEvent("popstate"));
   // Ny sida börjar överst. Utan det ligger en produktsida kvar på förra rutnätets rullposition.
   window.scrollTo(0, 0);
@@ -82,7 +103,8 @@ export function navigate(to: ButikRoute | string, opts: { replace?: boolean } = 
 export function replaceQuery(params: URLSearchParams): void {
   const qs = params.toString();
   const href = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
-  window.history.replaceState({}, "", href);
+  // Behåller steget som det är, se `navigate`: ett filterbyte skapar ingen ny väg bakåt.
+  window.history.replaceState(window.history.state, "", href);
   window.dispatchEvent(new PopStateEvent("popstate"));
 }
 

@@ -1,6 +1,8 @@
 import type { ListingAttribute, ModelCandidate } from "./types.js";
 import { countDimensions, harvestSpecs } from "./specHarvest.js";
 
+import { fargerI, fargPaslag } from "./pipeline/farg.js";
+
 /** En källa den grundade sökningen pekade ut. */
 export interface SourceRef {
   title: string;
@@ -561,7 +563,16 @@ function isSiteRoot(url: string): boolean {
  * bästa sida lånats ut till alla fyra kandidaterna, och säljaren fått fyra bilder på samma soffa —
  * värre än inga bilder alls, eftersom bilden är det man väljer på.
  */
-export function rankPages(candidate: ModelCandidate, pages: FetchedPage[], rivals: string[] = []): Ranked[] {
+export function rankPages(
+  candidate: ModelCandidate,
+  pages: FetchedPage[],
+  rivals: string[] = [],
+  /**
+   * Möbelns färg, kanonisk. Sidor som bara nämner ANDRA färger sorteras sist — se farg.ts.
+   * Null (och det vanliga fallet, när färgen inte är känd ännu) rangordnar precis som förut.
+   */
+  farg: string | null = null,
+): Ranked[] {
   const model = normalise(candidate.model);
   if (!model) return [];
   const others = rivals.map(normalise).filter((m) => m && m !== model);
@@ -593,9 +604,18 @@ export function rankPages(candidate: ModelCandidate, pages: FetchedPage[], rival
     const noImage = images.length > 0 ? 0 : 100;
     // Möbelns egen sida före sidan om möbelns klädsel. Se ACCESSORY.
     const accessory = !wantsAccessory && ACCESSORY.test(`${p.title} ${p.finalUrl}`) ? 50 : 0;
+    /**
+     * Rätt modell i fel färg är fel bild.
+     *
+     * Läses ur TITEL och ADRESS, inte ur sidans kropp: kroppen på en produktsida räknar upp varje
+     * variant modellen finns i ("finns även i vit, ek, antracit"), så en kroppsmatchning hade gjort
+     * varje sida till en sida om varje färg. Titeln och adressen namnger den variant sidan HANDLAR
+     * om — `/nordviken-barstol-svart/` är svart och ingenting annat.
+     */
+    const fargFel = fargPaslag(`${p.title} ${p.finalUrl}`, farg);
     // Nivå 1: modellen står i titeln eller adressen — sidan HANDLAR om den.
     if (named) {
-      hits.push({ page: p, images, rank: noImage + accessory + (p.source.qualityTier ?? 3) });
+      hits.push({ page: p, images, rank: noImage + fargFel + accessory + (p.source.qualityTier ?? 3) });
       continue;
     }
     /**
@@ -608,7 +628,7 @@ export function rankPages(candidate: ModelCandidate, pages: FetchedPage[], rival
      */
     const alsoNamesRivals = others.some((o) => p.body.includes(` ${o} `));
     if (!isSiteRoot(p.finalUrl) && !alsoNamesRivals && p.body.includes(` ${model} `)) {
-      hits.push({ page: p, images, rank: noImage + accessory + 10 + (p.source.qualityTier ?? 3) });
+      hits.push({ page: p, images, rank: noImage + fargFel + accessory + 10 + (p.source.qualityTier ?? 3) });
     }
   }
   hits.sort((a, b) => a.rank - b.rank);
@@ -616,8 +636,13 @@ export function rankPages(candidate: ModelCandidate, pages: FetchedPage[], rival
 }
 
 /** Den bästa av dem. */
-export function matchPage(candidate: ModelCandidate, pages: FetchedPage[], rivals: string[] = []): FetchedPage | null {
-  return rankPages(candidate, pages, rivals)[0]?.page ?? null;
+export function matchPage(
+  candidate: ModelCandidate,
+  pages: FetchedPage[],
+  rivals: string[] = [],
+  farg: string | null = null,
+): FetchedPage | null {
+  return rankPages(candidate, pages, rivals, farg)[0]?.page ?? null;
 }
 
 /**
@@ -641,10 +666,10 @@ export function matchPage(candidate: ModelCandidate, pages: FetchedPage[], rival
  * Den som ändå blev utan får sin bästa lediga sida efteråt, för måttens skull: en sida utan bild är
  * fortfarande kandidatens sida, och specifikationerna står där.
  */
-function assignPages(candidates: ModelCandidate[], pages: FetchedPage[]): Map<string, Ranked> {
+function assignPages(candidates: ModelCandidate[], pages: FetchedPage[], farg: string | null = null): Map<string, Ranked> {
   const models = candidates.map((c) => c.model);
   const options = new Map<string, Ranked[]>();
-  for (const c of candidates) options.set(c.model, rankPages(c, pages, models));
+  for (const c of candidates) options.set(c.model, rankPages(c, pages, models, farg));
   // Den vars bästa sida är starkast får välja först. Parningen blir maximal oavsett ordning, men
   // ordningen avgör VILKEN maximal parning — och då ska den säkraste matchningen få sitt förstahandsval.
   const best = (m: string) => options.get(m)?.[0]?.rank ?? Number.MAX_SAFE_INTEGER;
@@ -701,6 +726,18 @@ export async function resolveCandidateImages(
   sources: SourceRef[],
   onPartial?: (partial: ModelCandidate[]) => void | Promise<void>,
   budgetMs: number = HUNT_BUDGET_MS,
+  /**
+   * Möbelns färg, kanonisk. Används på TVÅ ställen, och det andra är det som betyder något:
+   *
+   *   1. Sidor som nämner en annan färg sorteras sist (rankPages).
+   *   2. Färgen går in i SÖKFRÅGAN (searchTargets). En färgviktad rangordning över en färgblind
+   *      träfflista kan bara välja den minst fel bilden — frågan måste be om rätt färg.
+   *
+   * Null under identifieringen, och det är ingen glömska: färgen kommer ur annonsen, som inte finns
+   * när kandidaterna letas upp. Den vägen är alltså färgblind med nödvändighet, och det är därför
+   * identify.ts prövar om bilden när färgen väl är känd — då med färgen i frågan.
+   */
+  farg: string | null = null,
 ): Promise<ModelCandidate[]> {
   const deadline = Date.now() + budgetMs;
   /**
@@ -726,12 +763,20 @@ export async function resolveCandidateImages(
       (pages.length ? `: ${pages.map((p) => `${p.title.slice(0, 40)}${p.images.length ? " [bild]" : ""}`).join(" | ")}` : ""),
   );
 
-  let assigned = assignPages(candidates, pages);
+  let assigned = assignPages(candidates, pages, farg);
   /** Modell -> den bildadress som faktiskt svarade som en bild. */
   const picked = new Map<string, string>();
+  /**
+   * Modeller vars bild kommer från en sida som bekräftar färgen.
+   *
+   * Skild från `picked` för att en bild kan finnas utan att vara rätt. Är färgen känd och bilden
+   * obekräftad fortsätter jakten — med färgen i sökfrågan — tills en sida bekräftar den eller stegen
+   * tar slut. Den preliminära bilden ligger kvar hela tiden, så ingen kandidat blir utan.
+   */
+  const bekraftad = new Set<string>();
   /** Adress -> är den bevisat död? Delas mellan rundorna, så ingen adress kontrolleras två gånger. */
   const checked = new Map<string, Promise<boolean>>();
-  await pickImages(candidates, assigned, picked, checked);
+  await pickImages(candidates, assigned, picked, checked, farg, bekraftad);
 
   /**
    * Hoppen: kandidaten saknar bild, men någon av de hämtade sidorna LEDER till den.
@@ -750,7 +795,7 @@ export async function resolveCandidateImages(
   let frontier = pages;
   let searchRound = 0;
   for (const [stepIndex, step] of STEPS.entries()) {
-    const missing = candidates.filter((c) => !picked.has(c.model));
+    const missing = candidates.filter((c) => !picked.has(c.model) || (!!farg && !bekraftad.has(c.model)));
     if (missing.length === 0) break;
     if (Date.now() >= deadline) {
       console.info(
@@ -780,7 +825,7 @@ export async function resolveCandidateImages(
         ? hopTargets(missing, frontier, seen)
         : step === "butikssökning"
           ? storeSearchTargets(missing, pages, seen)
-          : await searchTargets(missing, seen, searchRound++, deadline);
+          : await searchTargets(missing, seen, searchRound++, deadline, farg);
     // Ett steg som inte hittade något att hämta är inte slutet: nästa steg är en annan väg.
     if (hop.length === 0) continue;
     const extra = (await Promise.all(hop.map(fetchSafely))).filter((p): p is FetchedPage => p !== null);
@@ -792,11 +837,11 @@ export async function resolveCandidateImages(
     // Nästa runda läser de NYA sidornas länkar först, och fyller på med de gamlas som inte fick plats
     // under taket förra rundan. Redan hämtade adresser står i `seen` och tas aldrig om.
     frontier = [...extra, ...pages];
-    assigned = assignPages(candidates, pages);
+    assigned = assignPages(candidates, pages, farg);
     // Fördelningen kan ha flyttat sidor mellan kandidaterna, så valet görs om från grunden. Det
     // kostar inga nya anrop: varje redan kontrollerad bildadress ligger kvar i `checked`.
     picked.clear();
-    await pickImages(candidates, assigned, picked, checked);
+    await pickImages(candidates, assigned, picked, checked, farg, bekraftad);
   }
 
   const out = compose(candidates, assigned, picked, true);
@@ -854,12 +899,32 @@ async function pickImages(
   assigned: Map<string, Ranked>,
   picked: Map<string, string>,
   checked: Map<string, Promise<boolean>>,
+  /** Möbelns färg, kanonisk. Utan den beter sig rutinen exakt som förut. */
+  farg: string | null = null,
+  /** Modeller vars bild kommer från en sida som BEKRÄFTAR färgen. Fylls i här, läses av jakten. */
+  bekraftad: Set<string> = new Set(),
 ): Promise<void> {
   await Promise.all(
     candidates.map(async (c) => {
-      if (picked.has(c.model)) return;
       const hit = assigned.get(c.model);
       if (!hit) return;
+      /**
+       * Bekräftar den här sidan färgen?
+       *
+       * Läses ur titel och adress, som i rankPages. En sida som bekräftar färgen är den enda som får
+       * ta över en redan vald bild — annars byter en jakt fram och tillbaka mellan två lika osäkra
+       * sidor för varje steg.
+       */
+      const sidanBekraftar = !!farg && fargerI(`${hit.page.title} ${hit.page.finalUrl}`).has(farg);
+      /**
+       * EN OBEKRÄFTAD BILD ÄR PRELIMINÄR när färgen är känd.
+       *
+       * Förut var första bilden slutgiltig: hittades en sida med bild var kandidaten "klar" och
+       * jakten hoppade över den. IKEA Jules visade felet — museets svarta stol togs direkt, och
+       * sökstegen som kunde ha hittat en rosa kördes aldrig. Nu behålls den preliminära bilden (så
+       * ingen blir utan) men kandidaten räknas som ofärdig tills en sida bekräftar färgen.
+       */
+      if (picked.has(c.model) && !(sidanBekraftar && !bekraftad.has(c.model))) return;
       const options = hit.images.slice(0, MAX_IMAGE_CHECKS);
       for (const [i, url] of options.entries()) {
         /**
@@ -871,6 +936,7 @@ async function pickImages(
          */
         if (i === options.length - 1) {
           picked.set(c.model, url);
+          if (sidanBekraftar) bekraftad.add(c.model);
           return;
         }
         let verdict = checked.get(url);
@@ -880,6 +946,7 @@ async function pickImages(
         }
         if (!(await verdict)) {
           picked.set(c.model, url);
+          if (sidanBekraftar) bekraftad.add(c.model);
           return;
         }
         console.info(`[bild] ${c.model}: adressen svarade inte som en bild — ${url.slice(0, 80)}`);
@@ -1039,6 +1106,8 @@ async function searchTargets(
   seen: Set<string>,
   round: number,
   deadline: number,
+  /** Möbelns färg, kanonisk. Följer med i FRÅGAN — se query nedan. */
+  farg: string | null = null,
 ): Promise<SourceRef[]> {
   /**
    * Kandidaterna frågar SAMTIDIGT, var och en från sin egen plats i rotationen.
@@ -1065,7 +1134,24 @@ async function searchTargets(
        * frågan men "fåtölj" på sidan blir träfflistan tunn. Första frågan är därför den precisa, andra
        * bara märke och modell — samma modell, större nät.
        */
-      const query = [c.brand, c.model, round === 0 ? c.productType : ""].filter((s) => s && s.trim()).join(" ").trim();
+      /**
+       * FÄRGEN STÅR I FRÅGAN, och det är den enskilt viktigaste raden för att omslaget ska bli rätt.
+       *
+       * Rangordningen kan bara välja bland det sökningen hittade, och sökningen frågade efter "IKEA
+       * Jules" — inte "IKEA Jules rosa". De sex källor den kom tillbaka med var ett museum, en
+       * Blocket-annons, en botvägg, en 403, en YouTube-video och en möbeloutlet, och ingen av dem
+       * visade en rosa stol. Det finns hur många rosa Jules som helst att hitta; vi bad aldrig om
+       * dem. En färgviktad rangordning över en färgblind träfflista kan i bästa fall välja den minst
+       * fel bilden.
+       *
+       * Färgen läggs på FÖRSTA omgången, tillsammans med produkttypen. Andra omgången släpper båda
+       * och frågar bara märke och modell — samma trappa som förut: precis fråga först, större nät
+       * sedan. Att köra bredare först hade gjort den smala frågan meningslös.
+       */
+      const query = [c.brand, c.model, round === 0 ? c.productType : "", round === 0 ? (farg ?? "") : ""]
+        .filter((s) => s && s.trim())
+        .join(" ")
+        .trim();
       if (!query) return [];
       const model = normalise(c.model);
       const out: SourceRef[] = [];
@@ -1204,6 +1290,8 @@ function hopTargets(missing: ModelCandidate[], pages: FetchedPage[], seen: Set<s
 export async function resolveProductPage(
   identity: { brand: string | null; model: string },
   sources: SourceRef[],
+  /** Möbelns färg, kanonisk. Sidor som bara nämner andra färger sorteras sist — se farg.ts. */
+  farg: string | null = null,
 ): Promise<{ image: { url: string; sourceUrl: string | null } | null; specs: ListingAttribute[] }> {
   if (!identity.model.trim() || sources.length === 0) return { image: null, specs: [] };
   const candidate: ModelCandidate = {
@@ -1214,7 +1302,7 @@ export async function resolveProductPage(
     confidence: "strong",
     distinguishingDetail: null,
   };
-  const [resolved] = await resolveCandidateImages([candidate], sources);
+  const [resolved] = await resolveCandidateImages([candidate], sources, undefined, undefined, farg);
   return {
     image: resolved?.imageUrl ? { url: resolved.imageUrl, sourceUrl: resolved.imageSource ?? null } : null,
     specs: resolved?.pageSpecs ?? [],

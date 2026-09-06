@@ -10,7 +10,8 @@
  * i intaget, vilket är ett större.
  */
 export const CATEGORY_LABELS: Record<string, string> = {
-  "soffor-fatoljer": "Soffor & fåtöljer",
+  "soffor": "Soffor",
+  "fatoljer": "Fåtöljer",
   "bord": "Bord",
   "stolar": "Stolar",
   "forvaring": "Förvaring",

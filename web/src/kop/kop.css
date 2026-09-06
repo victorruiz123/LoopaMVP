@@ -1,82 +1,320 @@
 /* ==========================================================================
-   Köpsidan
+   Efterlysningarna — och det som blev kvar av köpsidan
    ==========================================================================
-   Samma tokens som butiken. Formen är sidans egen: här ska en besökare på under
-   tio sekunder förstå en sak, och det görs med en rubrik, ett fält och fyra
-   bilder som rör sig — inte med text. */
+   FILEN HETER FORTFARANDE kop.css, men sidan den byggdes för finns inte längre.
+   Landningssidan på /kop är borttagen; kvar är "Mina efterlysningar", väggen,
+   inkorgen, inloggningsrutan (.grind) och efterlysningsfångaren (.fangare) —
+   de två sista används av BUTIKENS ram och av Trygg affär, inte av något som
+   hette köpsidan.
 
-/* ---- hero: sidans LCP ---- */
+   Reglerna för hero, animation, märkesbrickor, säljpunkter och skissläget ligger
+   kvar i filen utan att någon längre ritar dem. De är döda men inte farliga: allt
+   är klassbaserat och ingen markup bär klasserna. Sopa gärna, men gör det med
+   ögonen på sidorna som ÄR kvar — flera regler nedan delas av dem.
+   ========================================================================== */
 
-.hero { padding: 44px 0 30px; }
+/* ==========================================================================
+   Landningssidan är ritad efter skisserna, pixel för pixel.
+   ==========================================================================
+   Skisserna är två fönster av samma sida: 1351 px brett (proportionerna) och
+   748 px (innehållet). Varje mått är lika stor ANDEL av fönsterbredden i båda
+   — innehållet börjar på 8,5 % och är 84,8 % brett i bägge — så hela sidan är
+   satt i vw och skalar med fönstret precis som skissen gör.
+
+   Måtten nedan står i vw och kommer ur mätningar av skissfilerna, inte ur
+   uppskattningar: fältet 5,70vw högt och 56,33vw brett, knappen 14,58vw,
+   rubrikens radavstånd 5,55vw, panelernas radie 2,15vw, och så vidare. */
+
+/* ---- sidans ram: spalt, palett, topprad ---- */
+
+/*
+ * MÅTTEN HAR TAK. Sidan var satt i rena vw efter skissen, och det höll så länge
+ * fönstret var lika brett som skissen: på 1900 px blev rubriken 69 px, fältet
+ * 105 px högt och brickorna stora som vykort. Det läser som en barnapp, inte som
+ * en marknadsplats. Nu skalar graderna med fönstret men stannar vid ett tak, och
+ * spalten är centrerad med en maxbredd i stället för procent av skärmen.
+ *
+ * TYPSKALAN, hela sidans hierarki i fem steg:
+ *   rubrik            44 px / 40 px (fet fråga, lätt svar)
+ *   sektionsrubrik    26 px
+ *   fältens text      16 px
+ *   brödtext          15 px
+ *   meta              13 px
+ */
+/*
+ * COOKIERUTAN FÅR SAMMA DEKLARATIONER, via :has().
+ *
+ * Den hänger på app-roten och ligger utanför .butik-skiss i DOM:en, så den kan inte
+ * ärva skissens tokens — men den ligger ovanpå skissens sida och ska se ut som den:
+ * samma snitt, samma palett, samma radier. Att skriva av värdena hit hade blivit två
+ * paletter som glider isär vid första justeringen; att dela deklarationsblock är den
+ * enda formen av "samma" som håller. Samma grepp som body:has(.screen-camera) i
+ * styles.css, av samma skäl: rutan bor någon annanstans än den syns.
+ */
+.butik-skiss,
+body:has(.butik-skiss) .consent-inner {
+  /*
+   * SKISSEN ÄR SATT I POPPINS, inte i appens Inter. Det är inte en detalj: snittet
+   * är geometriskt — enkelvånings "a", cirkelrunda "o" och "g" — och sidans hela
+   * karaktär sitter i de bokstavsformerna.
+   */
+  font-family: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Skissens palett. Bara här — resten av appen behåller sin. */
+  --bg: #fffcf6;
+  --ink: #000000;
+  --field: #f9f5ef;
+  --border: #dedcd8;
+  --accent: #d94a02;
+  --accent-dark: #b93e02;
+
+  /*
+   * Skissens form, i mått med tak — och taket är inte samma sak som ett fast tal.
+   *
+   * Spalten låg på 1180 px, hämtat ur skissen, och det höll upp till ungefär en
+   * laptop. På 2400 px blev sidan en remsa med 600 px creme på var sida: skissens
+   * proportioner var kvar, men sidan hade slutat vara en sida och blivit ett fönster
+   * mitt i ett fält. Spannet börjar i skissens eget tal, så en laptop ser ut precis
+   * som förut, och slutar där en spalt inte längre tjänar på att bli bredare.
+   *
+   * Fältets höjd följer med: ett 54 px fält under en 56 px rubrik läser som ett
+   * formulär inklistrat i en affisch.
+   */
+  --sk-spalt: clamp(1180px, 84vw, 1520px);
+  --sk-pad: clamp(20px, 3.4vw, 56px);
+  --sk-falt: clamp(54px, 3.4vw, 64px);   /* ALLA fält på sidan har samma höjd */
+  --sk-radie: 18px;          /* paneler */
+  --sk-radie-liten: 11px;    /* fält och knappar */
+}
+
+.butik-skiss .butik-main {
+  max-width: var(--sk-spalt); margin: 0 auto;
+  padding: 0 var(--sk-pad) 72px;
+}
+
+/*
+ * Toppraden: ordmärke, luft, säljknapp, rund profil. Ingen sökikon, ingen linje
+ * under. Låg och tätt intill sidans överkant — den tog 87 px luft på en stor
+ * skärm och sköt ned allt annat.
+ */
+.butik-skiss .butik-bar {
+  position: static; gap: 0; align-items: center;
+  max-width: var(--sk-spalt); margin: 0 auto;
+  padding: 20px var(--sk-pad) 0;
+  background: none; backdrop-filter: none; border-bottom: 0;
+}
+.butik-skiss .butik-bar-ikon, .butik-skiss .butik-search { display: none; }
+.butik-skiss .butik-logo { font-size: 23px; letter-spacing: -0.015em; }
+/* Skissens ordmärke bär ingen punkt. */
+.butik-skiss .butik-logo span { display: none; }
+.butik-skiss .butik-bar-fyll { flex: 1 1 auto; }
+/*
+ * SÄLJKNAPPEN ÄR DÄMPAD PÅ DEN HÄR SIDAN, och det är en tydlighetsfråga och inte en smakfråga.
+ *
+ * Den är fylld orange på butikens sidor, där den är den enda uppmaningen. Här var den den enda
+ * orange ytan ovanför vecket — större och mer klickbar än sidans egen knapp — och sidan sa därmed
+ * "sälj" högst upp och "köp" i rubriken. Läsare kunde inte avgöra vilket håll affären gick.
+ *
+ * Exakt samma resonemang står redan i styles.css om `.app-bar-buy`, köpvägen i SÄLJverktygets
+ * topprad: den är ett dämpat piller och inte en fylld knapp, för att två tävlande uppmaningar gör
+ * ingendera tydligare. Det här är den regeln, tillämpad åt andra hållet.
+ *
+ * Knappen står kvar — vägen mellan köp och sälj hör hemma i toppraden på varje sida — och sidans
+ * egen säljuppmaning ligger orange och fylld sist på sidan, där den inte konkurrerar med något.
+ */
+.butik-skiss .butik-bar-sell {
+  order: 2; width: auto; height: 40px; padding: 0 18px;
+  border-radius: 10px; font-size: 15px; font-weight: 500;
+  background: transparent; color: #4b4a4a;
+  border: 1px solid var(--border);
+  transition: border-color var(--t-fast) ease, color var(--t-fast) ease;
+}
+.butik-skiss .butik-bar-sell:hover { border-color: var(--ink); color: var(--ink); background: transparent; }
+.butik-skiss .butik-bar-sell-short { display: none; }
+.butik-skiss .butik-bar-sell-long { display: inline; }
+/*
+ * Profilen är en grå cirkel i skissen — i båda lägena. Inloggad visar initialen
+ * som vanligt; utloggad är samma cirkel, fortfarande en knapp med etikett för
+ * skärmläsaren, bara utan text i.
+ */
+.butik-skiss .butik-avatar,
+.butik-skiss .butik-bar-logga-in {
+  order: 3; margin-left: 14px;
+  width: 36px; height: 36px; padding: 0; border: 0; border-radius: 999px;
+  background: #d9d9d9; color: transparent; font-size: 0;
+}
+
+/* ---- heron: rubrik, fält, och raden under ---- */
+
+.hero { padding: clamp(32px, 3.4vw, 66px) 0 0; }
+
+/* Fet fråga, lätt svar — svaret en grad mindre, som i skissen. Radavståndet är
+   stramt: 1,43 gav rubriken ett barnboksdrag som inte hörde till den. */
 .hero-rubrik {
-  margin: 0 0 12px;
-  font-size: clamp(34px, 7vw, 62px); line-height: 1.02;
-  letter-spacing: -0.035em; font-weight: 700; color: var(--ink);
+  margin: 0 0 10px;
+  font-size: clamp(30px, 3.4vw, 56px); line-height: 1.16;
+  letter-spacing: -0.025em; font-weight: 800; color: var(--ink);
 }
-.hero-rubrik em { font-style: normal; color: var(--accent); }
-.hero-sub {
-  margin: 0 0 28px; font-size: clamp(17px, 2.2vw, 21px);
-  color: var(--muted); line-height: 1.5; max-width: 40ch;
+.hero-rubrik-svar { font-size: clamp(27px, 3.05vw, 51px); font-weight: 400; }
+/*
+ * Ingressen under rubriken. INTE en viskning: här stod ett utrop på fyra ord, och sidan förlorade
+ * sin enda chans att förklara vad man gör här. Den är satt en grad över brödtexten och bruten på
+ * ett läsmått, så att de två raderna läses som en mening och inte som finstilt.
+ */
+.hero-ingress {
+  margin: 0 0 24px; max-width: 62ch;
+  font-size: clamp(15px, 1.15vw, 20px); font-weight: 400; line-height: 1.55; color: #4b4a4a;
 }
+/* Punkten efter ordmärket är svart och fet i skissen, inte satt i radens vikt.
+   Heter INTE .punkt — det namnet är säljpunkternas kort längre ned i den här filen. */
+.ordmark-punkt { font-weight: 800; color: var(--ink); }
 
-.hero-form { max-width: 720px; }
+/* Fältet är ett fält, inte en banner: 580 px räcker för en länk, och det ska inte gå
+   kant i kant över en spalt som blivit 1500 px. Men det ska inte heller stå kvar på
+   580 medan rubriken ovanför växer till 56 punkter — då läser det som en fotnot. */
+.hero-form { width: 100%; max-width: clamp(580px, 44vw, 760px); margin: 0; }
+
+/*
+ * FÄLTET OCH KNAPPEN DELAR SKAL. En ram, en höjd, en radie — knappen möter
+ * fältets kant i stället för att ligga och flyta med luft runt sig.
+ */
 .hero-falt {
-  display: flex; align-items: center; gap: 8px;
-  background: var(--surface); border: 2px solid var(--border);
-  border-radius: 18px; padding: 8px 8px 8px 18px;
-  box-shadow: 0 12px 34px -24px hsl(var(--scrim) / 0.45);
-  transition: border-color 120ms ease;
+  display: flex; align-items: stretch;
+  height: var(--sk-falt); padding: 0;
+  background: var(--field); border: 1px solid var(--border);
+  border-radius: var(--sk-radie-liten);
+  transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease;
 }
-.hero-falt:focus-within { border-color: var(--accent); }
+.hero-falt:focus-within { border-color: var(--accent); box-shadow: var(--focus); }
 .hero-falt-fel { border-color: var(--danger); }
+/* Fokusringen är accentfärgad. Runt en röd ram blir den grumlig, så felet får
+   sin egen ring i sin egen färg — en signal, inte två som slåss. */
+.hero-falt-fel:focus-within { border-color: var(--danger); box-shadow: 0 0 0 3px hsl(4 68% 50% / 0.16); }
+
 .hero-falt input {
-  flex: 1; min-width: 0; height: 56px; padding: 0; border: none; background: transparent;
-  font: inherit; font-size: clamp(16px, 1.9vw, 18px); color: var(--ink);
+  flex: 1; min-width: 0; border: none; background: transparent;
+  padding: 0 18px; font: inherit; font-size: clamp(16px, 1.05vw, 19px); font-weight: 500; color: var(--ink);
 }
 .hero-falt input:focus { outline: none; }
-.hero-falt input::placeholder { color: var(--muted-soft); }
-.hero-go {
-  flex: none; height: 56px; padding: 0 26px; border: none; border-radius: 12px; cursor: pointer;
-  background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-md); font-weight: 700;
-  white-space: nowrap;
+/* Platshållaren är en instruktion och ska läsas som en, inte som ett avstängt fält. */
+.hero-falt input::placeholder { color: #6d6a67; opacity: 1; }
+
+/* Scopad till fältet med flit. `.hero-go` är ett namn som butiken en gång ägde
+   och läckte ifrån sig (se slutet av butik/butik.css) — kopplad till `.hero-falt`
+   kan regeln inte gälla någon annans knapp, och ingen annans kan gälla den här. */
+.hero-falt .hero-go {
+  flex: none; width: auto; padding: 0 22px; border: none; cursor: pointer;
+  /* Knappen täcker ramen, precis som i skissen. */
+  margin: -1px -1px -1px 0;
+  border-radius: var(--sk-radie-liten);
+  background: var(--accent); color: #fff; font: inherit;
+  font-size: clamp(15px, 1vw, 18px); font-weight: 500; white-space: nowrap;
+  transition: background var(--t-fast) ease;
 }
-.hero-go:hover { background: var(--accent-dark); }
+/* Ordmärket i knappen är vitt — det är knappens text, inte en logotyp på en yta. */
+.hero-falt .hero-go .ordmark { color: inherit; }
+.hero-falt .hero-go:hover { background: var(--accent-dark); }
+.hero-falt .hero-go:active { filter: brightness(0.96); }
 
 /* Felet hjälper. Ton, inte färgstyrka: en röd ram räcker som signal. */
-.hero-fel { margin: 10px 0 0; font-size: var(--fs-md); color: var(--danger-dark); line-height: 1.5; max-width: 58ch; }
-.hero-hjalp { margin: 12px 0 0; font-size: var(--fs-md); color: var(--muted); }
-.hero-lank-knapp {
-  padding: 0; border: none; background: none; cursor: pointer;
-  font: inherit; color: var(--accent-ink); text-decoration: underline;
-}
+.hero-fel { margin: 10px 0 0; font-size: 14px; color: var(--danger-dark); line-height: 1.5; max-width: 54ch; }
 
-/* Källorna som ren igenkänning — text, inte deras varumärkesfiler. */
-.hero-kallor {
-  list-style: none; display: flex; flex-wrap: wrap; gap: 8px 18px;
-  margin: 22px 0 0; padding: 0;
-  font-size: var(--fs-sm); font-weight: 600; color: var(--muted-soft);
-  letter-spacing: 0.01em;
+/* Den andra vägen: en rad, tydligt underordnad fältet ovanför. */
+.hero-sok {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin: 16px 0 0; font-size: clamp(15px, 1vw, 18px); font-weight: 500;
+  color: #4b4a4a; text-decoration: none;
+  transition: color var(--t-fast) ease;
 }
-.hero-kallor li { display: flex; align-items: center; gap: 8px; }
-.hero-kallor li::before {
-  content: ""; width: 5px; height: 5px; border-radius: 999px; background: var(--muted-soft); opacity: 0.55;
-}
-.hero-kallor li:first-child::before { display: none; }
+.hero-sok-pil { width: 17px; height: 17px; flex: none; transition: transform var(--t-fast) ease; }
+.hero-sok:hover { color: var(--accent); }
+.hero-sok:hover .hero-sok-pil { transform: translateX(2px); }
 
-/* ---- animationen ---- */
+/*
+ * SEKTIONSRYTM. Sektionerna under skissens del av sidan bar egna bottenmarginaler
+ * på 44 px som staplades ojämnt mot rubrikernas luft. Här sätts en enda takt.
+ */
+.butik-skiss .punkter,
+.butik-skiss .pris,
+.butik-skiss .faq,
+.butik-skiss .fangare { margin-bottom: 0; }
+/* Takten följer fönstret av samma skäl som graderna gör det: 56 px mellan två
+   sektioner är en paus på en laptop och en skarv på en bred skärm, där allt annat
+   omkring har blivit större. */
+.butik-skiss .punkter { margin-top: clamp(26px, 2.2vw, 40px); }
+.butik-skiss .pris { margin-top: clamp(56px, 4.4vw, 88px); }
+.butik-skiss .faq { margin-top: clamp(44px, 3.6vw, 72px); }
+.butik-skiss .fangare { margin-top: clamp(56px, 4.4vw, 88px); }
+.butik-skiss .butik-sell { margin-top: clamp(56px, 4.4vw, 88px); }
+
+/* ---- animationen: panel, rubrik, kort ---- */
 
 /* Reserverar höjden innan komponenten laddats, så sidan inte hoppar. */
-.funkar-plats { min-height: 320px; }
+.funkar-plats { min-height: clamp(300px, 24vw, 460px); }
 
-.funkar { margin: 12px 0 44px; }
-.funkar-scen {
-  display: grid; gap: 14px; justify-items: center;
-  padding: 26px 20px 20px;
-  /* Smalare än sidan: illustrationen ska dominera rutan, inte simma i den. */
-  max-width: 720px; margin: 0 auto;
-  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+/* Panelen: en rubrik och ett kort. Luften inuti är 26 px, inte 4 % av skärmen. */
+.funkar-ram {
+  margin: clamp(36px, 4.4vw, 88px) 0 0;
+  padding: clamp(20px, 2vw, 38px);
+  background: var(--field); border: 1px solid var(--border); border-radius: var(--sk-radie);
 }
-.funkar-bild { width: 100%; max-width: 560px; }
+.funkar-rubrik {
+  margin: 0 0 18px; font-size: clamp(19px, 1.9vw, 30px); line-height: 1.2;
+  letter-spacing: -0.02em; font-weight: 700; color: var(--ink);
+}
+
+/*
+ * KORTET ÄR HELA ANIMATIONEN, inte bara scenen.
+ *
+ * I skissen är panelen en rubrik och en enda ruta — stegprickarna och pausknappen
+ * har ingen egen yta under den. De ligger därför INUTI kortet i stället för att
+ * tas bort: en animation som spelar av sig själv måste gå att stoppa (WCAG 2.2.2),
+ * och skissen ritar en tom platshållare, inte ett beslut om att spelaren ska bort.
+ */
+.funkar {
+  margin: 0; min-height: clamp(300px, 24vw, 460px);
+  display: grid; grid-template-columns: minmax(250px, 38%) 1fr; gap: clamp(20px, 2vw, 40px); align-items: center;
+  padding: clamp(18px, 1.9vw, 36px) clamp(20px, 2.1vw, 40px);
+  background: var(--bg); border-radius: 14px;
+  box-shadow: 0 6px 20px -12px hsl(var(--scrim) / 0.28);
+}
+
+/* Vänster spalt: de fyra stegen i ord, och spelaren under dem. */
+.funkar-stegen { display: grid; align-content: center; gap: 16px; }
+.funkar-stegen ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.funkar-stegen li button {
+  width: 100%; display: flex; align-items: flex-start; gap: 11px;
+  padding: 8px 11px; border: 0; border-radius: 10px; background: none; cursor: pointer;
+  font: inherit; text-align: left; color: var(--ink);
+  transition: background var(--t-fast) ease;
+}
+/* Rubrik och förklaring: raden säger vad som händer, undertexten vem som gör det. */
+.funkar-steg-ord { display: grid; gap: 1px; }
+.funkar-steg-ord b { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.funkar-steg-ord span { font-size: 12.5px; line-height: 1.35; color: #7a766f; }
+.funkar-stegen li button:hover { background: var(--field); }
+/* Det som spelas nu är markerat — resten är läsbara, inte bortdimmade. */
+.funkar-stegen li button { opacity: 0.62; }
+.funkar-stegen li .funkar-steg-nu { background: var(--field); opacity: 1; }
+.funkar-stegen li .funkar-steg-nu .funkar-steg-ord b { font-weight: 700; }
+.funkar-stegen li button:hover { opacity: 1; }
+.funkar-steg-ikon {
+  flex: none; width: 28px; height: 28px; margin-top: 1px; display: grid; place-items: center;
+  border-radius: 999px; background: var(--field); color: #8d8a84;
+  transition: background var(--t-fast) ease, color var(--t-fast) ease;
+}
+.funkar-stegen li .funkar-steg-nu .funkar-steg-ikon { background: var(--ink); color: var(--bg); }
+.funkar-stegen li button:hover .funkar-steg-ikon { color: var(--ink); }
+
+/* Höger spalt: scenen, som får ta plats. */
+.funkar-scen {
+  min-height: 0; display: grid; justify-items: center; align-items: center;
+  padding: 0; background: none; border: 0; border-radius: 0; box-shadow: none;
+}
+/* Teckningen är panelens innehåll, inte en illustration bredvid den: står den kvar på
+   440 px i ett kort som blivit 1000 px brett är halva kortet tomt. */
+.funkar-bild { min-height: 0; width: 100%; max-width: clamp(440px, 30vw, 640px); display: grid; }
+.funkar-bild .scen-svg { width: 100%; height: 100%; min-height: 0; }
 
 /*
  * Scenernas palett, som roller och inte som färger.
@@ -100,97 +338,156 @@
   --scen-accent: var(--accent);
   --scen-accent-ljus: var(--accent-light);
   --scen-gron: var(--green);
+  /*
+   * TYG OCH TRÄ, tre toner var. En möbel i en enda ton läser som papper; skillnaden
+   * mellan dynans ovansida, dess framkant och ramen under är det som gör den till
+   * ett föremål med volym. Träbenen är egen färg av samma skäl — ett ben i tygets
+   * ton försvinner i soffan.
+   */
+  --scen-tyg: hsl(32 20% 76%);
+  --scen-tyg-ljus: hsl(34 26% 86%);
+  --scen-tyg-mork: hsl(30 16% 62%);
+  --scen-tra: hsl(28 32% 42%);
+  --scen-tra-mork: hsl(28 34% 30%);
 }
-.scen-text { font-weight: 700; }
-.scen-text-betyg { font-size: 32px; fill: #fff; font-family: Poppins, Inter, sans-serif; }
-.scen-text-pris { font-size: 16px; fill: #fff; letter-spacing: -0.01em; }
+.scen-text { font-weight: 700; font-family: Poppins, Inter, sans-serif; }
+.scen-text-betyg { font-size: 15px; letter-spacing: -0.01em; }
+.scen-text-pris { font-size: 15px; letter-spacing: -0.01em; }
+.scen-text-knapp { font-size: 14px; letter-spacing: -0.01em; }
+.scen-text-litet { font-size: 11px; font-weight: 600; letter-spacing: -0.005em; }
+.scen-text-etikett { font-size: 8px; font-weight: 700; letter-spacing: 0.09em; }
+/* Ordmärket inuti en scen: samma snitt och vikt som sidans, i scenens skala. */
+.scen-text-ordmark { font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
 
-.funkar-text {
-  margin: 0; text-align: center;
-  font-size: clamp(18px, 2.4vw, 24px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink);
-  animation: funkar-in 420ms ease both;
-}
-@keyframes funkar-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
-
-.funkar-steg { list-style: none; display: flex; justify-content: center; gap: 10px; margin: 16px 0 0; padding: 0; }
-.funkar-steg button {
-  width: 44px; height: 44px; border-radius: 999px; cursor: pointer;
-  display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--border); color: var(--muted-soft);
-}
-/*
- * Hovern gäller BARA de vilande stegen.
- *
- * Utan `:not()` mörknade även det aktiva steget vid hover — och dess bakgrund ÄR mörk, så ikonen
- * försvann i sin egen knapp. Det syntes bara i just det läge man alltid hamnar i: markören ligger
- * kvar på steget man nyss klickade på.
- */
-.funkar-steg button:not(.funkar-steg-nu):hover { color: var(--ink); background: var(--field); }
-.funkar-steg .funkar-steg-nu { background: var(--ink); border-color: var(--ink); color: var(--bg); }
-.funkar-steg .funkar-steg-nu:hover { color: var(--bg); }
-
+/* Spelaren: paus, framdrift, längd. Ligger i vänsterspalten under stegen. */
+.funkar-langd { flex: none; white-space: nowrap; }
 .funkar-kontroll {
-  display: flex; align-items: center; gap: 12px; justify-content: center;
-  margin-top: 14px; font-size: var(--fs-sm); color: var(--muted-soft);
+  display: flex; align-items: center; gap: 12px;
+  font-size: 13px; color: var(--muted-soft);
 }
 .funkar-kontroll button {
-  padding: 5px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: var(--fs-sm);
+  flex: none; padding: 5px 12px; border-radius: 999px; cursor: pointer; font: inherit; font-size: var(--fs-sm);
   background: transparent; border: 1px solid var(--border); color: var(--muted);
 }
-.funkar-linje { flex: 0 1 160px; height: 3px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.funkar-linje { flex: 1 1 auto; min-width: 40px; height: 3px; border-radius: 999px; background: var(--border); overflow: hidden; }
 .funkar-linje span {
   display: block; height: 100%; width: 100%; background: var(--accent);
   transform-origin: left; animation: funkar-fram linear both;
 }
 @keyframes funkar-fram { from { transform: scaleX(0); } to { transform: scaleX(1); } }
 
-/* Scenernas egna rörelser. Startas om av React-nyckeln på .funkar-bild. */
-.scen1-annons { animation: scen-tona 500ms ease both; }
-.scen1-tumme { animation: scen1-tryck 1500ms 500ms ease-in-out both; }
-@keyframes scen1-tryck {
-  0% { transform: translate(26px, 34px); opacity: 0; }
-  35% { transform: none; opacity: 1; }
-  55% { transform: translate(-4px, 4px); }
-  75% { transform: none; }
+/*
+ * Scenernas egna rörelser. Startas om av React-nyckeln på .funkar-bild.
+ *
+ * En rörelse per sak som händer, i den ordning den händer — och ingen rörelse för
+ * rörelsens skull: den som tittar ska hinna läsa vad som pekas ut.
+ */
+
+/* Scen 1: annonsen tonar in, tummen skrollar, ringen kvitterar trycket. */
+.s1-annons { animation: scen-tona 500ms ease both; }
+.s1-tumme { animation: s1-tryck 1600ms 400ms ease-in-out both; }
+@keyframes s1-tryck {
+  0% { transform: translate(30px, 40px); opacity: 0; }
+  30% { transform: none; opacity: 1; }
+  50% { transform: translate(-3px, 5px); }
+  70% { transform: none; }
   100% { transform: none; opacity: 1; }
 }
-/* Ringen som kvitterar trycket. */
-.scen1-ring { opacity: 0; transform-origin: 196px 156px; animation: scen1-ring 700ms 1050ms ease-out both; }
-@keyframes scen1-ring {
-  from { opacity: 0.9; transform: scale(0.3); }
-  to { opacity: 0; transform: scale(1.6); }
+.s1-ring { opacity: 0; transform-origin: 180px 120px; animation: s1-ring 900ms 700ms ease-out both; }
+.s1-prick { opacity: 0; transform-origin: 180px 120px; animation: scen-pop 320ms 620ms ease both; }
+@keyframes s1-ring {
+  from { opacity: 0.9; transform: scale(0.4); }
+  to { opacity: 0; transform: scale(1.35); }
 }
-.scen2-skanner { animation: scen2-svep 2500ms 200ms ease-in-out both; }
-/* Slutar strax bortom soffan och tonar ut — en linje som blir stående vid kanten läser som ett fel. */
-@keyframes scen2-svep {
-  0% { transform: translateX(24px); opacity: 1; }
-  85% { transform: translateX(300px); opacity: 1; }
-  100% { transform: translateX(316px); opacity: 0; }
+
+/* Scen 2: länken flyger in i fältet, texten fylls, brevet går till säljaren som tackar ja. */
+.s2-lank { animation: s2-flyg 900ms ease-in-out both; }
+@keyframes s2-flyg {
+  0% { transform: translate(-90px, -18px) scale(0.9); opacity: 0; }
+  55% { transform: translate(46px, 44px) scale(1); opacity: 1; }
+  100% { transform: translate(78px, 54px) scale(0.94); opacity: 0; }
 }
-.scen2-nal { opacity: 0; animation: scen-pop 400ms ease both; }
-.scen2-nal-1 { animation-delay: 900ms; }
-.scen2-nal-2 { animation-delay: 1500ms; }
-.scen2-stampel { opacity: 0; animation: scen2-stampla 500ms 2500ms ease both; }
-@keyframes scen2-stampla {
-  from { opacity: 0; transform: scale(1.3) rotate(-6deg); }
+.s2-textrad { transform-origin: 78px 127px; animation: s2-fyll 500ms 800ms ease both; }
+@keyframes s2-fyll { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.s2-brev { opacity: 0; animation: s2-brev 1000ms 1250ms ease-in-out both; }
+@keyframes s2-brev {
+  0% { opacity: 0; transform: translate(0, 6px) scale(0.9); }
+  25% { opacity: 1; transform: none; }
+  85% { opacity: 1; transform: translate(88px, 40px) scale(0.8); }
+  100% { opacity: 0; transform: translate(96px, 46px) scale(0.72); }
+}
+.s2-bock { opacity: 0; animation: scen-pop 400ms 2150ms ease both; }
+
+/* Scen 3: luppen sveper över möbeln, fynden pekas ut, värderingen stämplas. */
+.s3-lupp { animation: s3-svep 2600ms 200ms ease-in-out both; }
+@keyframes s3-svep {
+  0% { transform: translate(56px, 150px) scale(0.9); opacity: 0; }
+  12% { opacity: 1; }
+  40% { transform: translate(96px, 128px) scale(1); }
+  70% { transform: translate(232px, 138px) scale(1); }
+  100% { transform: translate(286px, 150px) scale(0.9); opacity: 0; }
+}
+.s3-fynd { opacity: 0; animation: scen-pop 400ms ease both; }
+.s3-fynd-1 { animation-delay: 1100ms; }
+.s3-fynd-2 { animation-delay: 1900ms; }
+.s3-vardering { opacity: 0; animation: s3-stampla 500ms 2500ms ease both; }
+@keyframes s3-stampla {
+  from { opacity: 0; transform: translateY(-10px) scale(1.06); }
   to { opacity: 1; transform: none; }
 }
-.scen3-pengar { animation: scen3-flyg 1300ms 150ms ease-in-out both; }
-@keyframes scen3-flyg {
-  0% { transform: translateX(-60px) rotate(-8deg); opacity: 0; }
-  35% { transform: translateX(0) rotate(0); opacity: 1; }
-  100% { transform: translateX(112px) scale(0.4); opacity: 0; }
-}
-.scen3-ratt { transform-origin: 171px 123px; animation: scen3-vrid 900ms 1000ms ease-in-out both; }
-@keyframes scen3-vrid { from { transform: rotate(0); } to { transform: rotate(110deg); } }
-.scen3-bock { opacity: 0; animation: scen-pop 400ms 1200ms ease both; }
-.scen4-bil { animation: scen4-kor 1500ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-@keyframes scen4-kor { from { transform: translateX(-200px); } to { transform: none; } }
-.scen4-mobel { opacity: 0; animation: scen-pop 500ms 1200ms ease both; }
-@keyframes scen-pop { from { opacity: 0; transform: scale(0.7); } to { opacity: 1; transform: none; } }
-@keyframes scen-tona { from { opacity: 0; } to { opacity: 1; } }
 
-/* Stilla läget: fyra paneler bredvid varandra, ingen rörelse alls. */
+/* Scen 4: kortet reser sig, granskad-brickan slår till, pekaren klickar köp. */
+.s4-kort { animation: s4-res 600ms ease both; }
+@keyframes s4-res {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: none; }
+}
+.s4-markt { opacity: 0; animation: scen-pop 400ms 700ms ease both; }
+.s4-pekare { opacity: 0; animation: s4-klick 1100ms 1050ms ease-in-out both; }
+@keyframes s4-klick {
+  0% { opacity: 0; transform: translate(268px, 236px); }
+  35% { opacity: 1; transform: translate(232px, 200px); }
+  60% { transform: translate(228px, 196px); }
+  75% { transform: translate(232px, 200px); }
+  100% { opacity: 1; transform: translate(232px, 200px); }
+}
+.s4-knapp { transform-origin: 238px 201px; animation: s4-tryck 260ms 1750ms ease-in-out both; }
+@keyframes s4-tryck { 0%, 100% { transform: none; } 50% { transform: scale(0.97); } }
+
+/* Scen 5: bilen kör fram, bäraren går in, möbeln landar på plats. */
+.s5-bil { animation: s5-kor 1400ms cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes s5-kor { from { transform: translateX(-190px); } to { transform: none; } }
+.s5-barare { opacity: 0; animation: s5-in 900ms 900ms ease both; }
+@keyframes s5-in {
+  from { opacity: 0; transform: translateX(-30px); }
+  to { opacity: 1; transform: none; }
+}
+.s5-mobel { opacity: 0; animation: s5-plats 600ms 1400ms ease both; }
+@keyframes s5-plats {
+  from { opacity: 0; transform: translateY(-12px) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+ * STILLA LÄGET. Med prefers-reduced-motion spelas ingen scen — panelerna visas alla på en gång —
+ * och då ska varje scen stå färdig i stället för att spela sin rörelse en enda gång. Det som BARA
+ * är rörelse (luppen, den flygande länken, muspekaren, tryckringen) göms: de betyder ingenting
+ * som frusna bilder.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .s1-annons, .s2-textrad, .s2-brev, .s2-bock,
+  .s3-fynd, .s3-vardering, .s4-kort, .s4-markt, .s4-knapp,
+  .s5-bil, .s5-barare, .s5-mobel { animation: none; opacity: 1; }
+  .s1-ring, .s1-prick, .s2-lank, .s3-lupp, .s4-pekare { display: none; }
+}
+
+@keyframes scen-tona { from { opacity: 0; } to { opacity: 1; } }
+@keyframes scen-pop {
+  0% { opacity: 0; transform: scale(0.6); }
+  70% { transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
 .funkar-paneler {
   list-style: none; margin: 0; padding: 0;
   display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
@@ -198,70 +495,170 @@
 .funkar-panel {
   padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
 }
-.funkar-panel p { margin: 10px 0 0; font-size: var(--fs-md); font-weight: 600; line-height: 1.4; }
+.funkar-panel p { margin: 10px 0 0; font-size: 14px; font-weight: 600; line-height: 1.4; }
+.funkar-panel-text { display: block; margin-top: 3px; font-size: 12.5px; font-weight: 400; color: #7a766f; }
 .funkar-nr { color: var(--accent); font-weight: 700; }
 .funkar-stilla .scen-svg,
 .funkar-stilla [class^="scen"] { animation: none !important; opacity: 1 !important; transform: none !important; }
 
 /* ---- tre säljpunkter ---- */
 
+/* En rad stödord, ingen ruta. Se Saljpunkter.tsx för varför. */
 .punkter {
-  display: grid; gap: 14px; margin-bottom: 44px;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  list-style: none; margin: 0; padding: 0;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 30px;
 }
-.punkt { padding: 20px 22px; background: var(--field); border-radius: var(--r-lg); }
-.punkt h2 { margin: 0 0 4px; font-size: var(--fs-lg); letter-spacing: -0.015em; }
-.punkt p { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
+.punkt { display: flex; align-items: center; gap: 8px; font-size: clamp(14px, 0.95vw, 17px); line-height: 1.3; }
+.punkt-ikon { flex: none; color: var(--accent); }
+.punkt b { font-weight: 700; letter-spacing: -0.01em; color: var(--ink); }
+.punkt span { color: #7a766f; }
 
 /* ---- märkena ---- */
 
-.marken { margin-bottom: 44px; }
-.marken-huvud { margin-bottom: 16px; }
-.marken-huvud h2 { margin: 0 0 6px; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
-.marken-huvud p { margin: 0; font-size: var(--fs-md); color: var(--muted); max-width: 58ch; line-height: 1.5; }
+.marken { margin: clamp(36px, 4.4vw, 88px) 0 0; }
 
-/* Sökraden ligger ÖVER brickorna och filtrerar dem medan man skriver. */
-.marken-sok { display: flex; gap: 8px; margin-bottom: 16px; max-width: 480px; }
+/* Rubriken till vänster i två vikter, ordmärket ute i högerkanten. */
+.marken-huvud {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 24px;
+  margin: 0;
+}
+.marken-huvud h2 {
+  margin: 0; font-size: clamp(20px, 2.1vw, 32px); line-height: 1.3;
+  letter-spacing: -0.02em; font-weight: 400; color: var(--ink);
+}
+.marken-huvud h2 b { font-weight: 700; }
+.marken-huvud p {
+  margin: 10px 0 0; font-size: clamp(15px, 1vw, 18px); line-height: 1.5;
+  color: #605f5c; max-width: 46ch;
+}
+.marken-ordmark { flex: none; font-size: 23px; line-height: 1.2; letter-spacing: -0.015em; }
+
+/*
+ * Sökraden har heron:s fält — samma höjd, samma radie, samma skal. Den gick
+ * tidigare kant i kant över hela spalten, vilket gjorde ett filter till sidans
+ * största element.
+ */
+.marken-sok {
+  display: flex; align-items: stretch; height: var(--sk-falt);
+  max-width: clamp(460px, 34vw, 600px); margin: 22px 0 0;
+  background: var(--field); border: 1px solid #d2cfcc;
+  border-radius: var(--sk-radie-liten);
+  transition: border-color var(--t-fast) ease, box-shadow var(--t-fast) ease;
+}
+.marken-sok:focus-within { border-color: var(--accent); box-shadow: var(--focus); }
 .marken-sok input {
-  flex: 1; min-width: 0; height: 46px; padding: 0 16px; font: inherit; font-size: var(--fs-field);
-  color: var(--ink); background: var(--surface);
-  border: 1px solid var(--border); border-radius: var(--r);
+  flex: 1; min-width: 0; border: none; background: transparent;
+  padding: 0 18px; font: inherit; font-size: clamp(16px, 1.05vw, 19px); font-weight: 500; color: var(--ink);
 }
-.marken-sok input:focus { outline: none; border-color: var(--accent); }
-.marken-sok input::placeholder { color: var(--muted-soft); }
+.marken-sok input:focus { outline: none; }
+.marken-sok input::placeholder { color: #6d6a67; opacity: 1; }
 .marken-sok button {
-  flex: none; height: 46px; padding: 0 20px; border: none; border-radius: var(--r); cursor: pointer;
-  background: var(--ink); color: var(--bg); font: inherit; font-size: var(--fs-md); font-weight: 700;
+  flex: none; width: 54px; border: none; border-radius: var(--sk-radie-liten); cursor: pointer;
+  /* Knappen täcker ramen, som heron:s. */
+  margin: -1px -1px -1px 0;
+  display: grid; place-items: center; background: var(--accent); color: #fff;
+  transition: background var(--t-fast) ease;
 }
-.marken-sok button:hover { background: var(--accent); color: #fff; }
+.marken-sok button svg { width: 18px; height: 18px; }
+.marken-sok button:hover { background: var(--accent-dark); }
 
-.marken-rutnat {
-  list-style: none; margin: 0; padding: 0;
-  display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+/* Brickorna bor i en egen ljus ruta. Fler och mindre per rad — tre stora brickor
+   i en 1180 px spalt blev vykort. */
+.marken-rutnat, .marken-skimmer {
+  list-style: none; margin: 24px 0 0;
+  padding: clamp(16px, 1.6vw, 28px); background: #f7f4ef; border: 1px solid #e0dddb;
+  border-radius: var(--sk-radie);
+  /* auto-fill: en bredare ruta ska rymma FLER märken, inte större plattor. */
+  display: grid; gap: clamp(12px, 0.9vw, 18px); grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
 }
-.marken-bricka { display: grid; gap: 8px; text-decoration: none; color: inherit; }
-/* Märkets egen färg och bokstavsform. Namnet är deras; ramen är vår. */
+.marken-bricka { display: block; text-decoration: none; color: inherit; }
+/*
+ * BRICKAN ÄR NEUTRAL I SKISSEN: en grå platta med märkets namn i, ingenting mer.
+ * Här stod tidigare märkets egen färg och bokstavsform, plus "12 granskade · 30 via
+ * Tradera" under varje bricka. Skissen ritar varken det ena eller det andra.
+ */
+/* Färgen och snittet sätts per märke i JSX (lib/brandLook.ts) — här står bara formen. Bottnen nedan
+   är den som gäller för ett märke utan känd hållning, alltså tills stilen skriver över den. */
 .marken-platta {
   display: grid; place-items: center; aspect-ratio: 16 / 10;
-  border-radius: var(--r-lg); padding: 12px; text-align: center;
-  font-size: clamp(15px, 2vw, 19px); overflow: hidden;
-  transition: transform 120ms ease;
+  background: #d9d9d9; color: #111111;
+  border-radius: 10px; padding: 12px; text-align: center; overflow: hidden;
+  transition: filter 120ms ease;
 }
-.marken-bricka:hover .marken-platta { transform: translateY(-2px); }
-.marken-antal { font-size: var(--fs-sm); color: var(--muted-soft); }
-/* Våra granskade väger tyngre i raden, och ser ut som det. */
-.marken-antal b { color: var(--green-dark); font-weight: 700; }
+.marken-platta-namn {
+  font-size: clamp(15px, 1vw, 18px); line-height: 1.15;
+  /* Långa namn ("Design House Stockholm") ska krympa, inte klippas: brickan har en fast höjd. */
+  overflow-wrap: anywhere; hyphens: auto;
+}
+.marken-bricka:hover .marken-platta { filter: brightness(0.96); }
 
-.marken-tomt { padding: 20px; background: var(--field); border-radius: var(--r-lg); color: var(--muted); }
-.marken-skimmer {
-  display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+/* --------------------------------------------------------------------------
+   Möbelträffarna under brickorna
+   --------------------------------------------------------------------------
+   Sökningen letar i lagret och inte bara bland märkena. Träffarna ritas med
+   butikens egna kort, så en granskad möbel och en Tradera-annons säger här
+   exakt samma sak om sig själva som i rutnätet. */
+.marken-produkter { margin-top: 20px; }
+.marken-produkter h3 {
+  margin: 0 0 12px; font-size: clamp(15px, 1vw, 17px); font-weight: 600; color: var(--ink);
 }
+.marken-produkt-rutnat { grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); }
+.marken-alla {
+  display: inline-block; margin-top: 14px; font-size: 15px; font-weight: 600;
+  color: var(--ink); text-decoration: underline; text-underline-offset: 3px;
+}
+
+.marken-tomt { padding: 20px; background: var(--field); border-radius: var(--sk-radie); color: var(--muted); font-size: 15px; }
 .marken-skimmer span {
-  display: block; aspect-ratio: 16 / 10; border-radius: var(--r-lg);
+  display: block; aspect-ratio: 16 / 10; border-radius: 10px;
   background: var(--skeleton); background-size: 200% 100%; animation: marken-skim 1.4s linear infinite;
 }
 @keyframes marken-skim { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) { .marken-skimmer span { animation: none; } }
+
+/* ==========================================================================
+   Varför genom oss och inte själv — jämförelsen
+   ==========================================================================
+   En tabell på fyra rader och trettio ord. Se Varfor.tsx för varför den inte är
+   längre än så; det här är formen som gör kortheten läsbar.
+
+   HÖGERKOLUMNEN LYSER, VÄNSTER DÄMPAS. Skillnaden mellan de två sidorna ska synas
+   innan man läst en enda cell — ljusare botten, mörkare text och halvfet vikt till
+   höger, grått till vänster. Rubrikraden står en gång högst upp och behöver aldrig
+   upprepas: cellerna är korta nog att ligga bredvid varandra också på 390 px. */
+
+.varfor { margin: clamp(36px, 4.4vw, 88px) 0 0; }
+.varfor-rubrik {
+  margin: 0 0 clamp(14px, 1.2vw, 20px);
+  font-size: clamp(19px, 2vw, 28px); line-height: 1.3;
+  letter-spacing: -0.02em; font-weight: 700; color: var(--ink);
+}
+
+.varfor-ram {
+  max-width: clamp(520px, 52vw, 780px);
+  border: 1px solid var(--border); border-radius: var(--sk-radie);
+  background: var(--field); overflow: hidden;
+}
+.varfor-tabell { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.varfor-tabell th, .varfor-tabell td {
+  width: 50%; padding: clamp(11px, 0.9vw, 16px) clamp(12px, 1vw, 20px);
+  text-align: left; vertical-align: top;
+}
+.varfor-tabell th {
+  font-size: 11px; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase;
+  border-bottom: 1px solid var(--border);
+}
+.varfor-tabell th:first-child { color: #78746e; }
+.varfor-tabell th:last-child { color: var(--accent); }
+.varfor-tabell td {
+  font-size: clamp(14px, 0.95vw, 17px); line-height: 1.35; letter-spacing: -0.01em;
+}
+.varfor-tabell td:first-child { color: #78746e; }
+.varfor-tabell td:last-child {
+  color: var(--ink); font-weight: 600;
+  background: var(--bg); border-left: 1px solid var(--border);
+}
+.varfor-tabell tbody tr + tr th, .varfor-tabell tbody tr + tr td { border-top: 1px solid var(--border); }
 
 /* ---- prisärlighet och FAQ ---- */
 
@@ -283,7 +680,7 @@
 .pris-lista dd { margin: 0; font-size: var(--fs-md); color: var(--ink); line-height: 1.5; }
 .pris-fot { color: var(--muted-soft) !important; }
 
-.faq h2 { margin: 0 0 12px; font-size: clamp(19px, 2.5vw, 25px); letter-spacing: -0.02em; }
+.faq h2 { margin: 0 0 12px; font-size: clamp(19px, 2.5vw, 30px); letter-spacing: -0.02em; }
 .faq ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .faq li { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg); overflow: hidden; }
 .faq button {
@@ -297,10 +694,10 @@
 /* ---- efterlysningsfångaren ---- */
 
 .fangare {
-  margin-bottom: 44px; padding: 26px;
+  margin-bottom: clamp(44px, 3.6vw, 72px); padding: clamp(20px, 2vw, 38px);
   background: var(--ink); color: var(--on-dark-strong); border-radius: var(--r-lg);
 }
-.fangare h2 { margin: 0 0 6px; font-size: clamp(19px, 2.5vw, 25px); color: #fff; letter-spacing: -0.02em; }
+.fangare h2 { margin: 0 0 6px; font-size: clamp(19px, 2.5vw, 30px); color: #fff; letter-spacing: -0.02em; }
 .fangare > p { margin: 0 0 18px; font-size: var(--fs-md); line-height: 1.5; }
 .fangare-kompakt { margin-top: 16px; padding: 20px; }
 .fangare-form { display: flex; gap: 8px; flex-wrap: wrap; align-items: flex-end; }
@@ -433,12 +830,49 @@
 }
 .vagg-kategorier a { color: var(--muted); }
 
-@media (max-width: 640px) {
-  .hero { padding: 26px 0 22px; }
-  .hero-falt { flex-wrap: wrap; padding: 10px; }
-  .hero-falt input { flex-basis: 100%; height: 48px; padding: 0 6px; }
-  .hero-go { width: 100%; }
-  .funkar-scen { padding: 18px 14px 14px; }
+/*
+ * TELEFONEN. Graderna sköter sig själva — de är satta i clamp och krymper med
+ * fönstret — så här står bara det som måste byta form: fälten i full bredd,
+ * brickorna två i bredd, och luften mellan sektionerna kortare.
+ */
+@media (max-width: 747px) {
+  .butik-skiss { --sk-falt: 50px; --sk-radie: 16px; }
+  .butik-skiss .butik-bar { padding-top: 14px; }
+  .butik-skiss .butik-bar-sell { height: 38px; padding: 0 14px; font-size: 14px; }
+  .butik-skiss .butik-avatar, .butik-skiss .butik-bar-logga-in { width: 34px; height: 34px; margin-left: 10px; }
+
+  .hero { padding: 28px 0 0; }
+  .hero-rubrik { margin-bottom: 8px; }
+  /* Ingressen krymper INTE på telefonen. Den är sidans förklaring, och den skärm där någon är
+     mest osäker på vad de tittar på är inte den där texten ska bli mindre. */
+  .hero-ingress { margin-bottom: 20px; }
+  .hero-form { max-width: none; }
+  .hero-falt input { padding: 0 14px; font-size: 15px; }
+  .hero-falt .hero-go { padding: 0 16px; font-size: 14px; }
+  .hero-sok { margin-top: 14px; font-size: 14px; }
+
+  .funkar-ram { margin-top: 36px; padding: 16px; }
+  .funkar-rubrik { margin-bottom: 14px; }
+  .funkar { min-height: 0; grid-template-columns: 1fr; gap: 16px; padding: 16px; }
+  /* Scenen först på telefon: bilden är hooken, orden bär den efteråt. */
+  .funkar-scen { order: -1; }
+  .funkar-bild { max-width: 260px; }
+  .funkar-stegen li button { padding: 7px 10px; font-size: 14px; gap: 10px; }
+  .funkar-steg-ikon { width: 26px; height: 26px; }
+
+  .marken { margin-top: 40px; }
+  .marken-huvud { gap: 12px; }
+  .marken-huvud p { font-size: 14px; }
+  .marken-sok { max-width: none; margin-top: 18px; }
+  .marken-sok input { padding: 0 14px; font-size: 15px; }
+  .marken-sok button { width: 50px; }
+  .marken-rutnat, .marken-skimmer {
+    margin-top: 18px; padding: 14px; gap: 10px; grid-template-columns: repeat(2, 1fr);
+  }
+  .marken-platta { border-radius: 8px; }
+  .marken-platta-namn { font-size: 14px; }
+  .marken-produkt-rutnat { grid-template-columns: repeat(2, 1fr); }
+
   .fangare { padding: 20px; }
   .fangare-form label, .fangare-form button { flex-basis: 100%; }
   .kop-mina-rad { flex-direction: column; }
@@ -446,12 +880,7 @@
   .butik-main { padding-bottom: 84px; }
 }
 
-/* ---- den andra vägen, och inloggningsfrågan ---- */
-
-/* "eller leta bland produkter" — tydligt underordnad fältet ovanför. */
-.hero-eller { margin: 18px 0 0; font-size: var(--fs-md); color: var(--muted-soft); }
-.hero-eller a { color: var(--muted); font-weight: 600; }
-.hero-eller a:hover { color: var(--accent-ink); }
+/* ---- inloggningsfrågan ---- */
 
 /* Frågan om inloggning: ett ark över sidan, inte en ny adress. Den som stänger står kvar där de var. */
 .grind {
@@ -466,3 +895,264 @@
   box-shadow: 0 30px 80px -30px hsl(var(--scrim) / 0.6);
 }
 @keyframes grind-in { from { opacity: 0; } to { opacity: 1; } }
+
+
+
+/* ==========================================================================
+   Genomkörningen — fem steg bredvid rubriken
+   ==========================================================================
+   Fem bilder med var sin mening över: du hittar annonsen, den flyttas hit, vi
+   granskar möbeln, du köper den tryggt, vi kör hem den. Se Genomkorningen.tsx
+   för varför det är steg och inte ett svep, Steg.tsx för bilderna och
+   Streck.tsx för formspråket.
+
+   VARJE STEG HAR SIN EGEN TIDSLINJE. Rörelserna nedan är vanliga animationer i
+   millisekunder, inte procent av ett gemensamt varv — de startas om av
+   React-nyckeln på rutan när steget byts. Att flytta något i ett steg påverkar
+   därför inget annat steg, vilket var precis det som inte gällde förut. */
+
+/*
+ * ORDEN OCH BILDEN BREDVID VARANDRA, i panelens vita kort.
+ *
+ * Rutan låg en stund i heron:s högerspalt och var då 330 punkter bred, med en
+ * rubrik åt gången över sig. Två fel på en gång: teckningen var för liten för att
+ * läsas på det ögonblick den får, och de fyra steg som inte spelades fanns inte.
+ * Här är bilden dubbelt så stor och alla fem stegen står kvar i klartext.
+ *
+ * LISTAN ÄR SPELARENS KNAPPAR. En rad är ett steg man kan hoppa till, och det som
+ * spelas är markerat — resten är läsbara, inte bortdimmade.
+ */
+.film {
+  display: grid; grid-template-columns: minmax(240px, 40%) 1fr; gap: clamp(20px, 2.1vw, 42px); align-items: center;
+  min-height: clamp(300px, 24vw, 470px);
+  padding: clamp(18px, 1.9vw, 36px) clamp(20px, 2.1vw, 40px);
+  background: var(--bg); border-radius: 14px;
+  box-shadow: 0 6px 20px -12px hsl(var(--scrim) / 0.28);
+}
+
+.film-stegen { display: grid; align-content: center; gap: 16px; }
+.film-stegen ol { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.film-steg {
+  width: 100%; display: flex; align-items: baseline; gap: 10px;
+  padding: 8px 11px; border: 0; border-radius: 10px; background: none;
+  font: inherit; text-align: left; color: var(--ink); opacity: 0.72;
+  transition: background var(--t-fast) ease, opacity var(--t-fast) ease;
+}
+.film-stegen li button { cursor: pointer; }
+.film-stegen li button:hover { opacity: 1; background: var(--field); }
+.film-steg-nr { flex: none; color: var(--accent); font-weight: 700; font-variant-numeric: tabular-nums; }
+/* Raden bär nu två saker: vad steget är, och vem som gör vad i det. Se STEG i Steg.tsx. */
+.film-steg-ord { display: grid; gap: 2px; min-width: 0; }
+.film-steg-ord b { font-size: 14.5px; font-weight: 600; letter-spacing: -0.01em; line-height: 1.3; }
+.film-steg-text { font-size: 12.5px; font-weight: 400; line-height: 1.4; color: #7a766f; }
+.film-steg-nu { opacity: 1; background: var(--field); }
+.film-steg-nu .film-steg-ord b { font-weight: 700; }
+
+/* Spelaren: paus, framdrift, längd. Under stegen, i deras spalt. */
+.film-kontroll { display: flex; align-items: center; gap: 12px; font-size: 12.5px; color: #8d8a84; }
+.film-kontroll button { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+.film-kontroll button:hover { color: var(--ink); }
+.film-linje { flex: 1 1 auto; min-width: 40px; height: 3px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.film-linje span {
+  display: block; height: 100%; background: var(--accent);
+  transform-origin: left; animation: film-fram linear both;
+}
+.film-langd { flex: none; white-space: nowrap; }
+@keyframes film-fram { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+
+/* Höger spalt: bilden, som får ta plats. */
+.film-scen { min-width: 0; display: grid; justify-items: center; }
+/* Samma skäl som .funkar-bild: bilden ÄR steget, och den ska fylla rutan den fått. */
+.film-svg { display: block; width: 100%; max-width: clamp(460px, 31vw, 680px); height: auto; animation: film-in 260ms ease both; }
+
+/*
+ * STILLA LÄGET. Med prefers-reduced-motion spelas ingenting: alla fem raderna står
+ * i full styrka och bredvid dem slutbilden. Fem meningar säger samma sak som fem
+ * bilder — det är just därför rubrikerna finns.
+ *
+ * PAUS FRYSER INTE BILDEN. Att pausa stannar på steget; stegets egen rörelse spelas
+ * ändå klart. En fryst första bildruta är inte steget, den är ingenting — och den som
+ * klickar sig tillbaka till steg 3 vill se granskningen, inte en tom soffa.
+ */
+.film-stilla .film-steg { opacity: 1; }
+@media (prefers-reduced-motion: reduce) {
+  .film-svg, .film-svg * { animation: none !important; }
+}
+
+@keyframes film-in { from { opacity: 0; } to { opacity: 1; } }
+
+/* ---- steg 1: telefonen bläddrar och stannar på soffan ---- */
+
+.g1-floede { animation: g1-rulla 1200ms 250ms cubic-bezier(0.18, 0.85, 0.25, 1) both; }
+@keyframes g1-rulla {
+  from { transform: translateY(54px); }
+  to { transform: translateY(0); }
+}
+
+/* ---- steg 2: annonsen flyttas hit ---- */
+
+/* Pilen ritas i stället för att tändas: en linje som växer läser som en riktning. */
+.g2-pil { animation: g2-rita 520ms 150ms ease both; }
+.g2-pilspets { animation: g2-rita 260ms 600ms ease both; }
+@keyframes g2-rita {
+  from { stroke-dashoffset: 1; }
+  to { stroke-dashoffset: 0; }
+}
+.g2-lank { animation: g2-far 950ms 460ms cubic-bezier(0.45, 0, 0.3, 1) both; }
+@keyframes g2-far {
+  0% { opacity: 0; transform: translate(42px, 91px) scale(0.75, 0.75); }
+  22% { opacity: 1; transform: translate(66px, 91px) scale(1, 1); }
+  74% { opacity: 1; transform: translate(158px, 93px) scale(1, 1); }
+  100% { opacity: 0; transform: translate(178px, 99px) scale(0.7, 0.7); }
+}
+.g2-kort { animation: g2-in 460ms 1000ms ease both; }
+@keyframes g2-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.g2-soffa { animation: g2-pop 420ms 1320ms ease both; transform-origin: 45px 24px; }
+@keyframes g2-pop {
+  0% { opacity: 0; transform: scale(0.82, 0.82); }
+  70% { transform: scale(1.04, 1.04); }
+  100% { opacity: 1; transform: scale(1, 1); }
+}
+
+/* ---- steg 3: roboten går runt möbeln ---- */
+
+/*
+ * SKALAN ÄR DJUPET: full storlek nere vid golvlinjen är nära, 0,66 högt upp i rutan
+ * är bakom möbeln. Negativ x-skala vänder roboten mot soffan; den byter håll först
+ * när den kommit ut på andra sidan, och just då är den skymd.
+ */
+.g3-rob-fram { animation: g3-fram 3200ms linear both; }
+@keyframes g3-fram {
+  0% { opacity: 0; transform: translate(258px, 162px) scale(-1, 1); }
+  6% { opacity: 1; transform: translate(236px, 162px) scale(-1, 1); }
+  18%, 30% { opacity: 1; transform: translate(214px, 162px) scale(-1, 1); }
+  37% { opacity: 0; transform: translate(226px, 124px) scale(-0.8, 0.8); }
+  60% { opacity: 0; transform: translate(24px, 124px) scale(0.8, 0.8); }
+  68% { opacity: 1; transform: translate(26px, 148px) scale(0.92, 0.92); }
+  76%, 100% { opacity: 1; transform: translate(26px, 162px) scale(1, 1); }
+}
+.g3-rob-bak { animation: g3-bak 3200ms linear both; }
+@keyframes g3-bak {
+  0%, 36% { opacity: 0; transform: translate(236px, 98px) scale(-0.72, 0.72); }
+  39% { opacity: 1; transform: translate(224px, 90px) scale(-0.72, 0.72); }
+  48% { opacity: 1; transform: translate(150px, 82px) scale(-0.66, 0.66); }
+  56% { opacity: 1; transform: translate(62px, 80px) scale(-0.66, 0.66); }
+  60% { opacity: 1; transform: translate(38px, 86px) scale(-0.7, 0.7); }
+  63%, 100% { opacity: 0; transform: translate(28px, 94px) scale(-0.72, 0.72); }
+}
+.g3-fynd { opacity: 0; animation: g3-pop 380ms ease both; }
+.g3-flack { animation-delay: 800ms; transform-origin: 122px 134px; }
+.g3-repa { animation-delay: 2560ms; transform-origin: 42px 110px; }
+@keyframes g3-pop {
+  0% { opacity: 0; transform: scale(0.55, 0.55); }
+  70% { transform: scale(1.06, 1.06); }
+  100% { opacity: 1; transform: scale(1, 1); }
+}
+
+/* ---- steg 4: fingret trycker ---- */
+
+/* Kortet är färdigt när steget börjar. Det enda som händer är trycket. */
+.g4-hand { animation: g4-tryck 2300ms ease-in-out both; }
+@keyframes g4-tryck {
+  0% { opacity: 0; transform: translate(212px, 200px) rotate(-16deg); }
+  20% { opacity: 1; transform: translate(168px, 152px) rotate(-16deg); }
+  40%, 46% { opacity: 1; transform: translate(146px, 132px) rotate(-16deg); }
+  56% { opacity: 1; transform: translate(149px, 139px) rotate(-16deg); }
+  68% { opacity: 1; transform: translate(146px, 132px) rotate(-16deg); }
+  100% { opacity: 0; transform: translate(200px, 194px) rotate(-16deg); }
+}
+.g4-knapp { animation: g4-nedtryck 2300ms linear both; transform-origin: 154px 139px; }
+@keyframes g4-nedtryck {
+  0%, 50% { transform: scale(1, 1); }
+  57% { transform: scale(0.985, 0.985); }
+  64%, 100% { transform: scale(1, 1); }
+}
+.g4-ring { animation: g4-ring 2300ms linear both; transform-origin: 154px 139px; }
+@keyframes g4-ring {
+  0%, 55% { opacity: 0; transform: scale(0.4, 0.4); }
+  58% { opacity: 0.6; transform: scale(0.7, 0.7); }
+  76%, 100% { opacity: 0; transform: scale(3.2, 3.2); }
+}
+
+/* ---- steg 5: hemleveransen ---- */
+
+/*
+ * BILEN KOM FÖRUT RAKT MOT KAMERAN OCH GENOM ANNONSEN. Effektfullt, men det enda man
+ * kunde läsa ut var att annonsen gick sönder — inte vad som hände med möbeln, som är
+ * hela steget. Nu kör bilen fram, dörren öppnas, någon tar emot, och soffan flyttar
+ * sig från flaket in genom dörren. Ordningen ÄR förklaringen, så den spelas i den:
+ * först fordonet, sedan dörren, sist lasten.
+ */
+.g5-bil { animation: g5-bil 3000ms cubic-bezier(0.2, 0.82, 0.25, 1) both; }
+@keyframes g5-bil {
+  0% { transform: translateX(-172px); }
+  28%, 100% { transform: translateX(0); }
+}
+
+/* Dörren svänger upp kring gångjärnet i öppningens högra kant. */
+.g5-dorr { animation: g5-dorr 520ms 900ms ease both; transform-origin: 212px 136px; }
+@keyframes g5-dorr {
+  from { transform: scaleX(0.04); }
+  to { transform: scaleX(1); }
+}
+
+.g5-mottagare { animation: g5-mottagare 400ms 1180ms ease both; }
+@keyframes g5-mottagare {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: none; }
+}
+
+/*
+ * Möbeln åker med bilen fram, står kvar en stund på flaket, och går sedan in.
+ * DEN KRYMPER PÅ VÄGEN IN, för den går inåt — bort från betraktaren. Utan det är
+ * dörren en tavla på en vägg och soffan något som klistras fast på den.
+ */
+.g5-soffa { animation: g5-soffa 3000ms cubic-bezier(0.3, 0.7, 0.3, 1) both; }
+@keyframes g5-soffa {
+  0% { transform: translate(-161px, 106px) scale(0.55, 0.55); }
+  28%, 47% { transform: translate(11px, 106px) scale(0.55, 0.55); }
+  66% { transform: translate(92px, 116px) scale(0.45, 0.45); }
+  86%, 100% { transform: translate(179px, 146px) scale(0.34, 0.34); }
+}
+
+@media (max-width: 747px) {
+  /* En spalt. Bilden först: teckningen är hooken, orden bär den efteråt. */
+  .film { grid-template-columns: 1fr; gap: 16px; padding: 16px; min-height: 0; }
+  .film-scen { order: -1; }
+  .film-svg { max-width: 300px; }
+  .film-stegen li button { padding: 7px 10px; }
+  .film-steg-ord b { font-size: 14px; }
+  .film-steg-text { font-size: 12.5px; }
+  .varfor { margin-top: 40px; }
+}
+
+/* ---- cookierutan på skissens sidor ---- */
+
+/*
+ * Formen, ovanpå den delade paletten. Rutan ska läsa som ett av sidans egna kort som
+ * råkar ligga i hörnet — inte som något appen skickat med.
+ */
+body:has(.butik-skiss) .consent-inner {
+  background: var(--bg);
+  border-color: var(--border);
+  border-radius: var(--sk-radie);
+  box-shadow: 0 18px 44px -20px hsl(var(--scrim) / 0.42);
+}
+body:has(.butik-skiss) .consent-title { font-size: 21px; letter-spacing: -0.025em; }
+body:has(.butik-skiss) .consent-body { color: #605f5c; }
+body:has(.butik-skiss) .consent-body strong { color: var(--ink); font-weight: 600; }
+/*
+ * Knapparna får sidans form — fältets radie, fältets yta, fältets vikt. De väger
+ * fortfarande exakt lika mycket som varandra; se CookieConsent.tsx för varför det inte
+ * är en smaksak.
+ */
+body:has(.butik-skiss) .consent-choice {
+  border-radius: var(--sk-radie-liten);
+  background: var(--field);
+  border-color: var(--border);
+  font-size: 15px; font-weight: 500; letter-spacing: 0;
+}
+body:has(.butik-skiss) .consent-choice:hover { background: #f2ece2; }

@@ -17,7 +17,7 @@ import type { Product } from "../server/src/butik/types.js";
 function want(over: Partial<Efterlysning> = {}): Efterlysning {
   return {
     id: "e1", userId: "u1", email: null, state: "active",
-    filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000, maxWidthMm: 2100 },
+    filter: { categorySlug: "soffor", maxPriceSek: 5000, maxWidthMm: 2100 },
     styleTags: [], deadline: null, urgency: "none", note: null,
     summary: "", parseMethod: "form",
     createdAt: "2026-09-01T00:00:00Z", updatedAt: "2026-09-01T00:00:00Z",
@@ -30,7 +30,7 @@ function want(over: Partial<Efterlysning> = {}): Efterlysning {
 function sofa(over: Partial<Product> = {}): Product {
   return {
     id: "p1", source: "loopa", title: "3-sits soffa", brand: "Mio", model: "Madison",
-    categorySlug: "soffor-fatoljer", color: "grön", material: "sammet",
+    categorySlug: "soffor", color: "grön", material: "sammet",
     dimensions: { widthMm: 2000, depthMm: 900, heightMm: 850, seatHeightMm: null },
     priceSek: 4000, retailPriceSek: null, imageUrl: null, condition: null,
     state: "live", listedAt: "2026-09-01T00:00:00Z", listedAtKnown: true,
@@ -85,7 +85,7 @@ test("ett för STORT mått är fortfarande ett brott, i båda lägena", () => {
 });
 
 test("utan gräns spelar ett saknat mått ingen roll", () => {
-  const e = want({ filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000 } });
+  const e = want({ filter: { categorySlug: "soffor", maxPriceSek: 5000 } });
   const p = sofa({ dimensions: { widthMm: null, depthMm: null, heightMm: null, seatHeightMm: null } });
   assert.ok(evaluate(e, p, "loopa_live", false));
 });
@@ -113,7 +113,7 @@ test("OKÄND färg påstås inte vara fel färg", () => {
 
 test("märket läses ur rubriken när fältet är tomt", () => {
   // Mätt skarpt: "STRING vägghylla" fick etiketten "inte String". Se DECISIONS.md #2.
-  const e = want({ filter: { categorySlug: "soffor-fatoljer", brands: ["String"] } });
+  const e = want({ filter: { categorySlug: "soffor", brands: ["String"] } });
   const c = evaluate(e, sofa({ brand: null, title: "STRING vägghylla i metall" }), "tradera", true);
   assert.doesNotMatch(c!.fitNote, /inte String/);
 });

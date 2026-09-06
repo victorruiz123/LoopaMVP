@@ -1,8 +1,13 @@
 /**
- * Köpsidans adresser.
+ * Efterlysningarnas adresser.
  *
- * `/kop/analysera` ÄGS INTE HÄR. Den vägen tillhör Trygg affär sedan tidigare (affar/router.ts), och
- * App.tsx prövar den routern först. Att flytta in den hit hade betytt att köpsidan måste känna till
+ * ROTEN `/kop` ÄGS INTE LÄNGRE HÄR. Landningssidan som låg där är borttagen, och adressen 301:as av
+ * servern till butiken. Kvar är de två vägar som bär någons faktiska efterlysningar — den egna listan
+ * och väggen — och de behåller sina adresser eftersom de står i delade länkar och i notiser vi redan
+ * skickat.
+ *
+ * `/kop/analysera` ÄGS INTE HELLER HÄR. Den vägen tillhör Trygg affär (affar/router.ts), och App.tsx
+ * prövar den routern först. Att flytta in den hit hade betytt att den här modulen måste känna till
  * affärsrummets tillstånd — och att flytta ut den hade brutit varje länk som redan delats.
  */
 
@@ -11,32 +16,35 @@ import { useEffect, useState } from "react";
 export const KOP_ROOT = "/kop";
 
 export type KopRoute =
-  | { name: "landing" }
   | { name: "mina" }
   /** Efterlysningsväggen. Egen adress och inte /kop/efterlyses: den är riktad till SÄLJARE. */
   | { name: "vagg"; kategori: string | null };
 
-/** Sant för de adresser köpsidan äger. `/kop/analysera` undantas — se filens topp. */
+/**
+ * Sant för de adresser modulen äger. `/kop/analysera` undantas — se filens topp.
+ *
+ * ROTEN INGÅR INTE. `/kop` var landningssidan; nu finns ingen vy att rita där, och adressen ska nå
+ * serverns 301 till butiken i stället för att fångas här och bli en tom ram.
+ */
 export function isKopPath(pathname: string): boolean {
   if (pathname.startsWith("/kop/analysera")) return false;
   if (pathname === "/efterlyses" || pathname.startsWith("/efterlyses/")) return true;
-  return pathname === KOP_ROOT || pathname === `${KOP_ROOT}/` || pathname.startsWith(`${KOP_ROOT}/mina-efterlysningar`);
+  return pathname.startsWith(`${KOP_ROOT}/mina-efterlysningar`);
 }
 
 export function parseKopPath(pathname: string): KopRoute {
-  if (pathname === "/efterlyses" || pathname === "/efterlyses/") return { name: "vagg", kategori: null };
+  if (pathname.startsWith(`${KOP_ROOT}/mina-efterlysningar`)) return { name: "mina" };
   if (pathname.startsWith("/efterlyses/")) {
     const slug = pathname.slice("/efterlyses/".length).replace(/\/+$/, "");
     return { name: "vagg", kategori: slug ? decodeURIComponent(slug) : null };
   }
-  if (pathname.startsWith(`${KOP_ROOT}/mina-efterlysningar`)) return { name: "mina" };
-  return { name: "landing" };
+  // Allt annat som når hit är väggen: `isKopPath` släpper bara in de två.
+  return { name: "vagg", kategori: null };
 }
 
 export function kopHref(route: KopRoute): string {
   if (route.name === "mina") return `${KOP_ROOT}/mina-efterlysningar`;
-  if (route.name === "vagg") return route.kategori ? `/efterlyses/${route.kategori}` : "/efterlyses";
-  return KOP_ROOT;
+  return route.kategori ? `/efterlyses/${route.kategori}` : "/efterlyses";
 }
 
 export function kopNavigate(route: KopRoute): void {

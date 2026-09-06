@@ -5,16 +5,16 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { validate, toQuery, rateLimited } from "../server/src/butik/aiSearch.js";
+import { validate, toQuery, rateLimited, interpretQuery } from "../server/src/butik/aiSearch.js";
 
 const BRANDS = ["IKEA", "Sits", "Swedese", "Mio"];
 
 test("en fullständig tolkning blir ett fullständigt filter", () => {
   const r = validate(
-    { kategori: "soffor-fatoljer", marken: ["IKEA"], maxpris: 5000, maxbredd_cm: 200, farger: ["svart"], material: ["tyg"], skick: ["A"] },
+    { kategori: "soffor", marken: ["IKEA"], maxpris: 5000, maxbredd_cm: 200, farger: ["svart"], material: ["tyg"], skick: ["A"] },
     BRANDS,
   );
-  assert.equal(r.filter.categorySlug, "soffor-fatoljer");
+  assert.equal(r.filter.categorySlug, "soffor");
   assert.deepEqual(r.filter.brands, ["IKEA"]);
   assert.equal(r.filter.maxPriceSek, 5000);
   assert.equal(r.filter.maxWidthMm, 2000, "centimeter in, millimeter i filtret");
@@ -101,6 +101,46 @@ test("ett sökord som bara upprepar kategorin kastas", () => {
 });
 
 test("men ett modellnamn kastas inte, även med en kategori satt", () => {
-  const r = validate({ kategori: "soffor-fatoljer", sokord: "Ektorp" }, BRANDS);
+  const r = validate({ kategori: "soffor", sokord: "Ektorp" }, BRANDS);
   assert.equal(r.filter.q, "Ektorp");
+});
+
+// ─── genvägen: korta sökord kostar inget modellanrop ────────────────────────
+//
+// Modellen finns för MENINGAR. Ett ensamt ord är ingen mening — "soffa" är en kategori och "IKEA"
+// ett märke, båda uppslagbara i listor vi redan har. Anropet kostade 1,8–3 s första gången ordet
+// söktes och gav samma svar som uppslagningen; det är den väntan de här testerna finns för att hålla
+// borta. Att de kan köra utan Gemini-nyckel är själva poängen: genvägen behöver ingen.
+
+test("ett ensamt sökord blir en kategori utan att modellen frågas", async () => {
+  const r = await interpretQuery("soffa", BRANDS);
+  assert.equal(r.aiUsed, false, "ingen modell ska ha rörts");
+  assert.equal(r.filter.categorySlug, "soffor");
+  assert.equal(r.filter.q, "soffa", "ordet står kvar bredvid kategorin — 'barstol' är inte vilken stol som helst");
+});
+
+test("ett ensamt märkesnamn blir ett märkesfilter, inte en textsökning", async () => {
+  const r = await interpretQuery("ikea", BRANDS);
+  assert.equal(r.aiUsed, false);
+  assert.deepEqual(r.filter.brands, ["IKEA"], "stavningen ska bli lagrets");
+  assert.equal(r.filter.categorySlug, undefined);
+});
+
+test("två ord räcker fortfarande", async () => {
+  const r = await interpretQuery("vitt matbord", BRANDS);
+  assert.equal(r.aiUsed, false);
+  assert.equal(r.filter.categorySlug, "bord");
+});
+
+test("siffror lämnas till modellen — det är där den är bra", async () => {
+  // Utan nyckel faller den tillbaka på ordmatchning, och det är just det som ska synas: genvägen
+  // har INTE svarat, för "under 3000" är ett pristak och inte ett uppslagsord.
+  const r = await interpretQuery("soffa under 3000", BRANDS);
+  assert.equal(r.filter.categorySlug, undefined, "genvägen ska ha avstått");
+});
+
+test("efterlysningen går aldrig genvägen", async () => {
+  // Där är det korta ordet början på ett samtal, och stil, deadline och brådska finns i ingen lista.
+  const r = await interpretQuery("soffa", BRANDS, { efterlysning: true });
+  assert.equal(r.filter.categorySlug, undefined, "efterlysningen ska ha lämnats till modellen");
 });

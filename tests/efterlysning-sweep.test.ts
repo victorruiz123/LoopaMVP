@@ -23,7 +23,7 @@ const { forecastFor } = await import("../server/src/efterlysning/sweep.js");
 
 const spec = (over = {}) => ({
   userId: "u1", email: null,
-  filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000 },
+  filter: { categorySlug: "soffor", maxPriceSek: 5000 },
   styleTags: [], deadline: null, urgency: "none" as const, note: null,
   summary: "", parseMethod: "form" as const, area: null,
   ...over,

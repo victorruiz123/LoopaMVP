@@ -18,8 +18,10 @@
 import type { ConditionJob, ConditionResult, GeneratedListing, ListingAttribute } from "../types.js";
 import { damageStands } from "../pipeline/grade.js";
 import { loopaIdFor } from "../loopaId.js";
+import { cutoutOf, harPubliktKort } from "../publicCard.js";
 import { brandSlug, fold, resolveCategorySlug } from "./catalog.js";
 import type { Dimensions, Product, ProductCondition, ProductState } from "./types.js";
+import { harGodkantOmslag } from "../pipeline/bild/omslag.js";
 
 /**
  * "81 cm", "ca 80 cm" — talet, med svenskt decimalkomma.
@@ -222,6 +224,26 @@ export function priceOf(job: ConditionJob): number | null {
   return null;
 }
 
+/**
+ * Prismotorns uppskattning av vad möbeln är värd begagnad.
+ *
+ * `status === "ok"` krävs. `no_data` betyder att motorn körde och inte hittade något jämförbart, och
+ * `unavailable` att den inte nåddes — i båda fallen är rätt svar null och inte noll. En vara utan
+ * uppskattning ska få NOLL fyndpoäng, inte maximal, och det är skillnaden mellan att sakna en siffra
+ * och att ha siffran noll.
+ */
+function uppskattatVarde(job: ConditionJob): number | null {
+  const p = job.result?.price;
+  if (p?.status !== "ok" || p.default === null) return null;
+  return Math.round(p.default);
+}
+
+/** Sant när minst ett mått är uppmätt och inget är gissat. Se hasMeasurements i types.ts. */
+function harUppmattMatt(d: Dimensions): boolean {
+  if (d.estimated) return false;
+  return d.widthMm !== null || d.depthMm !== null || d.heightMm !== null;
+}
+
 function retailOf(listing: GeneratedListing | null): number | null {
   const r = listing?.pricing?.retailPriceSek;
   return typeof r === "number" && r > 0 ? Math.round(r) : null;
@@ -253,19 +275,64 @@ export function titleOf(brand: string | null, model: string | null, typeNoun: st
 }
 
 /**
- * Bilden butiken visar.
+ * Bilden butiken visar: TILLVERKARENS KATALOGBILD först, säljarens egen bildruta som reserv.
  *
- * ORDNINGEN ÄR EN INTEGRITETSREGEL, inte en smaksak. Säljarens råa bildrutor är tagna i någons hem
- * och blir aldrig publika — samma gräns som publicCard.ts drar. Urklippet är härlett ur en bildruta
- * men visar bara möbeln mot vitt, och är därför det enda av säljarens material som får ut. Först när
- * inget urklipp finns visas tillverkarens katalogbild, och den visar en NY exemplar av modellen.
+ * VI REDIGERAR INTE NÅGONS FOTO. Vägen hit har gått via två försök som båda gjorde det: möbeln
+ * friklippt och lagd på vitt, och samma urklipp lagt på säljarens egen bildruta i oskärpa. Det
+ * första krävde en mask som var perfekt — och blev annars en soffa med en tvättkorg fastvuxen i
+ * armstödet — det andra lämnade rummet kvar fast suddigt, alltså varken borttaget eller ärligt. Ett
+ * redigerat foto som misslyckas ser värre ut än ett oredigerat som är tråkigt.
  *
- * MÄTT PÅ LAGRET I DAG: 0 av 172 jobb har ett urklipp och 49 har en katalogbild. Butiken kan alltså
- * bara visa bild på de 49 förrän urklippen börjar produceras — se COVER_CUTOUT i config.ts.
+ * KATALOGBILDEN ÄR REDAN DEN BILDEN. Den är fotograferad i studio mot vitt av den som tillverkat
+ * möbeln, den behöver ingen bearbetning av oss, och den ger rutnätet exakt det utseende en möbelbutik
+ * har. Att den visar en NY exemplar av modellen är dess enda svaghet — och den bärs av att kortet
+ * säger det rakt ut (se ListingView) och av att varje skada står utskriven med sitt eget foto.
+ *
+ * SÄLJARENS BILDRUTA ÄR RESERVEN, orörd. Utan katalogbild är den enda ärliga bilden av möbeln den
+ * som togs av den, och den är bättre än en tom ruta. Adressen är kortets, inte jobbets:
+ * `/api/cards/:id/cover` är den publika porten och lämnar ut exakt en bildruta, bara när kortet finns
+ * publikt — därför frågas `harPubliktKort` innan adressen läggs ut.
+ *
+ * Saknas båda ritas möbeln ur sina mått (se ProductCard).
  */
 export function imageUrlOf(job: ConditionJob, loopaId: string): string | null {
-  if (job.result?.coverCutout || job.coverCutout) return `/api/cards/${loopaId}/cover`;
-  return job.result?.productImage?.url ?? job.productImage?.url ?? null;
+  /**
+   * SÄLJARENS EGEN MÖBEL FÖRST, katalogbilden som reserv. Ordningen var tvärtom fram till att
+   * produktbildssystemet kom (server/src/pipeline/bild/), och den ordningen var ett medgivande.
+   *
+   * Katalogbilden är en NY exemplar av modellen. Den svarar snabbt på "vad är det här?" och lika
+   * snabbt fel på "vad är det jag köper?": en fläckfri studiosoffa ovanför ett pris som gäller en tio
+   * år gammal. Ett kort som annars räknar upp varje skråma har då sitt största påstående — bilden —
+   * hämtat någon annanstans ifrån. Den stod ändå först, därför att alternativet var ett urklipp som
+   * ofta saknade ett ben.
+   *
+   * Det alternativet är nu en produktbild med mätt kvalitet och en spärr framför sig. Porten
+   * (`/api/cards/:id/cover`) lämnar urklippet när kontrollen godkänt det och säljarens bildruta
+   * annars — så adressen här är rätt i båda fallen, och katalogbilden behövs bara när det inte finns
+   * någon bildruta alls.
+   */
+  const harBildruta = (job.result?.images.length ?? 0) > 0;
+  const publikt = harBildruta && harPubliktKort(job);
+
+  // 1. Produktbilden, när den finns och kvalitetskontrollen godkänt den.
+  if (publikt && harGodkantOmslag(cutoutOf(job))) return `/api/cards/${loopaId}/cover`;
+
+  // 2. Katalogbilden. Fel möbel — en NY exemplar — men den ser ut som en produktbild, och kortet
+  //    skriver ut att den inte är möbeln som säljs.
+  const katalog = job.result?.productImage?.url ?? job.productImage?.url ?? null;
+  if (katalog) return katalog;
+
+  /**
+   * 3. Säljarens bildruta, med rummet kvar.
+   *
+   * SIST, och det ledet fanns inte i första versionen av den här ordningen: då lämnades
+   * omslagsadressen ut så fort det fanns en bildruta, och porten föll själv tillbaka på den råa
+   * rutan. Följden var att varje vara vars urklipp underkändes visade ett vardagsrumsfoto i
+   * rutnätet i stället för katalogbilden — rutnätet blev en samling privata foton, vilket är precis
+   * det produktbildssystemet finns för att slippa. Reserven ska vara den näst bästa bilden, inte
+   * den sista.
+   */
+  return publikt ? `/api/cards/${loopaId}/cover` : null;
 }
 
 /**
@@ -320,6 +387,11 @@ export function jobToProduct(job: ConditionJob, state: ProductState): Product | 
     dimensions: parseDimensionsMm(attributes, categorySlug),
     priceSek: priceOf(job),
     retailPriceSek: retailOf(listing),
+    estimatedValueSek: uppskattatVarde(job),
+    priceHistory: job.priceLadder?.drops ?? [],
+    priceDroppedAt: job.priceLadder?.drops?.at(-1)?.at ?? null,
+    imageCount: result.images.length,
+    hasMeasurements: harUppmattMatt(parseDimensionsMm(attributes, categorySlug)),
     imageUrl: imageUrlOf(job, loopaId),
     condition,
     state,

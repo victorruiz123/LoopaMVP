@@ -17,7 +17,7 @@ const attrs = (...pairs: ([string, string] | [string, string, boolean])[]): List
   }));
 
 test("måtten läses ur engelska nycklar och blir millimeter", () => {
-  const d = parseDimensionsMm(attrs(["width", "81 cm"], ["depth", "92 cm"], ["height", "80 cm"]), "soffor-fatoljer");
+  const d = parseDimensionsMm(attrs(["width", "81 cm"], ["depth", "92 cm"], ["height", "80 cm"]), "fatoljer");
   assert.deepEqual(d, { widthMm: 810, depthMm: 920, heightMm: 800, seatHeightMm: null, estimated: false });
 });
 
@@ -92,9 +92,10 @@ test("kategorin väljs på längsta nyckelordet, inte på listordning", () => {
 });
 
 test("kategorin läses ur en brödsmula och ur versaler", () => {
-  assert.equal(resolveCategorySlug({ category: "Möbler > Soffor & Fåtöljer > Fåtöljer" }), "soffor-fatoljer");
-  assert.equal(resolveCategorySlug({ category: "FÅTÖLJ" }), "soffor-fatoljer");
-  assert.equal(resolveCategorySlug({ category: "3-sitssoffa" }), "soffor-fatoljer");
+  // Längsta nyckelordet vinner: "fatoljer" (8) slår "soffor" (6) i samma sträng.
+  assert.equal(resolveCategorySlug({ category: "Möbler > Soffor & Fåtöljer > Fåtöljer" }), "fatoljer");
+  assert.equal(resolveCategorySlug({ category: "FÅTÖLJ" }), "fatoljer");
+  assert.equal(resolveCategorySlug({ category: "3-sitssoffa" }), "soffor");
 });
 
 test("ett modellnamn i kategorifältet faller igenom till nästa signal", () => {
@@ -104,7 +105,7 @@ test("ett modellnamn i kategorifältet faller igenom till nästa signal", () => 
 });
 
 test("type-attributet väger tyngst — det är generatorns eget svar på frågan", () => {
-  assert.equal(resolveCategorySlug({ type: "Fåtölj", category: "Möbler" }), "soffor-fatoljer");
+  assert.equal(resolveCategorySlug({ type: "Fåtölj", category: "Möbler" }), "fatoljer");
 });
 
 test("färg och material kapas till något en filterknapp kan bära", () => {

@@ -11,7 +11,7 @@ import { needsVerification, verifyFindings } from "./verify.js";
 import { dedupeDamages } from "./dedup.js";
 import { gradeCondition } from "./grade.js";
 import { coverFirst, pickCoverImageId } from "./cover.js";
-import { buildCover, pickCoverFrame } from "./cutout.js";
+import { byggOmslag } from "./bild/omslag.js";
 
 /**
  * Runs the full ConditionInput -> ConditionResult pipeline. AT MOST 2 Gemini calls: one main inspection
@@ -259,14 +259,15 @@ function startCover(jobId: string, dir: string, images: CapturedImage[], coverIm
    * Omslagsrutan väljs på möbelns synlighet, inte på skickets.
    *
    * `coverImageId` väljer den ruta som visar SKADORNA bäst — rätt för skickrapporten, fel för ett
-   * omslag: en närbild på ett armstöd säger ingenting om vilken möbel som säljs. pickCoverFrame
-   * poängsätter varje ruta lokalt (en sekund styck) och tar den där möbeln är hel i bild. Faller
-   * den används jobbets egen ruta.
+   * omslag: en närbild på ett armstöd säger ingenting om vilken möbel som säljs. byggOmslag
+   * poängsätter varje ruta med den lilla modellen (en sekund styck) och bygger sedan produktbilden
+   * ur den bästa med den stora. Saknas urvalsmodellen används `coverImageId` — inspektionens egen
+   * vy-utpekning — i stället. Se pipeline/bild/omslag.ts.
+   *
+   * Null = det gick inte att göra en produktbild. Då visar kortet katalogbilden eller säljarens
+   * bildruta som den är: hellre det än ett urklipp där soffan saknar ett ben.
    */
-  void pickCoverFrame(dir, images)
-    // Null = ingen bildruta duger som produktbild. Då blir det inget omslag, och kortet visar
-    // katalogbilden — hellre en ny exemplar av modellen än en oläslig bild av den rätta.
-    .then((image) => (image ? buildCover(jobId, dir, image.id, image.path) : null))
+  void byggOmslag(jobId, dir, images, coverImageId)
     .then(async (cutout) => {
       if (!cutout) return;
       const job = getJobSync(jobId);

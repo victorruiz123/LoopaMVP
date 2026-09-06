@@ -1,28 +1,47 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, ChevronRight, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChevronRight, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
-import type { AdminUser, AdminDirectory } from "../types";
+import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
+import AdminAdsScreen from "./AdminAdsScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
+export type AdminFlik = "annonser" | "anvandare";
+
 /**
- * Adminpanelen: de konton som registrerade sig idag eller igår, med vägen in till deras annonser.
+ * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
  *
- * Urvalet görs på servern (server/src/admin.ts) och inte här — det är samma fönster oavsett vem som
- * frågar, och vyn behöver aldrig hämta hem hela användarlistan för att sedan kasta det mesta.
+ * TVÅ LISTOR OCH ETT VAL, inte en lista med en knapp till den andra. Panelen öppnas med en av två
+ * frågor i huvudet — "vad har vi fått in" eller "vem är det här" — och båda besvaras genom att
+ * BLÄDDRA. Annonserna låg tidigare bakom en knapp, alltså ett sidbyte bort, och den som ville jämföra
+ * de två fick navigera fram och tillbaka och tappa både sökning och rullposition på vägen.
  *
- * Vem som ser den avgörs på servern och bara där (server/src/admin.ts). Klienten får ett ja eller nej
- * i inloggningssvaret och ritar ingången efter det — men varje väg bakom den prövar rollen igen, så
- * en påhittad flagga i webbläsaren ger 404 och inget mer.
+ * Annonserna är förvald flik: det är den frågan som ställs oftast.
+ *
+ * Vem som ser panelen avgörs på servern och bara där (server/src/admin.ts). Klienten får ett ja eller
+ * nej i inloggningssvaret och ritar ingången efter det — men varje väg bakom den prövar rollen igen,
+ * så en påhittad flagga i webbläsaren ger 404 och inget mer.
  */
 export default function AdminScreen({
   onBack,
   onOpenUser,
+  onOpenAd,
+  flik: initialFlik = "annonser",
 }: {
   onBack: () => void;
   onOpenUser: (user: AdminUser) => void;
+  /** Öppnar en annons i redigeringsvyn. Frivillig: panelen ska gå att rita utan den. */
+  onOpenAd?: (rad: AdminAnnonsRad) => void;
+  /**
+   * Fliken panelen öppnar på.
+   *
+   * Bärs utifrån för att vägen TILLBAKA från en annons ska landa i annonsfliken och inte i den
+   * förvalda. Att backa ur en annons till användarlistan är att kastas ur det man höll på med.
+   */
+  flik?: AdminFlik;
 }) {
+  const [flik, setFlik] = useState<AdminFlik>(initialFlik);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const t = useT();
   usePageTitle("Adminpanel");
@@ -62,19 +81,47 @@ export default function AdminScreen({
 
       <header className="admin-head">
         <span className="admin-badge">Admin</span>
-        <h1 className="profile-name">{t("Nya användare")}</h1>
+        <h1 className="profile-name">{t("Adminpanel")}</h1>
       </header>
+
+      {/*
+        VALET STÅR ÖVERST, före allt som skiljer de två listorna åt.
+        Flikarna byter innehåll och inte sida: adressen är densamma, tillbakaknappen leder till samma
+        ställe, och det enda som ändras är vad man bläddrar i. Varje lista behåller sitt eget filter
+        och sin egen sökning så länge panelen är öppen.
+      */}
+      <div className="admin-flikar" role="tablist" aria-label={t("Adminpanel")}>
+        <button
+          role="tab"
+          aria-selected={flik === "annonser"}
+          className={`admin-flik-knapp${flik === "annonser" ? " vald" : ""}`}
+          onClick={() => setFlik("annonser")}
+        >
+          <CardIcon size={16} /> {t("Annonser")}
+        </button>
+        <button
+          role="tab"
+          aria-selected={flik === "anvandare"}
+          className={`admin-flik-knapp${flik === "anvandare" ? " vald" : ""}`}
+          onClick={() => setFlik("anvandare")}
+        >
+          <UserIcon size={16} /> {t("Användare")}
+        </button>
+      </div>
+
+      {flik === "annonser" ? (
+        <AdminAdsScreen inbaddad onOpenAd={(rad) => onOpenAd?.(rad)} />
+      ) : (
+        <>
       <p className="admin-lede">
-        {t("Konton som registrerade sig idag eller igår")}
-        {users !== null && total > 0
-          ? ` · ${t("{antal} av {total} konton", { antal: users.length, total })}`
-          : ""}
+        {t("Alla konton, nyast först")}
+        {users !== null && total > 0 ? ` · ${t("{antal} konton", { antal: total })}` : ""}
       </p>
 
       <section className="profile-stats">
         <div className="profile-stat">
           <div className="profile-stat-value">{users?.length ?? "—"}</div>
-          <div className="profile-stat-label">{t("Nya konton")}</div>
+          <div className="profile-stat-label">{t("Konton")}</div>
         </div>
         <div className="profile-stat">
           <div className="profile-stat-value">{users ? totalCards : "—"}</div>
@@ -82,13 +129,14 @@ export default function AdminScreen({
         </div>
       </section>
 
-      {/* Vad urvalet faktiskt vilar på. Ett datumfilter som i tysthet gissar datumet vore ett värre
-          fel än inget filter alls — den som läser listan ska veta vilket av de två den ser. */}
+      {/* Vad listan faktiskt vilar på. Urvalet är borta — listan är alla konton — men den kan
+          fortfarande vara ofullständig, och det beror på varifrån katalogen kom. Den som läser den
+          ska veta vilket av fallen de ser, och vilka datum sorteringen bygger på. */}
       {users !== null && directory !== "service" && (
         <p className="admin-note">
           {directory === "profiles"
-            ? "Registreringsdatum kommer från profiltabellen. Konton utan datum där räknas från sitt första jobb."
-            : "Utan SUPABASE_SERVICE_ROLE_KEY finns inget registreringsdatum: konton räknas som nya efter sitt första jobb, och bara konton som syns i jobben kan visas alls."}
+            ? "Registreringsdatum kommer från profiltabellen. Konton utan datum där dateras efter sitt första jobb."
+            : "Utan SUPABASE_SERVICE_ROLE_KEY finns inget registreringsdatum: konton dateras efter sitt första jobb, och bara konton som syns i jobben kan visas alls."}
         </p>
       )}
 
@@ -114,13 +162,11 @@ export default function AdminScreen({
           <span className="profile-empty-mark">
             <UserIcon size={22} />
           </span>
-          <p className="profile-empty-title">{query ? t("Ingen träff") : t("Inga nya konton")}</p>
+          <p className="profile-empty-title">{query ? t("Ingen träff") : t("Inga konton")}</p>
           <p className="profile-empty-hint">
             {query
-              ? t("Ingen av de nya användarna matchar sökningen.")
-              : t(
-                  "Ingen har registrerat sig idag eller igår. Kontona som fanns sedan tidigare ligger kvar — de visas bara inte här.",
-                )}
+              ? t("Ingen användare matchar sökningen.")
+              : t("Katalogen svarade, men den innehöll inga konton.")}
           </p>
         </div>
       ) : (
@@ -157,6 +203,8 @@ export default function AdminScreen({
           ))}
         </ul>
       )}
+        </>
+      )}
     </div>
   );
 }
@@ -179,7 +227,7 @@ export function formatDate(iso: string): string {
   return new Date(iso).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
 }
 
-/** "idag" / "igår" för fönstrets två dagar, datum för allt annat. */
+/** "idag" och "igår" skrivs som ord — de två dagarna man läser listan för. Datum för allt annat. */
 function dayLabel(iso: string): string {
   const day = new Date(iso);
   const midnight = new Date();

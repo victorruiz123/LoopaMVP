@@ -93,10 +93,83 @@ export function IkonLevererad({ size = 32, className }: IkonProps) {
   );
 }
 
+/** Berättelsens steg 2 — Länken in, säljaren bjuds in. En kedjelänk och en person. */
+export function IkonLank({ size = 32, className }: IkonProps) {
+  return (
+    <svg {...bas(size)} className={className}>
+      <path
+        d="M17 31l14-14M20.5 14.5l3-3a8.5 8.5 0 0112 12l-3 3M27.5 33.5l-3 3a8.5 8.5 0 01-12-12l3-3"
+        stroke="currentColor" strokeWidth="4.4" strokeLinecap="round" fill="none"
+      />
+      <circle cx="38" cy="38" r="7" fill="currentColor" />
+      <path d="M32 46.5q6-6 12 0z" fill="currentColor" />
+    </svg>
+  );
+}
+
+/** Berättelsens steg 4 — Annonskortet hos Loopa. Ett kort med en bock. */
+export function IkonKort({ size = 32, className }: IkonProps) {
+  return (
+    <svg {...bas(size)} className={className}>
+      <rect x="6" y="8" width="36" height="32" rx="5" fill="currentColor" />
+      <rect x="10" y="12" width="28" height="13" rx="3" fill="#fff" opacity="0.92" />
+      <rect x="10" y="28" width="16" height="3" rx="1.5" fill="#fff" opacity="0.7" />
+      <rect x="10" y="33.5" width="10" height="3" rx="1.5" fill="#fff" opacity="0.45" />
+      <circle cx="35" cy="33" r="7.5" fill="#fff" />
+      <path d="M31.5 33l2.6 2.6L39 30.5" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+    </svg>
+  );
+}
+
 /** Stegen i ordning, med de exakta raderna som står i animationen. */
 export const STEG = [
   { nr: 1, ikon: IkonHittar, text: "Du hittar den – var som helst" },
   { nr: 2, ikon: IkonGranskar, text: "Vi granskar den åt dig" },
   { nr: 3, ikon: IkonBetalar, text: "Du betalar säkert" },
   { nr: 4, ikon: IkonLevererad, text: "Hemlevererad. Klar." },
+] as const;
+
+/**
+ * KÖPSIDANS BERÄTTELSE — fem steg, den verkliga processen.
+ *
+ * Skild från STEG ovan med flit. STEG är Trygg affärs stegrad: fyra tillstånd en pågående affär
+ * kan vara i. Det här är landningssidans berättelse om hur ett köp går till från början, och den
+ * har två beats som affären inte har — att hitta annonsen och att klistra in länken. Samma ikoner
+ * återanvänds där stegen är samma sak, så språket hänger ihop.
+ *
+ * RUBRIK OCH FÖRKLARING var för sig. Raden säger vad som händer, förklaringen vem som gör det
+ * eller vad vi tittar på — och det är förklaringarna som svarar på frågorna en besökare faktiskt
+ * har: letar ni skador, vad kostar den, kommer någon bära in den.
+ */
+export const BERATTELSEN = [
+  {
+    nr: 1,
+    ikon: IkonHittar,
+    rubrik: "Du hittar annonsen",
+    text: "På Blocket, Tradera eller Marketplace",
+  },
+  {
+    nr: 2,
+    ikon: IkonLank,
+    rubrik: "Länken in hos Loopa",
+    text: "Du klistrar in den och bjuder in säljaren",
+  },
+  {
+    nr: 3,
+    ikon: IkonGranskar,
+    rubrik: "Vi granskar möbeln",
+    text: "Letar skador och sätter ett marknadsvärde",
+  },
+  {
+    nr: 4,
+    ikon: IkonKort,
+    rubrik: "Annonskortet är klart",
+    text: "Skick, pris och en knapp — klicka hem den tryggt",
+  },
+  {
+    nr: 5,
+    ikon: IkonLevererad,
+    rubrik: "Hemleverans",
+    text: "Vi bär in den i rummet. Pengarna släpps när du godkänt",
+  },
 ] as const;

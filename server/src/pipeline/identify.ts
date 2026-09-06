@@ -1,5 +1,6 @@
 import { callSellerGenerate, type Resolution, type SellerCall } from "../listing.js";
 import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../candidateImages.js";
+import { fargForAnnons, fargerI } from "./farg.js";
 import { mergeSpecs } from "../specHarvest.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { estimatePrice, pricingSignature, takeSpeculativePrice } from "../pricing.js";
@@ -683,9 +684,42 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    * att lägga den väntan framför prisskrivningen hade gjort en bild till något priset står och väntar
    * på. Omslaget behövs på annonsskärmen, priset redan på skärmen före.
    */
-  void (job.productImage
-    ? Promise.resolve({ image: job.productImage as ProductImage, specs: [] as ListingAttribute[] })
-    : resolveProductPage({ brand, model }, listing.result?.sources ?? [])
+  /**
+   * MÖBELNS FÄRG, och varför den prövas HÄR och inte när bilden först hämtades.
+   *
+   * Kandidaternas bilder letas upp under identifieringen, innan annonsen finns — och färgen står i
+   * annonsens attribut. Den vägen är alltså färgblind med nödvändighet, och resultatet syntes: rätt
+   * modell, fel variant. NORDVIKEN finns i svart och i vitlaserad ek, och omslaget blev den som råkade
+   * ligga först bland källorna.
+   *
+   * Nu finns färgen, och bilden hämtas om om den inte är BEKRÄFTAD i rätt färg — alltså både när
+   * adressen namnger en annan färg och när den inte säger något alls.
+   *
+   * Det andra fallet var först undantaget, med argumentet att en tyst adress inte är fel adress. Det
+   * argumentet håller inte, och IKEA Jules visade varför: annonsen sa "rosa", omslaget var en svart
+   * museibild från 1998, och adressen nämnde ingen färg — så inget hände. Skillnaden mot förut är att
+   * omhämtningen nu frågar sökmotorn efter FÄRGEN (se searchTargets). Den letar alltså inte om bland
+   * samma träffar, den ställer en annan fråga.
+   *
+   * DEN GAMLA BILDEN BEHÅLLS OM DEN NYA UTEBLIR. Omprövningen får kosta tid, aldrig en bild.
+   */
+  const farg = fargForAnnons({
+    attribut: listing.result?.attributes ?? null,
+    titel: listing.result?.listing?.title ?? null,
+    variant: job.selected?.variant ?? null,
+  });
+  const gammal = job.productImage ?? null;
+  const bekraftadFarg = !!gammal && !!farg && fargerI(gammal.sourceUrl ?? "").has(farg);
+  const provaOm = !!gammal && !!farg && !bekraftadFarg;
+  if (provaOm) {
+    console.info(`[omslag] ${jobId.slice(0, 8)} omslaget är inte bekräftat ${farg} — söker om med färgen`);
+  }
+
+  void (gammal && !provaOm
+    ? Promise.resolve({ image: gammal as ProductImage, specs: [] as ListingAttribute[] })
+    : resolveProductPage({ brand, model }, listing.result?.sources ?? [], farg)
+        // Utebliven ny bild får inte kosta den gamla. Se resonemanget ovan.
+        .then((r) => (r.image ? r : { image: gammal, specs: r.specs }))
   )
     .then(async ({ image, specs }: { image: ProductImage | null; specs: ListingAttribute[] }) => {
       const withCover = getJobSync(jobId) ?? (await getJob(jobId));

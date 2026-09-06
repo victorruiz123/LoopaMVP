@@ -166,7 +166,7 @@ test("bilderna städas men slutsatsen står kvar", async () => {
   await store().put({
     ...d,
     submission: { source: "MANUAL_CONTENT", adUrl: "https://blocket.se/x", imagePaths: ["a.jpg", "b.jpg"], description: "Fin soffa", askingPriceSek: 4500, submittedAt: new Date().toISOString() },
-    assessment: { brand: "IKEA", model: "Ektorp", categorySlug: "soffor-fatoljer", grade: "C", gradeNote: "n", observations: [], confidence: "low", marketLowSek: 3600, marketHighSek: 4200, questions: [], redFlags: [], assessedAt: new Date().toISOString() },
+    assessment: { brand: "IKEA", model: "Ektorp", categorySlug: "soffor", grade: "C", gradeNote: "n", observations: [], confidence: "low", marketLowSek: 3600, marketHighSek: 4200, questions: [], redFlags: [], assessedAt: new Date().toISOString() },
   });
   await purgeSubmissionMedia(d.id);
   const after = (await store().get(d.id))!;

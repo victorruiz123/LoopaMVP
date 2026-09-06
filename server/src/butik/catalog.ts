@@ -17,7 +17,8 @@ export interface Category {
 
 /** MVP-uppsättningen, i den ordning de visas på landningssidan. */
 export const CATEGORIES: readonly Category[] = [
-  { slug: "soffor-fatoljer", label: "Soffor & fåtöljer", blurb: "Soffor, fåtöljer och loungemöbler — besiktigade, mätta och prissatta." },
+  { slug: "soffor", label: "Soffor", blurb: "Soffor, bäddsoffor och divaner — besiktigade, mätta och prissatta." },
+  { slug: "fatoljer", label: "Fåtöljer", blurb: "Fåtöljer, loungestolar och puffar — en och en granskade." },
   { slug: "bord", label: "Bord", blurb: "Matbord, soffbord och sidobord med måtten utskrivna." },
   { slug: "stolar", label: "Stolar", blurb: "Matstolar, barstolar och pinnstolar, en och en granskade." },
   { slug: "forvaring", label: "Förvaring", blurb: "Byråer, bokhyllor, skåp och sideboards." },
@@ -29,8 +30,35 @@ export const CATEGORIES: readonly Category[] = [
 
 const BY_SLUG = new Map(CATEGORIES.map((c) => [c.slug, c]));
 
+/**
+ * Kategorier som INTE finns längre, och vart de tog vägen.
+ *
+ * `soffor-fatoljer` var en kategori fram till att soffor och fåtöljer delades. Den slugen ligger i
+ * en publicerad sitemap, i kanoniska adresser och i länkar vi inte äger, och en delning som gör dem
+ * till 404 kastar bort den rankning kategorisidan byggt upp. Uppslaget nedan låter dem leva vidare
+ * som ingångar; att de ska svara 301 och inte 200 är SEO-lagrets sak (seo.ts), för det är där
+ * kanoniska adresser bestäms.
+ *
+ * Soffor och inte fåtöljer som mål: soffan är den möbel de flesta som skrev den adressen letade
+ * efter, och det är den som bär flest varor i lagret.
+ */
+export const FLYTTADE_SLUGGAR: Readonly<Record<string, string>> = {
+  "soffor-fatoljer": "soffor",
+};
+
+/** Vart en gammal slug pekar i dag, eller null när den aldrig funnits. */
+export function flyttadSlug(slug: string): string | null {
+  return FLYTTADE_SLUGGAR[slug] ?? null;
+}
+
+/**
+ * Kategorin, med gamla adresser inräknade.
+ *
+ * Slår upp den flyttade slugen också, så att en gammal länk landar på rätt rutnät i stället för på
+ * en tom sida. Anroparen som behöver veta OM det var en omdirigering frågar `flyttadSlug`.
+ */
 export function categoryBySlug(slug: string): Category | undefined {
-  return BY_SLUG.get(slug);
+  return BY_SLUG.get(slug) ?? BY_SLUG.get(FLYTTADE_SLUGGAR[slug] ?? "");
 }
 
 /**
@@ -42,7 +70,8 @@ export function categoryBySlug(slug: string): Category | undefined {
  * tömningsbreven läser samma ord.
  */
 const NOUNS: Record<string, string> = {
-  "soffor-fatoljer": "soffa eller fåtölj",
+  "soffor": "soffa",
+  "fatoljer": "fåtölj",
   "bord": "bord",
   "stolar": "stol",
   "forvaring": "hylla eller byrå",
@@ -68,12 +97,14 @@ export function categoryLabel(slug: string): string {
  * hamnar soffbordet bland sofforna första gången någon lägger till ett ord på fel rad.
  */
 const KEYWORDS: Readonly<Record<string, string>> = {
-  // soffor & fåtöljer
-  soffa: "soffor-fatoljer", soffor: "soffor-fatoljer", baddsoffa: "soffor-fatoljer",
-  divan: "soffor-fatoljer", schaslong: "soffor-fatoljer", sackosack: "soffor-fatoljer",
-  fatolj: "soffor-fatoljer", fatoljer: "soffor-fatoljer", oronlappsfatolj: "soffor-fatoljer",
-  loungestol: "soffor-fatoljer", puff: "soffor-fatoljer", fotpall: "soffor-fatoljer",
-  "sits": "soffor-fatoljer", "sitssoffa": "soffor-fatoljer", soffgrupp: "soffor-fatoljer",
+  // soffor — det man ligger på och sitter flera i
+  soffa: "soffor", soffor: "soffor", baddsoffa: "soffor", soffgrupp: "soffor",
+  divan: "soffor", schaslong: "soffor", "sitssoffa": "soffor", hornsoffa: "soffor",
+  // "3-sits" är soffa på svenska och föll bort en stund när kategorin delades.
+  sits: "soffor", sitsar: "soffor",
+  // fåtöljer — det man sitter en i
+  fatolj: "fatoljer", fatoljer: "fatoljer", oronlappsfatolj: "fatoljer",
+  loungestol: "fatoljer", puff: "fatoljer", fotpall: "fatoljer", sackosack: "fatoljer",
   // bord
   bord: "bord", matbord: "bord", soffbord: "bord", sidobord: "bord", sangbord: "bord",
   avlastningsbord: "bord", klaffbord: "bord", barbord: "bord", brickbord: "bord",

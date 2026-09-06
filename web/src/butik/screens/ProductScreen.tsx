@@ -6,6 +6,7 @@ import { fetchPublicCard } from "../../api";
 import ListingView from "../../components/ListingView";
 import { Link, SellCta, TrustRow, track } from "../components/Bits";
 import { dimensionLabel, timeLeft } from "../components/ProductCard";
+import { brandInk, brandLook, brandTypeStyle } from "../../lib/brandLook";
 import FitsThrough from "../components/FitsThrough";
 import BuyPanel from "../components/BuyPanel";
 import { useViewItem } from "../components/ProductGrid";
@@ -87,7 +88,15 @@ export default function ProductScreen({ id }: { id: string }) {
   return (
     <>
       <header className="butik-pdp-head">
-        {product.brand && <span className="butik-card-brand">{product.brand}</span>}
+        {/* Samma behandling som på kortet i rutnätet: märkets egen färg och bokstavsform. */}
+        {product.brand && (
+          <span
+            className="butik-card-brand"
+            style={{ ...brandTypeStyle(brandLook(product.brand).type), color: brandInk(product.brand) }}
+          >
+            {product.brand}
+          </span>
+        )}
         <h1>{product.title}</h1>
       </header>
 
@@ -108,7 +117,7 @@ export default function ProductScreen({ id }: { id: string }) {
         <div className="butik-pdp-main">
           <div className="butik-slot butik-slot-cover">
             {card ? (
-              <ListingView {...card} loopaId={product.id} only={["cover"]} />
+              <ListingView {...card} loopaId={product.id} hideSources only={["cover"]} />
             ) : (
               <div className="butik-skeleton" style={{ aspectRatio: "1 / 1" }} />
             )}
@@ -116,14 +125,14 @@ export default function ProductScreen({ id }: { id: string }) {
 
           <div className="butik-slot butik-slot-condition">
             {card ? (
-              <ListingView {...card} loopaId={product.id} only={["condition"]} />
+              <ListingView {...card} loopaId={product.id} hideSources only={["condition"]} />
             ) : (
               <div className="butik-skeleton" style={{ height: 280 }} />
             )}
           </div>
 
           <div className="butik-slot butik-slot-about">
-            {card && <ListingView {...card} loopaId={product.id} only={["about"]} />}
+            {card && <ListingView {...card} loopaId={product.id} hideSources only={["about"]} />}
           </div>
         </div>
 
@@ -137,11 +146,11 @@ export default function ProductScreen({ id }: { id: string }) {
           </div>
 
           <div className="butik-slot butik-slot-specs">
-            {card && <ListingView {...card} loopaId={product.id} only={["specs"]} />}
+            {card && <ListingView {...card} loopaId={product.id} hideSources only={["specs"]} />}
           </div>
 
           <div className="butik-slot butik-slot-chat">
-            {card && <ListingView {...card} loopaId={product.id} only={["chat"]} />}
+            {card && <ListingView {...card} loopaId={product.id} hideSources only={["chat"]} />}
           </div>
         </aside>
       </div>
@@ -167,6 +176,18 @@ function BuyBox({ product, sold, reserved }: { product: Product; sold: boolean; 
 
   return (
     <section className="butik-buybox">
+      {/*
+        HELA KÖPET I EN RUTA, MED AVSÄNDAREN I KANTEN.
+        Delarna — priset, löftena, postnumret, knappen — låg tidigare som fyra fristående stycken i
+        en vit spalt bland sidans andra vita kort, och köpet syntes därför inte som ETT ställe utan
+        som fyra. En inramad ruta med en rubrik är hur varje möbelbutik sätter sin kassa: det som
+        står innanför ramen är vad du får och vad det kostar, och det som står utanför är beskrivning.
+
+        "Köp hos Loopa" och inte "Köp": på en sida som också visar andras annonser är avsändaren
+        halva beskedet. Det är VI som tar betalt, kör hem möbeln och tar tillbaka den — Tradera-rutan
+        säger med samma ord att det inte är vi.
+      */}
+      <h2 className="butik-buybox-titel">Köp hos Loopa</h2>
       <div className="butik-buybox-price">
         <span className="butik-price" style={{ fontSize: 30 }}>
           {product.priceSek !== null ? `${SEK.format(product.priceSek)} kr` : "Pris saknas"}
@@ -205,6 +226,9 @@ function TraderaPanel({ product }: { product: Product }) {
   const auction = product.auction;
   return (
     <section className="butik-buybox">
+      {/* Samma ruta, motsatt besked: rubriken säger vem säljaren är innan priset hinner antyda att
+          det är vi. Se BuyBox ovan. */}
+      <h2 className="butik-buybox-titel butik-buybox-titel-extern">Köp via Tradera</h2>
       <div className="butik-buybox-price">
         <span className="butik-price" style={{ fontSize: 30 }}>
           {product.priceSek !== null ? `${SEK.format(product.priceSek)} kr` : "Pris saknas"}

@@ -83,9 +83,21 @@
      mindre ut än så, men ytan under fingret får inte vara det. */
   --tap: 44px;
 
+  /* ---- sidans marginal, och spaltens bredd ----
+     16 px mot kanten är rätt på en telefon och för lite på en 27-tumsskärm: samma tal
+     gör att sidan ser fastklistrad i vänsterkanten ut. Marginalen är därför en andel av
+     fönstret med golv och tak — golvet är telefonens 16, taket den luft en bred skärm
+     tål innan spalten börjar se instängd ut.
+
+     --spalt är telefonkolumnen. 480 px är rätt i handen, men en surfplatta i porträtt
+     är 834 px bred och fick samma 480 som en iPhone: en remsa mitt i ett tomt fält.
+     Kolumnen växer nu med fönstret tills datorvyn tar över vid 900 (se lib/viewMode.ts). */
+  --gutter: clamp(16px, 2.6vw, 44px);
+  --spalt: clamp(480px, 78vw, 720px);
+
   --safe-top: calc(16px + env(safe-area-inset-top));
-  --safe-left: calc(16px + env(safe-area-inset-left));
-  --safe-right: calc(16px + env(safe-area-inset-right));
+  --safe-left: calc(var(--gutter) + env(safe-area-inset-left));
+  --safe-right: calc(var(--gutter) + env(safe-area-inset-right));
   --safe-bottom-sm: calc(20px + env(safe-area-inset-bottom));
 
   /* ---- typografisk skala ----
@@ -150,7 +162,7 @@ body {
 /* Ordmärket sätts som på loopa.se: Inter i tyngsta vikten, hårt hopdraget, i accentfärg.
    Här stod tidigare Poppins — en andra font som bara användes till fem bokstäver, laddades
    separat, och gjorde att logotypen i appen och logotypen på webben inte var samma form. */
-.app-wordmark, .auth-wordmark, .auth-wordmark-inline {
+.app-wordmark, .auth-wordmark, .auth-wordmark-inline, .ordmark {
   /* Ordmärket är det enda som lämnar Inter. Poppins gemena "a" är enkelvånings och rund, och det är
      den bokstaven ordet vilar på — Inters tvåvånings-a gav "Loopa" en helt annan karaktär.
      Inter står kvar som första reserv: faller Poppins ser ordmärket ut som resten av appen i stället
@@ -171,14 +183,14 @@ body {
    dvh, inte vh: på iOS Safari räknar 100vh med adressfältet som om det vore borta, så
    en skärm satt till 100vh är alltid högre än fönstret den ska fylla. */
 .screen {
-  max-width: 480px;
+  max-width: var(--spalt);
   margin: 0 auto;
   min-height: 100dvh;
   padding:
     calc(16px + env(safe-area-inset-top))
-    calc(16px + env(safe-area-inset-right))
+    var(--safe-right)
     calc(40px + env(safe-area-inset-bottom))
-    calc(16px + env(safe-area-inset-left));
+    var(--safe-left);
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -209,6 +221,20 @@ body {
 .app-bar-profile:active { opacity: 0.6; }
 .app-bar-profile:focus-visible { outline: none; box-shadow: var(--focus); }
 .app-bar-profile-name { max-width: 11ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* Vägen över till köpsidan. Medvetet samma sänkta piller som profilknappen och INTE den fyllda
+   orange knapp säljuppmaningen har i köpsidans topprad: där är sälj sidans mål, här är sälj hela
+   sidan, och två tävlande uppmaningar ovanför märkeslistan gör ingendera tydligare. */
+.app-bar-buy {
+  display: inline-flex; align-items: center;
+  border-radius: 999px; padding: 7px 14px; min-height: var(--tap);
+  background: var(--surface-sunk); color: var(--ink-soft);
+  font-size: var(--fs-md); font-weight: 600; letter-spacing: -0.01em;
+  text-decoration: none; white-space: nowrap;
+  transition: opacity var(--t) var(--ease-ui);
+}
+.app-bar-buy:active { opacity: 0.6; }
+.app-bar-buy:focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* ---- knappar ---- */
 .btn {
@@ -266,9 +292,9 @@ body {
 }
 
 .auth-inner {
-  position: relative; z-index: 1; max-width: 420px; margin: 0 auto;
-  padding: calc(44px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right))
-    calc(40px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+  position: relative; z-index: 1; max-width: clamp(420px, 62vw, 560px); margin: 0 auto;
+  padding: calc(44px + env(safe-area-inset-top)) calc(max(20px, var(--gutter)) + env(safe-area-inset-right))
+    calc(40px + env(safe-area-inset-bottom)) calc(max(20px, var(--gutter)) + env(safe-area-inset-left));
   display: flex; flex-direction: column;
 }
 /* Vägen ut ur inloggningen. Ligger ovanpå skärmen och inte i .auth-inner: den är ett rutnät i
@@ -572,7 +598,7 @@ body {
    tjugo olika typografier bara göra det svårare att hitta rätt. */
 .form-row-text-brand { font-size: var(--fs-lg); }
 
-/* ---- sparade annonser på startsidan ---- */
+/* ---- fällbara kort ---- */
 .collapsible-card {
   background: var(--surface); border-radius: var(--r-lg);
   padding: 12px 14px; box-shadow: var(--shadow-card);
@@ -587,20 +613,8 @@ body {
 .collapsible-chevron { display: flex; color: var(--muted-soft); transition: transform var(--t-slow) var(--ease-ui); }
 .collapsible-chevron-open { transform: rotate(90deg); }
 
-.saved-section { background: var(--surface); border-radius: var(--r-lg); padding: 14px; box-shadow: var(--shadow-card); }
-.saved-header { display: flex; justify-content: space-between; margin-bottom: 10px; }
-.saved-list { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
-.saved-item {
-  display: flex; align-items: center; gap: 10px; background: var(--surface); border: none; border-radius: var(--r); padding: 8px; cursor: pointer;
-  text-align: left; width: 100%; font-family: inherit;
-  transition: border-color var(--t) var(--ease-ui);
-}
-.saved-thumb { width: 44px; height: 44px; border-radius: var(--r-sm); object-fit: cover; background: var(--field); }
-.saved-item-body { flex: 1; min-width: 0; font-size: var(--fs-md); }
-.saved-item-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
-
 /* Siffror som inte hoppar i bredd när de uppdateras. */
-.price-main, .price-range-end em, .saved-item .small, .card-price, .profile-stat-value {
+.price-main, .price-range-end em, .card-price, .profile-stat-value {
   font-variant-numeric: tabular-nums;
 }
 
@@ -620,7 +634,7 @@ body {
   background: var(--surface); border-radius: var(--r-xl) var(--r-xl) 0 0;
   box-shadow: 0 -0.5px 0 hsl(var(--scrim) / 0.08), 0 -20px 60px hsl(var(--scrim) / 0.22);
   transform: translateY(100%); transition: transform 420ms var(--ease-sheet);
-  max-width: 480px; margin: 0 auto; will-change: transform;
+  max-width: var(--spalt); margin: 0 auto; will-change: transform;
 }
 .sheet-shown { transform: translateY(0); }
 /* Under dragningen får inget tweenas — arket ska sitta fast i fingret. */
@@ -1806,7 +1820,7 @@ body {
   background: var(--amber-light); color: var(--amber-ink); font-size: var(--fs-sm); line-height: 1.4;
 }
 .identify-fallback-floating {
-  max-width: 480px; margin: 16px auto -8px; position: relative; z-index: 1;
+  max-width: var(--spalt); margin: 16px auto -8px; position: relative; z-index: 1;
   width: calc(100% - 32px);
 }
 
@@ -1840,9 +1854,6 @@ body {
 /* Rubrik med ikon i ett fällbart kort. */
 .collapsible-title-icon { display: inline-flex; align-items: center; gap: 8px; }
 .collapsible-title-icon svg { color: var(--muted); flex-shrink: 0; }
-
-/* Hairline mellan kortets rubrik och listan under, aldrig runt kortet. */
-.saved-list { border-top: 1px solid var(--hairline); padding-top: 10px; }
 
 /* Rubriker i grupperade kort följer iOS: versaler, grå, tunn spärr — etiketten
    över en lista, inte en rubrik som konkurrerar med innehållet under sig. */
@@ -1913,6 +1924,20 @@ body {
   font-family: inherit; box-shadow: 0 1px 2px rgba(42, 27, 18, 0.05);
   transition: transform var(--t-fast) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
 }
+/* ---- surfplattan ----
+   Mellan 640 och 900 px är layouten fortfarande telefonens — pekdonet är ett finger och
+   flödet är ett steg i taget — men kolumnen är inte längre 480 px, och en lista med 204
+   märken i en 600 px bred spalt är 204 rader man rullar förbi. Samma resonemang som i
+   datorvyns mosaik, en våning ned: bredd som finns ska bli fler brickor. Reglerna gäller
+   också över 900 px, där datorvyns egna (tyngre) regler tar över dem. */
+@media (min-width: 640px) {
+  .brand-scroll {
+    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px; align-content: start;
+  }
+  .brand-tile { min-height: 70px; }
+}
+
 .brand-tile:active { transform: scale(0.99); }
 .brand-tile:focus-visible { outline: none; box-shadow: var(--focus); }
 .brand-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1989,12 +2014,42 @@ body {
   margin: 0; padding: 0 4px; font-size: var(--fs-xs); color: var(--muted-soft);
 }
 .listing-cover-note a { color: inherit; text-decoration: underline; text-underline-offset: 2px; }
-/* Renderingen när produktbilden tagit omslaget: samma ljusa yta som scenen, men inne i
-   skickrapportens kort och utan egen skugga — den ligger redan på ett. */
-.listing-damage-render {
-  margin: 0 -6px 12px; border-radius: var(--r-lg); overflow: hidden;
-  background: radial-gradient(120% 90% at 50% 8%, #ffffff 0%, var(--field) 100%);
+/* Skickrapportens galleri: säljarens egna bildrutor, en per anmärkning, med skadan inringad.
+   Här låg 3D-figuren förut — se ListingView.tsx om varför den är borta.
+
+   FAST HÖJD PÅ RUTORNA, bilden inpassad i dem. Bildrutorna kommer ur en filmning och har olika
+   format; ett rutnät där varje bild är olika hög läser som en trasa, inte som en rapport. Små med
+   flit också — de är bevis intill en lista, inte kortets produktbild — och den som vill se närmare
+   fäller ut en av dem. */
+.listing-damage-photos {
+  display: grid; gap: 10px; margin: 0 0 14px;
+  grid-template-columns: repeat(auto-fill, minmax(128px, 1fr));
 }
+.skadefoto {
+  display: grid; gap: 6px; min-width: 0; padding: 0; margin: 0; border: none; background: none;
+  font-family: inherit; text-align: left; cursor: pointer;
+}
+.skadefoto:focus-visible { outline: none; border-radius: var(--r-sm); box-shadow: var(--focus); }
+.skadefoto-ruta {
+  position: relative; width: 100%; height: 108px; background: var(--field); cursor: inherit;
+  transition: height var(--t) var(--ease-ui);
+}
+/* marked-thumb-inner ritas med span här, och en span är inline tills den inte är det. */
+.skadefoto .marked-thumb-inner { display: block; }
+/* Numret binder bilden till raden i listan. Utan det är galleriet en hög bilder att para ihop. */
+.skadefoto-num {
+  position: absolute; left: 6px; top: 6px; width: 21px; height: 21px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: var(--fs-xs); font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.skadefoto-titel {
+  font-size: var(--fs-xs); line-height: 1.3; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Vald ruta tar hela bredden och blir hög nog att bedöma skadan i — utan att lämna sidan. */
+.skadefoto-vald { grid-column: 1 / -1; }
+.skadefoto-vald .skadefoto-ruta { height: min(56vh, 340px); }
+.skadefoto-vald .skadefoto-titel { white-space: normal; font-weight: 600; color: var(--ink-soft); }
 .render-stage { position: relative; }
 .render-canvas { display: block; width: 100%; height: auto; touch-action: none; cursor: grab; }
 .render-canvas:active { cursor: grabbing; }
@@ -2097,7 +2152,7 @@ body {
   background: var(--accent); color: #fff; font-size: var(--fs-sm); font-weight: 700;
   display: inline-flex; align-items: center; justify-content: center;
 }
-/* Grå nål = skadan kunde inte placeras på en del, så den står bara i listan. */
+/* Grått nummer = anmärkningen saknar bevisruta, och står alltså inte i galleriet ovanför. */
 .pin-num-unplaced { background: var(--muted-soft); }
 .pin-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .pin-title { font-size: var(--fs-base); font-weight: 600; color: var(--ink); letter-spacing: -0.01em; }
@@ -2309,6 +2364,116 @@ body {
 }
 .profile-admin-link:active { opacity: 0.7; }
 
+/* --------------------------------------------------------------------------
+   Annonspanelen
+   --------------------------------------------------------------------------
+   Tätare än resten av appen med flit. Säljarens vyer är byggda för en möbel i
+   taget på en telefon; den här är byggd för att läsa hundra rader och hitta den
+   som ligger fel. Samma färger och samma radhöjd som kontolistan, men fler tal
+   per rad — panelen ska kännas som samma app, bara med mer på skärmen.
+   -------------------------------------------------------------------------- */
+
+/* Sex tal i stället för två: statistikraden får radbryta i stället för att krympa. */
+.admin-stats-wide { flex-wrap: wrap; }
+.admin-stats-wide .profile-stat { min-width: 88px; flex: 1 1 88px; }
+
+.admin-verktyg { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+.admin-sok {
+  flex: 1 1 200px; display: flex; align-items: center; gap: 8px;
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--muted-soft);
+}
+.admin-sok input {
+  flex: 1; min-width: 0; border: none; background: none; color: var(--ink);
+  font-family: inherit; font-size: var(--fs-base);
+}
+.admin-sok input:focus { outline: none; }
+.admin-verktyg select {
+  padding: 9px 12px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink); font-family: inherit; font-size: var(--fs-sm);
+}
+
+.annons-lista .card-row { align-items: flex-start; }
+.annons-bild {
+  width: 52px; height: 52px; flex-shrink: 0; border-radius: var(--r-sm); overflow: hidden;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--field); color: var(--muted-soft);
+}
+.annons-bild img { width: 100%; height: 100%; object-fit: cover; }
+.annons-bild.stor { width: 76px; height: 76px; }
+
+/* Läget som en bricka i rubriken: den ska gå att skanna nedför en lista utan att läsa raden. */
+.annons-lage {
+  margin-left: 7px; padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+  background: var(--field); color: var(--muted);
+  font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
+}
+.annons-lage-live { background: #E4F1E8; color: #2F7A50; }
+.annons-lage-reserverad { background: #FBEEDC; color: #A9722A; }
+.annons-lage-sald, .annons-lage-levererad { background: var(--accent-light); color: var(--accent); }
+.annons-lage-misslyckad, .annons-lage-returnerad { background: #F7E1DE; color: #96271C; }
+
+.annons-topp { display: flex; gap: 14px; align-items: flex-start; margin-top: 4px; }
+.annons-topp h1 { margin: 0 0 2px; }
+.annons-kvitto {
+  margin: 0; padding: 10px 12px; border-radius: var(--r-sm);
+  background: #E4F1E8; color: #2F7A50; font-size: var(--fs-sm);
+}
+
+.annons-form { display: flex; flex-wrap: wrap; gap: 10px; }
+.annons-falt { flex: 1 1 150px; display: flex; flex-direction: column; gap: 4px; }
+.annons-falt-bred { flex-basis: 100%; }
+.annons-falt > span {
+  font-size: var(--fs-xs); color: var(--muted);
+  display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 18px;
+}
+/* ↺ på ett rättat fält. Diskret tills man är i närheten: den ska finnas, inte ropa. */
+.annons-falt-aterstall {
+  border: none; background: none; cursor: pointer; padding: 0 2px; line-height: 1;
+  color: var(--muted-soft); font-size: var(--fs-base);
+}
+.annons-falt-aterstall:hover:not(:disabled) { color: var(--accent); }
+.annons-falt-aterstall:disabled { opacity: 0.4; cursor: default; }
+.annons-falt input, .annons-falt select, .annons-falt textarea {
+  padding: 9px 11px; border: 1px solid var(--border); border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink); font-family: inherit; font-size: var(--fs-base);
+}
+.annons-falt textarea { resize: vertical; line-height: 1.45; }
+.annons-falt input::placeholder, .annons-falt textarea::placeholder { color: var(--muted-soft); }
+.annons-falt input:focus, .annons-falt select:focus, .annons-falt textarea:focus {
+  outline: none; border-color: var(--accent); box-shadow: var(--focus);
+}
+/* Knappen ligger i formulärets rutnät men har ingen etikett — den ska stå i linje med fälten. */
+.annons-falt-knapp { justify-content: flex-end; }
+
+/* --------------------------------------------------------------------------
+   Adminpanelens flikar
+   --------------------------------------------------------------------------
+   Två val, och de ska läsas som två val — inte som en knapp bredvid en rubrik.
+   Den valda bär ytan och bläcket, den andra bara texten. */
+.admin-flikar {
+  display: flex; gap: 4px; margin: 12px 0 4px;
+  padding: 4px; border-radius: var(--r-md); background: var(--field);
+}
+.admin-flik-knapp {
+  flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
+  padding: 9px 12px; border: none; border-radius: var(--r-sm); cursor: pointer;
+  background: none; color: var(--muted); font-family: inherit; font-size: var(--fs-base);
+}
+.admin-flik-knapp.vald { background: var(--surface); color: var(--ink); box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.08)); }
+.admin-flik-knapp:not(.vald):hover { color: var(--ink); }
+/* Listan som flik: den ärver skärmens spalt och ska inte lägga en egen ram runt sig. */
+.admin-flik { display: contents; }
+
+.annons-knappar { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.annons-logg { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.annons-logg li {
+  display: flex; gap: 10px; padding: 8px 11px; border-radius: var(--r-sm);
+  background: var(--field); font-size: var(--fs-xs); color: var(--muted);
+}
+.annons-logg-tid { flex-shrink: 0; min-width: 96px; color: var(--muted-soft); font-variant-numeric: tabular-nums; }
+
 
 /* ==========================================================================
    DATORVYN
@@ -2331,6 +2496,28 @@ body {
   --ease-spring: cubic-bezier(0.22, 1.15, 0.36, 1);
   /* Lyftets skugga. Djupare och mjukare än --shadow-card, som är viloläget. */
   --shadow-hover: 0 2px 4px rgba(20, 17, 13, 0.05), 0 22px 44px -20px rgba(20, 17, 13, 0.24);
+
+  /* ---- typskalan följer fönstret ----
+     Stegen i :root är satta för en telefon på armlängds avstånd. Samma tal på en skärm
+     som står en halvmeter bort och är tre gånger så bred läser som finstilt: texten blir
+     inte fel, den blir liten — och en sida satt i 15 px mitt på en 27-tumsskärm är just
+     den bilden av en app som glömt att den fått plats.
+
+     Varje steg växer linjärt från SITT EGET värde vid 900 px — där datorvyn börjar, så
+     ingenting hoppar i bytet — till fjorton procent mer vid 2000 px, och står stilla
+     däröver. En skala och inte åtta lösa tal: förhållandet mellan stegen är detsamma på
+     varje bredd, vilket är vad som gör den till en skala.
+
+     BARA GRADERNA VÄXER. --tap, radier och ramar är fysiska mått: en tryckyta är 44 px
+     för att fingret är det, och en hårfin linje ska vara hårfin på varje skärm. */
+  --fs-2xs: clamp(11px, calc(9.74px + 0.14vw), 12.5px);
+  --fs-xs: clamp(12px, calc(10.63px + 0.153vw), 13.7px);
+  --fs-sm: clamp(13px, calc(11.51px + 0.165vw), 14.8px);
+  --fs-md: clamp(14px, calc(12.4px + 0.178vw), 16px);
+  --fs-base: clamp(15px, calc(13.28px + 0.191vw), 17.1px);
+  --fs-lg: clamp(17px, calc(15.05px + 0.216vw), 19.4px);
+  --fs-field: clamp(16px, calc(14.17px + 0.204vw), 18.2px);
+  --fs-title: clamp(22px, calc(19.48px + 0.28vw), 25.1px);
 }
 
 /* Ytan under allt. Två mycket svaga ljusningar i husfärgerna i stället för platt
@@ -2365,17 +2552,26 @@ body {
 /* ---- skärmens mått ----
    Bredden sätts per skärm, inte en gång för alla: modellvalet är en katalog och vill
    ha bredd, prisförslaget är ett besked och vill inte. 480 px mitt på en stor skärm
-   läser som ett fönster någon glömt dra ut; 1200 px löptext läser som ett kalkylark. */
+   läser som ett fönster någon glömt dra ut; 1200 px löptext läser som ett kalkylark.
+
+   MÅTTEN ÄR SPANN, INTE TAL. Ett fast tal är rätt på exakt en skärmbredd. Talen nedan
+   stod för en 1440-skärm, och på 2400 blev var och en av dem en smal spalt mitt i ett
+   fält av creme — sidan slutade fylla skärmen någonstans runt 1600. Varje spann börjar
+   i sitt gamla tal, så en laptop ser ut som förut, växer med fönstret och stannar där
+   en spalt till slutar tjäna på att bli bredare. Förhållandet mellan skärmarna står
+   kvar: katalogen är fortfarande bredast, beskedet fortfarande smalast. */
 [data-view="desktop"] .screen {
-  max-width: 860px; padding: 34px 40px 76px; gap: 18px;
+  max-width: clamp(860px, 60vw, 1120px);
+  padding: clamp(34px, 2.6vw, 48px) clamp(40px, 3.2vw, 68px) 76px;
+  gap: clamp(18px, 1.3vw, 26px);
 }
-[data-view="desktop"] .home { max-width: 1240px; }
-[data-view="desktop"] .card-screen { max-width: 1140px; }
-[data-view="desktop"] .public-card-screen { max-width: 1140px; }
-[data-view="desktop"] .result-screen { max-width: 1100px; }
-[data-view="desktop"] .price-screen, [data-view="desktop"] .specs-screen { max-width: 980px; }
-[data-view="desktop"] .profile, [data-view="desktop"] .admin { max-width: 920px; }
-[data-view="desktop"] .app-wordmark { font-size: 32px; }
+[data-view="desktop"] .home { max-width: clamp(1240px, 88vw, 1760px); }
+[data-view="desktop"] .card-screen { max-width: clamp(1140px, 80vw, 1560px); }
+[data-view="desktop"] .public-card-screen { max-width: clamp(1140px, 80vw, 1560px); }
+[data-view="desktop"] .result-screen { max-width: clamp(1100px, 76vw, 1480px); }
+[data-view="desktop"] .price-screen, [data-view="desktop"] .specs-screen { max-width: clamp(980px, 66vw, 1280px); }
+[data-view="desktop"] .profile, [data-view="desktop"] .admin { max-width: clamp(920px, 62vw, 1200px); }
+[data-view="desktop"] .app-wordmark { font-size: clamp(32px, 2vw, 40px); }
 [data-view="desktop"] .app-bar { min-height: 42px; }
 
 /* Skärmbytet får en resa. Flödet är en följd av steg, och utan någon rörelse alls
@@ -2426,7 +2622,6 @@ body {
 /* Korten lyfter i stället för att byta bottenfärg. En vit yta som blir beige läser som
    markerad; en som lyfter läser som gripbar — och det är vad de är, allihop är knappar. */
 [data-view="desktop"] .card-row,
-[data-view="desktop"] .saved-item,
 [data-view="desktop"] .candidate,
 [data-view="desktop"] .choose-card {
   transition: transform var(--t-slow) var(--ease-spring), box-shadow var(--t-slow) var(--ease-ui), background var(--t) var(--ease-ui);
@@ -2434,7 +2629,6 @@ body {
 [data-view="desktop"] .card-row:hover,
 [data-view="desktop"] .candidate:hover,
 [data-view="desktop"] .choose-card:hover { transform: translateY(-2px); box-shadow: var(--shadow-hover); }
-[data-view="desktop"] .saved-item:hover { background: var(--field); }
 [data-view="desktop"] .card-row:hover .card-row-chevron,
 [data-view="desktop"] .candidate:hover .candidate-chevron { color: var(--accent); }
 [data-view="desktop"] .card-row-chevron, [data-view="desktop"] .candidate-chevron {
@@ -2453,8 +2647,11 @@ body {
   display: grid;
   grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  column-gap: 60px; row-gap: 14px;
-  height: 100vh; padding: 28px 40px 34px; overflow: hidden;
+  column-gap: clamp(60px, 4.4vw, 96px); row-gap: 14px;
+  /* dvh, inte vh: samma skäl som .screen — vh räknar med adressfältet som om det vore borta. */
+  height: 100dvh;
+  padding: clamp(28px, 2.2vw, 42px) clamp(40px, 3.2vw, 68px) clamp(34px, 2.4vw, 46px);
+  overflow: hidden;
 }
 [data-view="desktop"] .home > .app-bar { grid-column: 1 / -1; grid-row: 1; margin-bottom: 12px; }
 /* Rubriken sträcker sig över sökrutans rad och listans, så dess överkant hamnar i
@@ -2470,10 +2667,19 @@ body {
 /* Historiken ankras i nederkanten av vänsterspalten: den är ett arkiv, inte nästa steg. */
 [data-view="desktop"] .home > .collapsible-card { grid-column: 1; grid-row: 4; align-self: end; }
 
+/* Spalternas förhållande på en riktigt bred skärm. 0,8/1,2 är satt för en laptop, där
+   vänsterspalten behöver varenda punkt för att rubriken ska få plats på två rader. Vid
+   1600 px och uppåt har den plats över — och det som ska ha den är mosaiken, som är
+   sidans enda handling: samma förhållande där betyder bara en bredare tom yta under
+   stegen och en kolumn märken färre. */
+@media (min-width: 1600px) {
+  [data-view="desktop"] .home { grid-template-columns: minmax(320px, 0.64fr) minmax(0, 1.36fr); }
+}
+
 /* Rubriken skalar med fönstret. Datorläget börjar redan vid 900 px, och 54 punkter i en
    304 px vänsterspalt spiller ut ur den — clamp ger samma rubrik en storlek den ryms i. */
-[data-view="desktop"] .home-title { font-size: clamp(38px, 3.6vw, 54px); letter-spacing: -0.042em; }
-[data-view="desktop"] .home-lede { font-size: 18px; max-width: 32ch; margin-top: 16px; }
+[data-view="desktop"] .home-title { font-size: clamp(38px, 3.6vw, 62px); letter-spacing: -0.042em; }
+[data-view="desktop"] .home-lede { font-size: clamp(18px, 1.15vw, 22px); max-width: 32ch; margin-top: 16px; }
 [data-view="desktop"] .brand-pill { font-size: var(--fs-xs); letter-spacing: 0.08em; }
 /* Pricken andas. Det är sidans enda ofrivilliga rörelse och den enda plats där en
    sådan hör hemma — den säger att här finns en maskin som arbetar. */
@@ -2508,8 +2714,16 @@ body {
    husets egen färg och typografi, och de lyfter under pekaren. */
 [data-view="desktop"] .brand-scroll {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
-  gap: 10px; align-content: start;
+  /* auto-fill och inte ett antal: en bredare spalt ska ge FLER brickor, inte större.
+     Brickan bär ett märkesnamn och en chevron — den blir inte bättre av att vara 300 px.
+
+     MEN MINSTA MÅTTET VÄXER OCKSÅ, långsammare än spalten. Med 190 px låst gav en 1040 px
+     spalt fem brickor på 193 px, och då tog namnen slut mitt i ordet: "Svenskt Te…",
+     "Fritz Hans…", "Bruno Mat…". En mosaik man känner igen sitt märke i är inte en mosaik
+     med fler rutor, det är en där märket står skrivet — så brickan får bli bredare i
+     stället för att bli en till. */
+  grid-template-columns: repeat(auto-fill, minmax(clamp(190px, 11vw, 240px), 1fr));
+  gap: clamp(10px, 0.7vw, 16px); align-content: start;
   padding: 3px 8px 26px 3px; overflow-y: auto;
   -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
           mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
@@ -2544,19 +2758,19 @@ body {
     var(--bg);
 }
 [data-view="desktop"] .auth-inner {
-  width: 100%; max-width: 960px; padding: 0;
+  width: 100%; max-width: clamp(960px, 66vw, 1240px); padding: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 396px);
+  grid-template-columns: minmax(0, 1fr) minmax(0, clamp(396px, 26vw, 480px));
   grid-template-rows: auto auto 1fr;
-  column-gap: 72px; align-content: center;
+  column-gap: clamp(72px, 5vw, 110px); align-content: center;
 }
 [data-view="desktop"] .auth-back { top: 26px; left: 30px; }
 [data-view="desktop"] .auth-wordmark {
   grid-column: 1; grid-row: 1; text-align: left; font-size: 40px; margin-bottom: 28px;
 }
 [data-view="desktop"] .auth-hero { grid-column: 1; grid-row: 2; text-align: left; margin-bottom: 0; }
-[data-view="desktop"] .auth-title { font-size: 46px; letter-spacing: -0.038em; }
-[data-view="desktop"] .auth-lede { font-size: 18px; max-width: 28ch; }
+[data-view="desktop"] .auth-title { font-size: clamp(46px, 3.4vw, 62px); letter-spacing: -0.038em; }
+[data-view="desktop"] .auth-lede { font-size: clamp(18px, 1.15vw, 22px); max-width: 28ch; }
 [data-view="desktop"] .auth-terms {
   grid-column: 1; grid-row: 3; align-self: end; text-align: left;
   margin: 28px 0 0; max-width: 36ch;
@@ -2637,8 +2851,8 @@ body {
 [data-view="desktop"] .price-screen > .next-step { grid-column: 1; grid-row: 3; }
 [data-view="desktop"] .price-screen > .form-hint { grid-column: 1; grid-row: 4; }
 [data-view="desktop"] .price-big-card { padding: 32px 26px 26px; }
-[data-view="desktop"] .price-main-xl { font-size: 58px; letter-spacing: -0.045em; }
-[data-view="desktop"] .price-identity { font-size: 26px; }
+[data-view="desktop"] .price-main-xl { font-size: clamp(58px, 4vw, 76px); letter-spacing: -0.045em; }
+[data-view="desktop"] .price-identity { font-size: clamp(26px, 1.7vw, 32px); }
 [data-view="desktop"] .ladder-card { padding: 22px 22px 20px; }
 /* Reglagen är tumstora på telefonen. Med en mus i handen behövs inte den ytan, men
    tumman ska svara på att pekaren är över den. */
@@ -2741,8 +2955,8 @@ body {
   column-gap: 44px; align-items: start;
 }
 [data-view="desktop"] .listing-cover-block { position: sticky; top: 26px; align-self: start; }
-[data-view="desktop"] .listing-name { font-size: 42px; }
-[data-view="desktop"] .listing-price-now { font-size: 44px; }
+[data-view="desktop"] .listing-name { font-size: clamp(42px, 3vw, 56px); }
+[data-view="desktop"] .listing-price-now { font-size: clamp(44px, 3.1vw, 58px); }
 [data-view="desktop"] .listing-block { padding: 20px 22px; }
 [data-view="desktop"] .card-done { max-width: 360px; align-self: center; }
 [data-view="desktop"] .card-chat-stream { max-height: 420px; }
@@ -2769,7 +2983,7 @@ body {
    finns ingen tumme, och en yta klistrad i skärmens underkant har inget som håller
    den där — den flyttas in och blir ett fönster mitt i bilden. */
 [data-view="desktop"] .sheet {
-  max-width: 540px; height: min(680px, 78vh); bottom: 8vh;
+  max-width: clamp(540px, 34vw, 680px); height: min(760px, 78vh); bottom: 8vh;
   border-radius: var(--r-xl);
   transform: translateY(calc(100% + 8vh + 24px));
 }
@@ -2851,11 +3065,20 @@ body {
 }
 
 /* ---- cookierutan ---- */
+/*
+ * NEDRE HÖGRA HÖRNET, inte en list tvärs över underkanten.
+ *
+ * En rad som går från kant till kant läser som en systemvarning och delar sidan i två.
+ * Ett kort i hörnet är vad frågan faktiskt är: något som väntar, medan sidan fortsätter
+ * att vara en sida. På telefon finns inget hörn att lägga sig i — där tar den bredden
+ * och blir ett ark, vilket är rätt form på den skärmen.
+ */
 .consent {
   position: fixed; z-index: 70;
   left: 0; right: 0; bottom: 0;
-  padding: 0 12px calc(12px + env(safe-area-inset-bottom));
+  padding: 0 16px calc(16px + env(safe-area-inset-bottom));
   pointer-events: none; /* bara kortet tar tryck — sidan bakom ska gå att använda */
+  display: flex; justify-content: flex-end;
 }
 /* Inte över kameran.
    Kameravyn ritar sina kontroller direkt på bildrutan, i underkanten — samma plats som rutan tar.
@@ -2865,29 +3088,31 @@ body {
 body:has(.screen-camera) .consent { display: none; }
 .consent-inner {
   pointer-events: auto;
-  max-width: 480px; margin: 0 auto;
+  width: min(100%, 520px);
   background: var(--surface); border-radius: var(--r-xl);
   border: 1px solid var(--hairline);
   box-shadow: var(--shadow-raised);
-  padding: 18px 18px 14px;
-  animation: consent-in 320ms var(--ease-sheet) both;
+  padding: 22px 22px 18px;
+  animation: consent-in 340ms var(--ease-sheet) both;
 }
+/* Den kommer ur hörnet den ska ligga i — nedifrån OCH från höger. En ruta som far rakt
+   upp från underkanten pekar tillbaka på listen den inte längre är. */
 @keyframes consent-in {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+  from { opacity: 0; transform: translate(10px, 18px) scale(0.985); }
+  to { opacity: 1; transform: none; }
 }
 .consent-title {
-  margin: 0 0 6px; font-size: var(--fs-lg); font-weight: 700;
-  letter-spacing: -0.015em; color: var(--ink);
+  margin: 0 0 8px; font-size: var(--fs-title); font-weight: 700;
+  letter-spacing: -0.02em; color: var(--ink);
 }
-.consent-body { margin: 0 0 14px; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); }
+.consent-body { margin: 0 0 18px; font-size: var(--fs-base); line-height: 1.55; color: var(--muted); }
 .consent-body strong { color: var(--ink-soft); font-weight: 600; }
 /* Två spalter av samma bredd. Rutnätet ÄR regeln: ingen av knapparna kan råka bli den större,
    och den dagen någon lägger till en tredje delas bredden lika igen. */
 .consent-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.consent-choice { width: 100%; padding: 12px 10px; font-size: var(--fs-md); min-height: var(--tap); }
+.consent-choice { width: 100%; padding: 13px 12px; font-size: var(--fs-base); min-height: var(--tap); }
 .consent-links {
-  margin: 12px 0 0; text-align: center;
+  margin: 14px 0 0; text-align: center;
   display: flex; justify-content: center; gap: 12px;
 }
 
@@ -3331,3 +3556,110 @@ body:has(.screen-camera) .consent { display: none; }
   background: var(--accent-light); color: var(--accent-ink);
   font-size: var(--fs-md); line-height: 1.5;
 }
+
+/* ==========================================================================
+   Inloggningen INUTI en annan sida
+   ==========================================================================
+   Skärmen är ritad som en helsida: full höjd och en bakgrund som tonar ut mot
+   kanterna. Släppt i butikens spalt klipptes den bakgrunden till en rektangel
+   med synliga kanter mitt på sidan, och blocket fick ett fält av tomhet under
+   sig. Reglerna nedan tar bort helsidesdelarna och lämnar kvar formuläret. */
+
+.auth-inbaddad {
+  min-height: 0;
+  padding: 0;
+  background: none;
+}
+.auth-inbaddad .auth-inner {
+  max-width: none;
+  /* Spalten äger redan sidmarginalerna — en padding till hade skjutit in formuläret från sidans
+     vänsterlinje, som allt annat på sidan följer. */
+  padding: 24px 0 32px;
+}
+/* "Tillbaka" satt absolut mot skärmens hörn. I en spalt hör den till innehållet. */
+.auth-inbaddad .auth-back { position: static; margin-bottom: 18px; }
+
+[data-view="desktop"] .auth-inbaddad {
+  /* Överst i spalten, inte centrerad i ett tomrum den inte äger. */
+  place-items: start stretch;
+  padding: 28px 0 8px;
+  /*
+   * Gradienten bort — igen, och med rätt specificitet.
+   *
+   * `.auth-inbaddad { background: none }` räckte inte: datorvyns regel är
+   * `[data-view="desktop"] .auth-screen`, som väger tyngre än en ensam klass. Kvar blev ett blekt
+   * rosa fält med synliga kanter mitt på sidan — helsidesbakgrunden klippt till spaltens form.
+   */
+  background: none;
+}
+[data-view="desktop"] .auth-inbaddad .auth-inner {
+  /* Två spalter som BÖRJAR på samma rad. Vänsterspalten är kort och högerspalten
+     hög; centrerat innehåll gav två block som gled isär i höjdled. */
+  align-content: start;
+  column-gap: 56px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 400px);
+}
+[data-view="desktop"] .auth-inbaddad .auth-wordmark { margin-bottom: 18px; font-size: 34px; }
+[data-view="desktop"] .auth-inbaddad .auth-title { font-size: clamp(30px, 3.4vw, 40px); }
+[data-view="desktop"] .auth-inbaddad .auth-terms { margin-top: 22px; align-self: start; }
+[data-view="desktop"] .auth-inbaddad .auth-tabs { margin-bottom: 12px; }
+
+/*
+ * I arket ovanpå köpsidan finns ingen sidospalt att fylla — en spalt med ordmärke bredvid fyra fält
+ * gör bara arket dubbelt så brett som det behöver vara.
+ *
+ * RUTNÄTET MÅSTE BORT, inte bara spalten. Datorvyns inloggning är två spalter där varje del har sin
+ * ruta utpekad med BÅDE `grid-column` och `grid-row`: ordmärke och rubrik i rad 1 och 2 till vänster,
+ * flikar och formulär i samma två rader till höger. Regeln här skrev tidigare bara om spalten till
+ * en — raderna blev kvar, och fyra delar hamnade i två rutor. Mätt i datorvyn före fixen låg
+ * `auth-wordmark` och `auth-tabs` båda på y=281, `auth-hero` och `auth-card` båda på y=334, och
+ * villkorsraden tvärs över formuläret. Rubriken syntes inte alls: den låg BAKOM det vita kortet.
+ *
+ * En flexspalt har inga rutor att ärva. Delarna faller i markupens ordning, vilket är den ordning de
+ * är skrivna för — och en ny del i formuläret hamnar sist i stället för ovanpå någon annan.
+ */
+.grind .auth-inbaddad .auth-inner {
+  display: flex;
+  flex-direction: column;
+  max-width: none;
+  padding: 0;
+}
+.grind .auth-inbaddad .auth-hero,
+.grind .auth-inbaddad .auth-terms { text-align: left; }
+
+/*
+ * Textbredderna är satta för den smala vänsterspalten i tvåspaltsvyn — 28ch på ingressen, 36ch på
+ * villkorsraden. I arket, som är en enda spalt på 508 px, blir samma mått i stället ett kort
+ * textblock med fransig högerkant och tomrum bredvid. Radlängden här ges av arket.
+ */
+.grind .auth-inbaddad .auth-lede,
+.grind .auth-inbaddad .auth-terms { max-width: none; }
+
+/*
+ * Flikarna och formuläret fyller arket.
+ *
+ * `align-self: end` respektive `start` är satta för tvåspaltsvyn, där de styr HÖJDLED: flikarna
+ * skjuts ned mot rubrikens fot, kortet läggs mot spaltens topp. I en flexspalt byter de axel och
+ * styr i stället bredden — flikarna hamnade högerklistrade och kortet krympte till sitt innehåll och
+ * lade sig till vänster. Två delar av samma formulär, i var sitt hörn.
+ */
+.grind .auth-inbaddad .auth-tabs,
+.grind .auth-inbaddad .auth-card { align-self: stretch; }
+
+/*
+ * Ordmärket bort i arket. Det står direkt ovanför en rubrik som redan säger "Välkommen till Loopa",
+ * och sidan bakom bär loggan i sitt vänstra hörn — tre Loopa på en skärm, varav två i rad.
+ * I tvåspaltsvyn satt det högst upp i en egen spalt, långt från rubriken, och gjorde nytta där.
+ */
+.grind .auth-inbaddad .auth-wordmark { display: none; }
+
+.grind .auth-inbaddad { padding: 26px; }
+
+/*
+ * Cookiefrågan viker för inloggningen, av samma skäl som den viker för kameran ovan: den låg över
+ * arkets nederkant och skymde "Skapa konto"-knappen. Frågan är inte brådskande och står kvar när
+ * arket stängts — men den får inte lägga sig över det den som klickade "Logga in" håller på med.
+ */
+body:has(.grind) .consent { display: none; }
+
+

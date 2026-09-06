@@ -51,8 +51,8 @@ export interface AdminAccount {
   /** Senaste jobbet, som ISO-tid. Null för ett konto som aldrig filmat något. */
   lastActivity: string | null;
   /**
-   * När kontot registrerades. Null när varken Supabase eller jobben kan säga det — och ett konto utan
-   * datum kan inte påstås ha registrerats idag, så det faller ur panelens fönster.
+   * När kontot registrerades. Null när varken Supabase eller jobben kan säga det — kontot syns ändå,
+   * men sist i listan: okänt är inte samma sak som gammalt. Se `jamforSenastRegistrerad`.
    */
   signedUpAt: string | null;
   /**
@@ -66,24 +66,22 @@ export interface AdminAccount {
 }
 
 /**
- * Panelens fönster: idag och igår, lokal tid på maskinen som kör servern.
+ * Ordningen i listan: nyast först, okänt datum sist.
  *
- * Dygnsgräns och inte "48 timmar bakåt". Frågan panelen svarar på är "vem är ny nu" och den ställs av
- * en människa som tänker i dagar — ett rullande timfönster hade tappat gårdagsmorgonens konton vid
- * lunch, mitt i den dag de fortfarande räknas som nya.
+ * Panelen visade tidigare BARA konton från idag och igår. Fönstret gjorde vyn oanvändbar för allt
+ * utom "vem registrerade sig nyss" — den som letade upp ett konto för att svara en kund fick veta
+ * att det inte fanns, fast det låg kvar. Urvalet är därför borta, och sorteringen bär det som
+ * fönstret var till för: den som är ny står överst ändå.
+ *
+ * ETT KONTO UTAN DATUM ÄR INTE GAMMALT, det är okänt — men det kan inte påstås vara nytt heller, och
+ * det hör därför hemma sist och inte blandat in bland de daterade. Se `signupApproximate` för
+ * skillnaden mellan ett känt och ett gissat datum.
  */
-export function signupWindowStart(now: Date = new Date()): Date {
-  const start = new Date(now);
-  start.setHours(0, 0, 0, 0);
-  start.setDate(start.getDate() - 1);
-  return start;
-}
-
-/** Registrerade sig kontot inom fönstret? Ett konto utan känt datum räknas aldrig som nytt. */
-export function signedUpInWindow(account: Pick<AdminAccount, "signedUpAt">, now: Date = new Date()): boolean {
-  if (!account.signedUpAt) return false;
-  const at = new Date(account.signedUpAt).getTime();
-  return Number.isFinite(at) && at >= signupWindowStart(now).getTime();
+export function jamforSenastRegistrerad(a: Pick<AdminAccount, "signedUpAt">, b: Pick<AdminAccount, "signedUpAt">): number {
+  if (!a.signedUpAt && !b.signedUpAt) return 0;
+  if (!a.signedUpAt) return 1;
+  if (!b.signedUpAt) return -1;
+  return a.signedUpAt < b.signedUpAt ? 1 : a.signedUpAt > b.signedUpAt ? -1 : 0;
 }
 
 /**
@@ -257,8 +255,7 @@ function blank(row: DirectoryRow): AdminAccount {
  */
 export async function listAccounts(
   token: string | null,
-  now: Date = new Date(),
-): Promise<{ users: AdminAccount[]; directory: DirectorySource; total: number; since: string }> {
+): Promise<{ users: AdminAccount[]; directory: DirectorySource; total: number }> {
   const [dir, jobs] = await Promise.all([fetchDirectory(token), listJobs()]);
 
   const byId = new Map<string, AdminAccount>();
@@ -295,18 +292,14 @@ export async function listAccounts(
     }
   }
 
-  const all = [...byId.values()];
-
   /**
-   * Panelen visar de NYA kontona — de som registrerade sig idag eller igår — och inget annat.
+   * ALLA konton, inget urval.
    *
-   * `total` följer med så vyn kan skriva ut hur många konton som finns bakom urvalet. Ett filter som
-   * inte säger vad det döljer ser ut som en tom databas den dag ingen registrerat sig.
+   * Listan är hela katalogen sammanslagen med jobben, sorterad så att den nyaste står överst. Det
+   * enda som fortfarande kan göra den ofullständig är varifrån katalogen kom — se `directory`, och
+   * notisen panelen skriver ut när servicenyckeln saknas.
    */
-  const users = all
-    .filter((a) => signedUpInWindow(a, now))
-    // Nyast först: det är den ordning frågan "vem är ny" ställs i.
-    .sort((a, b) => ((a.signedUpAt as string) < (b.signedUpAt as string) ? 1 : -1));
+  const users = [...byId.values()].sort(jamforSenastRegistrerad);
 
-  return { users, directory: dir.source, total: all.length, since: signupWindowStart(now).toISOString() };
+  return { users, directory: dir.source, total: users.length };
 }

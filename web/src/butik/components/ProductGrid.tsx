@@ -22,10 +22,20 @@ export default function ProductGrid({
   query,
   emptyBody,
   categorySlug,
+  vantarPaTolkning = false,
 }: {
   query: BrowseQuery;
   emptyBody: string;
   categorySlug?: string | null;
+  /**
+   * Sant medan sökskärmens AI-tolkning fortfarande är på väg.
+   *
+   * ETT TOMT LÄGE ÄR ETT SVAR, och det svaret får inte ges innan frågan är färdigläst. En mening som
+   * "en bekväm soffa som passar ett litet vardagsrum" matchar ingen titel ordagrant, så den råa
+   * textsökningen ger noll — och rutnätet skrev "Inget matchar" i tre sekunder, tills tolkningen kom
+   * med kategorin och 24 möbler. Sidan sa alltså emot sig själv. Nu väntar den ut frågan i stället.
+   */
+  vantarPaTolkning?: boolean;
 }) {
   // Bevakningsarket bor här: det är rutnätet som vet när det är tomt, och det är då det behövs.
   const [bevakning, setBevakning] = useState(false);
@@ -40,6 +50,16 @@ export default function ProductGrid({
 
   // Nyckeln gör om filterändringar till en ny hämtning utan att jämföra objekt djupt.
   const key = JSON.stringify(query);
+  /**
+   * Nyckeln som varorna på skärmen hör till. Null = vi har aldrig visat något.
+   *
+   * SKELETTET ÄR BARA FÖR FÖRSTA HÄMTNINGEN. Sökskärmen byter query en gång till när AI-tolkningen
+   * landar, och rutnätet slängde då bort träffar som redan stod på skärmen och ritade ett skelett i
+   * deras ställe. Resultatet syntes efter 0,1 s, försvann efter två sekunder och kom tillbaka efter
+   * ytterligare en tiondel — vilket läser som att sökningen tar tre sekunder, fast den var klar på
+   * en tiondel. Nu står de gamla träffarna kvar, dämpade, tills de nya kommer.
+   */
+  const [visadNyckel, setVisadNyckel] = useState<string | null>(null);
   // Sena svar från en gammal filterinställning får inte skriva över ett nyare resultat.
   const requestRef = useRef(0);
 
@@ -51,6 +71,7 @@ export default function ProductGrid({
       .then((r) => {
         if (id !== requestRef.current) return;
         setItems(r.items);
+        setVisadNyckel(key);
         setTotal(r.total);
         setDegraded(r.traderaDegraded);
         setExcluded(r.excludedForMissingDimensions);
@@ -71,7 +92,11 @@ export default function ProductGrid({
       .finally(() => setLoadingMore(false));
   };
 
-  if (loading) return <GridSkeleton />;
+  // Bara när det inte finns något att stå kvar med. Se `visadNyckel`.
+  if (loading && visadNyckel === null) return <GridSkeleton />;
+  // Frågan är inte färdigläst — se `vantarPaTolkning`. Tomt är ett svar, och vi har inget än.
+  if (vantarPaTolkning && items.length === 0) return <GridSkeleton />;
+  const uppdaterar = loading && visadNyckel !== null;
 
   if (error) {
     return (
@@ -111,7 +136,9 @@ export default function ProductGrid({
         <EmptyState body={emptyBody} categorySlug={categorySlug} onBevakning={() => setBevakning(true)} />
       ) : (
         <>
-          <div className="butik-grid">
+          {/* `aria-busy` säger samma sak som dämpningen, för den som inte ser den: listan står kvar
+              men är på väg att bytas ut. */}
+          <div className={uppdaterar ? "butik-grid butik-grid-uppdaterar" : "butik-grid"} aria-busy={uppdaterar}>
             {items.map((p) => (
               <ProductCard key={p.id} product={p} />
             ))}

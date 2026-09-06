@@ -19,10 +19,20 @@ import LegalLink from "../components/LegalLink";
 export default function AuthScreen({
   intent = "account",
   initialTab,
+  inbaddad = false,
   onDone,
   onBack,
 }: {
   intent?: "account" | "flow";
+  /**
+   * Skärmen ligger INUTI en annan sida — butikens spalt, ett ark ovanpå köpsidan.
+   *
+   * Den är ritad som en helsida: full skärmhöjd och en bakgrund som tonar ut mot kanterna. Släppt i
+   * en spalt med maxbredd klipps den bakgrunden till en rektangel med synliga kanter mitt på sidan,
+   * och blocket får en tomhet under sig som ingen bett om. Flaggan tar bort helsidesdelarna och
+   * lämnar formuläret.
+   */
+  inbaddad?: boolean;
   /** Fliken skärmen öppnar på. Utelämnad följer den `intent` — se `tab` nedan. */
   initialTab?: "signin" | "signup";
   /** Inloggningen gick igenom. Anropas när sessionen finns, så det som följer kan bära dess token. */
@@ -73,7 +83,7 @@ export default function AuthScreen({
   }
 
   return (
-    <div className="auth-screen">
+    <div className={inbaddad ? "auth-screen auth-inbaddad" : "auth-screen"}>
       {/* Utanför .auth-inner: den är ett rutnät i datorvyn där varje del har sin ruta utpekad, och
           ett barn till hade auto-placerats i någon annans. */}
       {onBack && (

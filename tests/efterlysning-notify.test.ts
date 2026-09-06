@@ -33,7 +33,7 @@ import type { Product } from "../server/src/butik/types.js";
 
 const spec = (over = {}) => ({
   userId: "u1", email: "kopare@example.com",
-  filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000 },
+  filter: { categorySlug: "soffor", maxPriceSek: 5000 },
   styleTags: [], deadline: null, urgency: "none" as const, note: null,
   summary: "Soffor & fåtöljer · max 5 000 kr", parseMethod: "chat" as const, area: "Södermalm",
   ...over,
@@ -196,7 +196,7 @@ test("men den skickas när det bästa vi har bara är nära", async () => {
   const e = await store.create(spec({
     userId: "vent2",
     // Färgkravet gör varje träff till en nära-träff: ingen av våra möbler har färg satt.
-    filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000, colors: ["magenta"] },
+    filter: { categorySlug: "soffor", maxPriceSek: 5000, colors: ["magenta"] },
     deadline: new Date(Date.now() + 3 * 86_400_000).toISOString().slice(0, 10),
   }));
   await runDeadlineValve();

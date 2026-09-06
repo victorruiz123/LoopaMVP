@@ -13,14 +13,23 @@
   padding: calc(10px + env(safe-area-inset-top)) var(--safe-right) 10px var(--safe-left);
   border-bottom: 1px solid var(--border);
 }
-.affar-logo { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
+.affar-logo { font-size: clamp(26px, 1.8vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
 .affar-logo span { color: var(--accent); }
 .affar-bar-link { font-size: var(--fs-md); font-weight: 600; color: var(--accent); text-decoration: none; }
 
-.affar-page { max-width: 680px; margin: 0 auto; padding: 0 var(--safe-left) 60px; }
+/*
+ * SPALTEN VÄXER, MEN LÅNGSAMT. De här sidorna är text man läser — ett erbjudande, en
+ * bedömning, en status — och en rad blir inte bättre av att bli 1400 px lång. Men 680
+ * px mitt på en bred skärm är inte heller ett läsmått, det är en kvarglömd remsa: när
+ * allt omkring växer måste spalten göra det också, bara inte lika mycket. Taket ligger
+ * där raden fortfarande går att följa tillbaka till nästa radbörjan.
+ */
+.affar-page { max-width: clamp(680px, 48vw, 880px); margin: 0 auto; padding: 0 var(--safe-left) 60px; }
 
-.affar-hero { padding: 30px 0 20px; }
+.affar-hero { padding: clamp(30px, 2.6vw, 48px) 0 clamp(20px, 1.8vw, 32px); }
 .affar-hero h1 { margin: 8px 0 10px; font-size: clamp(26px, 6vw, 40px); line-height: 1.1; letter-spacing: -0.02em; }
+/* Andra halvan av kurvan, se .butik-hero h1: den första är telefonens och är brant. */
+@media (min-width: 900px) { .affar-hero h1 { font-size: clamp(40px, 2.4vw, 50px); } }
 .affar-hero p { margin: 0; font-size: var(--fs-lg); color: var(--muted); line-height: 1.5; }
 .affar-geo {
   display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
@@ -29,10 +38,10 @@
 }
 
 .affar-card {
-  background: var(--surface); border-radius: var(--r-xl); padding: 22px;
+  background: var(--surface); border-radius: var(--r-xl); padding: clamp(22px, 1.9vw, 34px);
   box-shadow: var(--shadow-card); margin: 0 0 18px;
 }
-.affar-card h2 { margin: 0 0 14px; font-size: 20px; letter-spacing: -0.01em; }
+.affar-card h2 { margin: 0 0 14px; font-size: clamp(20px, 1.45vw, 26px); letter-spacing: -0.01em; }
 .affar-card h3 { margin: 18px 0 8px; font-size: var(--fs-lg); }
 .affar-cta { background: var(--ink); color: #fff; }
 .affar-cta h2 { color: #fff; }
@@ -93,7 +102,7 @@
    Gul ram, inte vit. Skillnaden mot det verifierade kortet ska synas innan man läst en rad. */
 .affar-prelim {
   background: var(--amber-light); border: 1px solid color-mix(in srgb, var(--amber) 35%, transparent);
-  border-radius: var(--r-xl); padding: 22px; margin: 0 0 18px;
+  border-radius: var(--r-xl); padding: clamp(22px, 1.9vw, 34px); margin: 0 0 18px;
 }
 .affar-prelim-head { margin-bottom: 12px; }
 .affar-prelim-tag {
@@ -102,7 +111,7 @@
   font-size: var(--fs-2xs); font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
 }
 .affar-prelim-basis { margin: 8px 0 0; font-size: var(--fs-md); color: var(--amber-ink); line-height: 1.45; }
-.affar-prelim-name { margin: 10px 0 8px; font-size: 22px; letter-spacing: -0.01em; }
+.affar-prelim-name { margin: 10px 0 8px; font-size: clamp(22px, 1.6vw, 28px); letter-spacing: -0.01em; }
 .affar-prelim-note { margin: 0 0 8px; font-size: var(--fs-base); line-height: 1.55; color: var(--ink-soft); }
 .affar-prelim-confidence { margin: 0 0 14px; font-size: var(--fs-md); color: var(--amber-ink); font-weight: 600; line-height: 1.45; }
 

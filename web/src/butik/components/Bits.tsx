@@ -157,14 +157,32 @@ export function Link({ to, children, className }: { to: Parameters<typeof butikH
 /**
  * Analysen.
  *
- * Appen har ingen analysuppsättning i dag — inget GA, ingen Segment, ingen egen slutpunkt. Att välja
- * en åt butiken vore att välja åt hela produkten, så händelserna läggs i stället på `dataLayer` (den
- * form varje tagghanterare läser) och loggas i utveckling. Kopplas något in senare är det den här
- * funktionen som ändras, inte de tolv anropsställena.
+ * TVÅ MOTTAGARE, en rad kod. `dataLayer` ligger kvar — det är den form varje tagghanterare läser, och
+ * kopplas ett GA på i morgon fungerar de tjugofem anropsställena utan att röras. Dessutom går
+ * händelsen till vår EGEN server, och det är det som gör den mätbar för oss: dataLayer når bara den
+ * flik den skrevs i, och en händelse som ingen samlar upp är en händelse som inte finns. Panelen
+ * (server/src/adminAnnonser.ts) läser den serverhalvan.
+ *
+ * `sendBeacon` och inte `fetch`: den överlever att sidan stängs i samma ögonblick, vilket är precis
+ * vad ett utgående klick gör. Faller den — Safaris privata läge, en blockerare — händer ingenting.
+ * Mätningen får aldrig märkas av den som mäts.
+ *
+ * Servern tar bara emot vitlistade namn och egenskaper (server/src/analys/store.ts). Ingen identitet
+ * skickas, ingen kaka sätts, och därför krävs inget samtycke för det här anropet.
  */
 export function track(event: string, props: Record<string, unknown> = {}): void {
   const payload = { event, ...props };
   const w = window as unknown as { dataLayer?: unknown[] };
   (w.dataLayer ??= []).push(payload);
   if (import.meta.env.DEV) console.debug("[analytics]", payload);
+  try {
+    const kropp = JSON.stringify({ event, props });
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon("/api/analys", new Blob([kropp], { type: "application/json" }));
+    } else {
+      void fetch("/api/analys", { method: "POST", body: kropp, headers: { "Content-Type": "application/json" }, keepalive: true }).catch(() => {});
+    }
+  } catch {
+    // Se ovan.
+  }
 }

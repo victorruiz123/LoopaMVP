@@ -135,6 +135,17 @@ export async function ordersForProduct(productId: string): Promise<Order[]> {
 }
 
 /**
+ * Alla ordrar, i en läsning.
+ *
+ * Finns för adminpanelens annonslista, som vill veta antalet ordrar på 193 möbler samtidigt.
+ * `ordersForProduct` i en slinga hade läst samma fil en gång per rad — samma fil, samma svar, 193
+ * gånger. Ingen annan än panelen har anledning att läsa hela listan.
+ */
+export async function allOrders(): Promise<Order[]> {
+  return [...(await load()).values()];
+}
+
+/**
  * Köparens egna ordrar, nyast först.
  *
  * `pending` följer med. En påbörjad kassa som aldrig blev betald är inte skräp för den som står i

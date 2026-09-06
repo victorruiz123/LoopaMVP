@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { andra, fornya, minaEfterlysningar, taBort, type Efterlysning } from "../api";
 import { useAuth } from "../../auth/AuthProvider";
 import AuthScreen from "../../screens/AuthScreen";
-import { kopNavigate } from "../router";
 import Inkorg from "../components/Inkorg";
 
 /**
@@ -25,7 +24,9 @@ export default function MinaEfterlysningar() {
 
   if (loading) return <div className="butik-skeleton" style={{ height: 200 }} />;
   if (!user) {
-    return <AuthScreen intent="account" onBack={() => kopNavigate({ name: "landing" })} onDone={() => ladda()} />;
+    // Vägen ut går till butiken. Landningssidan som låg på /kop är borttagen.
+    return <AuthScreen inbaddad
+        intent="account" onBack={() => { window.location.href = "/butik"; }} onDone={() => ladda()} />;
   }
 
   const agera = async (id: string, fn: () => Promise<unknown>) => {
@@ -48,8 +49,14 @@ export default function MinaEfterlysningar() {
       {rader?.length === 0 && (
         <div className="kop-mina-tom">
           <p>Du har inga efterlysningar än.</p>
-          <button type="button" className="kop-spec-go" onClick={() => kopNavigate({ name: "landing" })}>
-            Beskriv vad du letar efter
+          {/*
+            Vägen till en NY efterlysning går genom butiken sedan landningssidan togs bort: söker man
+            efter något vi inte har möter det tomma rutnätet en med "lägg en bevakning", förifylld med
+            det man just sökte på (butik/components/BevakningSheet.tsx). Det är samma efterlysning,
+            fångad där den faktiskt uppstår — i stunden då lagret inte räckte.
+          */}
+          <button type="button" className="kop-spec-go" onClick={() => { window.location.href = "/butik"; }}>
+            Sök i butiken
           </button>
         </div>
       )}

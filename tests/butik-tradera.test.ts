@@ -68,7 +68,7 @@ test("en avslutad auktion blir aldrig en vara", () => {
 
 test("Traderas kategori styr när den säger något", () => {
   const p = itemToProduct(AUCTION, [])!;
-  assert.equal(p.categorySlug, "soffor-fatoljer", "302537 = Vardagsrum > Soffor");
+  assert.equal(p.categorySlug, "soffor", "302537 = Vardagsrum > Soffor");
 });
 
 test("men Övriga möbler är ingen kategori — då läses rubriken", () => {

@@ -1,16 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { imageUrl, listJobs } from "../api";
-import type { FurnitureIdentity, JobSummary } from "../types";
-import GradeBadge from "../components/GradeBadge";
-import { CardSearchIcon, ChevronRight, SearchIcon, CloseIcon, UserIcon } from "../components/icons";
+import type { FurnitureIdentity } from "../types";
+import { ChevronRight, SearchIcon, CloseIcon, UserIcon } from "../components/icons";
 import { useAuth } from "../auth/AuthProvider";
-import { formatPriceRange } from "../lib/price";
 import { KNOWN_BRANDS } from "../lib/brands";
 import { LOOPA_PERCENT } from "../lib/fees";
 import { POPULAR_BRANDS } from "../lib/brandSeed";
 import { brandTheme } from "../lib/brandTheme";
+import { brandLook, brandTypeStyle } from "../lib/brandLook";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
+// Mätningen av köp<->sälj-slingan bor i butikens Bits — samma funktion som räknar
+// `sell_cta_click` åt andra hållet, så de två riktningarna blir jämförbara i analysen.
+import { track } from "../butik/components/Bits";
+// MARKNADSPLATSTESTET: köphalvan av startsidan. Allt nytt bor i ../marknad — se Upptack.tsx för
+// varför, och för hur testet tas bort igen (de tre raderna här och mappen).
+import Upptack, { MARKNADSPLATS, SaljHero } from "../marknad/Upptack";
 
 function fold(s: string): string {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -32,16 +36,11 @@ const ALL_BRANDS = [
  */
 export default function HomeScreen({
   onStartScan,
-  onOpenJob,
   onOpenProfile,
-  onOpenLookup,
   dealId,
 }: {
   onStartScan: (identity: FurnitureIdentity) => void;
-  onOpenJob: (jobId: string) => void;
   onOpenProfile: () => void;
-  /** Slå upp en publik annons på dess Loopa-ID — ikonen i topplisten. */
-  onOpenLookup: () => void;
   /**
    * Affären säljaren kom hit från (Trygg affär), när de klickat "Filma möbeln" i sitt affärsrum.
    *
@@ -53,9 +52,7 @@ export default function HomeScreen({
   const t = useT();
   const { profile, user, loading } = useAuth();
   usePageTitle(null);
-  const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [query, setQuery] = useState("");
-  const [historyOpen, setHistoryOpen] = useState(false);
 
   /**
    * Förifyllningen från affären, hämtad en gång.
@@ -79,23 +76,6 @@ export default function HomeScreen({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dealId, loading, user]);
 
-  /**
-   * Listan är säljarens egen och hämtas bara när det finns en säljare.
-   *
-   * Startsidan öppnas numera utan konto — där finns inga sparade annonser att visa, och ett anrop
-   * hade bara växlat ett 401 mot en tom lista. Väntar in `loading`, annars går frågan iväg utan
-   * token i den korta stund det tar att läsa sessionen ur webbläsaren.
-   */
-  useEffect(() => {
-    if (loading) return;
-    if (!user) return setJobs([]);
-    listJobs()
-      .then(setJobs)
-      .catch(() => setJobs([]));
-  }, [loading, user?.id]);
-
-  const finished = jobs?.filter((j) => j.progress.stage === "done") ?? [];
-
   const shown = useMemo(() => {
     const q = fold(query);
     if (!q) return ALL_BRANDS;
@@ -108,16 +88,35 @@ export default function HomeScreen({
   const exact = shown.some((n) => fold(n) === fold(typed));
 
   return (
-    <div className="screen screen-light home">
+    /* `home-marknad` gör startsidan scrollbar — se marknad.css. Klassen är testets enda
+       ingrepp i befintlig layout, och den försvinner med flaggan. */
+    <div className={MARKNADSPLATS ? "screen screen-light home home-marknad" : "screen screen-light home"}>
       {/* Loopa-ordmärket i vänsterkant, uppslaget och profilen i höger. */}
       <div className="app-bar">
         <span className="app-wordmark">Loopa</span>
         <div className="app-bar-actions">
-          {/* Loopa-ID:t ur en annons slås upp här. Varje annons är publik, så knappen leder inte
-              in i det egna kontot utan till vilket kort som helst. */}
-          <button className="app-bar-icon" onClick={onOpenLookup} aria-label={t("Sök annons på Loopa-ID")}>
-            <CardSearchIcon size={18} />
-          </button>
+          {/*
+            VÄGEN ÖVER TILL KÖPSIDAN. Motsvarigheten till "Sälj en möbel" i köpsidans topprad
+            (butik/components/Chrome.tsx) — slingan köp<->sälj gick hittills bara åt ena hållet:
+            därifrån hit, aldrig härifrån dit. Den som landat på säljstartsidan och egentligen ville
+            handla hade ingen väg vidare än att gissa en adress.
+
+            DÄMPAD, inte en fylld knapp som säljuppmaningen på andra sidan. Där är sälj målet med
+            sidan; här ÄR sälj sidan, och en orange knapp bredvid märkeslistan hade tävlat med det
+            enda den skärmen ber om — att välja ett märke och börja filma. Samma sänkta pillerform
+            som profilknappen: en väg ut, inte ett rop.
+
+            Placerad FÖRE profilen så att kontot får ligga kvar längst till höger, där det stått och
+            där en avatar hör hemma. Länken byter app, inte skärm, så det är ett vanligt <a> med en
+            riktig adress — den ska gå att öppna i en ny flik och att dela.
+          */}
+          <a
+            className="app-bar-buy"
+            href="/butik"
+            onClick={() => track("buy_cta_click", { from: "header" })}
+          >
+            {t("Köp")}
+          </a>
           {/* Ingen knapp alls medan sessionen läses: valet står mellan ett namn och "Logga in", och
               att gissa fel i en tiondels sekund byter ut texten framför ögonen på den som läser den. */}
           {!loading && (
@@ -135,30 +134,38 @@ export default function HomeScreen({
         </div>
       </div>
 
-      <header className="home-header">
-        <span className="brand-pill">
-          <span className="brand-dot" /> {t("SÄLJ MED LOOPA")}
-        </span>
-        {/* Rubriken bryts i två rader, och brytpunkten är olika på olika språk: "Vilket märke"
-            väger jämnt mot "är möbeln?", men "What brand" mot "is the furniture?" gör det inte.
-            Därför är raderna två egna meningar i ordlistan och inte en med ett radbrott i. */}
-        <h1 className="home-title">
-          {t("Vilket märke")}
-          <br />
-          <span className="accent">{t("är möbeln?")}</span>
-        </h1>
-        {/* Löftet står FÖRE första trycket, på varje skärmstorlek. Det som stod här hette
-            "AI-granskning" och lovade "en färdig annons" — och den som läste det trodde sig ha
-            beställt ett dokument. Erbjudandet är att möbeln blir såld; det får inte vara något
-            man upptäcker först på sista skärmen. Två rader räcker på telefonen, där listan är
-            resten av skärmen — stegen under är fortfarande datorvyns, som har plats för dem. */}
-        <p className="home-lede">{t("Vi gör annonsen, säljer möbeln och hör av oss när den är såld.")}</p>
-        <ol className="home-steps desktop-only">
-          <li>{t("Välj märket")}</li>
-          <li>{t("Filma ett varv")}</li>
-          <li>{t("Vi säljer den åt dig")}</li>
-        </ol>
-      </header>
+      {/*
+        HERON I TVÅ UPPLAGOR. Testets version säger "Sälj din möbel" och har frågan om märket som
+        andra rad; den ursprungliga frågar rakt av. Båda står kvar i koden med flit — det är så
+        testet går att ångra utan att någon behöver komma ihåg vad det stod förut.
+      */}
+      {MARKNADSPLATS && <SaljHero />}
+      {!MARKNADSPLATS && (
+        <header className="home-header">
+          <span className="brand-pill">
+            <span className="brand-dot" /> {t("SÄLJ MED LOOPA")}
+          </span>
+          {/* Rubriken bryts i två rader, och brytpunkten är olika på olika språk: "Vilket märke"
+              väger jämnt mot "är möbeln?", men "What brand" mot "is the furniture?" gör det inte.
+              Därför är raderna två egna meningar i ordlistan och inte en med ett radbrott i. */}
+          <h1 className="home-title">
+            {t("Vilket märke")}
+            <br />
+            <span className="accent">{t("är möbeln?")}</span>
+          </h1>
+          {/* Löftet står FÖRE första trycket, på varje skärmstorlek. Det som stod här hette
+              "AI-granskning" och lovade "en färdig annons" — och den som läste det trodde sig ha
+              beställt ett dokument. Erbjudandet är att möbeln blir såld; det får inte vara något
+              man upptäcker först på sista skärmen. Två rader räcker på telefonen, där listan är
+              resten av skärmen — stegen under är fortfarande datorvyns, som har plats för dem. */}
+          <p className="home-lede">{t("Vi gör annonsen, säljer möbeln och hör av oss när den är såld.")}</p>
+          <ol className="home-steps desktop-only">
+            <li>{t("Välj märket")}</li>
+            <li>{t("Filma ett varv")}</li>
+            <li>{t("Vi säljer den åt dig")}</li>
+          </ol>
+        </header>
+      )}
 
       <div className="brand-search">
         <span className="brand-search-icon">
@@ -191,7 +198,9 @@ export default function HomeScreen({
               style={{ background: t.bg, color: t.ink }}
               onClick={() => onStartScan({ brand: name, model: "" })}
             >
-              <span className="brand-tile-name">{name}</span>
+              {/* Storleken kommer ur brand-font-klassen, resten — familj, vikt, spärr, versaler —
+                  ur märkets eget tonfall. Samma regel som brickorna i butiken. */}
+              <span className="brand-tile-name" style={brandTypeStyle(brandLook(name).type)}>{name}</span>
               <span className="brand-tile-go" style={{ color: t.accent }}>
                 <ChevronRight size={18} />
               </span>
@@ -210,48 +219,13 @@ export default function HomeScreen({
         {shown.length === 0 && !typed && <p className="muted small">{t("Inga märken.")}</p>}
       </div>
 
-      {finished.length > 0 && (
-        <section className="collapsible-card">
-          <button className="collapsible-header" onClick={() => setHistoryOpen((v) => !v)}>
-            <span className="collapsible-title">{t("Sparade annonser")}</span>
-            <span className="collapsible-meta">
-              {t("{antal} st", { antal: finished.length })}
-              <span className={`collapsible-chevron ${historyOpen ? "collapsible-chevron-open" : ""}`}>
-                <ChevronRight size={16} />
-              </span>
-            </span>
-          </button>
-          {historyOpen && (
-            <div className="saved-list">
-              {finished.map((j) => (
-                <button key={j.id} className="saved-item" onClick={() => onOpenJob(j.id)}>
-                  {/* Samma omslag som ligger överst på kortet. Säljarens egen bildruta är reserven —
-                      den finns alltid, medan produktbilden bara finns när en källa gick att belägga. */}
-                  <img
-                    className="saved-thumb"
-                    src={j.coverImageUrl ?? (j.thumbnailImageId ? imageUrl(j.id, j.thumbnailImageId) : undefined)}
-                    alt=""
-                  />
-                  <div className="saved-item-body">
-                    <div className="saved-item-title">{describe(j, t)}</div>
-                    <div className="muted small">
-                      {t("Betyg {betyg}", { betyg: j.grade?.grade ?? "?" })}
-                      {j.price?.status === "ok" ? ` · ${formatPriceRange(j.price)}` : ""}
-                    </div>
-                  </div>
-                  {j.grade && <GradeBadge grade={j.grade.grade} size={34} />}
-                </button>
-              ))}
-            </div>
-          )}
-        </section>
-      )}
-
       {/* Vad det kostar, i en rad. Priset på tjänsten stod förut ingenstans i appen — säljaren
           filmade, granskade och tryckte på "Sälj med Loopa" utan att ha fått veta vad Loopa tar för
-          det. Raden ligger sist på sidan, under de sparade annonserna, och står kvar även för den
-          som ännu inte har några. */}
+          det. Raden ligger sist på sidan, ovanför köphalvan. */}
       <p className="home-fee-line">{t("Loopa tar {andel} % av försäljningspriset", { andel: LOOPA_PERCENT })}</p>
+
+      {/* Köphalvan, sist på sidan: först när man sagt nej till att sälja är man en köpare. */}
+      {MARKNADSPLATS && <Upptack />}
     </div>
   );
 }
@@ -260,9 +234,4 @@ export default function HomeScreen({
 function shortName(name: string | null | undefined, email: string | null | undefined): string {
   const source = name || email?.split("@")[0] || "Profil";
   return source.split(/\s+/)[0];
-}
-
-function describe(job: JobSummary, t: (sv: string) => string): string {
-  const name = [job.identity?.brand, job.identity?.model].filter(Boolean).join(" ");
-  return name || t("Möbel");
 }

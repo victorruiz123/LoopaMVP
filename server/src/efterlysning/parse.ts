@@ -44,7 +44,7 @@ export interface FollowUp {
  * En lampa passar överallt; en soffa gör det inte. Att fråga om mått på allt hade gjort en följdfråga
  * till en formalitet man klickar förbi, och då hjälper den inte där den behövs.
  */
-const BULKY = new Set(["soffor-fatoljer", "bord", "sangar", "forvaring", "skrivbord-kontor"]);
+const BULKY = new Set(["soffor", "fatoljer", "bord", "sangar", "forvaring", "skrivbord-kontor"]);
 
 export async function parse(text: string): Promise<ParsedSpec> {
   const brands = (await brandFacets()).map((b) => b.brand);

@@ -20,6 +20,7 @@ import { alla as allaOverstyrningar, tillampaPaProdukt } from "./overrides.js";
 import { fold } from "./catalog.js";
 import { notify, takePendingNotifications } from "./bevakningar.js";
 import { BROWSABLE_STATES, type BrowseResult, type Product, type ProductFilter, type SortKey } from "./types.js";
+import { rankScore } from "./rank.js";
 
 /** Hur länge indexet får vara gammalt. Kort — en säljare som publicerar ska se sin möbel i butiken. */
 const INDEX_TTL_MS = Number(process.env.BUTIK_INDEX_TTL_MS ?? 30_000);
@@ -202,7 +203,7 @@ function withinDimension(actual: number | null, max: number | null | undefined):
   return actual <= max ? "pass" : "fail";
 }
 
-function sorted(items: Product[], sort: SortKey, scores: Map<string, number>): Product[] {
+function sorted(items: Product[], sort: SortKey, scores: Map<string, number>, rang: Map<string, number>): Product[] {
   /**
    * Nyast först — men det som har ett KÄNT datum före det som inte har det.
    *
@@ -231,8 +232,19 @@ function sorted(items: Product[], sort: SortKey, scores: Map<string, number>): P
        */
       return [...items].sort((a, b) => {
         if (a.source !== b.source) return a.source === "loopa" ? -1 : 1;
+        /**
+         * TEXTTRÄFFEN FÖRST, rangordningen sedan.
+         *
+         * Ordningen mellan de två är inte en avvägning utan en nödvändighet. Söker någon på "HAY"
+         * ska HAY-möbler komma först, även om en billigare IKEA-soffa har högre fyndpoäng — annars
+         * svarar sökrutan på en annan fråga än den som ställdes. Utan sökord är `score` 1 för
+         * allihop (se score()), raden nedan blir noll, och rangordningen tar över hela sorteringen
+         * av sig själv.
+         */
         const d = (scores.get(b.id) ?? 0) - (scores.get(a.id) ?? 0);
-        return d !== 0 ? d : byNewest(a, b);
+        if (d !== 0) return d;
+        const r = (rang.get(b.id) ?? 0) - (rang.get(a.id) ?? 0);
+        return r !== 0 ? r : byNewest(a, b);
       });
   }
 }
@@ -314,7 +326,17 @@ export function applyFilter(source: Product[], filter: ProductFilter): BrowseRes
 
   const limit = Math.min(Math.max(filter.limit ?? 24, 1), 96);
   const offset = Math.max(filter.offset ?? 0, 0);
-  const ordered = sorted(matched, filter.sort ?? "relevans", scores);
+  /**
+   * Rangpoängen räknas EN GÅNG per vara, inte inne i jämförelsefunktionen.
+   *
+   * Två skäl, och det andra är en riktig bugg och inte en optimering: `alderspoang` läser klockan,
+   * och anropas den inuti komparatorn kan två jämförelser i samma sortering se olika tidpunkter.
+   * Sorteringen blir då icke-transitiv — a > b, b > c, c > a — och utfallet är en ordning som byter
+   * sig själv mellan två anrop utan att något ändrats. Ett `nu` för hela svepet kan inte göra det.
+   */
+  const nu = new Date();
+  const rang = new Map(matched.map((p) => [p.id, rankScore(p, null, nu)]));
+  const ordered = sorted(matched, filter.sort ?? "relevans", scores, rang);
 
   return {
     items: ordered.slice(offset, offset + limit),

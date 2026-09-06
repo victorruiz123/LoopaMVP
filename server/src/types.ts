@@ -366,7 +366,38 @@ export interface CoverCutout {
   sourceImageId: string;
   /** Vad modellen kallade möbeln när den pekade ut den. Bara för loggen. */
   label: string | null;
+  /**
+   * Vem som räknade silhuetten. null = urklipp från före fältet fanns.
+   *
+   * FRITT STRÄNGFÄLT sedan produktbildssystemet kom (pipeline/bild/). Det var en union av två
+   * leverantörsnamn, och unionen var själva problemet: varje ny modell krävde en typändring som
+   * rörde både servern och webben, vilket är precis den friktion som gjorde att modellen aldrig
+   * byttes trots att den var mätbart sämst. Nu står modellens namn ur registret här —
+   * `birefnet-general`, `isnet-general-use`, `u2netp` — och de gamla värdena `pixian` och `u2net`
+   * fortsätter läsa som de alltid gjort.
+   *
+   * Ett omslag som ser fel ut ska gå att härleda till sin modell, och en ombyggnad ska kunna ta om
+   * bara den sämre sorten. Se scripts/bygg-produktbilder.ts, som filtrerar på just det här fältet.
+   */
+  provider: string | null;
   createdAt: string;
+  /**
+   * Kvalitetskontrollens dom, 0–1. Saknas på urklipp från före kontrollen fanns.
+   *
+   * Mätt på RESULTATET och inte frågad av modellen: en modell som pekat ut en matta i stället för en
+   * soffa är precis lika säker som när den har rätt. Se pipeline/bild/kvalitet.ts för de sju måtten.
+   */
+  qualityScore?: number;
+  /**
+   * Sant när omslaget inte får publiceras av sig självt.
+   *
+   * Bilden är ändå byggd och sparad — en människa ska kunna öppna den bredvid originalet och avgöra.
+   * Det enda fältet styr är om den går ut publikt utan att någon tittat. Frågan ställs på ETT ställe:
+   * `harGodkantOmslag` i pipeline/bild/omslag.ts.
+   */
+  needsReview?: boolean;
+  /** Kvalitetskontrollens koder, för att kunna sortera fram vad som gick fel över hela lagret. */
+  anmarkningar?: string[];
 }
 
 export interface ConditionResult {

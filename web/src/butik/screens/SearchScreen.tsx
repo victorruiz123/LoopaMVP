@@ -87,6 +87,7 @@ export default function SearchScreen({ q }: { q: string }) {
 
       <ProductGrid
         query={query}
+        vantarPaTolkning={thinking}
         emptyBody={
           q
             ? `Inget matchar "${q}" just nu. Prova en bredare beskrivning, eller lägg en bevakning så hör vi av oss.`

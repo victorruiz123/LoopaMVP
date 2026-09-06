@@ -73,10 +73,10 @@ test("ett tal utan riktningsord är inget mått", () => {
 // ─── nätet fyller bara luckor ───────────────────────────────────────────────
 
 test("nätet lägger till det tolkningen tappade", () => {
-  const f = fillHardFields({ categorySlug: "soffor-fatoljer" }, "grön sammetssoffa, 3-sits, max 6000 kr och högst 220 cm bred");
+  const f = fillHardFields({ categorySlug: "soffor" }, "grön sammetssoffa, 3-sits, max 6000 kr och högst 220 cm bred");
   assert.equal(f.maxPriceSek, 6000);
   assert.equal(f.maxWidthMm, 2200);
-  assert.equal(f.categorySlug, "soffor-fatoljer", "rör inte det som redan fanns");
+  assert.equal(f.categorySlug, "soffor", "rör inte det som redan fanns");
 });
 
 test("men överprövar aldrig ett fält modellen satt", () => {
@@ -133,7 +133,7 @@ test("ett mått är inget pris, ens med ett gränsord framför", () => {
 // ─── följdfrågorna ──────────────────────────────────────────────────────────
 
 test("bara fält som ändrar matchningen frågas om", () => {
-  const q = followUps(spec({ filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000, maxWidthMm: 2100 } }));
+  const q = followUps(spec({ filter: { categorySlug: "soffor", maxPriceSek: 5000, maxWidthMm: 2100 } }));
   assert.deepEqual(q, [], "allt hårt är satt — ingen fråga kvar");
 });
 
@@ -144,7 +144,7 @@ test("saknad kategori frågas alltid, den avgör vilka källor vi frågar", () =
 test("mått frågas bara om skrymmande möbler", () => {
   const lampa = followUps(spec({ filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
   assert.deepEqual(lampa, [], "en lampa passar överallt");
-  const soffa = followUps(spec({ filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 5000 } }));
+  const soffa = followUps(spec({ filter: { categorySlug: "soffor", maxPriceSek: 5000 } }));
   assert.deepEqual(soffa.map((q) => q.field), ["matt"]);
 });
 
@@ -161,7 +161,7 @@ test("färg och stil frågas aldrig om — de gör en träff bättre, inte möjl
 
 test("sammanfattningen beskriver bara det vi faktiskt filtrerar på", () => {
   const s = summarize(spec({
-    filter: { categorySlug: "soffor-fatoljer", maxPriceSek: 6000, maxWidthMm: 2200, colors: ["grön"] },
+    filter: { categorySlug: "soffor", maxPriceSek: 6000, maxWidthMm: 2200, colors: ["grön"] },
     styleTags: ["60-tal"],
   }));
   assert.match(s, /Soffor/);

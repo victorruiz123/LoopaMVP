@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminUsers, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -270,6 +270,36 @@ export async function ensureMediaSession(): Promise<{ isAdmin: boolean }> {
 export async function listUsers(): Promise<AdminUsers> {
   const res = await authFetch("/api/admin/users");
   return json(res);
+}
+
+/**
+ * Alla annonser vi fått in, med läge, priser, tider och mätning.
+ *
+ * En rad per JOBB och inte per butiksvara: de som aldrig blev en annons är halva anledningen till att
+ * listan finns. Se server/src/adminAnnonser.ts.
+ */
+export async function listAnnonser(): Promise<AdminAnnonser> {
+  return json(await authFetch("/api/admin/annonser"));
+}
+
+export async function getAnnons(loopaId: string): Promise<AdminAnnonsDetalj> {
+  return json(await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}`));
+}
+
+/**
+ * Ändrar en annons och får tillbaka den som den blev.
+ *
+ * PATCH: kroppen är en delmängd. Ett fält som inte nämns lämnas i fred, och `null` betyder
+ * uttryckligen tomt — skillnaden är hela överstyrningslagret (server/src/butik/overrides.ts).
+ */
+export async function patchAnnons(loopaId: string, andring: AnnonsAndring): Promise<AdminAnnonsDetalj> {
+  return json(
+    await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(andring),
+    }),
+  );
 }
 
 /** Ett kontos jobb, i samma form som profilens egen lista. */

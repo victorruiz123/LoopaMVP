@@ -101,10 +101,14 @@ export const VERIFY_SEVERITIES = new Set(["S3", "S4"]);
 export const VERIFY_IMPACTS = new Set(["structural", "functional"]);
 
 /**
- * Omslagsurklippet — säljarens bildruta klippt fri och lagd på vitt. PÅ, `COVER_CUTOUT=0` stänger av.
+ * Produktbilden — säljarens möbel klippt fri och lagd på rent vitt. PÅ, `COVER_CUTOUT=0` stänger av.
  *
- * Ett Gemini-anrop per jobb, utanför säljarens väntan: det startas när inspektionen valt bildrutan
- * och är framme långt innan annonsskärmen öppnas. Med flaggan av visar kortet säljarens bildruta som
- * den är — samma väg som när masken underkänns. Se pipeline/cutout.ts.
+ * Ett bygge per jobb, utanför säljarens väntan: det startas när inspektionen är klar och är framme
+ * långt innan annonsskärmen öppnas. Silhuetten räknas lokalt av en segmenteringsmodell och kanten
+ * förfinas mot bildens egna pixlar — se pipeline/bild/, som bygger den, och modeller.ts för vilka
+ * modeller som finns och vad de kostar.
+ *
+ * Flaggan här stänger av HELA produktbilden. Kortet visar då säljarens bildruta som den är — samma
+ * väg som när kvalitetskontrollen underkänner masken.
  */
 export const COVER_CUTOUT_ENABLED = process.env.COVER_CUTOUT !== "0";

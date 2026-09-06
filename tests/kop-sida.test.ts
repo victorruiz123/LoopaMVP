@@ -73,32 +73,21 @@ test("fångarens efterlysning bevakas av sveparen", async () => {
 });
 
 // ─── SEO ────────────────────────────────────────────────────────────────────
+//
+// KÖPSIDANS EGET SIDHUVUD ÄR BORTTAGET MED SIDAN. /kop bar en titel, en beskrivning och tre frågor
+// som strukturerad FAQ; adressen 301:as numera till butiken (server.ts), och ett sidhuvud för en
+// adress som svarar 301 vore ett löfte till sökmotorn om en sida som inte finns. Testerna som
+// mätte det huvudet är därför borta — det som står kvar nedan är grinden, som fortfarande gäller.
 
-test("/kop har titel, beskrivning och strukturerad FAQ", async () => {
-  const head = await seoFor("/kop", "");
-  assert.ok(head, "sidan ska ha ett huvud");
-  assert.match(head!.title, /begagnade möbler tryggt/i);
-  assert.match(head!.canonical, /\/kop$/);
-  const ld = JSON.parse(head!.jsonLd!);
-  assert.equal(ld["@type"], "FAQPage");
-  assert.equal(ld.mainEntity.length, 3, "tre frågor, som på sidan");
+test("/kop har inget sidhuvud längre — adressen är en omdirigering", async () => {
+  assert.equal(await seoFor("/kop", ""), null);
+  assert.equal(await seoFor("/kop/", ""), null);
 });
 
-test("FAQ-svaret om priset skriver INTE talen för hand", async () => {
-  // Skulle någon hårdkoda 200 eller 495 här hade sökresultatet varit det som blev kvar längst efter
-  // att siffran slutat stämma.
-  const head = await seoFor("/kop", "");
-  const ld = JSON.parse(head!.jsonLd!);
-  const pris = ld.mainEntity.find((q: { name: string }) => /kostar/i.test(q.name));
-  assert.ok(pris, "det ska finnas en prisfråga");
-  assert.match(pris.acceptedAnswer.text, new RegExp(`${SERVICE_FEE_SEK} kr i serviceavgift`));
-  assert.match(pris.acceptedAnswer.text, new RegExp(`från ${Math.min(...ZONE_FEES)} kr`));
-});
-
-test("brödtexten i kroppen är den enda texten, och den finns", async () => {
-  const head = await seoFor("/kop", "");
-  assert.match(head!.body!, /<h1>Hittat en möbel\? Köp den tryggt\.<\/h1>/);
-  assert.match(head!.body!, /Vanliga frågor/);
+test("butiken och efterfrågeväggen har kvar sina huvuden", async () => {
+  // Grannarna ska inte ha följt med i raderingen: båda är riktiga sidor med riktiga länkar.
+  assert.ok(await seoFor("/butik/sok", ""), "butikens sökning ska ha ett huvud");
+  assert.ok(await seoFor("/efterlyses", ""), "efterfrågeväggen ska ha ett huvud");
 });
 
 test("säljverktygets startsida får INTE köpsidans huvud", async () => {

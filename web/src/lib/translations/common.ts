@@ -13,6 +13,9 @@ export const COMMON: Record<string, Translation> = {
   "Logga ut": { en: "Log out", fr: "Se déconnecter" },
   "Skapa konto": { en: "Create account", fr: "Créer un compte" },
   "Din profil": { en: "Your profile", fr: "Votre profil" },
+  // Toppradens väg till köpsidan. Verb, inte substantiv: knappen leder till att handla, och
+  // "Shop"/"Boutique" hade beskrivit en plats i stället för vad man kan göra där.
+  "Köp": { en: "Buy", fr: "Acheter" },
   Rensa: { en: "Clear", fr: "Effacer" },
   Stäng: { en: "Close", fr: "Fermer" },
   Avbryt: { en: "Cancel", fr: "Annuler" },

@@ -21,8 +21,8 @@ const COVER_TIMEOUT_MS = 12_000;
  *
  * Skillnaden mot en annons för en NY möbel är att skicket står med, och det är hela poängen med
  * Loopa: en begagnad möbel presenterad lika helt som en ny, med skadorna utsatta i stället för
- * bortretuscherade. Renderingen är stället där de två sakerna möts — en produktbild där varje
- * anmärkning sitter på den del den faktiskt gäller.
+ * bortretuscherade. Skickrapporten är stället där de två sakerna möts — säljarens EGNA bilder, med
+ * varje anmärkning inringad på det foto den syns i.
  *
  * Vyn tar EXPLICITA props och inte ett ConditionResult, för att kortet ritas på två ställen: hos
  * säljaren, som äger jobbet, och publikt, där kortet slås upp på sitt Loopa-ID av någon som inte har
@@ -44,6 +44,7 @@ export default function ListingView({
   cover,
   loopaId,
   hideHeader = false,
+  hideSources = false,
   only,
 }: ListingViewData & {
   /**
@@ -81,6 +82,21 @@ export default function ListingView({
    * ingress ovanför sig och måste bära sin rubrik själva.
    */
   hideHeader?: boolean;
+  /**
+   * Utelämnar källänkarna vid specifikationerna och under omslaget.
+   *
+   * BUTIKEN ÄR EN BUTIK, INTE EN REDOVISNING. Ett "källa" efter varje mått läser som fotnoter i en
+   * utredning — och den som handlar möbler läser dem som att butiken inte själv står för uppgiften.
+   * Ingen möbelhandlare fotnotar sitt sitthöjdsmått; de skriver måttet, och tar ansvar för det.
+   *
+   * Uppgifterna är desamma och `sourceUrl` följer orört med i svaret: det som faller bort är länken,
+   * inte belägget. "Uppskattat" står kvar — det är en reservation om vad vi VET, inte en hänvisning
+   * till någon annan, och att tiga om den vore att påstå mer än vi kan.
+   *
+   * Falskt överallt annars. Säljarens eget kort och det publika kortet på /c/LP-XXXX-XXXX ÄR en
+   * redovisning — där är källan halva poängen, för läsaren kontrollerar oss.
+   */
+  hideSources?: boolean;
 }) {
   const t = useT();
   const [selected, setSelected] = useState<string | null>(null);
@@ -97,16 +113,28 @@ export default function ListingView({
    * Kandidaterna står i fallande sanning: urklippet, säljarens bildruta som den togs — den skickas bara
    * till säljarens eget kort, se ListingScreen — och sist katalogbilden av modellen.
    *
-   * RENDERINGEN STÅR INTE I LISTAN, och det är hela poängen med den. Omslaget är ett foto av möbeln
-   * som säljs, eller ingenting alls. En 3D-figur högst upp läser som en produktbild men visar en möbel
-   * som aldrig fotograferats: kortets första och största påstående blir då en ritning. Figuren har sin
-   * plats längre ned, i skickrapporten, där den är en karta över anmärkningarna och inte en bild av
-   * varan.
+   * OMSLAGET ÄR ETT FOTO, eller ingenting alls. Här stod förut en 3D-figur som reserv; den läste som
+   * en produktbild men visade en möbel som aldrig fotograferats, och kortets första och största
+   * påstående blev då en ritning. Figuren är borta helt — skadorna visas numera på säljarens egna
+   * bilder längre ned, vilket är det enda stället där en bild av möbeln kan bevisa något.
    */
   const candidates = useMemo(() => {
+    /**
+     * SÄLJARENS EGEN MÖBEL FÖRST — men bara när den är urklippt.
+     *
+     * Ordningen har vänt två gånger och skälet är samma varje gång: omslaget ska vara den bästa
+     * bilden AV MÖBELN SOM SÄLJS, och vilken det är beror på vad vi lyckats göra.
+     *
+     * Är `cover` ett urklipp (`cutout`) är den vinnaren utan konkurrens: rätt möbel, rätt slitage,
+     * rätt färg, mot rent vitt precis som varje annan produktbild man handlar efter. Är den en orörd
+     * bildruta (`photo`) — alltså ett vardagsrum med en soffa i — går katalogbilden före, för den
+     * ser ut som en möbel man köper. Att den visar en NY exemplar sägs rakt ut i bildtexten under,
+     * och det är det som gör den ordningen försvarlig i stället för smickrande.
+     */
     const list: Array<{ url: string; kind: "cutout" | "photo" | "product"; sourceUrl?: string | null }> = [];
-    if (cover) list.push(cover);
+    if (cover?.kind === "cutout") list.push(cover);
     if (productImage) list.push({ ...productImage, kind: "product" });
+    if (cover && cover.kind !== "cutout") list.push(cover);
     return list;
   }, [cover, productImage]);
 
@@ -135,24 +163,18 @@ export default function ListingView({
   const name = card.identity.exactProduct ?? card.identity.variant ?? identity?.model ?? t("Möbel");
   const brand = card.identity.brand ?? identity?.brand ?? null;
 
-  // Modellen byggs bara när måtten finns. Se furnitureModel.ts: hellre ingen bild än en bild av en
-  // möbel med påhittade proportioner.
-  const model = useMemo(() => {
-    const archetype = archetypeFor(card.identity.category, card.listing.title);
-    const dims = parseDimensions(card.attributes, archetype);
-    // Kategorin, annonsrubriken och varianten följer med in i bygget: det är där "3-sits",
-    // "utan armstöd" och träslaget står, och det är de orden som gör figuren till just den här
-    // möbeln i stället för till kategorin i allmänhet.
-    return dims
-      ? buildModel(archetype, dims, card.attributes, {
-          category: card.identity.category,
-          title: card.listing.title,
-          variant: card.identity.variant,
-        })
-      : null;
-  }, [card]);
+  /**
+   * Anmärkningarna som HAR ett foto, med sitt nummer ur listan.
+   *
+   * Numret räknas ur `damages` och inte ur den filtrerade listan: rad 3 i skickrapporten ska heta 3
+   * i bilden även när rad 2 saknar bevisruta. En skada utan foto står kvar i listan — den är sann
+   * ändå — men har ingenting att visa i galleriet.
+   */
+  const fotade = useMemo(
+    () => damages.map((d, i) => ({ d, nummer: i + 1 })).filter((x) => x.d.bild),
+    [damages],
+  );
 
-  const pins = useMemo(() => (model ? placeDamages(damages, model) : []), [damages, model]);
   const retail = card.pricing.retailPriceSek;
   const now = price?.status === "ok" ? price.default : null;
   const discount = retail && now && retail > now ? Math.round((1 - now / retail) * 100) : null;
@@ -188,16 +210,24 @@ export default function ListingView({
             />
           </div>
           {/* Vad bilden är, sagt rakt ut.
+              Bildrutan: säljarens egen bild, orörd. Att den ÄR orörd är en uppgift och inte en
+              självklarhet — kortet påstår att det redovisar möbeln som den är, och då ska det stå
+              vad bilden har varit med om.
               Urklippet: möbeln är säljarens egen, men den vita bakgrunden är VÅR redigering, och ett
-              kort som räknar upp varje skråma får inte tiga om att det rört bilden.
+              kort som räknar upp varje skråma får inte tiga om att det rört bilden. Ingen väg sätter
+              "cutout" när produktbildssystemet lyckats och kvalitetskontrollen godkänt resultatet;
+              annars är omslaget bildrutan och texten säger det.
               Katalogbilden: den visar inte ens möbeln som säljs, och då ska det stå — inte antas. */}
+          {shown.kind === "photo" && (
+            <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, orörd")}</p>
+          )}
           {shown.kind === "cutout" && (
             <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, bakgrunden borttagen")}</p>
           )}
           {shown.kind === "product" && (
             <p className="listing-cover-note">
               {t("Produktbild av modellen — inte möbeln som säljs")}
-              {shown.sourceUrl && (
+              {shown.sourceUrl && !hideSources && (
                 <>
                   {" · "}
                   <a href={shown.sourceUrl} target="_blank" rel="noreferrer">
@@ -266,7 +296,7 @@ export default function ListingView({
                   <dt>{a.label}</dt>
                   <dd>
                     {a.value}
-                    {a.sourceUrl ? (
+                    {a.sourceUrl && !hideSources ? (
                       <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
                         {t("källa")}
                       </a>
@@ -298,13 +328,29 @@ export default function ListingView({
               </div>
             </div>
           </div>
-          {/* Renderingens enda plats på kortet. Den är inte dekoration och inte ett omslag, utan
-              skickrapportens karta: varje anmärkning som en numrerad punkt på den del den gäller,
-              med samma nummer som raderna under. Villkoret satt förut på att en bild tagit omslaget
-              — figuren fick annars flytta upp och bli kortets produktbild, vilket den aldrig var. */}
-          {model && (
-            <div className="listing-damage-render">
-              <FurnitureRender model={model} pins={pins} selectedId={selected} onSelect={setSelected} />
+          {/*
+            SKADORNA PÅ SÄLJARENS EGNA BILDER.
+            Här stod förut en 3D-figur med anmärkningarna som numrerade nålar. Den var en karta över
+            en möbel vi ritat själva — proportionerna kom från måtten, ytan från ingenting — och en
+            läsare som vill veta hur stor repan är får inget svar av en nål på en teckning. Fotot där
+            skadan syns, med den inringad, svarar direkt och är dessutom det enda vi kan belägga.
+
+            Alltid synliga, inte gömda bakom ett klick: bilderna ÄR skickrapporten, och en rapport
+            vars bevis kräver att man letar läser som ett påstående. Rutnätet håller dem små och
+            lika stora — en vald bild fäller ut sig i full bredd för den som vill se närmare.
+          */}
+          {fotade.length > 0 && (
+            <div className="listing-damage-photos">
+              {fotade.map(({ d, nummer }) => (
+                <SkadeFoto
+                  key={d.id}
+                  bild={d.bild!}
+                  nummer={nummer}
+                  titel={`${typeLabel(d.type)} — ${d.part}`}
+                  vald={selected === d.id}
+                  onValj={() => setSelected(selected === d.id ? null : d.id)}
+                />
+              ))}
             </div>
           )}
           {damages.length === 0 ? (
@@ -312,7 +358,6 @@ export default function ListingView({
           ) : (
             <ol className="pin-list">
               {damages.map((d, i) => {
-                const pin = pins.find((p) => p.id === d.id);
                 const active = selected === d.id;
                 return (
                   <li key={d.id}>
@@ -322,7 +367,10 @@ export default function ListingView({
                       onClick={() => setSelected(active ? null : d.id)}
                       aria-pressed={active}
                     >
-                      <span className={`pin-num ${pin ? "" : "pin-num-unplaced"}`}>{pin ? pin.number : i + 1}</span>
+                      {/* Grått nummer = anmärkningen har ingen bevisruta, och står alltså inte i
+                          galleriet ovanför. Att den syns i listan ändå är avsiktligt: en skada som
+                          försvinner för att fotot fattas är en skada vi tigit om. */}
+                      <span className={`pin-num ${d.bild ? "" : "pin-num-unplaced"}`}>{i + 1}</span>
                       <span className="pin-body">
                         <span className="pin-title">
                           {typeLabel(d.type)}
@@ -337,8 +385,10 @@ export default function ListingView({
               })}
             </ol>
           )}
-          {model && pins.length > 0 && (
-            <p className="listing-pin-note">{t("Punkterna i bilden har samma nummer som listan.")}</p>
+          {fotade.length > 0 && (
+            <p className="listing-pin-note">
+              {t("Bilderna är säljarens egna, orörda så när som på markeringen. Numren är samma som i listan.")}
+            </p>
           )}
         </section>
         )}
@@ -369,44 +419,66 @@ export default function ListingView({
 }
 
 /**
- * Skadorna ut på modellen.
+ * Bildrutan med anmärkningen utmärkt — en ruta i skickrapportens galleri.
  *
- * Två skador på samma del skulle annars hamna på exakt samma punkt och dölja varandra, så följande
- * på en upptagen zon förskjuts i sidled längs ytan. Skador vars del inte gick att tolka fördelas på
- * kategorins lediga zoner i tur och ordning — de får en plats i bilden utan att påstå exakt vilken.
+ * RUTAN ÄR ANGIVEN I ANDELAR av bilden, så behållaren måste ha bildens EGNA proportion — annars
+ * sitter markeringen fel, och en markering som pekar ut fel ställe är sämre än ingen. Därför följer
+ * måtten med från servern i stället för att läsas ur bilden när den laddat: en ruta som hoppar på
+ * plats en halv sekund efter att bilden dykt upp läser som ett fel.
+ *
+ * Samma klasser som säljarens egen bevisvy (`marked-thumb`) — det är samma sak som visas, och två
+ * uppsättningar stilar för en röd fyrkant hade glidit isär vid första justeringen. Rutan har en
+ * FAST höjd och bilden ligger inpassad i den: säljarens bildrutor kommer i olika format, och ett
+ * galleri där varje bild är olika hög blir en trasa i stället för en rad.
+ *
+ * Knapp och inte figur, för att den går att fälla ut: vald ruta tar hela bredden och blir hög nog
+ * att läsa skadan i. Det är samma val som raden i listan gör, och de två håller varandra i takt.
  */
-function placeDamages(damages: CardDamage[], model: ReturnType<typeof buildModel>): RenderPin[] {
-  const used = new Map<string, number>();
-  let fallbackIndex = 0;
-  const pins: RenderPin[] = [];
-
-  for (const [i, d] of damages.entries()) {
-    let zone = zoneForPart(d.part, d.semanticLocation, model);
-    if (!zone) {
-      zone = model.fallbackZones[fallbackIndex % model.fallbackZones.length] ?? null;
-      fallbackIndex++;
-    }
-    const anchor = zone ? model.anchors[zone] : undefined;
-    if (!anchor) continue;
-
-    const seen = used.get(zone!) ?? 0;
-    used.set(zone!, seen + 1);
-    // Förskjutningen växlar sida: 0, +12, −12, +24 … så en klunga sprider sig kring delens mitt.
-    const step = Math.ceil(seen / 2) * 12 * (seen % 2 === 1 ? 1 : -1);
-    const spread = Math.abs(anchor.normal.x) > 0.5 ? { x: 0, y: 0, z: step } : { x: step, y: 0, z: 0 };
-
-    pins.push({
-      id: d.id,
-      number: i + 1,
-      point: {
-        x: anchor.point.x + spread.x,
-        y: anchor.point.y + spread.y,
-        z: anchor.point.z + spread.z,
-      },
-      normal: anchor.normal,
-      label: `${typeLabel(d.type)} — ${d.part}`,
-      severity: d.severity,
-    });
-  }
-  return pins;
+function SkadeFoto({
+  bild,
+  nummer,
+  titel,
+  vald,
+  onValj,
+}: {
+  bild: NonNullable<CardDamage["bild"]>;
+  nummer: number;
+  titel: string;
+  vald: boolean;
+  onValj: () => void;
+}) {
+  const m = bild.mark;
+  return (
+    <button
+      type="button"
+      className={`skadefoto ${vald ? "skadefoto-vald" : ""}`}
+      onClick={onValj}
+      aria-pressed={vald}
+    >
+      <span className="marked-thumb skadefoto-ruta">
+        <span className="marked-thumb-inner" style={{ aspectRatio: `${bild.width} / ${bild.height}` }}>
+          <img src={bild.url} alt={titel} loading="lazy" decoding="async" />
+          {m.kind === "box" ? (
+            <span
+              className="marked-thumb-box"
+              style={{
+                left: `${m.x * 100}%`,
+                top: `${m.y * 100}%`,
+                width: `${(m.w ?? 0.1) * 100}%`,
+                height: `${(m.h ?? 0.1) * 100}%`,
+              }}
+            />
+          ) : (
+            <svg className="marked-thumb-line" viewBox="0 0 100 100" preserveAspectRatio="none">
+              <line x1={m.x * 100} y1={m.y * 100} x2={(m.x2 ?? m.x) * 100} y2={(m.y2 ?? m.y) * 100} />
+            </svg>
+          )}
+        </span>
+        {/* Numret i hörnet är hela kopplingen till listan under. Utan det är galleriet en hög
+            bilder som läsaren själv får para ihop med raderna. */}
+        <span className="skadefoto-num">{nummer}</span>
+      </span>
+      <span className="skadefoto-titel">{titel}</span>
+    </button>
+  );
 }

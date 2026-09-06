@@ -17,13 +17,13 @@
  */
 
 import { brandSlug, CATEGORIES, categoryBySlug, categoryLabel } from "./catalog.js";
-import { allProducts, productById } from "./inventory.js";
-import type { Product } from "./types.js";
+import { allProducts, applyFilter, productById } from "./inventory.js";
+import { BROWSABLE_STATES, type Product } from "./types.js";
 
 const SITE = "Loopa Butik";
 const MOTTO = "Köp begagnat. Handla som nytt.";
 
-function baseUrl(): string {
+export function baseUrl(): string {
   return (process.env.LOOPA_PUBLIC_URL || "https://app.loopa.nu").replace(/\/+$/, "");
 }
 
@@ -118,59 +118,163 @@ function productJsonLd(p: Product): string {
   return JSON.stringify(data);
 }
 
+/**
+ * Om möbeln ska ligga i sökresultatet.
+ *
+ * EN REGEL, TVÅ LÄSARE. Sidhuvudet nedan sätter noindex utifrån den, och sitemap.ts avgör med samma
+ * funktion vilka adresser vi ber Google hämta. Skulle de svara olika hade sitemapen pekat på sidor
+ * som säger noindex — vilket Search Console rapporterar som fel, och de felen dränker de riktiga.
+ *
+ * En såld möbel finns i ett exemplar och kommer aldrig tillbaka. Sidan svarar fortfarande 200 och
+ * går att läsa, men den ska inte vara en träff man klickar på och möts av "såld".
+ */
+export function arIndexerbar(p: Product): boolean {
+  return BROWSABLE_STATES.includes(p.state);
+}
+
+/** Priset som text, med samma "Pris saknas" som produktsidan säger. */
+function prisText(p: Product): string {
+  return p.priceSek !== null ? `${p.priceSek} kr` : "Pris saknas";
+}
+
+/**
+ * Varorna som en läsbar lista i kroppen.
+ *
+ * DET HÄR ÄR SIDANS FAKTISKA INNEHÅLL. Kategorisidan bar tidigare en rubrik och en blurb, punkt —
+ * två meningar som ska ranka på "begagnade stolar" mot sidor med hundra varor på. Värre: eftersom
+ * rutnätet ritas av React var det HÄRIFRÅN ingen länk gick vidare till en enda produktsida, och en
+ * robot som inte kör JavaScript hittade därför aldrig till möblerna alls.
+ *
+ * Listan är riktiga länkar med riktiga priser, och den är samma innehåll React strax ritar om — inte
+ * en dold kopia för robotar. Antalet är tilltaget för att sidan ska ha tyngd men inte bli en vägg:
+ * de 48 första i samma ordning som rutnätet visar dem.
+ */
+const MAX_I_LISTAN = 48;
+
+function varulista(items: Product[]): string {
+  if (items.length === 0) return "";
+  return (
+    `<ul>` +
+    items
+      .slice(0, MAX_I_LISTAN)
+      .map((p) => {
+        const href = `/butik/objekt/${encodeURIComponent(p.id)}`;
+        const skick = p.condition ? ` – ${esc(p.condition.label)}` : "";
+        return `<li><a href="${esc(href)}">${esc(p.title)}</a> – ${esc(prisText(p))}${skick}</li>`;
+      })
+      .join("") +
+    `</ul>`
+  );
+}
+
+/**
+ * Rutnätets varor för ett filter, i rutnätets egen ordning.
+ *
+ * Går genom `applyFilter` och inte genom en egen slinga, för att listan roboten ser och listan
+ * besökaren ser MÅSTE vara samma urval. Två filtreringar av samma lager är två sanningar, och den
+ * ena hade blivit fel den dag någon rör vid den andra.
+ */
+async function varorFor(filter: { categorySlug?: string; brands?: string[] }): Promise<Product[]> {
+  const alla = await allProducts();
+  return applyFilter(alla, { ...filter, limit: MAX_I_LISTAN, sort: "relevans" }).items;
+}
+
+/**
+ * ItemList — listan som strukturerad data.
+ *
+ * Talar om för Google att sidan ÄR en lista av produkter och vilka de är, i vilken ordning. Det som
+ * gör en kategorisida till en kategorisida i deras ögon i stället för en artikel som råkar nämna
+ * möbler.
+ */
+function itemListJsonLd(items: Product[], name: string): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "ItemList",
+    name,
+    numberOfItems: items.length,
+    itemListElement: items.slice(0, MAX_I_LISTAN).map((p, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      url: `${baseUrl()}/butik/objekt/${encodeURIComponent(p.id)}`,
+      name: p.title,
+    })),
+  };
+}
+
+/**
+ * Brödsmulorna.
+ *
+ * Ger sökresultatet "loopa.nu › Butik › Stolar" i stället för en naken URL, vilket är den enda
+ * gratis ytan man har för att säga var på sajten träffen sitter. Trappan skrivs som par av namn och
+ * adress; sista steget är sidan man står på.
+ */
+function breadcrumbJsonLd(steg: Array<{ name: string; path: string }>): Record<string, unknown> {
+  return {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: steg.map((s, i) => ({
+      "@type": "ListItem",
+      position: i + 1,
+      name: s.name,
+      item: `${baseUrl()}${s.path}`,
+    })),
+  };
+}
+
+/**
+ * Flera grafer i EN script-tagg.
+ *
+ * injectSeo skjuter in `jsonLd` som den är, och en JSON-LISTA är giltig JSON-LD — Google läser varje
+ * post för sig. Alternativet, flera script-taggar, hade krävt att skalet kan ta emot en lista och
+ * gav ingenting tillbaka.
+ */
+function grafer(...delar: Array<Record<string, unknown> | null>): string {
+  const kvar = delar.filter((d): d is Record<string, unknown> => d !== null);
+  if (kvar.length === 0) return "";
+  return JSON.stringify(kvar.length === 1 ? kvar[0] : kvar);
+}
+
+/**
+ * Vem butiken är. Ligger på landningssidan, en gång.
+ *
+ * Organization knyter ihop sajten med företaget, och `WebSite` med `SearchAction` är det som kan ge
+ * ett sökfält direkt i Googles träff. Båda är billiga och båda står på EN sida — upprepade på varje
+ * produktsida blir de brus utan att bli sannare.
+ */
+function sajtJsonLd(): Record<string, unknown>[] {
+  const base = baseUrl();
+  return [
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      name: "Loopa",
+      url: base,
+      areaServed: { "@type": "City", name: "Stockholm" },
+    },
+    {
+      "@context": "https://schema.org",
+      "@type": "WebSite",
+      name: SITE,
+      url: `${base}/butik`,
+      inLanguage: "sv-SE",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: `${base}/butik/sok?q={search_term_string}` },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ];
+}
+
 /** Sidhuvudet för en adress under /butik, eller null när adressen inte är butikens. */
 export async function seoFor(pathname: string, search: string): Promise<SeoHead | null> {
-  /**
-   * Köpsidan: sidans enda brödtext, renderad server-side.
+  /*
+   * KÖPSIDANS SIDHUVUD ÄR BORTTAGET MED SIDAN.
    *
-   * Titeln siktar på det folk faktiskt söker efter — "köpa begagnade möbler tryggt stockholm" — och
-   * kroppen bär de tre frågorna som strukturerad FAQ. Samma tre frågor och samma svar som sidan
-   * visar; att indexera något annat än det besökaren möter är att lova en sak i sökresultatet och
-   * hålla en annan.
-   *
-   * Priset skrivs INTE här. Serviceavgiften och zonpriserna bor i koden som räknar dem, och en
-   * hårdkodad siffra i ett sökresultat är den som blir kvar längst efter att den slutat stämma.
+   * /kop bar en egen titel, en beskrivning och tre frågor som strukturerad FAQ. Adressen 301:as nu
+   * till butiken (se server.ts), och ett sidhuvud för en adress som svarar 301 vore ett löfte till
+   * sökmotorn om en sida som inte finns. Butikens egna sidor och efterfrågeväggen har sina kvar.
    */
-  if (pathname === "/kop" || pathname === "/kop/") {
-    const { SERVICE_FEE_SEK } = await import("../affar/fees.js");
-    const { ZONE_FEES } = await import("./delivery.js");
-    const frakt = Math.min(...ZONE_FEES);
-    const svar: Array<[string, string]> = [
-      [
-        "Hur funkar det?",
-        "Du klistrar in länken till en annons du hittat. Vi läser den och säger vilken modell det är, vad den mäter och vad den är värd. Vill du gå vidare får du en färdig text att skicka säljaren — vi hör aldrig av oss till dem själva. Säljaren filmar möbeln på tre minuter, vi granskar den och sätter ett pris efter skicket. Sedan betalar du, vi hämtar hos säljaren och bär in hos dig.",
-      ],
-      [
-        "Vad kostar det?",
-        `Möbelns pris går oavkortat till säljaren. Ovanpå det betalar du ${SERVICE_FEE_SEK} kr i serviceavgift och frakten, från ${frakt} kr beroende på zon i Stockholms län. Hela uppdelningen står på kortet innan du bjuder in säljaren.`,
-      ],
-      [
-        "Vad händer om möbeln inte stämmer?",
-        "Pengarna hålls hos oss tills möbeln står hos dig. Är den inte som granskningen visade får du dem tillbaka. Det är därför vi granskar innan du betalar och inte efter.",
-      ],
-    ];
-    return {
-      title: "Köpa begagnade möbler tryggt i Stockholm – Loopa",
-      description:
-        `Hittat en möbel på Blocket, Marketplace eller Tradera? Loopa granskar den, håller pengarna tills du godkänt och kör hem den. Serviceavgift ${SERVICE_FEE_SEK} kr, frakt från ${frakt} kr i Stockholms län.`,
-      canonical: `${baseUrl()}/kop`,
-      jsonLd: JSON.stringify({
-        "@context": "https://schema.org",
-        "@type": "FAQPage",
-        mainEntity: svar.map(([q, a]) => ({
-          "@type": "Question",
-          name: q,
-          acceptedAnswer: { "@type": "Answer", text: a },
-        })),
-      }),
-      body:
-        `<h1>Hittat en möbel? Köp den tryggt.</h1>` +
-        `<p>Vi granskar, betalar säkert och kör hem den. Fungerar med Blocket, Facebook Marketplace och Tradera.</p>` +
-        `<h2>Vanliga frågor</h2>` +
-        svar.map(([q, a]) => `<h3>${esc(q)}</h3><p>${esc(a)}</p>`).join("") +
-        `<p><a href="/butik/sok">Se våra granskade möbler</a></p>`,
-    };
-  }
 
   /**
    * Efterlysningsväggen, renderad per kategori.
@@ -210,13 +314,35 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
   const canonical = `${baseUrl()}${pathname}`;
 
   if (rest === "") {
+    const marken = [
+      ...new Set(
+        (await allProducts())
+          .filter((p) => arIndexerbar(p) && p.brand)
+          .map((p) => p.brand as string),
+      ),
+    ].sort((a, b) => a.localeCompare(b, "sv"));
     return {
       title: `${SITE} – ${MOTTO}`,
       description:
         "Begagnade möbler i Stockholm, besiktigade av AI. Du ser varje skada och exakta mått innan du köper. Fast pris och hemleverans i Stockholm.",
       canonical,
-      body: `<h1>${MOTTO}</h1><p>Begagnade möbler i Stockholm. Varje Loopa-granskad möbel är filmad, besiktigad och prissatt efter skick.</p>` +
-        `<ul>${CATEGORIES.map((c) => `<li><a href="/butik/kategori/${c.slug}">${esc(c.label)}</a></li>`).join("")}</ul>`,
+      jsonLd: grafer(...sajtJsonLd()),
+      /**
+       * Landningssidan är navet, och den ska LÄNKA som ett nav.
+       *
+       * Kategorierna stod här ensamma. Märkeslänkarna är tillagda för att märkessidorna annars bara
+       * nås via ett filter React ritar — de fanns i adressrymden men inte i länkgrafen, och en sida
+       * ingenting länkar till hittas inte. Märkena hämtas ur lagret så att listan aldrig lovar en
+       * sida för ett märke vi inte har i hyllan.
+       */
+      body:
+        `<h1>${MOTTO}</h1><p>Begagnade möbler i Stockholm. Varje Loopa-granskad möbel är filmad, besiktigad och prissatt efter skick.</p>` +
+        `<ul>${CATEGORIES.map((c) => `<li><a href="/butik/kategori/${c.slug}">${esc(c.label)}</a></li>`).join("")}</ul>` +
+        (marken.length
+          ? `<h2>Märken i butiken</h2><ul>${marken
+              .map((m) => `<li><a href="/butik/marke/${brandSlug(m)}">${esc(m)} secondhand</a></li>`)
+              .join("")}</ul>`
+          : ""),
     };
   }
 
@@ -225,11 +351,36 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
   if (head === "kategori" && tail) {
     const category = categoryBySlug(decodeURIComponent(tail));
     if (!category) return null;
+    const items = await varorFor({ categorySlug: category.slug });
+    const rubrik = `Begagnade ${category.label.toLowerCase()} i Stockholm`;
     return {
-      title: `Begagnade ${category.label.toLowerCase()} i Stockholm – ${SITE}`,
+      /**
+       * Antalet i titeln, när vi har ett.
+       *
+       * "Begagnade stolar i Stockholm – 23 st" säger något en konkurrents titel inte gör, och det är
+       * en uppgift och inte en påhittad superlativ. Faller lagret till noll faller siffran bort med
+       * det — en titel som lovar varor på en tom sida är sämre än ingen siffra alls.
+       */
+      title: items.length
+        ? `${rubrik} – ${items.length} st – ${SITE}`
+        : `${rubrik} – ${SITE}`,
       description: `${category.blurb} Besiktigade av Loopa, med mått och skick redovisat. Hemleverans i Stockholm.`,
       canonical,
-      body: `<h1>${esc(category.label)}</h1><p>${esc(category.blurb)}</p>`,
+      // En tom kategori har ingenting att indexera. Samma regel som efterlysningsväggens tomma vägg.
+      noindex: items.length === 0,
+      jsonLd: grafer(
+        breadcrumbJsonLd([
+          { name: SITE, path: "/butik" },
+          { name: category.label, path: `/butik/kategori/${category.slug}` },
+        ]),
+        items.length ? itemListJsonLd(items, rubrik) : null,
+      ),
+      body:
+        `<h1>${esc(rubrik)}</h1><p>${esc(category.blurb)}</p>` +
+        varulista(items) +
+        `<h2>Fler kategorier</h2><ul>${CATEGORIES.filter((c) => c.slug !== category.slug)
+          .map((c) => `<li><a href="/butik/kategori/${c.slug}">${esc(c.label)}</a></li>`)
+          .join("")}</ul>`,
     };
   }
 
@@ -253,13 +404,40 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
      * sökresultatet som kan matcha den frasen ordagrant. Sidan heter samma sak i rubriken, så det
      * som klickades på är det som möter.
      */
+    const items = await varorFor({ brands: [name] });
+    /**
+     * Kategorierna märket FAKTISKT har varor i.
+     *
+     * "begagnad mio madison" och "ikea stolar begagnat" är märke + kategori, och den korsningen har
+     * ingen egen adress än. Tills den finns är de här länkarna det som för en robot vidare från
+     * märket till rätt kategori — och listan räknas ur lagret, så den lovar aldrig en korsning som
+     * är tom.
+     */
+    const kategorier = [...new Set(items.map((p) => p.categorySlug))];
     return {
-      title: `${name} secondhand i Stockholm – ${SITE}`,
+      title: items.length
+        ? `${name} secondhand i Stockholm – ${items.length} möbler – ${SITE}`
+        : `${name} secondhand i Stockholm – ${SITE}`,
       description: `${name} secondhand: begagnade ${name}-möbler besiktigade av Loopa. Skick, mått och pris redovisat innan du köper. Hemleverans i Stockholm.`,
       canonical,
+      // Ett märke utan varor är en tom sida. Den ska inte ligga i sökresultatet i väntan på lager.
+      noindex: items.length === 0,
+      jsonLd: grafer(
+        breadcrumbJsonLd([
+          { name: SITE, path: "/butik" },
+          { name: `${name} secondhand`, path: `/butik/marke/${slug}` },
+        ]),
+        items.length ? itemListJsonLd(items, `${name} secondhand i Stockholm`) : null,
+      ),
       body:
         `<h1>${esc(name)} secondhand</h1>` +
-        `<p>Begagnade möbler från ${esc(name)}, granskade av Loopa och klara att köpa i Stockholm.</p>`,
+        `<p>Begagnade möbler från ${esc(name)}, granskade av Loopa och klara att köpa i Stockholm.</p>` +
+        varulista(items) +
+        (kategorier.length
+          ? `<h2>${esc(name)} per kategori</h2><ul>${kategorier
+              .map((c) => `<li><a href="/butik/kategori/${c}">${esc(categoryLabel(c))} från ${esc(name)}</a></li>`)
+              .join("")}</ul>`
+          : ""),
     };
   }
 
@@ -280,14 +458,37 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
         `Besiktigad av Loopa med varje skada utpekad. Hemleverans i Stockholm.`.trim(),
       canonical,
       image: product.imageUrl,
-      // Strukturerad data bara för det vi själva säljer och kan svara för.
-      jsonLd: product.source === "loopa" ? productJsonLd(product) : null,
+      /**
+       * Strukturerad data bara för det vi själva säljer och kan svara för.
+       *
+       * Brödsmulorna gäller däremot BÅDA källorna: de beskriver var sidan sitter på vår sajt, inte
+       * vems möbeln är, och det är sant även för en Tradera-vara vi visar.
+       */
+      jsonLd: grafer(
+        breadcrumbJsonLd([
+          { name: SITE, path: "/butik" },
+          { name: categoryLabel(product.categorySlug), path: `/butik/kategori/${product.categorySlug}` },
+          { name: product.title, path: `/butik/objekt/${encodeURIComponent(product.id)}` },
+        ]),
+        product.source === "loopa" ? (JSON.parse(productJsonLd(product)) as Record<string, unknown>) : null,
+      ),
       // En såld möbel ska inte ligga kvar som en träff i sökresultatet.
-      noindex: product.state !== "live" && product.state !== "reserved",
+      noindex: !arIndexerbar(product),
+      /**
+       * Kroppen bär också VÄGEN VIDARE.
+       *
+       * En produktsida är en återvändsgränd för en robot om den bara beskriver sin egen möbel: den
+       * enda vägen ut går genom rutnätet, som React ritar. Länkarna till kategorin och märket är
+       * därför inte dekoration — de är det som gör att lagret hänger ihop som en graf. De hjälper
+       * dessutom en människa som landat på en möbel som just blivit såld.
+       */
       body:
         `<h1>${esc(product.title)}</h1><p>${esc(price)}</p>` +
         (product.condition ? `<p>Skick: ${esc(product.condition.label)} — ${esc(product.condition.rationale)}</p>` : "") +
-        (dims.length ? `<p>Mått: ${dims.join(" × ")} cm</p>` : ""),
+        (dims.length ? `<p>Mått: ${dims.join(" × ")} cm</p>` : "") +
+        `<p><a href="/butik/kategori/${product.categorySlug}">Fler begagnade ${esc(categoryLabel(product.categorySlug).toLowerCase())} i Stockholm</a>` +
+        (product.brand ? ` · <a href="/butik/marke/${brandSlug(product.brand)}">${esc(product.brand)} secondhand</a>` : "") +
+        `</p>`,
     };
   }
 

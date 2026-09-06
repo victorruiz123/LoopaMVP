@@ -171,7 +171,7 @@ test("ensureRecord är idempotent — en ompublicering skapar ingen andra post",
 
 const baseProduct = {
   id: "LP-1", source: "loopa" as const, title: "IKEA Ektorp soffa", brand: "IKEA", model: "Ektorp",
-  categorySlug: "soffor-fatoljer", color: null, material: null,
+  categorySlug: "soffor", color: null, material: null,
   dimensions: { widthMm: 2180, depthMm: 880, heightMm: 880, seatHeightMm: null, estimated: false },
   priceSek: 2500, retailPriceSek: null, imageUrl: "/x.jpg",
   condition: { grade: "B" as const, canonical: "Mycket bra skick" as const, label: "L", rationale: "R", defectCount: 1, inspectedAt: "2026-08-01", reviewed: true },

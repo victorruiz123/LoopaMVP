@@ -18,7 +18,7 @@ import type { IncomingMessage } from "node:http";
 
 process.env.MEDIA_COOKIE_SECRET = "test-hemlighet-for-bildkakan";
 
-const { isAdminEmail, signedUpInWindow, signupWindowStart } = await import("../server/src/admin.js");
+const { isAdminEmail, jamforSenastRegistrerad } = await import("../server/src/admin.js");
 const { identityFromRequest, issueMediaCookie } = await import("../server/src/identity.js");
 
 const ADMIN = "victor@ruiz.se";
@@ -87,36 +87,36 @@ test("kakan legitimerar bara läsning — inte ens en admins", async () => {
   assert.equal(await identityFromRequest(request(value, "POST")), null);
 });
 
-// ─── fönstret: vem som räknas som ny ────────────────────────────────────────
+// ─── ordningen: alla konton, nyast först ────────────────────────────────────
 //
-// Panelen visar konton som registrerade sig idag eller igår. Gränsen går vid ett dygnsskifte i lokal
-// tid och inte 48 timmar bakåt — testas därför att skillnaden syns först vid gårdagens tidiga timmar,
-// när ett rullande timfönster hade tappat konton som fortfarande är nya.
+// Panelen visade förut BARA konton från idag och igår. Fönstret är borta — listan är hela katalogen,
+// och det enda som styr vad man ser först är sorteringen. Den testas därför att den nu bär det
+// fönstret var till för: den som är ny ska stå överst utan att någon annan göms.
 
 const at = (iso: string) => ({ signedUpAt: iso });
 
-test("fönstret börjar vid lokal midnatt i går", () => {
-  const now = new Date(2026, 7, 29, 14, 30);
-  const start = signupWindowStart(now);
-  assert.equal(start.getDate(), 28);
-  assert.equal(start.getHours(), 0);
-  assert.equal(start.getMinutes(), 0);
+test("nyast först", () => {
+  const igar = at(new Date(2026, 7, 28, 7, 0).toISOString());
+  const idag = at(new Date(2026, 7, 29, 9, 0).toISOString());
+  const ifjol = at(new Date(2025, 0, 3, 12, 0).toISOString());
+  const sorterat = [ifjol, idag, igar].sort(jamforSenastRegistrerad);
+  assert.deepEqual(sorterat, [idag, igar, ifjol]);
 });
 
-test("idag och igår räknas som nya, dagen dessförinnan inte", () => {
-  const now = new Date(2026, 7, 29, 14, 30);
-  assert.equal(signedUpInWindow(at(new Date(2026, 7, 29, 9, 0).toISOString()), now), true);
-  assert.equal(signedUpInWindow(at(new Date(2026, 7, 28, 0, 0).toISOString()), now), true);
-  assert.equal(signedUpInWindow(at(new Date(2026, 7, 27, 23, 59).toISOString()), now), false);
+test("ett gammalt konto göms inte längre — det står bara längre ned", () => {
+  // Regressionen som ändringen finns för: kontot registrerades i fjol och fanns inte i panelen alls.
+  const ifjol = at(new Date(2025, 0, 3, 12, 0).toISOString());
+  const idag = at(new Date(2026, 7, 29, 9, 0).toISOString());
+  const lista = [idag, ifjol].sort(jamforSenastRegistrerad);
+  assert.equal(lista.length, 2);
+  assert.equal(lista[1], ifjol);
 });
 
-test("gårdagsmorgonens konto är kvar hela dagen efter", () => {
-  // Det ett rullande 48-timmarsfönster hade tappat: registrerat 07:00 igår, avläst 14:30 idag.
-  const now = new Date(2026, 7, 29, 14, 30);
-  assert.equal(signedUpInWindow(at(new Date(2026, 7, 28, 7, 0).toISOString()), now), true);
-});
-
-test("ett konto utan känt datum kan inte påstås vara nytt", () => {
-  assert.equal(signedUpInWindow({ signedUpAt: null }, new Date()), false);
-  assert.equal(signedUpInWindow(at("inte-ett-datum"), new Date()), false);
+test("okänt registreringsdatum sist — okänt är inte samma sak som gammalt", () => {
+  const utanDatum = { signedUpAt: null };
+  const ifjol = at(new Date(2025, 0, 3, 12, 0).toISOString());
+  assert.deepEqual([utanDatum, ifjol].sort(jamforSenastRegistrerad), [ifjol, utanDatum]);
+  assert.deepEqual([ifjol, utanDatum].sort(jamforSenastRegistrerad), [ifjol, utanDatum]);
+  // Två odaterade jämför lika: ordningen dem emellan är inte något vi påstår.
+  assert.equal(jamforSenastRegistrerad({ signedUpAt: null }, { signedUpAt: null }), 0);
 });

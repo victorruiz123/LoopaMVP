@@ -1,6 +1,7 @@
 import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import path from "node:path";
 import { mkdir, writeFile, readFile, stat } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 
 try {
@@ -31,7 +32,8 @@ import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tra
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
-import { cutoutOf, jobByLoopaId, publicCardFor } from "./publicCard.js";
+import { cutoutOf, jobByLoopaId, publicCardFor, publikaBildrutor } from "./publicCard.js";
+import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
 import { handleAffar, handleAffarPublic } from "./affar/routes.js";
 import { handleEfterlysning, handleEfterlysningPublic } from "./efterlysning/routes.js";
@@ -42,6 +44,7 @@ import { attachScan } from "./affar/scan.js";
 import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
 import { bearerToken } from "./supabaseAuth.js";
+import { avtryck, KLIENTHANDELSER, spara } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
 
@@ -143,6 +146,22 @@ function handleCreateSession(req: IncomingMessage, res: ServerResponse, identity
   const proto = req.headers["x-forwarded-proto"];
   const secure = (Array.isArray(proto) ? proto[0] : proto) === "https";
   res.setHeader("Set-Cookie", issueMediaCookie(identity.id, secure, identity.isAdmin));
+
+  /**
+   * Rollen skrivs ut, en rad per inloggning.
+   *
+   * DET HÄR ÄR ENDA STÄLLET rollen avgörs, och den avgörs på ADRESSEN (admin.ts). När adminingången
+   * uteblir är frågan alltid densamma — vilken adress såg servern? — och utan raden finns svaret
+   * ingenstans: klienten får ett `false` som ser exakt likadant ut vare sig adressen inte stod i
+   * listan, kontot var ett annat än man trodde, eller anropet aldrig kom fram.
+   *
+   * Adressen skrivs hel med flit. Ett maskat `vi***@ruiz.se` hade dolt just det som brukar vara fel
+   * — en bokstav, en annan domän, ett testkonto man glömt att man satt inloggad som.
+   */
+  console.log(
+    `[loopa] session: ${identity.email ?? "adress okänd"} → ${identity.isAdmin ? "ADMIN" : "vanlig användare"}`,
+  );
+
   // Klienten får veta om den ska rita adminingången här, i anropet den ändå gör vid varje inloggning.
   // Rollen avgörs på servern; svaret är bara en upplysning om vad den kom fram till.
   sendJson(res, 200, { ok: true, isAdmin: identity.isAdmin });
@@ -548,13 +567,12 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
         identity: j.identity ?? null,
         price: j.result?.price ?? null,
         thumbnailImageId: j.result?.coverImageId ?? j.result?.images[0]?.id ?? null,
-        // Samma omslag som kortet, i samma ordning: säljarens möbel urklippt mot vitt först, och
-        // tillverkarens katalogbild bara för de jobb som inte fick något urklipp. Listan och kortet
-        // ska visa SAMMA möbel — en miniatyr av en ny exemplar bredvid ett kort med den begagnade
-        // var två bilder av två olika saker.
-        coverImageUrl: cutoutOf(j)
-          ? `/api/jobs/${j.id}/cover`
-          : (j.result?.productImage?.url ?? j.productImage?.url ?? null),
+        // Samma omslag som kortet, i samma ordning: tillverkarens katalogbild först, säljarens egna
+        // bildruta som reserv. Listan och kortet ska visa samma bild — två olika bilder av samma
+        // möbel på två skärmar är sämre än vilken av dem som helst.
+        coverImageUrl: j.result?.productImage?.url
+          ?? j.productImage?.url
+          ?? (j.result?.coverImageId ? `/api/jobs/${j.id}/images/${j.result.coverImageId}` : null),
         error: j.error,
         hasListing: listing?.status === "ok" && !!listing.result,
         listingTitle: listing?.result?.listing.title ?? null,
@@ -567,6 +585,74 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
       };
     }),
   );
+}
+
+// ---- mätningen: /api/analys och visningsräkningen ---------------------------
+
+/**
+ * Loopa-ID:t ur en egenskap som kan bära ett.
+ *
+ * Klienten skickar `item_id` på produkthändelser och `produkt` på utbudsraden — samma sak under två
+ * namn, för att namnen redan fanns i GA-anropen och att byta dem hade gjort de befintliga
+ * dataLayer-mätningarna oläsbara. Här slås de ihop.
+ */
+function annonsUr(props: Record<string, unknown>): string | null {
+  for (const nyckel of ["item_id", "produkt"]) {
+    const v = props[nyckel];
+    if (typeof v === "string" && /^LP-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(v.trim())) return v.trim().toUpperCase();
+  }
+  return null;
+}
+
+/**
+ * Besökarens avtryck, för att kunna skilja en visning från en omladdning.
+ *
+ * Adressen tas ur X-Forwarded-For när den finns — servern står bakom nginx i drift
+ * (deploy/oracle/) och skulle annars se samma proxy-IP för alla. Den lämnar aldrig den här raden:
+ * `avtryck` hashar den med ett salt som byts vid varje omstart, och det är hashen som lagras.
+ */
+function besokare(req: IncomingMessage): string {
+  const vidare = req.headers["x-forwarded-for"];
+  const ip = (Array.isArray(vidare) ? vidare[0] : vidare)?.split(",")[0]?.trim() || req.socket.remoteAddress || null;
+  return avtryck(ip, typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : null);
+}
+
+/** Sökrobotar räknas inte. En annons som "setts" 400 gånger av Googlebot är inte sedd av någon. */
+const ROBOT = /bot|crawl|spider|slurp|facebookexternalhit|preview|monitor|curl|wget|headless/i;
+
+/**
+ * Räknar en sidvisning. Väntar aldrig — en mätning får inte ligga i vägen för svaret.
+ *
+ * Serverräknad och inte klientmätt, av två skäl: anropet sker ändå (produktsidan och kortet hämtar
+ * sin data härifrån), och en besökare ska inte kunna påstå visningar på någon annans annons.
+ */
+function raknaVisning(handelse: "annons_visning" | "kort_visning", id: string, req: IncomingMessage): void {
+  const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+  if (ROBOT.test(ua)) return;
+  void spara(handelse, id.trim().toUpperCase(), {}, besokare(req));
+}
+
+/**
+ * Klientens händelser. Svarar 204 oavsett utfall — se anropsstället.
+ *
+ * Serverhändelser tas INTE emot här: `annons_visning` och `kort_visning` skrivs bara av servern
+ * själv, och en väg som lät en besökare skicka in dem hade gjort visningssiffran till något vem som
+ * helst kunde skriva.
+ */
+async function handleAnalys(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const body = await readJsonBody<{ event?: string; props?: Record<string, unknown> }>(req, 8 * 1024);
+    const event = typeof body.event === "string" ? body.event : "";
+    const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+    if (KLIENTHANDELSER.has(event) && !ROBOT.test(ua)) {
+      const props = body.props && typeof body.props === "object" ? body.props : {};
+      await spara(event, annonsUr(props), props);
+    }
+  } catch {
+    // En trasig kropp är inte värd ett felmeddelande — se anropsstället.
+  }
+  res.writeHead(204);
+  return res.end();
 }
 
 // ---- adminpanelen: /api/admin/*, bara för adresserna i admin.ts -------------
@@ -611,21 +697,72 @@ async function handleGetCover(jobId: string, res: ServerResponse) {
 }
 
 /**
- * Samma fil, men slagen på Loopa-ID och utan inloggning — kortets omslag för den som läser annonsen.
+ * Kortets omslag, slaget på Loopa-ID och utan inloggning: säljarens EGNA bildruta, orörd.
  *
- * Det här är den enda bild av säljarens egen möbel som är publik, och det är ett medvetet undantag:
- * urklippet visar möbeln mot vitt och ingenting av rummet den står i. Bildrutorna själva, med hem,
- * ansikten och allt annat som råkade vara i bild, ligger kvar bakom inloggningen.
+ * Vägen serverade en tid urklippet — möbeln friklippt mot vitt eller mot sin egen suddade bakgrund.
+ * Det är avvecklat: en mask som nästan lyckas ger en möbel med en tvättkorg fastvuxen i armstödet,
+ * och redigerade foton som misslyckas ser värre ut än oredigerade som är tråkiga. Kortet visar
+ * tillverkarens katalogbild när den finns, och den här bildrutan annars — se publicCard.ts.
  *
  * Kortet måste dessutom FINNAS publikt för att bilden ska lämnas ut: ett jobb utan färdig annons har
  * inget publikt kort, och då har det inget publikt omslag heller.
  */
 async function handleGetPublicCover(loopaId: string, res: ServerResponse) {
   const job = await jobByLoopaId(loopaId);
-  if (!job || !publicCardFor(job) || !cutoutOf(job)) {
+  if (!job || !publicCardFor(job)) {
     return sendJson(res, 404, { error: "Vi hittade ingen annons med det Loopa-ID:t." });
   }
-  await streamFile(path.join(jobDir(job.id), "cover", "cover.jpg"), res);
+  /**
+   * PRODUKTBILDEN FÖRST: säljarens möbel mot rent vitt, byggd av pipeline/bild/.
+   *
+   * Bara när kvalitetskontrollen godkänt den. Ett urklipp som flaggats för granskning finns på disk
+   * — en människa ska kunna öppna det — men går inte ut här av sig självt. Frågan ställs på ett enda
+   * ställe (`harGodkantOmslag`) så att den här porten och butikens rutnät inte kan svara olika; gör
+   * de det pekar rutnätet på en bild porten vägrar lämna ut, och varje sådan ruta blir en trasig
+   * bild.
+   */
+  const cutout = cutoutOf(job);
+  if (harGodkantOmslag(cutout)) {
+    const produktbild = path.join(jobDir(job.id), "cover", "cover.jpg");
+    if (existsSync(produktbild)) return await streamFile(produktbild, res);
+  }
+
+  /**
+   * Reserven: bildrutan som säljaren tog, med rummet kvar.
+   *
+   * Sämre som omslag och ändå rätt svar när urklippet uteblev — en möbel i ett vardagsrum säger vad
+   * som säljs, en tom ruta säger ingenting. Exponeringen är oförändrad mot förut: det är samma
+   * bildruta den här porten alltid lämnat ut.
+   */
+  const imageId = await resolveCoverImageId(job);
+  const image = imageId ? findImage(job, imageId) : undefined;
+  if (!image) return sendJson(res, 404, { error: "Annonsen har ingen bild." });
+  await streamFile(path.join(jobDir(job.id), "originals", image.path), res);
+}
+
+/**
+ * Bildrutan en skada syns i, publikt och slagen på Loopa-ID.
+ *
+ * Kortet räknar upp varje anmärkning i klartext. Den som läser "repa på vänster armstöd" har en
+ * rimlig följdfråga — hur stor? — och den enda ärliga svaret är fotot med skadan utmärkt. Utan det
+ * är skickrapporten ett påstående man får tro på.
+ *
+ * TRE SPÄRRAR, och de är hela gränsen:
+ *
+ *   1. Kortet måste finnas publikt. Inget färdigt annonsläge, ingen bild.
+ *   2. Bild-id:t måste pekas ut av en KVARSTÅENDE skada — se publikaBildrutor. Den som gissar ett
+ *      id kan alltså inte bläddra i filmningen, bara se de rutor kortet självt visar.
+ *   3. Faller en skada bort ur rapporten tar den sin bild med sig ut ur porten samma sekund, för
+ *      listan byggs ur samma filter som kortet.
+ */
+async function handleGetPublicDamageImage(loopaId: string, imageId: string, res: ServerResponse) {
+  const job = await jobByLoopaId(loopaId);
+  if (!job || !publicCardFor(job) || !publikaBildrutor(job).has(imageId)) {
+    return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  }
+  const image = findImage(job, imageId);
+  if (!image) return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  await streamFile(path.join(jobDir(job.id), "originals", image.path), res);
 }
 
 async function handleGetCrop(jobId: string, filename: string, res: ServerResponse) {
@@ -852,13 +989,33 @@ const server = http.createServer(async (req, res) => {
        * säljarens egna bildrutor — se publicCard.ts för vad som följer med.
        */
       if (segments[1] === "cards" && segments.length === 3 && req.method === "GET") {
+        raknaVisning("kort_visning", segments[2], req);
         return await handleGetPublicCard(segments[2], res);
+      }
+
+      /**
+       * Mätningen, utanför grinden.
+       *
+       * MÅSTE vara det: den som tittar på en möbel är oftast inte inloggad, och det är just den
+       * besökaren mätningen finns för. Vägen tar bara vitlistade händelsenamn och vitlistade
+       * egenskaper (analys/store.ts) — en öppen skrivväg utan den listan är en gratis disk för vem
+       * som helst på internet.
+       *
+       * Svarar 204 och aldrig något annat. `sendBeacon` i webbläsaren läser inte svaret, och ett
+       * felmeddelande hit hade bara varit ett svar ingen läser — men som berättar för den som
+       * provar vad som räknas.
+       */
+      if (segments[1] === "analys" && segments.length === 2 && req.method === "POST") {
+        return await handleAnalys(req, res);
       }
       if (segments[1] === "cards" && segments.length === 4 && segments[3] === "chat" && req.method === "POST") {
         return await handleCardChat(segments[2], req, res);
       }
       if (segments[1] === "cards" && segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
         return await handleGetPublicCover(segments[2], res);
+      }
+      if (segments[1] === "cards" && segments.length === 5 && segments[3] === "skada" && req.method === "GET") {
+        return await handleGetPublicDamageImage(segments[2], segments[4], res);
       }
 
       /**
@@ -969,6 +1126,37 @@ const server = http.createServer(async (req, res) => {
         }
         if (segments[2] === "users" && segments.length === 5 && segments[4] === "jobs" && req.method === "GET") {
           return await handleAdminUserJobs(segments[3], res);
+        }
+
+        /**
+         * Annonspanelen: allt vi fått in, med läge, priser, tider och mätning.
+         *
+         * EN RAD PER JOBB och inte per butiksvara — se adminAnnonser.ts. Listan är det enda stället i
+         * produkten där ett jobb som aldrig blev en annons syns för en människa.
+         */
+        if (segments[2] === "annonser" && segments.length === 3 && req.method === "GET") {
+          const { listaAnnonser } = await import("./adminAnnonser.js");
+          return sendJson(res, 200, await listaAnnonser());
+        }
+        if (segments[2] === "annonser" && segments.length === 4 && req.method === "GET") {
+          const { annonsDetalj } = await import("./adminAnnonser.js");
+          const detalj = await annonsDetalj(segments[3]);
+          if (!detalj) return sendJson(res, 404, { error: "Annonsen finns inte." });
+          return sendJson(res, 200, detalj);
+        }
+        /**
+         * Ändringen. PATCH och inte PUT: kroppen är en delmängd, och ett fält som inte nämns ska
+         * lämnas i fred — skillnaden mellan "rör inte" och "sätt till tomt" är hela överstyrningen.
+         */
+        if (segments[2] === "annonser" && segments.length === 4 && req.method === "PATCH") {
+          const { andraAnnons, AndringsFel } = await import("./adminAnnonser.js");
+          try {
+            const patch = await readJsonBody<Parameters<typeof andraAnnons>[1]>(req, 256 * 1024);
+            return sendJson(res, 200, await andraAnnons(segments[3], patch, identity.id));
+          } catch (err) {
+            if (err instanceof AndringsFel) return sendJson(res, 400, { error: err.message });
+            throw err;
+          }
         }
         /**
          * Efterfrågepanelen: öppen efterfrågan per kategori, märke och prisband.
@@ -1125,20 +1313,43 @@ const server = http.createServer(async (req, res) => {
     }
 
     /**
-     * /butik → /kop, permanent.
+     * robots.txt och sitemap.xml.
      *
-     * Köpsidan flyttade. Butikens rot var ingången till köpsidan i tidigare versioner, och den
-     * adressen står i delade länkar, bokmärken och sökresultat — en 301 är det enda svaret som tar
-     * dem alla med sig, och den enda som talar om för en sökmotor att flytta värdet över.
+     * FÖRE serveStatic, och det är inte kosmetik: den serverar index.html för allt som inte är en
+     * fil på disk (se static.ts), så utan de här raderna hade Googlebot fått en HTML-sida med
+     * Content-Type text/html när den bad om robots.txt — vilket den tolkar som "ingen robots.txt
+     * som går att läsa" och sitemapen som ett trasigt dokument.
      *
-     * BARA ROTEN. /butik/kategori/…, /butik/objekt/… och resten av katalogen ligger kvar där de är:
-     * de är fortfarande sina egna sidor och har sina egna länkar.
-     *
-     * En sökning under roten (?q=) tas ändå av butiken — den som söker vill bläddra i lagret, inte
-     * beskriva något vi ska leta upp.
+     * Byggs vid varje förfrågan ur lagerindexet, som redan är cachat i minnet. En kort
+     * Cache-Control gör att en robot som frågar ofta inte bygger om den varje gång, utan att en
+     * nypublicerad möbel behöver vänta på en utrullning för att stå med.
      */
-    if ((url.pathname === "/butik" || url.pathname === "/butik/") && !url.searchParams.get("q")) {
-      res.writeHead(301, { Location: "/kop" });
+    if (req.method === "GET" && url.pathname === "/robots.txt") {
+      const { robotsTxt } = await import("./butik/sitemap.js");
+      res.writeHead(200, { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" });
+      return res.end(robotsTxt());
+    }
+    if (req.method === "GET" && url.pathname === "/sitemap.xml") {
+      const { sitemapXml } = await import("./butik/sitemap.js");
+      res.writeHead(200, { "Content-Type": "application/xml; charset=utf-8", "Cache-Control": "public, max-age=600" });
+      return res.end(await sitemapXml());
+    }
+
+    /**
+     * /kop → /butik, permanent.
+     *
+     * Landningssidan på /kop är borttagen. Adressen står i delade länkar, i bokmärken, i sökresultat
+     * och i toppradens "Köp" i äldre klienter — en 301 är det enda svaret som tar dem alla med sig,
+     * och den enda som talar om för en sökmotor att flytta värdet till butiken.
+     *
+     * BARA ROTEN, och det är viktigare här än det låter: /kop/analysera är Trygg affärs ingång och
+     * /kop/mina-efterlysningar är köparens egen lista. Båda ligger kvar, båda skulle dö av en
+     * omdirigering på prefixet.
+     *
+     * Riktningen var tidigare den motsatta — /butik 301:ades hit. Den raden är borta med sidan.
+     */
+    if (url.pathname === "/kop" || url.pathname === "/kop/") {
+      res.writeHead(301, { Location: "/butik" });
       return res.end();
     }
 

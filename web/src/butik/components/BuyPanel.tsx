@@ -63,7 +63,10 @@ export default function BuyPanel({ product }: { product: Product }) {
   }
 
   return (
-    <section className="butik-explainer" style={{ padding: 18, margin: "18px 0" }}>
+    /* Ingen egen ram och ingen egen rubrik: panelen bor inuti köprutan, som redan har båda (se
+       .butik-buybox i butik.css). Måtten stod som inline-stilar och slog därför stilmallens regel —
+       resultatet var en ruta i rutan med ett eget "Köp och hemleverans" under rubriken "Köp hos Loopa". */
+    <section className="butik-explainer">
       <h2 style={{ fontSize: 18 }}>Köp och hemleverans</h2>
       <p style={{ marginBottom: 14 }}>Skriv ditt postnummer så ser du fraktpris och totalsumma innan du betalar.</p>
 

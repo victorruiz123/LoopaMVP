@@ -18,7 +18,7 @@ import type { Product } from "../server/src/butik/types.js";
 
 const base: Product = {
   id: "LP-B-1", source: "loopa", title: "IKEA Ektorp", brand: "IKEA", model: "Ektorp",
-  categorySlug: "soffor-fatoljer", color: null, material: null,
+  categorySlug: "soffor", color: null, material: null,
   dimensions: { widthMm: 2000, depthMm: 880, heightMm: 880, seatHeightMm: null, estimated: false },
   priceSek: 2500, retailPriceSek: null, imageUrl: null, condition: null,
   state: "live", listedAt: "2026-08-31", listedAtKnown: true, externalUrl: null, auction: null,
@@ -26,7 +26,7 @@ const base: Product = {
 };
 
 const watch = (over: Partial<Parameters<typeof matches>[0]> = {}) => ({
-  id: "b1", userId: "u1", email: "u@x.se", categorySlug: "soffor-fatoljer", brand: null,
+  id: "b1", userId: "u1", email: "u@x.se", categorySlug: "soffor", brand: null,
   maxPriceSek: 3000, maxWidthMm: null, maxDepthMm: null, maxHeightMm: null,
   createdAt: "2026-08-01", notifiedProductIds: [], ...over,
 });
@@ -62,7 +62,7 @@ test("en möbel som inte är live matchar inte", () => {
 });
 
 test("samma möbel aviseras en gång, inte en gång per körning", async () => {
-  await createBevakning({ userId: "u-dup", email: "d@x.se", categorySlug: "soffor-fatoljer", brand: null, maxPriceSek: 3000, maxWidthMm: null, maxDepthMm: null, maxHeightMm: null });
+  await createBevakning({ userId: "u-dup", email: "d@x.se", categorySlug: "soffor", brand: null, maxPriceSek: 3000, maxWidthMm: null, maxDepthMm: null, maxHeightMm: null });
   const first = await takePendingNotifications([base]);
   const second = await takePendingNotifications([base]);
   assert.equal(first.filter((p) => p.bevakning.userId === "u-dup").length, 1);

@@ -12,7 +12,7 @@
  * får inte se ut som ett vi gjort.
  */
 
-import type { CanonicalCondition, ConditionGrade, FurnitureIdentity } from "../types.js";
+import type { CanonicalCondition, ConditionGrade, FurnitureIdentity, PriceDrop } from "../types.js";
 
 export type ProductSource = "loopa" | "tradera";
 
@@ -151,6 +151,43 @@ export interface Product {
   priceSek: number | null;
   /** Nypris när prismotorn eller annonsen känner det — stryks över, och besparingen räknas ur det. */
   retailPriceSek: number | null;
+  /**
+   * Prismotorns uppskattning av vad möbeln är värd BEGAGNAD. Inte nypriset.
+   *
+   * Skild från `retailPriceSek` med flit, och skillnaden är hela fyndpoängen. Nypriset säger vad en
+   * ny kostar i butik och ligger nästan alltid långt över; att räkna fynd mot det hade gjort varje
+   * begagnad möbel till ett lika stort fynd. Den här siffran säger vad just den här möbeln, med sitt
+   * skick och sina skador, borde kosta — och en möbel som ligger under DEN är faktiskt billig.
+   *
+   * Null när prismotorn inte nådde fram eller inte hittade jämförbara. Då får varan ingen fyndpoäng
+   * alls i stället för en gissad; se rank.ts.
+   */
+  estimatedValueSek: number | null;
+  /**
+   * Genomförda prissänkningar, äldst först. Tom lista = priset har aldrig sänkts.
+   *
+   * Kommer ur säljarens prisstege (priceLadder.ts), som sänker 15 % i veckan tills golvet nås.
+   * Butiken hittar alltså inte på sänkningar — den visar de som redan skett.
+   */
+  priceHistory: PriceDrop[];
+  /**
+   * När priset senast sänktes. Driver etiketten "Prissänkt" och sektionen med samma namn.
+   *
+   * Ett eget fält och inte `priceHistory.at(-1)?.at` hos varje läsare: frågan "är den nyss sänkt?"
+   * ställs på kortet, i sektionen och i sorteringen, och tre uträkningar av samma sak hinner bli
+   * olika.
+   */
+  priceDroppedAt: string | null;
+  /** Antal bildrutor. Listningskvalitet i rangordningen — se rank.ts. */
+  imageCount: number;
+  /**
+   * Om möbeln har minst ett UPPMÄTT mått, inte ett uppskattat för möbeltypen.
+   *
+   * `dimensions.estimated` säger att något är gissat; det här säger att något är känt. De är inte
+   * varandras motsatser — en möbel utan några mått alls har `estimated: false` och ändå ingenting
+   * att gå på.
+   */
+  hasMeasurements: boolean;
   imageUrl: string | null;
   /** Loopa-varor: alltid satt. Tradera: alltid null — vi har inte granskat dem. */
   condition: ProductCondition | null;

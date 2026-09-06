@@ -66,7 +66,7 @@ export async function serveStatic(pathname: string, res: ServerResponse, search 
    * Säljflödets skärmar ska ingen hitta via en sökmotor, och en riktig fil serveras som den är.
    * Faller uppslaget skickas skalet orört — en trasig titel får aldrig bli en trasig sida.
    */
-  if (!direct && (pathname.startsWith("/butik") || pathname.startsWith("/efterlyses") || pathname === "/kop" || pathname === "/kop/")) {
+  if (!direct && (pathname.startsWith("/butik") || pathname.startsWith("/efterlyses"))) {
     try {
       const head = await seoFor(pathname, search);
       if (head) {

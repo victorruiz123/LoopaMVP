@@ -326,6 +326,52 @@ function validateExtras(raw: RawInterpretation): EfterlysningExtras {
 
 export const EMPTY_EXTRAS: EfterlysningExtras = { styleTags: [], deadlineDays: null, urgency: "none", note: null };
 
+/**
+ * Svaret utan modellen, när frågan inte är en mening.
+ *
+ * MODELLEN FINNS FÖR MENINGAR — "en soffa till ett litet vardagsrum, max 5000, gärna i tyg". Ett
+ * ensamt ord är ingen mening: "soffa" är en kategori och "IKEA" är ett märke, och båda går att slå
+ * upp i listor vi redan har. Anropet kostade 1,8–3 s första gången ordet söktes och gav samma svar
+ * som uppslagningen — en väntan köparen betalade för ingenting.
+ *
+ * TVÅ ORD RÄCKER SOM GRÄNS, och siffror diskvalificerar: "under 3000" och "max 80 cm" är precis den
+ * sortens frågor modellen är bra på, och de får kosta sitt anrop.
+ *
+ * Returnerar null när frågan inte är entydig — då är modellen fortfarande rätt verktyg.
+ */
+function utanModell(text: string, brands: string[]): Interpretation | null {
+  const ord = text.split(/\s+/).filter(Boolean);
+  if (ord.length > 2 || /\d/.test(text)) return null;
+
+  // Märket först: "Mio" är ett märke OCH ett ord som kan råka finnas i en titel. Märkesfiltret är
+  // det snävare och mer sanna av de två.
+  const marke = brands.find((b) => fold(b) === fold(text));
+  if (marke) {
+    const filter: ProductFilter = { brands: [marke] };
+    return { filter, query: toQuery(filter), summary: marke, aiUsed: false };
+  }
+
+  /**
+   * Kategorin ur samma nyckelordslista som butiken kategoriserar VARORNA med (catalog.ts).
+   *
+   * Att låna den listan är hela poängen: ett ord som gör en möbel till en soffa gör en sökning på
+   * soffor. Två vokabulärer hade kunnat säga olika saker om samma ord.
+   */
+  const slug = resolveCategorySlug({ title: text });
+  if (slug !== "ovrigt") {
+    // Sökordet står kvar bredvid kategorin: "barstol" är kategorin stolar, men ordet skiljer
+    // barstolen från matstolen och det är den skillnaden köparen skrev.
+    const filter: ProductFilter = { categorySlug: slug, q: text.slice(0, 80) };
+    return {
+      filter,
+      query: toQuery(filter),
+      summary: `${categoryBySlug(slug)?.label ?? slug} · ${text}`,
+      aiUsed: false,
+    };
+  }
+  return null;
+}
+
 export async function interpretQuery(
   question: string,
   brands: string[],
@@ -333,6 +379,22 @@ export async function interpretQuery(
 ): Promise<Interpretation & { extras: EfterlysningExtras }> {
   const text = question.trim();
   if (!text) return { filter: {}, query: {}, summary: "Hela lagret", aiUsed: false, extras: EMPTY_EXTRAS };
+  /**
+   * Genvägen prövas FÖRE nyckeln, och gäller BARA sökläget.
+   *
+   * Före nyckeln därför att den inte behöver någon: uppslagningen mot kategori- och märkeslistorna
+   * är vår egen, och utan Gemini-nyckel är den dessutom ett bättre svar än ren ordmatchning.
+   *
+   * Bara sökläget därför att efterlysningen läser stil, deadline och brådska ur samma mening, och de
+   * fälten finns inte i någon lista. "Soffa" som efterlysning är dessutom en annan sorts yttrande än
+   * "soffa" som sökning — där ÄR det korta ordet början på ett samtal, och modellen ställer
+   * följdfrågorna.
+   */
+  if (!opts.efterlysning) {
+    const genvag = utanModell(text, brands);
+    if (genvag) return { ...genvag, extras: EMPTY_EXTRAS };
+  }
+
   if (!aiSearchAvailable()) return { ...fallback(text), extras: EMPTY_EXTRAS };
 
   try {

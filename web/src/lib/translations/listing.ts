@@ -7,6 +7,10 @@ import type { Translation } from "../translations";
 
 export const LISTING: Record<string, Translation> = {
   // ---- annonskortet ----
+  "Säljarens egen bild av möbeln, orörd": {
+    en: "The seller's own photo of the furniture, unedited",
+    fr: "Photo du meuble prise par le vendeur, non retouchée",
+  },
   "Säljarens egen bild av möbeln, bakgrunden borttagen": {
     en: "The seller's own photo of the furniture, background removed",
     fr: "Photo du meuble prise par le vendeur, fond supprimé",
@@ -196,24 +200,21 @@ export const LISTING: Record<string, Translation> = {
   "Sälj din egen möbel med Loopa": { en: "Sell your own furniture with Loopa", fr: "Vendez votre meuble avec Loopa" },
 
   // ---- adminpanelen ----
-  "Nya användare": { en: "New users", fr: "Nouveaux utilisateurs" },
-  "Nya konton": { en: "New accounts", fr: "Nouveaux comptes" },
-  "Konton som registrerade sig idag eller igår": {
-    en: "Accounts that signed up today or yesterday",
-    fr: "Comptes créés aujourd'hui ou hier",
-  },
-  "{antal} av {total} konton": { en: "{antal} of {total} accounts", fr: "{antal} comptes sur {total}" },
+  "Användare": { en: "Users", fr: "Utilisateurs" },
+  "Konton": { en: "Accounts", fr: "Comptes" },
+  "Alla konton, nyast först": { en: "All accounts, newest first", fr: "Tous les comptes, du plus récent" },
+  "{antal} konton": { en: "{antal} accounts", fr: "{antal} comptes" },
   "Sök på e-post eller namn": { en: "Search by email or name", fr: "Rechercher par e-mail ou par nom" },
   "Sök användare": { en: "Search users", fr: "Rechercher des utilisateurs" },
   "Ingen träff": { en: "No match", fr: "Aucun résultat" },
-  "Inga nya konton": { en: "No new accounts", fr: "Aucun nouveau compte" },
-  "Ingen av de nya användarna matchar sökningen.": {
-    en: "None of the new users match the search.",
-    fr: "Aucun nouvel utilisateur ne correspond à la recherche.",
+  "Inga konton": { en: "No accounts", fr: "Aucun compte" },
+  "Ingen användare matchar sökningen.": {
+    en: "No user matches the search.",
+    fr: "Aucun utilisateur ne correspond à la recherche.",
   },
-  "Ingen har registrerat sig idag eller igår. Kontona som fanns sedan tidigare ligger kvar — de visas bara inte här.": {
-    en: "Nobody signed up today or yesterday. Existing accounts are still there — they're just not shown here.",
-    fr: "Personne ne s'est inscrit aujourd'hui ni hier. Les comptes existants sont toujours là — ils ne sont simplement pas affichés ici.",
+  "Katalogen svarade, men den innehöll inga konton.": {
+    en: "The directory answered, but it held no accounts.",
+    fr: "L'annuaire a répondu, mais il ne contenait aucun compte.",
   },
   "{antal} annons": { en: "{antal} listing", fr: "{antal} annonce" },
   "{antal} annonser": { en: "{antal} listings", fr: "{antal} annonces" },

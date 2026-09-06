@@ -16,6 +16,7 @@ import type { CapturedImage, ConditionJob, TraderaPublication } from "../../type
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
 import { armPriceLadder } from "../../priceLadder.js";
 import { loopaIdFor } from "../../loopaId.js";
+import { medRattelser } from "../../butik/overrides.js";
 import { SHIPPING_INCLUDED_SEK, traderaPriceWithShipping } from "./shipping.js";
 import {
   TRADERA_CONDITION,
@@ -88,7 +89,14 @@ export type PublishReadiness =
  * Tre saker måste finnas: en annonstext, ett pris och minst en bild. Saknas något sägs det rakt ut i
  * stället för att annonsen skickas iväg och avvisas av Tradera med ett engelskt valideringsfel.
  */
-export async function planTraderaPublish(job: ConditionJob): Promise<PublishReadiness> {
+export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishReadiness> {
+  /**
+   * Adminens rättelse av rubriken går ut i annonsen, inte bara i panelen.
+   *
+   * Läggs på HÄR, vid porten, för att annonsbyggaren i adContent.ts är synkron och läser texten på
+   * tre möjliga ställen. Kopian sparas aldrig — se butik/overrides.ts.
+   */
+  const job = await medRattelser(rajob);
   const result = job.result;
   const card = result?.listing?.result ?? null;
   if (!result) return { ok: false, reason: "Analysen är inte klar än." };
@@ -153,12 +161,16 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
     if (!readiness.ok) throw new Error(readiness.reason);
     const { plan } = readiness;
 
+    // Samma rättelse en gång till, för texten: `job` nedan skriver publiceringsläget och måste vara
+    // det riktiga jobbet, medan beskrivningen ska byggas ur den rättade kopian.
+    const annons = await medRattelser(job);
+
     const images = await loadImages(job);
 
     const result = await publishToTradera({
       ownReference: job.id,
       title: plan.title,
-      description: buildDescription(job),
+      description: buildDescription(annons),
       categoryId: plan.categoryId,
       price: plan.price,
       images,
