@@ -18,5 +18,12 @@
     "@types/node": "^22.10.2",
     "tsx": "^4.22.4",
     "typescript": "^5.8.3"
+  },
+  "allowScripts": {
+    "onnxruntime-node@1.20.1": true,
+    "sharp@0.33.5": true,
+    "esbuild@0.28.2": true,
+    "protobufjs@7.6.6": true,
+    "@google/genai@2.19.0": true
   }
 }
