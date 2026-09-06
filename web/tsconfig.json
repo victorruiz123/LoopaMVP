@@ -1,8 +1,19 @@
 {
   "compilerOptions": {
-    "target": "ES2020",
+    /*
+      ES2022 SKRIVET UTTRYCKLIGEN, och det är inte kosmetik.
+
+      Här stod ES2020, och bygget gick ändå igenom på utvecklarmaskinen: TypeScript letar @types
+      uppåt i katalogträdet, hittade rotens node_modules/@types/node och fick ett nyare lib-set på
+      köpet. På servern finns ingen node_modules i /opt/loopa — där installeras bara server/ och
+      web/ — så samma kod föll på `Array.prototype.at` mitt i en utrullning.
+
+      Ett bygge ska inte bero på vad som råkar ligga en katalog upp. ES2022 är dessutom vad koden
+      faktiskt använder, och stöds av varje webbläsare sedan 2022.
+    */
+    "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "skipLibCheck": true,
     "moduleResolution": "bundler",
