@@ -14,11 +14,20 @@ compatibility_date = "2026-01-01"
 
 # ─── Appens sidor ───────────────────────────────────────────────────────────
 #
-# ROTEN OCKSÅ. loopa.nu/ är säljflödet — det man kommer till för att sälja en möbel. Mönstret utan
-# jokertecken matchar exakt "/", inget annat, så marknadssajtens övriga sidor rörs inte.
-[[routes]]
-pattern = "loopa.nu/"
-zone_name = "loopa.nu"
+# ROTEN ÄR MEDVETET INTE MED — den läggs till vid lansering.
+#
+# loopa.nu/ ska visa marknadssajtens företagssida fram till dess. Rutten fanns här en kort stund och
+# togs bort igen: en Worker-rutt VINNER över Cloudflares omdirigeringsregel, tvärtemot vad jag antog,
+# så roten började genast visa säljflödet.
+#
+# VID LANSERING, i den här ordningen:
+#   1. Lägg tillbaka blocket nedan och kör `npx wrangler deploy`
+#   2. Ta bort omdirigeringsregeln loopa.nu/ → /company i Cloudflare (Rules → Redirect Rules)
+#   3. Sätt LOOPA_ROT_FLYTTAD=1 i server/.env och starta om, så att app.loopa.nu/ pekar hit
+#
+# [[routes]]
+# pattern = "loopa.nu/"
+# zone_name = "loopa.nu"
 
 [[routes]]
 pattern = "loopa.nu/butik*"
