@@ -262,3 +262,17 @@ test("utan känd värd händer ingenting", () => {
   });
   assert.equal(kanoniskVard(), kanoniskVard(), "ska inte kasta");
 });
+
+test("loopback och IP-adresser kanoniseras aldrig", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    // Utrullningsskriptet frågar servern på 127.0.0.1 och ska få sidan, inte en 301. Utan det här
+    // underkände skriptet en fullt korrekt utrullning — och riktiga besökare, som kommer via
+    // tunneln med rätt värdnamn, märkte ingenting alls.
+    assert.equal(flyttadAdress("127.0.0.1:8799", "/butik", ""), null);
+    assert.equal(flyttadAdress("localhost:8799", "/sitemap.xml", ""), null);
+    assert.equal(flyttadAdress("[::1]:8799", "/butik", ""), null);
+    assert.equal(flyttadAdress("82.70.45.236", "/butik", ""), null, "en IP är inget sökresultat");
+    // Men ett riktigt värdnamn ska fortfarande flyttas.
+    assert.equal(flyttadAdress("app.loopa.nu", "/butik", ""), "https://loopa.nu/butik");
+  });
+});

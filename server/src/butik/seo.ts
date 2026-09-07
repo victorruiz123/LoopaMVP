@@ -369,6 +369,26 @@ export function kanoniskVard(): string | null {
 const FLYTTAT = ["/butik", "/efterlyses", "/sitemap.xml", "/robots.txt"];
 
 /**
+ * Är värdnamnet ett publikt namn en besökare kan ha skrivit in?
+ *
+ * BARA SÅDANA SKA KANONISERAS. Utan den här kontrollen omdirigerade servern varje förfrågan mot
+ * 127.0.0.1 till app.loopa.nu — hälsokontroller, interna anrop och utrullningsskriptets egen
+ * verifiering, som därför underkände en fullt korrekt utrullning. Riktiga besökare kommer via
+ * tunneln med rätt värdnamn och märkte ingenting, vilket är precis varför felet var lätt att missa.
+ *
+ * Loopback och rena IP-adresser räknas bort. Ingen surfar till en butik via en IP-adress, och den
+ * som gör det har inte kommit dit från ett sökresultat — vilket är det enda omdirigeringen finns för.
+ */
+function arPublikVard(host: string): boolean {
+  const namn = host.split(":")[0].trim().toLowerCase().replace(/^\[|\]$/g, "");
+  if (namn === "localhost" || namn.endsWith(".localhost")) return false;
+  if (namn === "::1" || namn.startsWith("127.")) return false;
+  // Ren IPv4. Ett namn utan bokstäver är ingen domän.
+  if (/^\d{1,3}(\.\d{1,3}){3}$/.test(namn)) return false;
+  return namn.includes(".");
+}
+
+/**
  * Adressen en förfrågan ska omdirigeras till, eller null när den redan står rätt.
  *
  * DUBBELPUBLICERING ÄR DET SOM SKA UNDVIKAS. Ligger samma butikssida på två värdnamn räknar Google
@@ -382,6 +402,7 @@ const FLYTTAT = ["/butik", "/efterlyses", "/sitemap.xml", "/robots.txt"];
 export function flyttadAdress(host: string | null, pathname: string, search: string): string | null {
   const kanonisk = kanoniskVard();
   if (!kanonisk || !host) return null;
+  if (!arPublikVard(host)) return null;
   if (host.toLowerCase() === kanonisk.toLowerCase()) return null;
   if (!FLYTTAT.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
   return `${baseUrl()}${pathname}${search}`;
