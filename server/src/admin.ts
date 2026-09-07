@@ -17,7 +17,7 @@ import type { ConditionJob } from "./types.js";
 const BUILT_IN_ADMINS = ["victor@ruiz.se"];
 
 /** Läses ur miljön vid varje anrop: modulen importeras innan server.ts hunnit läsa server/.env. */
-function adminEmails(): string[] {
+export function adminEmails(): string[] {
   const extra = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase())

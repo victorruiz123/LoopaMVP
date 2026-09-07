@@ -42,6 +42,7 @@ export const COMMON: Record<string, Translation> = {
   // ---- listor och kort som går igen ----
   "Sparade annonser": { en: "Saved listings", fr: "Annonces enregistrées" },
   "Till salu": { en: "For sale", fr: "En vente" },
+  "Granskas av Loopa": { en: "Under review", fr: "En cours de vérification" },
   "Läggs ut…": { en: "Publishing…", fr: "Mise en ligne…" },
   "Kunde inte läggas ut": { en: "Could not be published", fr: "Publication impossible" },
   "{antal} st": { en: "{antal} listings", fr: "{antal} annonces" },

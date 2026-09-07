@@ -495,6 +495,7 @@ body {
   background: var(--green-light); color: var(--green-dark);
   font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
 }
+.card-row-sale-pending { background: #FBEEDC; color: #A9722A; }
 .card-row-sale-publishing { background: var(--accent-light); color: var(--accent); }
 .card-row-sale-error { background: var(--danger-light); color: var(--danger-dark); }
 .card-row-chevron { display: flex; color: var(--muted-soft); flex-shrink: 0; }
@@ -2408,12 +2409,20 @@ body {
   background: var(--field); color: var(--muted);
   font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
 }
+.annons-lage-vantar { background: #FBEEDC; color: #A9722A; }
 .annons-lage-live { background: #E4F1E8; color: #2F7A50; }
 .annons-lage-reserverad { background: #FBEEDC; color: #A9722A; }
 .annons-lage-sald, .annons-lage-levererad { background: var(--accent-light); color: var(--accent); }
 .annons-lage-misslyckad, .annons-lage-returnerad { background: #F7E1DE; color: #96271C; }
 
 .annons-topp { display: flex; gap: 14px; align-items: flex-start; margin-top: 4px; }
+
+/* Kön: den enda rutan på sidan där någon annan väntar på ett tryck. Därför en egen ram i köns färg. */
+.annons-godkann { margin-top: 16px; border: 1.5px solid #E7C89A; background: #FFF8EE; }
+.annons-godkann .profile-section-title { margin-top: 0; }
+.annons-godkann .btn-primary { margin-top: 10px; }
+.admin-stat-knapp { cursor: pointer; font: inherit; text-align: inherit; border: 1.5px solid transparent; }
+.admin-stat-knapp.aktiv { border-color: #A9722A; background: #FBEEDC; }
 .annons-topp h1 { margin: 0 0 2px; }
 .annons-kvitto {
   margin: 0; padding: 10px 12px; border-radius: var(--r-sm);

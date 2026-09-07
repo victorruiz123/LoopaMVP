@@ -18,6 +18,7 @@ import type { AdminAnnonsRad, AdminAnnonser, AnnonsLage } from "../types";
  * utan att säljas, vad har många sett men ingen klickat på, var har priset vandrat längst ner.
  */
 const LAGE_ETIKETT: Record<AnnonsLage, string> = {
+  vantar: "Väntar på godkännande",
   live: "Ligger uppe",
   reserverad: "Reserverad",
   sald: "Såld",
@@ -87,7 +88,14 @@ export default function AdminAdsScreen({
       case "dyrast":
         return kopia.sort((a, b) => (b.prisNu ?? 0) - (a.prisNu ?? 0));
       default:
-        return kopia.sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
+        // Kön överst, äldst väntande först: det är den raden någon ska trycka på nu. Resten nyast först.
+        return kopia.sort((a, b) => {
+          const av = a.lage === "vantar" ? 1 : 0;
+          const bv = b.lage === "vantar" ? 1 : 0;
+          if (av !== bv) return bv - av;
+          if (av && a.begardAt && b.begardAt) return a.begardAt < b.begardAt ? -1 : 1;
+          return a.createdAt < b.createdAt ? 1 : -1;
+        });
     }
   }, [data, fraga, lage, sortering]);
 
@@ -114,6 +122,15 @@ export default function AdminAdsScreen({
           <div className="profile-stat-value">{s?.antal ?? "—"}</div>
           <div className="profile-stat-label">Totalt</div>
         </div>
+        <button
+          type="button"
+          className={`profile-stat admin-stat-knapp${lage === "vantar" ? " aktiv" : ""}`}
+          onClick={() => setLage(lage === "vantar" ? "alla" : "vantar")}
+          title="Visa bara det som väntar på godkännande"
+        >
+          <div className="profile-stat-value">{s?.vantar ?? "—"}</div>
+          <div className="profile-stat-label">Att godkänna</div>
+        </button>
         <div className="profile-stat">
           <div className="profile-stat-value">{s?.live ?? "—"}</div>
           <div className="profile-stat-label">Ligger uppe</div>

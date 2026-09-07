@@ -504,14 +504,26 @@ export interface PriceLadder {
  * `tradera` har aldrig publicerats och ska inte se ut som ett misslyckat försök.
  */
 export interface TraderaPublication {
-  status: "publishing" | "published" | "error";
+  /**
+   * `pending` är det första läget: säljaren har tryckt "Sälj med Loopa", och annonsen ligger i
+   * adminpanelens kö tills en admin godkänner den. Först då går den ut — i Butiken och på Tradera i
+   * samma tryck. Ingenting publiceras på säljarens eget tryck längre.
+   */
+  status: "pending" | "publishing" | "published" | "error";
   /** Traderas kö-id. Finns bara i loggen och i felsökning — annonsen adresseras med itemId. */
   requestId: number | null;
   itemId: number | null;
   url: string | null;
   error: string | null;
+  /** När säljaren tryckte. Kön i panelen sorteras på den. */
   startedAt: string;
   publishedAt: string | null;
+  /**
+   * Godkännandet. Sätts av panelen och står kvar genom publiceringen — det är det som säger att
+   * möbeln FÅR ligga i butiken, oavsett om Tradera sedan tog emot annonsen eller inte.
+   */
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 export interface ConditionJob {

@@ -98,6 +98,7 @@ export default function ProfileScreen({
     (j) =>
       j.sale?.status === "published" ||
       j.sale?.status === "publishing" ||
+      j.sale?.status === "pending" ||
       j.shop?.state === "live" ||
       j.shop?.state === "reserved",
   );
@@ -284,6 +285,7 @@ const SHOP_LABEL: Partial<Record<NonNullable<JobSummary["shop"]>["state"], strin
 };
 
 const SALE_LABEL = {
+  pending: "Granskas av Loopa",
   publishing: "Läggs ut…",
   published: "Till salu",
   error: "Kunde inte läggas ut",

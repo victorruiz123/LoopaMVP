@@ -225,20 +225,55 @@ function explainFailure(message: string): string {
   return message;
 }
 
-/** Markerar jobbet som "publicerar" innan bakgrundsarbetet startar, så knappen kan låsas direkt. */
-export async function markTraderaPublishing(job: ConditionJob): Promise<TraderaPublication> {
+/**
+ * Säljarens tryck på "Sälj med Loopa". Annonsen ställs i kö — den går inte ut förrän en admin godkänt
+ * den i panelen (adminAnnonser.ts, `lage: "godkann"`). Ett nytt tryck efter ett avslag från Tradera
+ * ställer den i kön igen; ett tryck medan den redan står där ändrar ingenting.
+ */
+export async function markTraderaPending(job: ConditionJob): Promise<TraderaPublication> {
   const publication: TraderaPublication = {
-    status: "publishing",
+    status: "pending",
     requestId: null,
     itemId: null,
     url: null,
     error: null,
     startedAt: new Date().toISOString(),
     publishedAt: null,
+    approvedAt: null,
+    approvedBy: null,
   };
   job.tradera = publication;
   await persist(job);
   return publication;
+}
+
+/** Godkänd av en admin. Sätts i samma skrivning som publiceringen startar, så stämpeln inte kan tappas. */
+export async function markTraderaPublishing(job: ConditionJob, approvedBy: string | null = null): Promise<TraderaPublication> {
+  const publication: TraderaPublication = {
+    status: "publishing",
+    requestId: null,
+    itemId: null,
+    url: null,
+    error: null,
+    // Tiden säljaren tryckte står kvar: det är kötiden panelen mäter, inte klockslaget för godkännandet.
+    startedAt: job.tradera?.startedAt ?? new Date().toISOString(),
+    publishedAt: null,
+    approvedAt: job.tradera?.approvedAt ?? new Date().toISOString(),
+    approvedBy: job.tradera?.approvedBy ?? approvedBy,
+  };
+  job.tradera = publication;
+  await persist(job);
+  return publication;
+}
+
+/**
+ * Får möbeln ligga i butiken? Ja så fort en admin godkänt den — Traderas svar ändrar inte på det.
+ * Äldre jobb, publicerade innan godkännandesteget fanns, räknas som godkända av att de ligger uppe.
+ */
+export function godkand(job: ConditionJob): boolean {
+  const t = job.tradera;
+  if (!t) return false;
+  return !!t.approvedAt || t.status === "published";
 }
 
 async function update(

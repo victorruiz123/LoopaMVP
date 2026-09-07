@@ -396,13 +396,16 @@ export interface PriceLadder {
  * samma sak som ett misslyckat försök, och knappen ska se olika ut i de två fallen.
  */
 export interface TraderaPublication {
-  status: "publishing" | "published" | "error";
+  /** `pending` = säljaren har tryckt, Loopa har inte godkänt än. Ingenting ligger ute. */
+  status: "pending" | "publishing" | "published" | "error";
   requestId: number | null;
   itemId: number | null;
   url: string | null;
   error: string | null;
   startedAt: string;
   publishedAt: string | null;
+  approvedAt?: string | null;
+  approvedBy?: string | null;
 }
 
 /** Vad som KOMMER att publiceras. Visas i bekräftelsesteget så säljaren ser det innan de trycker. */
@@ -488,7 +491,7 @@ export interface ConditionJob {
  * säljs just nu, och den skillnaden är hela skälet till att raden finns i profilen.
  */
 export interface JobSale {
-  status: "publishing" | "published" | "error";
+  status: "pending" | "publishing" | "published" | "error";
   /** Annonsen hos marknadsplatsen. Finns först när den gått upp. */
   url: string | null;
 }
@@ -597,6 +600,7 @@ export type AnnonsLage =
   | "pagaende"
   | "utan-annons"
   | "utkast"
+  | "vantar"
   | "live"
   | "reserverad"
   | "sald"
@@ -630,8 +634,10 @@ export interface AdminAnnonsRad {
   soldAt: string | null;
   soldChannel: "butik" | "tradera" | null;
   dagarUppe: number | null;
-  traderaStatus: "publishing" | "published" | "error" | null;
+  traderaStatus: "pending" | "publishing" | "published" | "error" | null;
   traderaItemId: number | null;
+  /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. */
+  begardAt: string | null;
   statistik: AnnonsStatistik;
   /** Klick delat med visningar + listvisningar. Null när ingen sett annonsen. */
   ctr: number | null;
@@ -699,6 +705,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   overstyrning: AnnonsOverstyrning | null;
   annonstext: { title: string; description: string; conditionText: string } | null;
   ladder: PriceLadder | null;
+  /** Publiceringen mot Tradera i sin helhet: länken, felet, vem som godkände. */
+  tradera: TraderaPublication | null;
   handelser: AnnonsHandelse[];
   matningar: AnnonsMatning[];
   ordrarRader: Array<{
@@ -718,6 +726,7 @@ export interface AdminAnnonser {
   rader: AdminAnnonsRad[];
   summering: {
     antal: number;
+    vantar: number;
     live: number;
     salda: number;
     utanAnnons: number;
@@ -733,7 +742,8 @@ export interface AnnonsAndring {
   falt?: Record<string, string | number | null>;
   prisNu?: number;
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
-  lage?: "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
+  /** `godkann` lägger ut möbeln i Butiken OCH på Tradera. `publicera` är bara butiken. */
+  lage?: "godkann" | "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
   kanal?: "butik" | "tradera";
   /** Kastar alla rättelser. Skilt från att sätta fälten till null — se server/src/adminAnnonser.ts. */
   aterstall?: boolean;

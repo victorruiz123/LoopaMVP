@@ -158,6 +158,46 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
 
       <PrisForm annons={annons} sparar={sparar} skicka={skicka} />
 
+      {/* ---------------- Godkännandet ---------------- */}
+      {/*
+        Kön. Säljaren har tryckt "Sälj med Loopa" och väntar på oss. Knappen gör båda kanalerna i ett
+        tryck — butiken direkt, Tradera i bakgrunden — och står överst i sin egen ruta: det är den
+        enda åtgärden på sidan som någon annan väntar på.
+      */}
+      {(annons.traderaStatus === "pending" || annons.traderaStatus === "error") && (
+        <section className="card-block annons-godkann">
+          <h2 className="profile-section-title">
+            {annons.traderaStatus === "pending" ? "Väntar på godkännande" : "Tradera avvisade annonsen"}
+          </h2>
+          <p className="admin-note">
+            {annons.traderaStatus === "pending"
+              ? `Säljaren tryckte "Sälj med Loopa" ${datum(annons.begardAt)}. Godkänn så går möbeln upp i butiken och på Tradera i samma tryck.`
+              : `Godkänd ${datum(annons.tradera?.approvedAt ?? null)}, men Tradera sa nej: ${annons.tradera?.error ?? "okänt fel"}. Möbeln ligger kvar i butiken. Rätta och försök igen.`}
+          </p>
+          {annons.saknas.length > 0 && (
+            <p className="public-card-error">Kan inte godkännas än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
+          )}
+          <button
+            className="btn btn-primary"
+            disabled={sparar || annons.saknas.length > 0}
+            onClick={() => skicka({ lage: "godkann" }, "Godkänd. Möbeln ligger i butiken; Tradera köar annonsen, det tar oftast under en minut.")}
+          >
+            {annons.traderaStatus === "pending" ? "Godkänn och lägg ut" : "Försök Tradera igen"}
+          </button>
+        </section>
+      )}
+      {annons.traderaStatus === "publishing" && (
+        <p className="admin-note">Tradera köar annonsen just nu. Ladda om sidan om en minut.</p>
+      )}
+      {annons.traderaStatus === "published" && annons.tradera?.url && (
+        <p className="admin-note">
+          Ligger på Tradera sedan {datum(annons.tradera.publishedAt)}:{" "}
+          <a href={annons.tradera.url} target="_blank" rel="noreferrer">
+            {annons.tradera.url}
+          </a>
+        </p>
+      )}
+
       {/* ---------------- Läget ---------------- */}
       <h2 className="profile-section-title">Läge</h2>
       <div className="annons-knappar">

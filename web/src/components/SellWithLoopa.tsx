@@ -52,6 +52,10 @@ export default function SellWithLoopa({
       setState(next);
       if (next.publication?.status === "publishing") {
         timer.current = window.setTimeout(refresh, 2500);
+      } else if (next.publication?.status === "pending") {
+        // Granskningen görs av en människa och tar minuter till timmar. Sällan nog att inte belasta,
+        // ofta nog att kvittot byts mot länken utan att säljaren behöver ladda om.
+        timer.current = window.setTimeout(refresh, 30_000);
       }
     } catch {
       timer.current = window.setTimeout(refresh, 4000);
@@ -101,6 +105,39 @@ export default function SellWithLoopa({
         </a>
         {/* Kvittot gäller EN möbel. Frågan som kommer efter det — vad har jag ute nu? — besvaras i
             profilen, där den här annonsen just lagt sig överst under "Till salu". */}
+        {onMyListings && (
+          <button className="btn btn-text sell-mine" onClick={onMyListings}>
+            {t("Till dina annonser")}
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  if (publication?.status === "pending") {
+    return (
+      <section className="card-block sell-block sell-done">
+        <h3>{t("Annonsen granskas av Loopa")}</h3>
+        <p className="muted small">
+          {t(
+            "Vi tittar igenom annonsen innan den läggs ut, oftast samma dag. Sedan går den upp i Loopas butik och på Tradera, och vi hör av oss så fort möbeln är såld. Du behöver inte göra något mer.",
+          )}
+        </p>
+        {/* Inte LadderStatus: den säger "ligger på", och inget ligger ute än. Stegen börjar räkna
+            när annonsen gått upp, så här står bara spannet säljaren valde. */}
+        {ladderDrops(state.ladder) > 0 && plan && (
+          <p className="muted small">
+            {t(
+              "Annonspriset börjar på {start} och sänks {andel} % i veckan ner till {golv}, där det stannar. De {frakt} för hemleveransen ligger kvar oförändrade hela vägen.",
+              {
+                start: formatSek(state.ladder!.startPrice + plan.shippingSek),
+                andel: Math.round(state.ladder!.weeklyDropPct * 100),
+                golv: formatSek(state.ladder!.floorPrice + plan.shippingSek),
+                frakt: formatSek(plan.shippingSek),
+              },
+            )}
+          </p>
+        )}
         {onMyListings && (
           <button className="btn btn-text sell-mine" onClick={onMyListings}>
             {t("Till dina annonser")}

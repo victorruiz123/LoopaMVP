@@ -21,6 +21,7 @@ import { fold, MOBELTYPER, resolveTypeSlug } from "./catalog.js";
 import { notify, takePendingNotifications } from "./bevakningar.js";
 import { BROWSABLE_STATES, type BrowseResult, type Product, type ProductFilter, type SortKey } from "./types.js";
 import { rankScore } from "./rank.js";
+import { godkand } from "../integrations/tradera/publish.js";
 
 /** Hur länge indexet får vara gammalt. Kort — en säljare som publicerar ska se sin möbel i butiken. */
 const INDEX_TTL_MS = Number(process.env.BUTIK_INDEX_TTL_MS ?? 30_000);
@@ -116,7 +117,9 @@ export async function syncFromJobs(): Promise<{ enrolled: number; published: num
       enrolled += 1;
     }
     const current = records.get(loopaId) ?? (await store().get(loopaId));
-    if (job.tradera?.status === "published" && current?.state === "draft") {
+    // Godkänd i panelen, inte publicerad på Tradera: butiken är Loopas egen kanal och väntar inte
+    // på en annans kö. Se `godkand` i integrations/tradera/publish.ts.
+    if (godkand(job) && current?.state === "draft") {
       /**
        * Förturen grindar publiceringen — men kan aldrig stoppa den.
        *

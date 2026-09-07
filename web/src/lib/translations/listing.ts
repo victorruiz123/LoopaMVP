@@ -89,6 +89,11 @@ export const LISTING: Record<string, Translation> = {
     fr: "Loopa prend la vente en charge à partir d'ici. Vous serez prévenu dès que le meuble est vendu — vous n'avez plus rien à faire. L'annonce est en ligne sur Tradera, sur le compte de Loopa.",
   },
   "Till dina annonser": { en: "To your listings", fr: "Vers vos annonces" },
+  "Annonsen granskas av Loopa": { en: "Loopa is reviewing your ad", fr: "Loopa vérifie votre annonce" },
+  "Vi tittar igenom annonsen innan den läggs ut, oftast samma dag. Sedan går den upp i Loopas butik och på Tradera, och vi hör av oss så fort möbeln är såld. Du behöver inte göra något mer.": {
+    en: "We look through the ad before it goes live, usually the same day. It then goes up in Loopa's shop and on Tradera, and we'll be in touch as soon as the piece sells. Nothing more for you to do.",
+    fr: "Nous relisons l'annonce avant sa mise en ligne, généralement le jour même. Elle est ensuite publiée dans la boutique Loopa et sur Tradera, et nous vous prévenons dès que le meuble est vendu. Vous n'avez plus rien à faire.",
+  },
   "Lägger ut möbeln till salu…": { en: "Putting the furniture up for sale…", fr: "Mise en vente du meuble…" },
   "Annonsen köas och bilderna laddas upp. Det tar oftast under en minut.": {
     en: "The ad is queued and the photos are uploading. It usually takes under a minute.",

@@ -40,11 +40,13 @@ import { allOrders, ordersForProduct, type Order } from "./butik/orders.js";
 import * as overrides from "./butik/overrides.js";
 import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
 import { makePriceLadder, nextRung } from "./priceLadder.js";
-import type { ConditionJob, PriceLadder } from "./types.js";
+import type { ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
+import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
+import { traderaConfigured, missingTraderaEnv } from "./integrations/tradera/tradera.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
-export type AnnonsLage = "misslyckad" | "pagaende" | "utan-annons" | "utkast" | "live" | "reserverad" | "sald" | "levererad" | "returnerad";
+export type AnnonsLage = "misslyckad" | "pagaende" | "utan-annons" | "utkast" | "vantar" | "live" | "reserverad" | "sald" | "levererad" | "returnerad";
 
 export interface AdminAnnonsRad {
   /** Loopa-ID:t. Adressen möbeln har utåt, och nyckeln allt annat slås upp på. */
@@ -89,8 +91,10 @@ export interface AdminAnnonsRad {
   dagarUppe: number | null;
 
   // --- kanaler ---
-  traderaStatus: "publishing" | "published" | "error" | null;
+  traderaStatus: TraderaPublication["status"] | null;
   traderaItemId: number | null;
+  /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. Kön sorteras på den. */
+  begardAt: string | null;
 
   // --- mätning ---
   statistik: AnnonsStatistik;
@@ -107,6 +111,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   overstyrning: overrides.Overstyrning | null;
   annonstext: { title: string; description: string; conditionText: string } | null;
   ladder: PriceLadder | null;
+  /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
+  tradera: TraderaPublication | null;
   /** Butikens huvudbok för möbeln: varje övergång, med vem och varför. */
   handelser: ProductEvent[];
   /** Mätningens råa rader, nyast först. */
@@ -132,15 +138,18 @@ function listingOf(job: ConditionJob) {
  * det säger jobbet var i pipelinen det står, och de tre lägena före butiken är just de som annars är
  * osynliga: föll, kör fortfarande, eller blev aldrig en annons.
  */
-function lageAv(job: ConditionJob, record: ButikRecord | undefined): AnnonsLage {
+export function lageAv(job: ConditionJob, record: ButikRecord | undefined): AnnonsLage {
   if (record) {
     if (record.state === "live") return "live";
     if (record.state === "reserved") return "reserverad";
     if (record.state === "sold") return "sald";
     if (record.state === "delivered") return "levererad";
     if (record.state === "returned") return "returnerad";
-    return "utkast";
   }
+  // Säljaren har tryckt "Sälj med Loopa" och ingen har svarat än. Går före utkastet: en möbel som
+  // redan finns som utkast i lagret men står i kön är i första hand något som väntar på oss.
+  if (job.tradera?.status === "pending") return "vantar";
+  if (record) return "utkast";
   if (job.error) return "misslyckad";
   if (!job.result) return "pagaende";
   return "utan-annons";
@@ -220,6 +229,7 @@ function radAv(
 
     traderaStatus: job.tradera?.status ?? null,
     traderaItemId: job.tradera?.itemId ?? null,
+    begardAt: job.tradera?.startedAt ?? null,
 
     statistik,
     ctr: ctrAv(statistik),
@@ -271,6 +281,8 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
 
 export interface Summering {
   antal: number;
+  /** Väntar på godkännande. Det tal panelen finns för att få ner till noll. */
+  vantar: number;
   live: number;
   salda: number;
   utanAnnons: number;
@@ -287,6 +299,7 @@ function summera(rader: AdminAnnonsRad[]): Summering {
   const dagar = salda.map((r) => r.dagarUppe).filter((d): d is number => d !== null).sort((a, b) => a - b);
   return {
     antal: rader.length,
+    vantar: rader.filter((r) => r.lage === "vantar").length,
     live: rader.filter((r) => r.lage === "live").length,
     salda: salda.length,
     utanAnnons: rader.filter((r) => r.lage === "utan-annons" || r.lage === "misslyckad").length,
@@ -321,6 +334,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     overstyrning: overstyrning ?? null,
     annonstext: overrides.annonstext(job, overstyrning),
     ladder: job.priceLadder ?? null,
+    tradera: job.tradera ?? null,
     handelser: await butikStore().events(id),
     matningar: await handelserFor(id),
     ordrarRader,
@@ -346,8 +360,13 @@ export interface AndringsPatch {
   prisNu?: number;
   /** Nytt spann för prisstegen. Startpris och golv måste följas åt — se makePriceLadder. */
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
-  /** Tillståndsbyte: publicera, ta ner, markera såld, levererad, returnerad, släpp reservation. */
-  lage?: "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
+  /**
+   * Tillståndsbyte: godkänn, publicera, ta ner, markera såld, levererad, returnerad, släpp reservation.
+   *
+   * `godkann` är kö-knappen: möbeln går ut i Butiken OCH på Tradera i samma tryck. `publicera` är
+   * bara butiken, för möbler som aldrig beställts till Tradera.
+   */
+  lage?: "godkann" | "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
   /** Kanalen försäljningen skedde i. Bara meningsfull tillsammans med lage: "sald". */
   kanal?: "butik" | "tradera";
   /**
@@ -486,6 +505,8 @@ async function bytLage(
    * Utan det kan panelen inte publicera det som `syncFromJobs` hoppat över — och det är just de
    * annonserna man öppnar panelen för att göra något åt.
    */
+  if (lage === "godkann") return godkann(id, job, adminId);
+
   if (lage === "publicera") {
     const produkt = jobToProduct(job, "draft");
     const rattat = produkt ? overrides.tillampaPaProdukt(produkt, await overrides.hamta(id)) : null;
@@ -513,6 +534,59 @@ async function bytLage(
       nu ? `Går inte att göra det från läget "${nu.state}".` : "Möbeln finns inte i butikslagret.",
     );
   }
+}
+
+/**
+ * Godkännandet: det säljaren beställde med "Sälj med Loopa", verkställt av en admin.
+ *
+ * Två kanaler i samma tryck, i den här ordningen:
+ *
+ *   1. Butiken. Posten skapas om den saknas och går till `live` genom tillståndsmaskinen — samma väg
+ *      som `publicera`. Det sker synkront; när svaret kommer ligger möbeln i rutnätet. Bara en förtur
+ *      (efterlysning/fortur.ts) håller den kvar som utkast, och då publicerar `syncFromJobs` den när
+ *      förturen gått ut — den läser `godkand()`, inte Traderas svar.
+ *   2. Tradera. Köas i bakgrunden precis som förut; panelen läser `tradera.status` för utfallet. Ett
+ *      avslag från Tradera tar INTE ner möbeln ur butiken: godkännandet är Loopas beslut, och det
+ *      står. Admin ser felet på annonsen och kan trycka igen.
+ *
+ * Ett andra tryck medan Tradera arbetar avvisas; ett tryck efter ett Tradera-fel är just det
+ * omförsöket som behövs.
+ */
+async function godkann(id: string, job: ConditionJob, adminId: string | null): Promise<void> {
+  const status = job.tradera?.status;
+  if (status === "publishing") throw new AndringsFel("Annonsen är redan på väg upp på Tradera.");
+  if (status === "published") throw new AndringsFel("Annonsen ligger redan uppe på Tradera.");
+  if (status !== "pending" && status !== "error") {
+    throw new AndringsFel("Säljaren har inte tryckt \"Sälj med Loopa\" på den här annonsen.");
+  }
+  if (!traderaConfigured()) {
+    throw new AndringsFel(`Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`);
+  }
+
+  // Samma krav som säljarens knapp ställde — underlaget kan ha ändrats sedan dess.
+  const readiness = await planTraderaPublish(job);
+  if (!readiness.ok) throw new AndringsFel(readiness.reason);
+
+  const produkt = jobToProduct(job, "draft");
+  const rattat = produkt ? overrides.tillampaPaProdukt(produkt, await overrides.hamta(id)) : null;
+  if (!rattat) throw new AndringsFel("Jobbet går inte att visa som en vara — det saknar besiktning eller betyg.");
+  const brist = shopReadiness(rattat);
+  if (!brist.ready) throw new AndringsFel(`Annonsen saknar ${brist.missing.join(", ")}.`);
+
+  // Stämpeln först. Skulle Tradera-steget falla är möbeln ändå godkänd, och butiken vet det.
+  await markTraderaPublishing(job, adminId);
+
+  await ensureRecord(id, job.id, "loopa", rattat.listedAt);
+  const { publishBlocked } = await import("./efterlysning/fortur.js");
+  const holl = await publishBlocked(id).catch(() => false);
+  if (!holl) {
+    // Null = redan live (eller i en affär). Det är inget fel: godkännandet gäller ändå.
+    await publish(id, { kind: "admin", userId: adminId });
+  } else {
+    console.info(`[butik] ${id} godkänd men hålls av en förtur — publiceras när den gått ut.`);
+  }
+
+  void runTraderaPublish(job.id);
 }
 
 /** Nästa steg ner, för förhandsvisningen i panelen. Ren funktion — samma som stegen själv använder. */

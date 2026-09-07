@@ -15,7 +15,7 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
-import { listAccounts } from "./admin.js";
+import { adminEmails, listAccounts } from "./admin.js";
 import { identityFromRequest, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
 import { estimatePrice, repriceResult } from "./pricing.js";
 import { finalizeWithModel, findMoreCandidates, runIdentify } from "./pipeline/identify.js";
@@ -26,7 +26,7 @@ import { loadImageAsBase64 } from "./imageUtils.js";
 import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
-import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
+import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
 import { blocketAdFor } from "./integrations/blocket.js";
 import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
@@ -331,11 +331,15 @@ async function handleGetTradera(jobId: string, res: ServerResponse) {
 }
 
 /**
- * Startar publiceringen och svarar direkt.
+ * Säljarens tryck på "Sälj med Loopa": annonsen ställs i kö för granskning.
  *
- * Tradera KÖAR annonsen — publiceringen tar 10–60 s och kan inte hållas i ett HTTP-svar. Jobbet
- * markeras som "publicerar" innan bakgrundsarbetet startar, så en andra tryckning inte kan lägga upp
- * samma möbel två gånger, och klienten pollar GET på samma väg.
+ * Ingenting publiceras här. Annonsen dyker upp i adminpanelen (victor@ruiz.se) som "väntar", och
+ * det är admins knapp där som lägger ut den — i Butiken och på Tradera i samma tryck. Se
+ * adminAnnonser.ts. Svaret är samma `traderaState` som klienten redan pollar, så knappen låses
+ * direkt och visar "granskas".
+ *
+ * Kravet att Tradera är konfigurerat står kvar: det är fortfarande en Tradera-annons som beställs,
+ * och en kö som inte kan tömmas hade varit värre än en gömd knapp.
  */
 async function handlePublishTradera(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
@@ -347,17 +351,42 @@ async function handlePublishTradera(jobId: string, res: ServerResponse) {
       ...(await traderaState(job)),
     });
   }
-  if (job.tradera?.status === "publishing") return sendJson(res, 202, await traderaState(job));
-  if (job.tradera?.status === "published") {
+  const status = job.tradera?.status;
+  if (status === "pending" || status === "publishing") return sendJson(res, 202, await traderaState(job));
+  if (status === "published") {
     return sendJson(res, 409, { error: "Annonsen är redan publicerad på Tradera.", ...(await traderaState(job)) });
   }
 
   const readiness = await planTraderaPublish(job);
   if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...(await traderaState(job)) });
 
-  await markTraderaPublishing(job);
-  void runTraderaPublish(job.id);
+  await markTraderaPending(job);
+  console.info(`[tradera] job ${jobId} väntar på godkännande — ${readiness.plan.loopaId} "${readiness.plan.title}"`);
+  void notifyAdminsOfPending(readiness.plan.loopaId, readiness.plan.title, readiness.plan.price);
   sendJson(res, 202, await traderaState(job));
+}
+
+/**
+ * Ett brev till adminadresserna om att kön fått en ny annons. Går genom samma utskick som
+ * efterlysningarna (notify/outbox.ts), så det hamnar där de andra breven hamnar. Får aldrig fälla
+ * svaret till säljaren — kön syns i panelen oavsett.
+ */
+async function notifyAdminsOfPending(loopaId: string, title: string, price: number): Promise<void> {
+  try {
+    const { sendLetter } = await import("./efterlysning/notify.js");
+    const base = (process.env.LOOPA_PUBLIC_URL ?? "").replace(/\/$/, "");
+    const body = [
+      `${title} (${loopaId}) väntar på godkännande. Pris till köpare: ${price} kr.`,
+      "",
+      `Öppna adminpanelen${base ? `: ${base}/admin` : ""} och tryck "Godkänn och lägg ut" så går den`,
+      "upp i Butiken och på Tradera.",
+    ].join("\n");
+    for (const to of adminEmails()) {
+      await sendLetter({ to, subject: `Ny annons att godkänna: ${title}`, body, kind: "granskning" });
+    }
+  } catch (err) {
+    console.warn(`[tradera] kunde inte avisera admin om ${loopaId}:`, err instanceof Error ? err.message : err);
+  }
 }
 
 // ---- Blocket: annonsen färdig att föra över för hand ----------------------
