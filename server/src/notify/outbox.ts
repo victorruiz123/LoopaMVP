@@ -71,10 +71,36 @@ const noneSender: Sender = {
   },
 };
 
+/**
+ * gmail  skickar på riktigt, genom Gmails SMTP med samma konto och applösenord som Tradera-posten
+ *        läser inkorgen med (GMAIL_USER / GMAIL_APP_PASSWORD). Avsändaren blir kontot självt.
+ *        Det är den första riktiga leverantören, och den valdes för att kontot redan fanns — inte
+ *        som ett beslut om hur Loopa ska skicka brev i stor skala. Gmail tillåter några hundra
+ *        brev om dagen, vilket räcker för adminens egna notiser.
+ */
+const gmailSender: Sender = {
+  name: "gmail",
+  async send(letter) {
+    const user = process.env.GMAIL_USER?.trim();
+    const pass = process.env.GMAIL_APP_PASSWORD?.trim();
+    if (!user || !pass) throw new Error("EMAIL_PROVIDER=gmail kräver GMAIL_USER och GMAIL_APP_PASSWORD.");
+    const { createTransport } = await import("nodemailer");
+    const transport = createTransport({ host: "smtp.gmail.com", port: 465, secure: true, auth: { user, pass } });
+    await transport.sendMail({
+      from: `Loopa <${user}>`,
+      to: letter.to,
+      subject: letter.subject,
+      text: letter.body,
+      headers: { "X-Loopa-Kind": letter.kind },
+    });
+  },
+};
+
 export function sender(): Sender {
   const choice = (process.env.EMAIL_PROVIDER ?? "file").trim().toLowerCase();
   if (choice === "none") return noneSender;
   if (choice === "file") return fileSender;
+  if (choice === "gmail") return gmailSender;
   /**
    * En okänd leverantör faller till `file` och SÄGER det.
    *

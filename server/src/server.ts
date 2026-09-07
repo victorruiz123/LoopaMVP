@@ -44,6 +44,7 @@ import { store as affarStore } from "./affar/store.js";
 import { attachScan } from "./affar/scan.js";
 import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
+import { startTraderaMailWatch } from "./integrations/tradera/mailwatch.js";
 import { bearerToken } from "./supabaseAuth.js";
 import { avtryck, KLIENTHANDELSER, spara } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
@@ -1215,6 +1216,28 @@ const server = http.createServer(async (req, res) => {
           }
         }
         /**
+         * Tradera-posten: det Gmail-bevakaren sett — sålda varor, frågor, bud — och vad den gjorde.
+         *
+         * `hamta` kör en läsning NU i stället för att vänta på halvtimmestimern; svaret är samma
+         * räkning som loggen får. Kryssrutan är panelens egen: mejlet i Gmail rörs aldrig.
+         */
+        if (segments[2] === "tradera-post" && segments.length === 3 && req.method === "GET") {
+          const { listTraderaPost } = await import("./integrations/tradera/mailwatch.js");
+          return sendJson(res, 200, await listTraderaPost());
+        }
+        if (segments[2] === "tradera-post" && segments[3] === "hamta" && segments.length === 4 && req.method === "POST") {
+          const { pollTraderaMail, listTraderaPost } = await import("./integrations/tradera/mailwatch.js");
+          const resultat = await pollTraderaMail();
+          return sendJson(res, resultat.error ? 502 : 200, { resultat, ...(await listTraderaPost()) });
+        }
+        if (segments[2] === "tradera-post" && segments.length === 4 && req.method === "PATCH") {
+          const { markTraderaPostHandled } = await import("./integrations/tradera/mailwatch.js");
+          const body = await readJsonBody<{ hanterad?: boolean }>(req, 4 * 1024);
+          const post = await markTraderaPostHandled(segments[3], body.hanterad !== false);
+          if (!post) return sendJson(res, 404, { error: "Posten finns inte." });
+          return sendJson(res, 200, post);
+        }
+        /**
          * Efterfrågepanelen: öppen efterfrågan per kategori, märke och prisband.
          *
          * Styr intaget och annonsutkasten. Rankad på OMÄTTAD efterfrågan — de som väntat utan att vi
@@ -1450,6 +1473,10 @@ void syncFromJobs().then(({ enrolled, published, withdrawn }) => {
 
 // Släpper reservationer som gått ut. Utan den låser en avbruten utcheckning möbeln för alltid.
 startButikSweeper();
+
+// Tradera-posten: Gmail läses var halvtimme, sålda möbler blir sålda i butiken, frågor når panelen
+// och adminadressen. Av av sig själv tills GMAIL_USER/GMAIL_APP_PASSWORD finns i server/.env.
+startTraderaMailWatch();
 
 /**
  * Efterlysningarna: migrering en gång, sedan sveparen.

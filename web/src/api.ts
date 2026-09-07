@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -298,6 +298,26 @@ export async function patchAnnons(loopaId: string, andring: AnnonsAndring): Prom
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(andring),
+    }),
+  );
+}
+
+/** Tradera-posten: det Gmail-bevakaren sett, nyast först, med bevakarens läge. */
+export async function listTraderaPost(): Promise<TraderaPosten> {
+  return json(await authFetch("/api/admin/tradera-post"));
+}
+
+/** Läser Gmail nu i stället för att vänta på timern. Svaret är hela posten igen plus räkningen. */
+export async function hamtaTraderaPost(): Promise<TraderaPosten> {
+  return json(await authFetch("/api/admin/tradera-post/hamta", { method: "POST" }));
+}
+
+export async function markeraTraderaPost(id: string, hanterad: boolean): Promise<TraderaPost> {
+  return json(
+    await authFetch(`/api/admin/tradera-post/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hanterad }),
     }),
   );
 }

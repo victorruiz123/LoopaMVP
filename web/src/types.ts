@@ -751,6 +751,46 @@ export interface AnnonsAndring {
   aterstallFalt?: string[];
 }
 
+// ---- Tradera-posten (GET /api/admin/tradera-post) ----
+
+export type TraderaPostKind = "sald" | "fraga" | "bud" | "ovrigt";
+
+/** Ett Tradera-mejl som bevakaren läst, och vad den gjorde. Se server/src/integrations/tradera/mailwatch.ts. */
+export interface TraderaPost {
+  id: string;
+  kind: TraderaPostKind;
+  subject: string;
+  receivedAt: string;
+  itemId: number | null;
+  title: string | null;
+  amountSek: number | null;
+  alias: string | null;
+  excerpt: string;
+  url: string | null;
+  loopaId: string | null;
+  outcome: "sald" | "redan-sald" | "okand-annons" | "noterad";
+  outcomeNote: string | null;
+  handledAt: string | null;
+  seenAt: string;
+}
+
+export interface TraderaPostStatus {
+  configured: boolean;
+  missing: string[];
+  account: string | null;
+  pollMinutes: number;
+  lastPollAt: string | null;
+  lastError: string | null;
+  ohanterade: number;
+}
+
+export interface TraderaPosten {
+  poster: TraderaPost[];
+  status: TraderaPostStatus;
+  /** Bara med i svaret på en manuell hämtning. */
+  resultat?: { fetched: number; nya: number; salda: number; fragor: number; error: string | null };
+}
+
 // ---- publik annons (GET /api/cards/:loopaId) ----
 
 /**

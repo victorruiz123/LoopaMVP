@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, CardIcon, ChevronRight, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
 import AdminAdsScreen from "./AdminAdsScreen";
+import AdminTraderaPostScreen from "./AdminTraderaPostScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare";
+export type AdminFlik = "annonser" | "anvandare" | "tradera";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -27,12 +28,15 @@ export default function AdminScreen({
   onBack,
   onOpenUser,
   onOpenAd,
+  onOpenAdId,
   flik: initialFlik = "annonser",
 }: {
   onBack: () => void;
   onOpenUser: (user: AdminUser) => void;
   /** Öppnar en annons i redigeringsvyn. Frivillig: panelen ska gå att rita utan den. */
   onOpenAd?: (rad: AdminAnnonsRad) => void;
+  /** Samma sak från Tradera-posten, som bara bär Loopa-id:t. */
+  onOpenAdId?: (loopaId: string) => void;
   /**
    * Fliken panelen öppnar på.
    *
@@ -107,10 +111,20 @@ export default function AdminScreen({
         >
           <UserIcon size={16} /> {t("Användare")}
         </button>
+        <button
+          role="tab"
+          aria-selected={flik === "tradera"}
+          className={`admin-flik-knapp${flik === "tradera" ? " vald" : ""}`}
+          onClick={() => setFlik("tradera")}
+        >
+          <MailIcon size={16} /> {t("Tradera-post")}
+        </button>
       </div>
 
       {flik === "annonser" ? (
         <AdminAdsScreen inbaddad onOpenAd={(rad) => onOpenAd?.(rad)} />
+      ) : flik === "tradera" ? (
+        <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : (
         <>
       <p className="admin-lede">

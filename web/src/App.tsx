@@ -446,6 +446,7 @@ function FlowApp() {
           onBack={() => setScreen({ name: "profile" })}
           onOpenUser={(u) => setScreen({ name: "adminUser", user: u })}
           onOpenAd={(rad) => setScreen({ name: "adminAd", loopaId: rad.id })}
+          onOpenAdId={(loopaId) => setScreen({ name: "adminAd", loopaId })}
         />
       );
     case "adminAd":
