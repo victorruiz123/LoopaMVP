@@ -12,16 +12,55 @@ name = "loopa-router"
 main = "loopa-router.js"
 compatibility_date = "2026-01-01"
 
-# Butikens och efterlysningens sidor.
+# ─── Appens sidor ───────────────────────────────────────────────────────────
+#
+# ROTEN OCKSÅ. loopa.nu/ är säljflödet — det man kommer till för att sälja en möbel. Mönstret utan
+# jokertecken matchar exakt "/", inget annat, så marknadssajtens övriga sidor rörs inte.
+[[routes]]
+pattern = "loopa.nu/"
+zone_name = "loopa.nu"
+
 [[routes]]
 pattern = "loopa.nu/butik*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/kop*"
 zone_name = "loopa.nu"
 
 [[routes]]
 pattern = "loopa.nu/efterlyses*"
 zone_name = "loopa.nu"
 
-# Sökmotorernas två filer. De MÅSTE komma från servern — det är där de byggs ur lagret.
+[[routes]]
+pattern = "loopa.nu/affar*"
+zone_name = "loopa.nu"
+
+# Affärsinbjudningar: korta länkar som delas i ett meddelande.
+[[routes]]
+pattern = "loopa.nu/a/*"
+zone_name = "loopa.nu"
+
+# Sanningskorten. Ligger kvar på app.loopa.nu också — publicerade Tradera-annonser bär den
+# adressen inbakad — men nya länkar ska kunna vara korta.
+[[routes]]
+pattern = "loopa.nu/c/*"
+zone_name = "loopa.nu"
+
+# De juridiska sidorna. Också de Merchant Center kommer att kräva.
+[[routes]]
+pattern = "loopa.nu/villkor"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/integritetspolicy"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/cookies"
+zone_name = "loopa.nu"
+
+# ─── Sökmotorernas filer ────────────────────────────────────────────────────
 [[routes]]
 pattern = "loopa.nu/sitemap.xml"
 zone_name = "loopa.nu"
@@ -30,21 +69,38 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/robots.txt"
 zone_name = "loopa.nu"
 
-# Appens byggda filer. Marknadssajten äger /assets; utan den här raden hämtar butikssidan
-# marknadssajtens JavaScript och visar en vit skärm.
+# ─── Appens byggda filer ────────────────────────────────────────────────────
+#
+# Marknadssajten äger /assets. Utan den här raden hämtar appen marknadssajtens JavaScript och
+# visar en vit skärm — vilket är precis varför bygget flyttades till /app-assets.
 [[routes]]
 pattern = "loopa.nu/app-assets/*"
 zone_name = "loopa.nu"
 
-# API-vägarna butikssidorna faktiskt anropar — en och en, aldrig hela /api/*. Marknadssajten har
-# egna funktioner på /api/chat, /api/generate-listing, /api/brand-preview och /api/seller/*, och
-# ett band till hela prefixet hade dödat dem.
 [[routes]]
-pattern = "loopa.nu/api/butik/*"
+pattern = "loopa.nu/manifest.webmanifest"
+zone_name = "loopa.nu"
+
+# ─── API:t ──────────────────────────────────────────────────────────────────
+#
+# EN RAD PER NAMNRYMD, aldrig hela /api/*. Marknadssajten har egna Pages Functions på /api/chat,
+# /api/generate-listing, /api/brand-preview och /api/seller/* — ett band till hela prefixet hade
+# dödat dem. Listan nedan är serverns tio namnrymder (server.ts) och måste utökas den dag en elfte
+# tillkommer. Det är priset för att marknadssajten får behålla sitt eget /api.
+[[routes]]
+pattern = "loopa.nu/api/admin/*"
 zone_name = "loopa.nu"
 
 [[routes]]
-pattern = "loopa.nu/api/efterlysning/*"
+pattern = "loopa.nu/api/affar/*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/analys*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/butik/*"
 zone_name = "loopa.nu"
 
 # Produktbilderna. Utan den här är varje möbel en trasig bild — även i Google Shopping.
@@ -53,7 +109,19 @@ pattern = "loopa.nu/api/cards/*"
 zone_name = "loopa.nu"
 
 [[routes]]
-pattern = "loopa.nu/api/analys*"
+pattern = "loopa.nu/api/condition*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/efterlysning/*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/jobs*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/price*"
 zone_name = "loopa.nu"
 
 [[routes]]

@@ -231,14 +231,21 @@ test("samma sida på RÄTT värdnamn omdirigeras inte — annars blir det en oä
   });
 });
 
-test("bara butiken och efterlysningen har flyttat — säljflödet och kassan står kvar", () => {
+test("hela appen flyttar — allt utom maskinvägarna och sanningskorten", () => {
   MED_KANONISK("https://loopa.nu", () => {
+    // Säljflödets rot flyttar numera också: loopa.nu/ ÄR appen.
+    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), "https://loopa.nu/");
     assert.equal(flyttadAdress("app.loopa.nu", "/efterlyses/stolar", ""), "https://loopa.nu/efterlyses/stolar");
     assert.equal(flyttadAdress("app.loopa.nu", "/sitemap.xml", ""), "https://loopa.nu/sitemap.xml");
-    // Säljflödets rot: loopa.nu/ är marknadssajtens förstasida, inte vår.
-    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), null);
-    assert.equal(flyttadAdress("app.loopa.nu", "/kop/analysera", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/kop/analysera", ""), "https://loopa.nu/kop/analysera");
+    assert.equal(flyttadAdress("app.loopa.nu", "/villkor", ""), "https://loopa.nu/villkor");
+
+    // MASKINVÄGARNA STÅR KVAR. En omdirigering här flyttar inte en läsare utan bryter en
+    // integration — och den som anropar API:t har fått sin adress av oss.
     assert.equal(flyttadAdress("app.loopa.nu", "/api/butik/produkter", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/v1/condition", ""), null);
+    // Övervakningen frågar maskinen, inte domänen.
+    assert.equal(flyttadAdress("app.loopa.nu", "/health", ""), null);
   });
 });
 
@@ -248,11 +255,15 @@ test("sanningskortet flyttar ALDRIG — adressen står inbakad i publicerade Tra
   });
 });
 
-test("ett prefix får inte träffa en adress som bara börjar likadant", () => {
+test("undantagen får inte träffa en adress som bara börjar likadant", () => {
   MED_KANONISK("https://loopa.nu", () => {
-    // "/butiken-vi-inte-har" är inte butiken. Utan gränskontrollen hade den omdirigerats också.
-    assert.equal(flyttadAdress("app.loopa.nu", "/butiksnara", ""), null);
-    assert.equal(flyttadAdress("app.loopa.nu", "/butik", ""), "https://loopa.nu/butik");
+    // Gränsen sitter numera på UNDANTAGEN, inte på det som flyttar — allt flyttar. "/carport" är
+    // inte ett sanningskort och "/apiary" är inte API:t; båda ska flytta med resten.
+    assert.equal(flyttadAdress("app.loopa.nu", "/carport", ""), "https://loopa.nu/carport");
+    assert.equal(flyttadAdress("app.loopa.nu", "/apiary", ""), "https://loopa.nu/apiary");
+    // Men de riktiga undantagen står kvar.
+    assert.equal(flyttadAdress("app.loopa.nu", "/c/LP-1", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/api/jobs", ""), null);
   });
 });
 

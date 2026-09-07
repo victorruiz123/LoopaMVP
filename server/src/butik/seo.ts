@@ -358,15 +358,22 @@ export function kanoniskVard(): string | null {
 }
 
 /**
- * Sidorna som flyttat till den kanoniska domänen.
+ * Sökvägar som ALDRIG kanoniseras.
  *
- * BARA butiken och efterlysningsväggen. Säljflödet, kassan och adminsidorna bor kvar där de bor —
- * de ska ingen hitta via en sökmotor, och `loopa.nu/` är marknadssajtens förstasida, inte vår.
+ * Allt annat flyttar. Listan är vänd sedan butiken flyttade ensam: nu bor hela appen på
+ * marknadsdomänen, och en tillåtelselista över det som flyttat hade behövt uppdateras varje gång
+ * appen fick en ny sida — och glömts, tyst, med en sida på fel domän som följd.
  *
- * `/c/` står MEDVETET INTE här: publicerade Tradera-annonser bär sanningskortets adress inbakad i
- * annonstexten, och den adressen får aldrig ändra form för den som redan har den.
+ * `/c/` — sanningskorten. Publicerade Tradera-annonser bär `app.loopa.nu/c/LP-XXXX` inbakat i sin
+ * annonstext. Adressen svarar där den står, utan omväg, för all framtid.
+ *
+ * `/api/` och `/v1/` — maskinvägar. En omdirigering här flyttar inte en läsare utan bryter en
+ * integration, och den som anropar API:t har fått sin adress av oss.
+ *
+ * `/health` — övervakningen frågar servern, inte domänen. Svaret ska komma från maskinen som
+ * tillfrågas, annars mäter man något annat än det man tror.
  */
-const FLYTTAT = ["/butik", "/efterlyses", "/sitemap.xml", "/robots.txt"];
+const ALDRIG = ["/c/", "/api/", "/v1/", "/health"];
 
 /**
  * Är värdnamnet ett publikt namn en besökare kan ha skrivit in?
@@ -404,7 +411,7 @@ export function flyttadAdress(host: string | null, pathname: string, search: str
   if (!kanonisk || !host) return null;
   if (!arPublikVard(host)) return null;
   if (host.toLowerCase() === kanonisk.toLowerCase()) return null;
-  if (!FLYTTAT.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
+  if (ALDRIG.some((p) => pathname === p.replace(/\/$/, "") || pathname.startsWith(p))) return null;
   return `${baseUrl()}${pathname}${search}`;
 }
 
