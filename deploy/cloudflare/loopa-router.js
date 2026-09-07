@@ -58,6 +58,16 @@ export default {
       const omskriven = new URL(plats, mal);
       if (omskriven.hostname === URSPRUNG) {
         omskriven.hostname = inkommande.hostname;
+        /**
+         * En omskrivning får ALDRIG peka på adressen vi just blev tillfrågade om.
+         *
+         * Det hände: servern kanoniserade till app.loopa.nu därför att LOOPA_PUBLIC_URL ännu inte
+         * var omställd, och omskrivningen nedan gjorde den till loopa.nu/butik — samma adress som
+         * kom in. Webbläsaren fick en 301 till sig själv och gav upp. Skickas serverns svar orört
+         * i stället hamnar besökaren på app.loopa.nu, vilket är fel domän men en fungerande sida —
+         * och felet syns i adressfältet i stället för att bli en oändlig slinga.
+         */
+        if (omskriven.toString() === inkommande.toString()) return svar;
         const nya = new Headers(svar.headers);
         nya.set("location", omskriven.toString());
         return new Response(svar.body, { status: svar.status, statusText: svar.statusText, headers: nya });
