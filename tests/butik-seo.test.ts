@@ -246,6 +246,13 @@ test("hela appen flyttar — allt utom maskinvägarna och sanningskorten", () =>
     assert.equal(flyttadAdress("app.loopa.nu", "/v1/condition", ""), null);
     // Övervakningen frågar maskinen, inte domänen.
     assert.equal(flyttadAdress("app.loopa.nu", "/health", ""), null);
+    /*
+     * robots.txt gäller värdnamnet den hämtas från. Omdirigerades den svarade Cloudflare med sin
+     * egen fil i stället — utan våra direktiv och utan Sitemap-raden. Sitemapen får däremot flytta:
+     * den är en lista över adresser, inte en regel om en värd.
+     */
+    assert.equal(flyttadAdress("app.loopa.nu", "/robots.txt", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/sitemap.xml", ""), "https://loopa.nu/sitemap.xml");
   });
 });
 

@@ -129,7 +129,10 @@ fi
 # hit, och vår egen fil syns då aldrig utåt hur rätt den än är.
 steg "Kontrollerar den publika vägen"
 PUBLIK=${PUBLIK:-https://app.loopa.nu}
-if curl -s --max-time 20 "$PUBLIK/robots.txt" | grep -qi '^sitemap:'; then
+# -L följer omdirigeringar. Utan den mätte kontrollen fel sak så fort en domänflytt pågick: den
+# gamla domänen svarar 301 och grepet såg en tom kropp, vilket rapporterades som en saknad
+# Sitemap-rad — ett larm om ett fel som inte fanns.
+if curl -sL --max-time 20 "$PUBLIK/robots.txt" | grep -qi '^sitemap:'; then
   echo "✓ $PUBLIK/robots.txt pekar ut webbplatskartan"
 else
   echo "⚠ $PUBLIK/robots.txt saknar Sitemap-rad."

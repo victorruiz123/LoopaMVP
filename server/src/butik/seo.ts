@@ -372,8 +372,14 @@ export function kanoniskVard(): string | null {
  *
  * `/health` — övervakningen frågar servern, inte domänen. Svaret ska komma från maskinen som
  * tillfrågas, annars mäter man något annat än det man tror.
+ *
+ * `/robots.txt` — filen gäller det värdnamn den hämtas från, och varje värdnamn ska kunna svara på
+ * sin egen. Den omdirigerades först, och då svarade Cloudflare med sin egen robots.txt i stället —
+ * utan våra direktiv och utan Sitemap-raden, eftersom det inte fanns något ursprungssvar att lägga
+ * dem till. En robot som frågar den gamla domänen ska få ett riktigt svar som pekar vidare, inte en
+ * omväg. Sitemapen får däremot flytta: den är en lista över adresser, inte en regel om en värd.
  */
-const ALDRIG = ["/c/", "/api/", "/v1/", "/health"];
+const ALDRIG = ["/c/", "/api/", "/v1/", "/health", "/robots.txt"];
 
 /**
  * Är värdnamnet ett publikt namn en besökare kan ha skrivit in?
