@@ -1,0 +1,61 @@
+# Routern som lägger butiken på marknadsdomänen. Se loopa-router.js för vad den gör och varför.
+#
+# Deploya från den här mappen:
+#   npx wrangler login
+#   npx wrangler deploy
+#
+# Rutterna står HÄR och inte i dashboard med flit: de är tio stycken, de hör ihop med koden, och en
+# rutt som glöms bort ger ett fel som ser ut som något helt annat — en vit sida, eller
+# marknadssajten där butiken skulle stå. Deployas de tillsammans kan de inte glida isär.
+
+name = "loopa-router"
+main = "loopa-router.js"
+compatibility_date = "2026-01-01"
+
+# Butikens och efterlysningens sidor.
+[[routes]]
+pattern = "loopa.nu/butik*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/efterlyses*"
+zone_name = "loopa.nu"
+
+# Sökmotorernas två filer. De MÅSTE komma från servern — det är där de byggs ur lagret.
+[[routes]]
+pattern = "loopa.nu/sitemap.xml"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/robots.txt"
+zone_name = "loopa.nu"
+
+# Appens byggda filer. Marknadssajten äger /assets; utan den här raden hämtar butikssidan
+# marknadssajtens JavaScript och visar en vit skärm.
+[[routes]]
+pattern = "loopa.nu/app-assets/*"
+zone_name = "loopa.nu"
+
+# API-vägarna butikssidorna faktiskt anropar — en och en, aldrig hela /api/*. Marknadssajten har
+# egna funktioner på /api/chat, /api/generate-listing, /api/brand-preview och /api/seller/*, och
+# ett band till hela prefixet hade dödat dem.
+[[routes]]
+pattern = "loopa.nu/api/butik/*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/efterlysning/*"
+zone_name = "loopa.nu"
+
+# Produktbilderna. Utan den här är varje möbel en trasig bild — även i Google Shopping.
+[[routes]]
+pattern = "loopa.nu/api/cards/*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/analys*"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/api/session*"
+zone_name = "loopa.nu"
