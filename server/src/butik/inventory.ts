@@ -17,7 +17,7 @@ import { jobToProduct } from "./normalize.js";
 import { shopReadiness } from "./state.js";
 import { ensureRecord, publish, store, unpublish, type ButikRecord } from "./store.js";
 import { alla as allaOverstyrningar, tillampaPaProdukt } from "./overrides.js";
-import { fold } from "./catalog.js";
+import { fold, MOBELTYPER, resolveTypeSlug } from "./catalog.js";
 import { notify, takePendingNotifications } from "./bevakningar.js";
 import { BROWSABLE_STATES, type BrowseResult, type Product, type ProductFilter, type SortKey } from "./types.js";
 import { rankScore } from "./rank.js";
@@ -260,6 +260,7 @@ export function applyFilter(source: Product[], filter: ProductFilter): BrowseRes
     if (!BROWSABLE_STATES.includes(p.state)) return false;
     if (filter.onlyLoopa && p.source !== "loopa") return false;
     if (filter.categorySlug && p.categorySlug !== filter.categorySlug) return false;
+    if (filter.typeSlug && resolveTypeSlug(p) !== filter.typeSlug) return false;
     if (filter.brands?.length && !filter.brands.some((b) => fold(b) === fold(p.brand ?? ""))) return false;
     if (filter.homeDeliveryOnly && !p.homeDeliveryAvailable) return false;
     if (filter.minPriceSek != null && (p.priceSek ?? 0) < filter.minPriceSek) return false;
@@ -419,4 +420,40 @@ export function categoryFacetsOf(items: Product[]): Record<string, number> {
     counts[p.categorySlug] = (counts[p.categorySlug] ?? 0) + 1;
   }
   return counts;
+}
+
+/**
+ * Antal per möbeltyp, för typbrickorna på startsidan.
+ *
+ * Samma tre regler som märkesbrickorna, och av samma skäl: bara det man kan gå till räknas, talet är
+ * DELAT på källa så att vår granskning inte lånas ut till Traderas annonser, och typer utan en enda
+ * vara står inte med — en bricka mot en tom sida är ett löfte som bryts i samma klick.
+ *
+ * Ordningen är däremot katalogens, inte storlekens. Märkena kan stå störst först eftersom de är
+ * likvärdiga; typerna är en hylla man går längs, och den ska se likadan ut varje dag.
+ */
+export interface TypFacet {
+  slug: string;
+  count: number;
+  loopa: number;
+  tradera: number;
+}
+
+export function typeFacetsMerged(items: Product[]): TypFacet[] {
+  const counts = new Map<string, { loopa: number; tradera: number }>();
+  for (const p of items) {
+    if (!BROWSABLE_STATES.includes(p.state)) continue;
+    const slug = resolveTypeSlug(p);
+    if (!slug) continue;
+    const rad = counts.get(slug) ?? { loopa: 0, tradera: 0 };
+    if (p.source === "loopa") rad.loopa += 1;
+    else rad.tradera += 1;
+    counts.set(slug, rad);
+  }
+  return MOBELTYPER
+    .filter((t) => counts.has(t.slug))
+    .map((t) => {
+      const n = counts.get(t.slug)!;
+      return { slug: t.slug, count: n.loopa + n.tradera, loopa: n.loopa, tradera: n.tradera };
+    });
 }

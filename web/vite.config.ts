@@ -28,6 +28,17 @@ export default defineConfig({
   // mot självsignerade certifikat och gör det ibland omöjligt att klicka sig förbi varningen på
   // localhost. Och det behövs inte där — `http://localhost` räknas ENLIGT SPECIFIKATIONEN som en säker
   // kontext, så kameran fungerar ändå. Bara telefonen, som når appen på en LAN-adress, kräver HTTPS.
+  /**
+   * Appens byggda filer i EGEN mapp, inte i /assets.
+   *
+   * Butikssidorna serveras numera under marknadsdomänen (loopa.nu), och den sajten är också ett
+   * Vite-bygg som lägger sina filer på /assets. Två olika bundlar på samma adress: butikssidan
+   * hade hämtat marknadssajtens JavaScript och visat en tom skärm.
+   *
+   * `assetsDir` och inte `base`: filerna ska ligga på /app-assets/, men sidorna ska fortsätta
+   * ligga på /butik. Ett ändrat `base` hade flyttat båda.
+   */
+  build: { assetsDir: "app-assets" },
   plugins: [react(), ...(httpsOff || lanCert ? [] : [basicSsl()])],
   server: {
     ...(!httpsOff && lanCert

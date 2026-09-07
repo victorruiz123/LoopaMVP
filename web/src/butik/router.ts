@@ -16,6 +16,8 @@ export const BUTIK_ROOT = "/butik";
 
 export type ButikRoute =
   | { name: "category"; slug: string }
+  /** En möbeltyp: /butik/mobel/matbord. Finare än kategorin, och den sida som ska ranka på "begagnat matbord". */
+  | { name: "type"; slug: string }
   | { name: "brand"; slug: string }
   | { name: "product"; id: string }
   | { name: "search"; q: string }
@@ -47,6 +49,7 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   }
   const [head, tail] = rest.split("/");
   if (head === "kategori" && tail) return { name: "category", slug: decodeURIComponent(tail) };
+  if (head === "mobel" && tail) return { name: "type", slug: decodeURIComponent(tail) };
   if (head === "marke" && tail) return { name: "brand", slug: decodeURIComponent(tail) };
   if (head === "objekt" && tail) return { name: "product", id: decodeURIComponent(tail) };
   if (head === "order" && tail) return { name: "order", id: decodeURIComponent(tail) };
@@ -60,6 +63,7 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
 export function butikHref(route: ButikRoute): string {
   switch (route.name) {
     case "category": return `${BUTIK_ROOT}/kategori/${encodeURIComponent(route.slug)}`;
+    case "type": return `${BUTIK_ROOT}/mobel/${encodeURIComponent(route.slug)}`;
     case "brand": return `${BUTIK_ROOT}/marke/${encodeURIComponent(route.slug)}`;
     case "product": return `${BUTIK_ROOT}/objekt/${encodeURIComponent(route.id)}`;
     case "order": return `${BUTIK_ROOT}/order/${encodeURIComponent(route.id)}`;

@@ -360,3 +360,41 @@ sidan bakom innehåller, och ett löfte som bara finns i en HTTP-hanterare går 
 
 **Sökraden filtrerar brickorna medan man skriver** och tar en till rutnätet när ordet inte är ett
 märke — den som skriver "Lamino" menar en modell, och ska inte mötas av tomhet.
+
+---
+
+## 17. Bläddra på möbeltyp — och en sida per ord som ska ranka på "begagnad soffa"
+
+**Beslut:** Under märkesbrickorna på startsidan ligger en rad med möbeltyper: Soffor, Fåtöljer,
+Matstolar, Matbord, Byråer, Bokhyllor och så vidare. Varje bricka leder till en egen sida på
+`/butik/mobel/<typ>` med rubriken *"Begagnad soffa i Stockholm"*.
+
+**Typen är finare än kategorin, och det är hela poängen.** Kategorierna är nio och rätt för ett
+filter. Men ingen söker på "begagnad förvaring" — man söker på "begagnad byrå", "begagnat matbord",
+"begagnad bäddsoffa". Typen är den nivån: ordet folk skriver, som en egen adress. Varje typ hör
+till exakt en kategori (`MOBELTYPER` i catalog.ts), och kategorin är brödsmulan uppåt.
+
+**Singular, obestämd form, först i titeln.** Kategorisidan heter "Begagnade soffor" och det är rätt
+över ett rutnät; frasen i sökrutan är "begagnad soffa", och titeln är det enda i träffen som kan
+matcha den ordagrant. Rubriken böjs efter substantivet — *begagnat* matbord, *begagnad* soffa
+(`typeHeading`); "begagnad matbord" hade sett ut som en maskin skrivit det.
+
+**Allt på sidan är hämtat ur hyllan.** Antalet i titeln, prisspannet i ingressen, märkena att gå
+vidare till, varulistan, svaren på "vad kostar en begagnad soffa" — allt räknas ur lagret vid varje
+förfrågan. Det är det som skiljer sidan från en tunn nyckelordssida, och det är också därför en tom
+typ ger `noindex` och saknas i sitemapen: en sida som lovar soffor och visar ingenting är sämre
+för rankningen än ingen sida alls.
+
+**React ritar samma rubrik som servern skrev.** Google renderar JavaScript, så det som räknas är
+sidan EFTER att appen startat. Typskärmen hämtar därför rubrik och ingress ur samma katalogpost
+(`/api/butik/mobeltyper/:slug`) i stället för att ha en egen text — två rubriker för samma sida är
+två sanningar.
+
+**Klassningen är ordbaserad och längsta ordet vinner**, samma regel som kategorierna: "sängbord" är
+ett sidobord, inte en säng. En vara utan träffande ord räknas till kategorins fallback-typ bara där
+kategorin *är* typen (soffor, fåtöljer, sängar, matstolar, skrivbord). Ett "Bord" utan mer blir
+inget matbord: typsidan får inte fyllas med bord vi inte vet är matbord.
+
+**Antalen är delade på brickan**, "12 granskade · 3 via Tradera", av samma skäl som på
+märkesbrickan (beslut 16). Räkningen bor i inventory.ts med tester som låser att brickan och
+rutnätet räknar på samma regel.

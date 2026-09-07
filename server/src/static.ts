@@ -28,8 +28,15 @@ const TYPES: Record<string, string> = {
   ".webmanifest": "application/manifest+json",
 };
 
-/** Byggda tillgångar bär innehållshash i namnet och kan cachas för alltid. index.html får aldrig. */
-const IMMUTABLE = /\/assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/;
+/**
+ * Byggda tillgångar bär innehållshash i namnet och kan cachas för alltid. index.html får aldrig.
+ *
+ * TVÅ MAPPAR: appens filer flyttade till /app-assets för att inte krocka med marknadssajtens
+ * /assets på den gemensamma domänen (se web/vite.config.ts). Den gamla mappen står kvar i mönstret
+ * så länge det finns utlämnade index.html i omlopp som pekar dit — en cachad sida som hämtar en
+ * fil vi svarar `no-cache` på blir långsam, inte trasig, men det är ändå onödigt.
+ */
+const IMMUTABLE = /\/(?:app-)?assets\/[^/]+-[A-Za-z0-9_-]{8,}\.[a-z0-9]+$/;
 
 async function fileAt(rel: string): Promise<string | null> {
   // path.resolve normaliserar bort "..", och kontrollen fångar det som ändå pekar ut ur roten.

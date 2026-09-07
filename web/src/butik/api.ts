@@ -7,7 +7,7 @@
  * butiken oåtkomlig för precis den trafik den byggs för.
  */
 
-import type { BrandFacet, BrowseResult, Category, Product, SortKey } from "./types";
+import type { BrandFacet, BrowseResult, Category, FurnitureType, Product, SortKey } from "./types";
 
 async function getJson<T>(path: string): Promise<T> {
   const res = await fetch(path, { headers: { Accept: "application/json" } });
@@ -21,6 +21,8 @@ async function getJson<T>(path: string): Promise<T> {
 export interface BrowseQuery {
   q?: string | null;
   kategori?: string | null;
+  /** Möbeltyp, t.ex. "matbord". Se /api/butik/mobeltyper. */
+  typ?: string | null;
   marke?: string[] | null;
   onlyLoopa?: boolean;
   minPris?: number | null;
@@ -47,6 +49,7 @@ export function browseParams(query: BrowseQuery): URLSearchParams {
   const p = new URLSearchParams();
   if (query.q) p.set("q", query.q);
   if (query.kategori) p.set("kategori", query.kategori);
+  if (query.typ) p.set("typ", query.typ);
   if (query.marke?.length) p.set("marke", query.marke.join(","));
   if (query.onlyLoopa) p.set("kalla", "loopa");
   if (query.minPris != null) p.set("minpris", String(query.minPris));
@@ -74,6 +77,21 @@ export function fetchCategories(): Promise<{ categories: Category[] }> {
 
 export function fetchBrands(): Promise<{ brands: BrandFacet[] }> {
   return getJson("/api/butik/marken");
+}
+
+/** Möbeltyperna med varor i lager. Driver typbrickorna på startsidan. */
+export function fetchTypes(): Promise<{ types: FurnitureType[] }> {
+  return getJson("/api/butik/mobeltyper");
+}
+
+/** En typsida: katalogposten, kategorin den hör till och dess syskon. Rutnätet hämtas för sig. */
+export function fetchType(slug: string): Promise<{
+  type: Omit<FurnitureType, "count" | "loopa" | "tradera">;
+  category: Category | null;
+  siblings: Array<Omit<FurnitureType, "count" | "loopa" | "tradera">>;
+  total: number;
+}> {
+  return getJson(`/api/butik/mobeltyper/${encodeURIComponent(slug)}?antal=1`);
 }
 
 export function fetchProduct(id: string): Promise<{ product: Product }> {

@@ -239,6 +239,8 @@ export type SortKey = "relevans" | "nyinkommet" | "pris_upp" | "pris_ner";
 export interface ProductFilter {
   q?: string | null;
   categorySlug?: string | null;
+  /** Möbeltyp — ett steg finare än kategorin. Se MOBELTYPER i catalog.ts. */
+  typeSlug?: string | null;
   brands?: string[] | null;
   /** "Endast Loopa-granskade". Förval av, men Loopa sorteras ändå först inom relevans. */
   onlyLoopa?: boolean;

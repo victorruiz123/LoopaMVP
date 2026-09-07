@@ -35,6 +35,7 @@ import { loopaIdFor } from "./loopaId.js";
 import { cutoutOf, jobByLoopaId, publicCardFor, publikaBildrutor } from "./publicCard.js";
 import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
+import { flyttadAdress } from "./butik/seo.js";
 import { handleAffar, handleAffarPublic } from "./affar/routes.js";
 import { handleEfterlysning, handleEfterlysningPublic } from "./efterlysning/routes.js";
 import { startEfterlysningSweeper } from "./efterlysning/matcher.js";
@@ -963,6 +964,32 @@ const server = http.createServer(async (req, res) => {
 
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
   const segments = url.pathname.split("/").filter(Boolean);
+
+  /**
+   * Butiken har EN adress, och det är den i LOOPA_PUBLIC_URL.
+   *
+   * Butikssidorna nås numera under marknadsdomänen, via en router hos Cloudflare som skickar
+   * /butik och /efterlyses hit (se deploy/cloudflare/loopa-router.js). Servern svarar fortfarande
+   * på sitt eget värdnamn — tunneln kräver det — och utan raden nedan hade varje sida då legat på
+   * två adresser med identiskt innehåll. Google räknar sådant som två sidor och delar värdet
+   * mellan dem, vilket är precis tvärtemot varför flytten gjordes.
+   *
+   * BARA GET. En 301 på en POST är en trasig förfrågan: klienter får byta metod till GET på vägen,
+   * och en kassa som förlorar sin kropp mitt i ett köp är värre än en dubblett i ett index.
+   *
+   * `x-forwarded-host` läses först och det är inte valfritt: routern framför oss anropar servern på
+   * dess EGET namn, så utan huvudet ser servern sitt eget värdnamn, omdirigerar dit den redan står
+   * och slingan blir oändlig. Huvudet går att förfalska, men det enda en förfalskning åstadkommer
+   * är att en omdirigering uteblir.
+   */
+  if (req.method === "GET") {
+    const bett = (req.headers["x-forwarded-host"] as string | undefined) ?? req.headers.host ?? null;
+    const dit = flyttadAdress(bett ? bett.split(",")[0].trim() : null, url.pathname, url.search);
+    if (dit) {
+      res.writeHead(301, { Location: dit });
+      return res.end();
+    }
+  }
 
   // Public API. Its own namespace so the local UI keeps working through /api without a key.
   if (segments[0] === "v1" && segments[1] === "condition") {

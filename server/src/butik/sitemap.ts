@@ -16,6 +16,7 @@
 import { BROWSABLE_STATES, type Product } from "./types.js";
 import { allProducts } from "./inventory.js";
 import { brandSlug, CATEGORIES } from "./catalog.js";
+import { typeFacetsMerged } from "./inventory.js";
 import { arIndexerbar, baseUrl } from "./seo.js";
 
 /** XML-escape. Titlar och märkesnamn kommer ur genererad text och kan innehålla vad som helst. */
@@ -122,6 +123,14 @@ export async function sitemapXml(): Promise<string> {
     const antal = synliga.filter((p) => p.categorySlug === c.slug).length;
     if (antal === 0) continue;
     poster.push({ loc: `${base}/butik/kategori/${c.slug}`, changefreq: "daily", priority: "0.9" });
+  }
+
+  /**
+   * Möbeltyperna, bara de med varor — samma regel som kategorierna, och samma tyngd: "begagnad soffa"
+   * är sidan vi helst vill att Google hämtar först.
+   */
+  for (const t of typeFacetsMerged(synliga)) {
+    poster.push({ loc: `${base}/butik/mobel/${t.slug}`, changefreq: "daily", priority: "0.9" });
   }
 
   // Märkena ur LAGRET, inte ur en lista — ett märke finns som sida bara så länge det finns i hyllan.

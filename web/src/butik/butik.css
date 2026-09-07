@@ -561,3 +561,28 @@
  * `.hero`: en tvåspaltsregel för 900px och uppåt la underrubriken bredvid rubriken i stället för
  * under den. Två filer som äger samma klassnamn är en fälla, och den här är gillrad en gång.
  */
+
+/* ---- möbeltypsbrickorna ----
+   Neutrala, till skillnad från märkesbrickorna: ett märke har en färg att känna igen, en soffa har
+   det inte. Ordet bär brickan. Samma slags rutnät som märkena så att de två raderna läser som en hylla. */
+.butik-types { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+@media (min-width: 700px) { .butik-types { grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 12px; } }
+.butik-type-tile {
+  display: flex; flex-direction: column; gap: 2px; min-height: 92px; padding: 14px;
+  text-decoration: none; color: var(--ink);
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+.butik-type-tile:active { transform: scale(0.98); }
+@media (hover: hover) { .butik-type-tile:hover { box-shadow: var(--shadow-raised); } }
+.butik-type-name { font-weight: 650; font-size: var(--fs-base); line-height: 1.25; }
+/* "begagnad soffa" under ordet — det är sökfrasen sidan bakom svarar på, och den ska stå på brickan
+   så att brickan och sidan säger samma sak. */
+.butik-type-sub { font-size: var(--fs-2xs); color: var(--muted-soft); letter-spacing: 0.04em; }
+.butik-type-count { margin-top: auto; padding-top: 8px; font-size: var(--fs-xs); color: var(--muted-soft); }
+
+/* ---- brödsmulor och lagerrad i heron ---- */
+.butik-crumbs { font-size: var(--fs-sm); color: var(--muted); margin-bottom: 6px; }
+.butik-crumbs a { color: inherit; text-decoration: none; }
+.butik-crumbs a:hover { text-decoration: underline; }
+.butik-hero-lager { margin-top: 10px !important; font-size: var(--fs-md) !important; color: var(--muted-soft) !important; }

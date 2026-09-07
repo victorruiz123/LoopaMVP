@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { injectSeo, seoFor } from "../server/src/butik/seo.js";
+import { flyttadAdress, injectSeo, kanoniskVard, seoFor } from "../server/src/butik/seo.js";
 
 /** Skalet som det faktiskt ser ut i web/index.html: taggar över flera rader, och redan med og-kort. */
 const SHELL = `<!doctype html>
@@ -194,4 +194,71 @@ test("sitemapen är välformad XML med bilderna på plats", async () => {
   assert.equal((xml.match(/<urlset/g) ?? []).length, 1);
   assert.equal((xml.match(/<url>/g) ?? []).length, (xml.match(/<\/url>/g) ?? []).length);
   assert.ok(xml.includes("/butik/kategori/"));
+});
+
+
+// ─── En adress per sida ─────────────────────────────────────────────────────
+//
+// Butiken nås under marknadsdomänen via en router hos Cloudflare, men servern svarar fortfarande på
+// sitt eget värdnamn — tunneln kräver det. Utan omdirigeringen låg varje butikssida på två adresser
+// med identiskt innehåll, och Google delar värdet mellan sådana i stället för att räkna ihop det.
+
+const MED_KANONISK = (host: string, fn: () => void) => {
+  const fore = process.env.LOOPA_PUBLIC_URL;
+  process.env.LOOPA_PUBLIC_URL = host;
+  try { fn(); } finally {
+    if (fore === undefined) delete process.env.LOOPA_PUBLIC_URL;
+    else process.env.LOOPA_PUBLIC_URL = fore;
+  }
+};
+
+test("en butikssida på fel värdnamn skickas till den kanoniska adressen", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    assert.equal(
+      flyttadAdress("app.loopa.nu", "/butik/objekt/LP-1", ""),
+      "https://loopa.nu/butik/objekt/LP-1",
+    );
+    assert.equal(flyttadAdress("app.loopa.nu", "/butik/sok", "?q=stol"), "https://loopa.nu/butik/sok?q=stol");
+  });
+});
+
+test("samma sida på RÄTT värdnamn omdirigeras inte — annars blir det en oändlig slinga", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    assert.equal(flyttadAdress("loopa.nu", "/butik", ""), null);
+    // Routern framför oss anropar servern på dess eget namn och sätter x-forwarded-host. Läses det
+    // huvudet ser servern "loopa.nu" och svarar 200 — det är hela skyddet mot slingan.
+    assert.equal(flyttadAdress("LOOPA.NU", "/butik", ""), null, "värdnamn är skiftlägesokänsliga");
+  });
+});
+
+test("bara butiken och efterlysningen har flyttat — säljflödet och kassan står kvar", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    assert.equal(flyttadAdress("app.loopa.nu", "/efterlyses/stolar", ""), "https://loopa.nu/efterlyses/stolar");
+    assert.equal(flyttadAdress("app.loopa.nu", "/sitemap.xml", ""), "https://loopa.nu/sitemap.xml");
+    // Säljflödets rot: loopa.nu/ är marknadssajtens förstasida, inte vår.
+    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/kop/analysera", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/api/butik/produkter", ""), null);
+  });
+});
+
+test("sanningskortet flyttar ALDRIG — adressen står inbakad i publicerade Tradera-annonser", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    assert.equal(flyttadAdress("app.loopa.nu", "/c/LP-ABCD-1234", ""), null);
+  });
+});
+
+test("ett prefix får inte träffa en adress som bara börjar likadant", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    // "/butiken-vi-inte-har" är inte butiken. Utan gränskontrollen hade den omdirigerats också.
+    assert.equal(flyttadAdress("app.loopa.nu", "/butiksnara", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/butik", ""), "https://loopa.nu/butik");
+  });
+});
+
+test("utan känd värd händer ingenting", () => {
+  MED_KANONISK("https://loopa.nu", () => {
+    assert.equal(flyttadAdress(null, "/butik", ""), null);
+  });
+  assert.equal(kanoniskVard(), kanoniskVard(), "ska inte kasta");
 });

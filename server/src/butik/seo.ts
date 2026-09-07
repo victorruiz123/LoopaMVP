@@ -16,7 +16,8 @@
  * det som syns under den halvsekund appen startar — därför är det riktig text, inte nyckelord.
  */
 
-import { brandSlug, CATEGORIES, categoryBySlug, categoryLabel } from "./catalog.js";
+import { brandSlug, CATEGORIES, categoryBySlug, categoryLabel, categoryNoun as categoryNounOf, furnitureTypeBySlug, furnitureTypesIn, MOBELTYPER, resolveTypeSlug, typeHeading, type FurnitureType } from "./catalog.js";
+import { typeFacetsMerged } from "./inventory.js";
 import { allProducts, applyFilter, productById } from "./inventory.js";
 import { BROWSABLE_STATES, type Product } from "./types.js";
 
@@ -174,7 +175,7 @@ function varulista(items: Product[]): string {
  * besökaren ser MÅSTE vara samma urval. Två filtreringar av samma lager är två sanningar, och den
  * ena hade blivit fel den dag någon rör vid den andra.
  */
-async function varorFor(filter: { categorySlug?: string; brands?: string[] }): Promise<Product[]> {
+async function varorFor(filter: { categorySlug?: string; typeSlug?: string; brands?: string[] }): Promise<Product[]> {
   const alla = await allProducts();
   return applyFilter(alla, { ...filter, limit: MAX_I_LISTAN, sort: "relevans" }).items;
 }
@@ -199,6 +200,87 @@ function itemListJsonLd(items: Product[], name: string): Record<string, unknown>
       name: p.title,
     })),
   };
+}
+
+/**
+ * Prisspannet i lagret, som text: "från 400 kr till 6 500 kr".
+ *
+ * Ett faktiskt spann ur hyllan och inte en påhittad prisbild. Det är den uppgift en sida om
+ * "begagnad soffa" oftast saknar och den som oftast avgör klicket. Null när ingen vara har pris.
+ */
+function prisSpann(items: Product[]): { min: number; max: number } | null {
+  const priser = items.map((p) => p.priceSek).filter((v): v is number => v !== null);
+  if (priser.length === 0) return null;
+  return { min: Math.min(...priser), max: Math.max(...priser) };
+}
+
+function kr(n: number): string {
+  return `${n.toLocaleString("sv-SE").replace(/\u00a0/g, " ")} kr`;
+}
+
+/**
+ * Frågorna en sida om en möbeltyp ska kunna svara på — och svaren är SANNA för just den hyllan.
+ *
+ * Prisfrågan bär det verkliga spannet, skickfrågan beskriver besiktningen som den görs, och
+ * leveransfrågan lovar det kassan faktiskt gör: Stockholm, inte "hela landet". Frågorna står i
+ * kroppen som text OCH som FAQPage — markeringen får bara beskriva det som syns på sidan.
+ */
+function vanligaFragor(what: string, whatPlural: string, span: { min: number; max: number } | null): Array<{ q: string; a: string }> {
+  const fragor: Array<{ q: string; a: string }> = [];
+  if (span) {
+    fragor.push({
+      q: `Vad kostar en begagnad ${what} hos Loopa?`,
+      a: span.min === span.max
+        ? `Just nu ${kr(span.min)}. Priset är satt efter skick och marknadspris för samma modell, och det står fast — ingen budgivning.`
+        : `Just nu från ${kr(span.min)} till ${kr(span.max)}. Varje pris är satt efter skick och marknadspris för samma modell, och det står fast — ingen budgivning.`,
+    });
+  }
+  fragor.push({
+    q: `Hur vet jag vilket skick en begagnad ${what} är i?`,
+    a: `Varje Loopa-granskad möbel är filmad runt om och besiktigad av AI. Skador, slitage och fläckar pekas ut på produktsidan med bild, och skicket får ett betyg från A till F. Måtten står i centimeter.`,
+  });
+  fragor.push({
+    q: `Levererar ni ${whatPlural} hem?`,
+    a: `Ja. Hemleverans i Stockholm ingår i köpet, och du väljer dag och tid efter betalningen. Betalningen hålls tills möbeln är levererad.`,
+  });
+  return fragor;
+}
+
+function faqJsonLd(fragor: Array<{ q: string; a: string }>): Record<string, unknown> | null {
+  if (fragor.length === 0) return null;
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    mainEntity: fragor.map((f) => ({
+      "@type": "Question",
+      name: f.q,
+      acceptedAnswer: { "@type": "Answer", text: f.a },
+    })),
+  };
+}
+
+function faqHtml(fragor: Array<{ q: string; a: string }>): string {
+  if (fragor.length === 0) return "";
+  return `<h2>Vanliga frågor</h2>` + fragor.map((f) => `<h3>${esc(f.q)}</h3><p>${esc(f.a)}</p>`).join("");
+}
+
+/** Märkena i ett urval, med antal, flest först. Länkarna gör typsidan till en väg vidare in i märkena. */
+function markenI(items: Product[]): Array<{ brand: string; count: number }> {
+  const counts = new Map<string, number>();
+  for (const p of items) if (p.brand) counts.set(p.brand, (counts.get(p.brand) ?? 0) + 1);
+  return [...counts].map(([brand, count]) => ({ brand, count })).sort((a, b) => b.count - a.count || a.brand.localeCompare(b.brand, "sv"));
+}
+
+/** Typerna i en kategori som FAKTISKT har varor, ur samma urval som sidan visar. */
+function typerMedVaror(items: Product[], categorySlug: string): Array<FurnitureType & { count: number }> {
+  const counts = new Map<string, number>();
+  for (const p of items) {
+    const t = resolveTypeSlug(p);
+    if (t) counts.set(t, (counts.get(t) ?? 0) + 1);
+  }
+  return furnitureTypesIn(categorySlug)
+    .filter((t) => counts.has(t.slug))
+    .map((t) => ({ ...t, count: counts.get(t.slug)! }));
 }
 
 /**
@@ -266,6 +348,45 @@ function sajtJsonLd(): Record<string, unknown>[] {
   ];
 }
 
+/** Värden butiken ska bo på, härledd ur LOOPA_PUBLIC_URL. Null när adressen inte går att tolka. */
+export function kanoniskVard(): string | null {
+  try {
+    return new URL(baseUrl()).host;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Sidorna som flyttat till den kanoniska domänen.
+ *
+ * BARA butiken och efterlysningsväggen. Säljflödet, kassan och adminsidorna bor kvar där de bor —
+ * de ska ingen hitta via en sökmotor, och `loopa.nu/` är marknadssajtens förstasida, inte vår.
+ *
+ * `/c/` står MEDVETET INTE här: publicerade Tradera-annonser bär sanningskortets adress inbakad i
+ * annonstexten, och den adressen får aldrig ändra form för den som redan har den.
+ */
+const FLYTTAT = ["/butik", "/efterlyses", "/sitemap.xml", "/robots.txt"];
+
+/**
+ * Adressen en förfrågan ska omdirigeras till, eller null när den redan står rätt.
+ *
+ * DUBBELPUBLICERING ÄR DET SOM SKA UNDVIKAS. Ligger samma butikssida på två värdnamn räknar Google
+ * dem som två sidor med samma innehåll, och delar värdet mellan dem — vilket är precis motsatsen
+ * till varför vi flyttade.
+ *
+ * `host` ska vara den värd BESÖKAREN bad om, inte den servern råkar lyssna på. Går förfrågan genom
+ * en router framför oss är det routern som vet det, och den skickar det i `x-forwarded-host`. Utan
+ * den skulle servern se sitt eget namn, omdirigera dit den redan står, och göra en oändlig slinga.
+ */
+export function flyttadAdress(host: string | null, pathname: string, search: string): string | null {
+  const kanonisk = kanoniskVard();
+  if (!kanonisk || !host) return null;
+  if (host.toLowerCase() === kanonisk.toLowerCase()) return null;
+  if (!FLYTTAT.some((p) => pathname === p || pathname.startsWith(`${p}/`))) return null;
+  return `${baseUrl()}${pathname}${search}`;
+}
+
 /** Sidhuvudet för en adress under /butik, eller null när adressen inte är butikens. */
 export async function seoFor(pathname: string, search: string): Promise<SeoHead | null> {
   /*
@@ -321,6 +442,7 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
           .map((p) => p.brand as string),
       ),
     ].sort((a, b) => a.localeCompare(b, "sv"));
+    const typer = typeFacetsMerged(await allProducts()).map((f) => furnitureTypeBySlug(f.slug)!);
     return {
       title: `${SITE} – ${MOTTO}`,
       description:
@@ -338,6 +460,16 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
       body:
         `<h1>${MOTTO}</h1><p>Begagnade möbler i Stockholm. Varje Loopa-granskad möbel är filmad, besiktigad och prissatt efter skick.</p>` +
         `<ul>${CATEGORIES.map((c) => `<li><a href="/butik/kategori/${c.slug}">${esc(c.label)}</a></li>`).join("")}</ul>` +
+        /**
+         * Möbeltyperna, bara de med varor. Typsidorna är de som ska ranka på "begagnad soffa" och
+         * "begagnat matbord", och en sida ingenting länkar till rankar inte alls. Räknas ur lagret av
+         * samma skäl som märkena: listan får inte lova en sida för en typ hyllan saknar.
+         */
+        (typer.length
+          ? `<h2>Begagnade möbler efter typ</h2><ul>${typer
+              .map((t) => `<li><a href="/butik/mobel/${t.slug}">${esc(typeHeading(t))}</a></li>`)
+              .join("")}</ul>`
+          : "") +
         (marken.length
           ? `<h2>Märken i butiken</h2><ul>${marken
               .map((m) => `<li><a href="/butik/marke/${brandSlug(m)}">${esc(m)} secondhand</a></li>`)
@@ -353,6 +485,8 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
     if (!category) return null;
     const items = await varorFor({ categorySlug: category.slug });
     const rubrik = `Begagnade ${category.label.toLowerCase()} i Stockholm`;
+    const typer = typerMedVaror(items, category.slug);
+    const fragor = items.length ? vanligaFragor(categoryNounOf(category.slug), category.label.toLowerCase(), prisSpann(items)) : [];
     return {
       /**
        * Antalet i titeln, när vi har ett.
@@ -374,13 +508,90 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
           { name: category.label, path: `/butik/kategori/${category.slug}` },
         ]),
         items.length ? itemListJsonLd(items, rubrik) : null,
+        faqJsonLd(fragor),
       ),
       body:
         `<h1>${esc(rubrik)}</h1><p>${esc(category.blurb)}</p>` +
         varulista(items) +
+        /**
+         * Typerna under kategorin, bara de med varor. "begagnad byrå" ska landa på byråsidan, och
+         * vägen dit går via kategorin — det här är den länken.
+         */
+        (typer.length
+          ? `<h2>${esc(category.label)} efter typ</h2><ul>${typer
+              .map((t) => `<li><a href="/butik/mobel/${t.slug}">${esc(typeHeading(t))} (${t.count})</a></li>`)
+              .join("")}</ul>`
+          : "") +
+        faqHtml(fragor) +
         `<h2>Fler kategorier</h2><ul>${CATEGORIES.filter((c) => c.slug !== category.slug)
           .map((c) => `<li><a href="/butik/kategori/${c.slug}">${esc(c.label)}</a></li>`)
           .join("")}</ul>`,
+    };
+  }
+
+  /**
+   * Typsidan — den som ska ranka på "begagnad soffa".
+   *
+   * Det är så folk söker: singular, obestämd form, ordet för möbeln. Kategorisidan heter "Begagnade
+   * soffor" och det är rätt över ett rutnät, men frasen i sökrutan är "begagnad soffa", och titeln
+   * är det enda i träffen som kan matcha den ordagrant. Därför står den först i titeln, i rubriken
+   * och i adressen.
+   *
+   * ALLT PÅ SIDAN ÄR HÄMTAT UR HYLLAN: antalet, prisspannet, märkena, varorna. Det är det som skiljer
+   * den från en tunn nyckelordssida — och en tom hylla ger noindex, aldrig en sida som lovar soffor
+   * och visar ingenting.
+   */
+  if (head === "mobel" && tail) {
+    const type = furnitureTypeBySlug(decodeURIComponent(tail));
+    if (!type) return null;
+    const category = categoryBySlug(type.categorySlug);
+    const items = await varorFor({ typeSlug: type.slug });
+    const heading = typeHeading(type);
+    const rubrik = `${heading} i Stockholm`;
+    const span = prisSpann(items);
+    const fragor = items.length ? vanligaFragor(type.noun, type.label.toLowerCase(), span) : [];
+    const marken = markenI(items);
+    const syskon = furnitureTypesIn(type.categorySlug).filter((t) => t.slug !== type.slug);
+    const lagerrad = items.length
+      ? `Just nu ${items.length} ${items.length === 1 ? `begagnad ${type.noun}` : `begagnade ${type.label.toLowerCase()}`} till salu hos Loopa` +
+        (span ? (span.min === span.max ? `, ${kr(span.min)}.` : `, från ${kr(span.min)} till ${kr(span.max)}.`) : ".") +
+        ` Alla är filmade, besiktigade och prissatta efter skick, och levereras hem i Stockholm.`
+      : "";
+    return {
+      title: items.length
+        ? `${heading} i Stockholm – ${items.length} till salu – ${SITE}`
+        : `${heading} i Stockholm – ${SITE}`,
+      description:
+        `${heading} i Stockholm: ${items.length ? `${items.length} begagnade ${type.label.toLowerCase()}` : `begagnade ${type.label.toLowerCase()}`}` +
+        (span ? ` från ${kr(span.min)}` : "") +
+        `, besiktigade av Loopa med skick och mått redovisat. Fast pris och hemleverans.`,
+      canonical,
+      noindex: items.length === 0,
+      jsonLd: grafer(
+        breadcrumbJsonLd([
+          { name: SITE, path: "/butik" },
+          ...(category ? [{ name: category.label, path: `/butik/kategori/${category.slug}` }] : []),
+          { name: heading, path: `/butik/mobel/${type.slug}` },
+        ]),
+        items.length ? itemListJsonLd(items, rubrik) : null,
+        faqJsonLd(fragor),
+      ),
+      body:
+        `<h1>${esc(rubrik)}</h1><p>${esc(type.blurb)}</p>` +
+        (lagerrad ? `<p>${esc(lagerrad)}</p>` : "") +
+        varulista(items) +
+        (marken.length
+          ? `<h2>${esc(heading)} efter märke</h2><ul>${marken
+              .map((m) => `<li><a href="/butik/marke/${brandSlug(m.brand)}">${esc(heading)} från ${esc(m.brand)} (${m.count})</a></li>`)
+              .join("")}</ul>`
+          : "") +
+        faqHtml(fragor) +
+        // "Fler övrigt" är inte svenska; hyllan utan eget namn får ett allmänt ord.
+        (category
+          ? `<h2>${category.slug === "ovrigt" ? "Fler möbler" : `Fler ${esc(category.label.toLowerCase())}`}</h2><ul>` +
+            syskon.map((t) => `<li><a href="/butik/mobel/${t.slug}">${esc(typeHeading(t))}</a></li>`).join("") +
+            `<li><a href="/butik/kategori/${category.slug}">Alla begagnade ${esc(category.label.toLowerCase())}</a></li></ul>`
+          : ""),
     };
   }
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import "./butik.css";
 import { navigate, useButikRoute } from "./router";
 import CategoryScreen from "./screens/CategoryScreen";
+import TypeScreen from "./screens/TypeScreen";
 import BrandScreen from "./screens/BrandScreen";
 import ProductScreen from "./screens/ProductScreen";
 import SearchScreen from "./screens/SearchScreen";
@@ -27,6 +28,7 @@ export default function ButikApp() {
   return (
     <ButikChrome>
         {route.name === "category" && <CategoryScreen slug={route.slug} />}
+        {route.name === "type" && <TypeScreen slug={route.slug} />}
         {route.name === "brand" && <BrandScreen slug={route.slug} />}
         {route.name === "product" && <ProductScreen id={route.id} />}
         {route.name === "search" && <SearchScreen q={route.q} />}
@@ -39,6 +41,9 @@ export default function ButikApp() {
 function titleFor(route: ReturnType<typeof useButikRoute>["route"]): string {
   switch (route.name) {
     case "category": return "Kategori – Loopa Butik";
+    // Skalet bär redan serverns titel ("Begagnad soffa i Stockholm – 41 till salu – Loopa Butik");
+    // skärmen skriver den exakta när typen är hämtad. Här bara ett rimligt mellanläge.
+    case "type": return "Begagnade möbler – Loopa Butik";
     case "brand": return `${route.slug} secondhand – Loopa Butik`;
     case "product": return "Möbel – Loopa Butik";
     case "search": return route.q ? `${route.q} – Loopa Butik` : "Alla möbler – Loopa Butik";

@@ -1,0 +1,32 @@
+startsidans radrubriker: För dig | Bläddra bland märken | Bläddra bland möbeltyper
+typbrickor: 16
+    Soffor (begagnad soffa) — 22 granskade · 20 via Tradera → /butik/mobel/soffor
+    Bäddsoffor (begagnad bäddsoffa) — 3 via Tradera → /butik/mobel/baddsoffor
+    Fåtöljer (begagnad fåtölj) — 5 granskade · 12 via Tradera → /butik/mobel/fatoljer
+    Matstolar (begagnad matstol) — 35 granskade · 19 via Tradera → /butik/mobel/matstolar
+    Barstolar (begagnad barstol) — 1 granskade · 3 via Tradera → /butik/mobel/barstolar
+    Matbord (begagnat matbord) — 2 via Tradera → /butik/mobel/matbord
+    Soffbord (begagnat soffbord) — 8 via Tradera → /butik/mobel/soffbord
+    Sidobord (begagnat sidobord) — 1 via Tradera → /butik/mobel/sidobord
+    Byråer (begagnad byrå) — 3 via Tradera → /butik/mobel/byraer
+    Bokhyllor (begagnad bokhylla) — 18 via Tradera → /butik/mobel/bokhyllor
+    Skåp (begagnat skåp) — 10 via Tradera → /butik/mobel/skap
+    Sideboards & tv-bänkar (begagnad sideboard) — 2 via Tradera → /butik/mobel/sideboards
+    Sängar (begagnad säng) — 10 via Tradera → /butik/mobel/sangar
+    Skrivbord (begagnat skrivbord) — 3 granskade · 9 via Tradera → /butik/mobel/skrivbord
+    Kontorsstolar (begagnad kontorsstol) — 3 via Tradera → /butik/mobel/kontorsstolar
+    Speglar (begagnad spegel) — 3 via Tradera → /butik/mobel/speglar
+
+efter klick på Soffor:
+  adress: /butik/mobel/soffor
+  document.title: Begagnad soffa i Stockholm – 22 till salu – Loopa Butik
+  h1: Begagnad soffa i Stockholm
+  brödsmulor: Butik › Soffor
+  ingress: Begagnade soffor i Stockholm — två-, tre- och hörnsoffor, filmade och besiktigade innan de…
+  lagerrad: Just nu 22 begagnade soffor till salu — granskade, prissatta efter skick och med hemleverans i Stockholm.
+  kort i rutnätet: 22
+  syskonchips: Endast Loopa-granskade, Filter, RelevansNyinkommetLägsta prisHögsta pris, Begagnad bäddsoffa, Alla soffor
+  serverns h1 i skalet: Begagnad soffa i Stockholm
+  samma som Reacts: true
+
+fel i konsolen: inga

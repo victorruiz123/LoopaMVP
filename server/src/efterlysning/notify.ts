@@ -122,7 +122,17 @@ export function reset(): void { cache = null; }
 /** Ett dygn mellan Tradera-brev per efterlysning. Config, för att takten kommer att justeras. */
 const TRADERA_COOLDOWN_MS = Number(process.env.EFTERLYSNING_TRADERA_COOLDOWN_MS ?? 24 * 3600_000);
 
-const BASE = () => process.env.PUBLIC_URL?.trim() || "https://app.loopa.nu";
+/**
+ * Adressen breven länkar till.
+ *
+ * `LOOPA_PUBLIC_URL` FÖRST. Här stod bara `PUBLIC_URL`, vilket var ett andra namn på samma sak —
+ * resten av servern läser `LOOPA_PUBLIC_URL` (se butik/seo.ts, checkout.ts, adContent.ts). Vid en
+ * domänflytt hade den som satte den ena fått notismejl som fortsatte peka på den gamla adressen,
+ * tyst, och först märkt det när någon klagade på en död länk. Det gamla namnet läses fortfarande,
+ * så en miljö som bara har det fungerar som förut.
+ */
+const BASE = () =>
+  process.env.LOOPA_PUBLIC_URL?.trim() || process.env.PUBLIC_URL?.trim() || "https://app.loopa.nu";
 
 export function deepLink(e: Efterlysning): string {
   return `${BASE()}/kop/mina-efterlysningar#${e.id}`;

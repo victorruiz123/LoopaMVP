@@ -1,10 +1,11 @@
 import { useEffect, useState } from "react";
 import { ProductStrip } from "../butik/components/ProductGrid";
 import BrandTiles from "../butik/components/BrandTiles";
+import TypeTiles from "../butik/components/TypeTiles";
 import AiSearch from "../butik/components/AiSearch";
 import { track } from "../butik/components/Bits";
-import { fetchBrands } from "../butik/api";
-import type { BrandFacet } from "../butik/types";
+import { fetchBrands, fetchTypes } from "../butik/api";
+import type { BrandFacet, FurnitureType } from "../butik/types";
 import { BUTIK_ROOT } from "../butik/router";
 import { useT } from "../lib/i18n";
 import "../butik/butik.css";
@@ -97,9 +98,11 @@ export function SaljHero() {
 export default function Upptack() {
   const t = useT();
   const [brands, setBrands] = useState<BrandFacet[] | null>(null);
+  const [types, setTypes] = useState<FurnitureType[] | null>(null);
 
   useEffect(() => {
     fetchBrands().then((r) => setBrands(r.brands)).catch(() => setBrands([]));
+    fetchTypes().then((r) => setTypes(r.types)).catch(() => setTypes([]));
     // Måttet på om testet landar: hur många som ens ser köphalvan, jämfört med hur många som
     // klickar vidare in i butiken. Samma spår som `buy_cta_click` från topplisten.
     track("view_item_list", { list: "startsidan" });
@@ -152,6 +155,15 @@ export default function Upptack() {
 
       <h3 className="marknad-rubrik">{t("Bläddra bland märken")}</h3>
       <BrandTiles brands={brands ?? []} />
+
+      {/*
+        MÖBELTYPERNA UNDER MÄRKENA. Märket är ingången för den som vet vad de vill ha; typen för den
+        som vet vad de behöver — "en soffa", "ett matbord". Varje bricka leder till en egen sida
+        (/butik/mobel/soffor) med rubriken "Begagnad soffa i Stockholm": det är den sidan som ska
+        svara på sökningen, och brickan här är vägen dit från startsidan. Bara typer med varor visas.
+      */}
+      <h3 className="marknad-rubrik">{t("Bläddra bland möbeltyper")}</h3>
+      <TypeTiles types={types ?? []} />
 
       {/*
         Vägen in i butiken i sin helhet. Ett vanligt <a> med en riktig adress: den byter app och ska

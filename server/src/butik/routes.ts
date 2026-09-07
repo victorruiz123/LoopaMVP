@@ -12,9 +12,9 @@ import { abandonCheckout, checkoutConfigured, CheckoutError, chooseSlot, fulfilP
 import { getOrder, orderByReference, ordersForUser, updateOrder } from "./orders.js";
 import { createBevakning, deleteBevakning, listBevakningar } from "./bevakningar.js";
 import { aiSearchAvailable, interpretQuery, rateLimited } from "./aiSearch.js";
-import { allProducts, applyFilter, brandFacets, brandFacetsMerged, categoryFacetsOf, productById } from "./inventory.js";
+import { allProducts, applyFilter, brandFacets, brandFacetsMerged, categoryFacetsOf, productById, typeFacetsMerged } from "./inventory.js";
 import { browse, mergedItems } from "./browse.js";
-import { CATEGORIES, categoryBySlug } from "./catalog.js";
+import { CATEGORIES, categoryBySlug, furnitureTypeBySlug, MOBELTYPER } from "./catalog.js";
 import { store } from "./store.js";
 import { avtryck, spara } from "../analys/store.js";
 import type { ConditionGrade } from "../types.js";
@@ -56,6 +56,7 @@ export function filterFromQuery(url: URL): ProductFilter {
   return {
     q: q.get("q"),
     categorySlug: q.get("kategori"),
+    typeSlug: q.get("typ"),
     brands: list(q.get("marke")),
     /**
      * BARA LOOPA-VAROR, om ingen uttryckligen ber om något annat.
@@ -187,6 +188,35 @@ export async function handleButikRequest(
     // som bara finns i en HTTP-hanterare går inte att pröva. Se brandFacetsMerged.
     const brands = brandFacetsMerged(items);
     json(res, 200, { brands });
+    return true;
+  }
+
+  /**
+   * GET /api/butik/mobeltyper — typbrickorna på startsidan, med antal per källa.
+   *
+   * Bara typer med minst en vara, och HELA katalogposten följer med: rubriken och ingressen typsidan
+   * visar kommer härifrån, så att det React ritar är samma text som seo.ts redan skrev in i skalet.
+   * Två texter om samma sida är två sanningar, och sökmotorn läser båda.
+   */
+  if (segments[0] === "mobeltyper" && segments.length === 1) {
+    const { items } = await mergedItems();
+    const facets = typeFacetsMerged(items);
+    const types = facets.map((f) => ({ ...furnitureTypeBySlug(f.slug)!, ...f }));
+    json(res, 200, { types });
+    return true;
+  }
+
+  // GET /api/butik/mobeltyper/:slug — typsidan: katalogposten, kategorin den hör till och rutnätet.
+  if (segments[0] === "mobeltyper" && segments.length === 2) {
+    const type = furnitureTypeBySlug(segments[1]);
+    if (!type) {
+      json(res, 404, { error: "Möbeltypen finns inte." });
+      return true;
+    }
+    const filter = { ...filterFromQuery(url), typeSlug: type.slug };
+    const category = categoryBySlug(type.categorySlug) ?? null;
+    const siblings = MOBELTYPER.filter((t) => t.categorySlug === type.categorySlug && t.slug !== type.slug);
+    json(res, 200, { type, category, siblings, ...(await browse(filter)) });
     return true;
   }
 

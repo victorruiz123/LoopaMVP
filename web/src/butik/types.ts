@@ -111,3 +111,22 @@ export interface BrandFacet {
   /** Adressens form av namnet. Serversatt, så klienten inte behöver upprepa slugreglerna. */
   slug?: string;
 }
+
+/**
+ * En möbeltyp — ett steg finare än kategorin. Speglar FurnitureType i server/src/butik/catalog.ts.
+ * Antalen är delade per källa av samma skäl som på märkesbrickan: en granskad möbel och en
+ * Tradera-annons är inte lika mycket värda, och ett sammanslaget tal hade lånat ut vår granskning.
+ */
+export interface FurnitureType {
+  slug: string;
+  /** Plural: "Soffor". */
+  label: string;
+  /** Singular: "soffa". */
+  noun: string;
+  categorySlug: string;
+  blurb: string;
+  neuter?: boolean;
+  count: number;
+  loopa: number;
+  tradera: number;
+}
