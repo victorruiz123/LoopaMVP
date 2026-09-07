@@ -402,6 +402,25 @@ function arPublikVard(host: string): boolean {
 }
 
 /**
+ * Har roten flyttat än?
+ *
+ * `loopa.nu/` visar marknadssajtens företagssida fram till lansering — en Cloudflare-regel som
+ * ligger kvar med flit. Kanoniserades roten ändå fick en säljare den här kedjan:
+ * app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company. Säljflödet gick inte att nå från någon adress
+ * alls, och det var precis vad som hände i drift innan den här raden fanns.
+ *
+ * Roten är den ENDA sökvägen där de två sajterna gör anspråk på samma adress, och därför den enda
+ * som behöver ett datum. Resten flyttade direkt.
+ *
+ * Vid lansering: sätt LOOPA_ROT_FLYTTAD=1 i server/.env, ta bort omdirigeringsregeln i Cloudflare,
+ * starta om. Ordningen spelar roll — regeln körs före Workers, så tas den inte bort når förfrågan
+ * aldrig appen.
+ */
+function rotFlyttad(): boolean {
+  return process.env.LOOPA_ROT_FLYTTAD?.trim() === "1";
+}
+
+/**
  * Adressen en förfrågan ska omdirigeras till, eller null när den redan står rätt.
  *
  * DUBBELPUBLICERING ÄR DET SOM SKA UNDVIKAS. Ligger samma butikssida på två värdnamn räknar Google
@@ -417,6 +436,7 @@ export function flyttadAdress(host: string | null, pathname: string, search: str
   if (!kanonisk || !host) return null;
   if (!arPublikVard(host)) return null;
   if (host.toLowerCase() === kanonisk.toLowerCase()) return null;
+  if (pathname === "/" && !rotFlyttad()) return null;
   if (ALDRIG.some((p) => pathname === p.replace(/\/$/, "") || pathname.startsWith(p))) return null;
   return `${baseUrl()}${pathname}${search}`;
 }

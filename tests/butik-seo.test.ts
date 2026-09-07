@@ -233,8 +233,12 @@ test("samma sida på RÄTT värdnamn omdirigeras inte — annars blir det en oä
 
 test("hela appen flyttar — allt utom maskinvägarna och sanningskorten", () => {
   MED_KANONISK("https://loopa.nu", () => {
-    // Säljflödets rot flyttar numera också: loopa.nu/ ÄR appen.
-    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), "https://loopa.nu/");
+    /*
+     * ROTEN VÄNTAR PÅ LANSERING. loopa.nu/ visar marknadssajtens företagssida än, så en
+     * kanonisering av roten gav kedjan app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company:
+     * säljflödet gick inte att nå från någon adress alls. Det hände i drift.
+     */
+    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), null);
     assert.equal(flyttadAdress("app.loopa.nu", "/efterlyses/stolar", ""), "https://loopa.nu/efterlyses/stolar");
     assert.equal(flyttadAdress("app.loopa.nu", "/sitemap.xml", ""), "https://loopa.nu/sitemap.xml");
     assert.equal(flyttadAdress("app.loopa.nu", "/kop/analysera", ""), "https://loopa.nu/kop/analysera");
@@ -293,4 +297,19 @@ test("loopback och IP-adresser kanoniseras aldrig", () => {
     // Men ett riktigt värdnamn ska fortfarande flyttas.
     assert.equal(flyttadAdress("app.loopa.nu", "/butik", ""), "https://loopa.nu/butik");
   });
+});
+
+test("roten flyttar när flaggan sätts vid lansering", () => {
+  const fore = process.env.LOOPA_ROT_FLYTTAD;
+  process.env.LOOPA_ROT_FLYTTAD = "1";
+  try {
+    MED_KANONISK("https://loopa.nu", () => {
+      assert.equal(flyttadAdress("app.loopa.nu", "/", ""), "https://loopa.nu/");
+      // Undantagen gäller fortfarande — flaggan rör bara roten.
+      assert.equal(flyttadAdress("app.loopa.nu", "/c/LP-1", ""), null);
+    });
+  } finally {
+    if (fore === undefined) delete process.env.LOOPA_ROT_FLYTTAD;
+    else process.env.LOOPA_ROT_FLYTTAD = fore;
+  }
 });
