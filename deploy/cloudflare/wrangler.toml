@@ -29,6 +29,26 @@ compatibility_date = "2026-01-01"
 # pattern = "loopa.nu/"
 # zone_name = "loopa.nu"
 
+# ─── Säljflödet på en delbar adress, tills roten flyttar ────────────────────
+#
+# loopa.nu/ går till marknadssajtens /company så länge omdirigeringsregeln ligger kvar (se ROTEN
+# ovan), och app.loopa.nu är ingen adress man skickar till någon. /salj lägger säljflödet på den
+# domän som faktiskt används, utan att röra roten.
+#
+# INGEN KOD BEHÖVDES. Säljflödet har med flit ingen router — App.tsx väljer vy på adressen och låter
+# allt den inte känner igen falla till startsidan (se FlowApp). /salj är alltså inte en ny sida utan
+# en adress som råkar landa på den som redan finns.
+#
+# Två mönster och inte "loopa.nu/salj*": stjärnan hade också fångat /saljare och vad marknadssajten
+# än lägger där i framtiden. Den här rutten ska äga precis två adresser.
+[[routes]]
+pattern = "loopa.nu/salj"
+zone_name = "loopa.nu"
+
+[[routes]]
+pattern = "loopa.nu/salj/*"
+zone_name = "loopa.nu"
+
 [[routes]]
 pattern = "loopa.nu/butik*"
 zone_name = "loopa.nu"
@@ -131,6 +151,14 @@ zone_name = "loopa.nu"
 
 [[routes]]
 pattern = "loopa.nu/api/price*"
+zone_name = "loopa.nu"
+
+# Startsidans chatt ("Hur fungerar det?"). Den enda av klientens tio API-namnrymder som saknades
+# här — utan raden svarar marknadssajtens egna Pages Functions på /api/salj/chat, och rutan säger
+# att anropet misslyckades. Sidan hade sett hel ut och varit trasig på precis det ställe den finns
+# för. Se listan i klienten: grep -roE "/api/[a-z-]+" web/src.
+[[routes]]
+pattern = "loopa.nu/api/salj/*"
 zone_name = "loopa.nu"
 
 [[routes]]
