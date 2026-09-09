@@ -41,6 +41,14 @@ export type BrandType =
   | "wide"
   /** Modernisterna: geometrisk sans i Futuras släkt. Artek, Massproductions. */
   | "geometric"
+  /**
+   * De som skriver sitt namn med GEMENER. String, Muuto, artek.
+   *
+   * Egen typ och inte "wide utan versaler", för gemenerna ÄR identiteten hos de här märkena — deras
+   * ordbild är låg och bred, och satt i versaler blir den någon annans. Det är samma skillnad som
+   * mellan IKEA och ikea: det ena är fel märke.
+   */
+  | "lower"
   /** Arvet: antikva. Svenskt Tenn, Källemo, DUX, Carl Malmsten. */
   | "serif"
   /** Allt annat — appens egen typografi. */
@@ -52,6 +60,15 @@ export interface BrandLook {
   type: BrandType;
   /** Ljus botten behöver en kontur för att inte flyta ihop med det vita kortet under. */
   ring?: boolean;
+  /**
+   * Hur märket SKRIVER sitt namn, när det skiljer sig från namnet i vår korpus.
+   *
+   * "String Furniture" heter så i prismotorns data och i sökningen; på sina egna möbler står det
+   * "string". Fältet är BARA för visning — matchning, sökning och allt som slår upp ett märke
+   * använder oförändrat namnet i listan. Ett märke vars ordbild vi skriver fel är ett märke säljaren
+   * inte känner igen, och igenkänningen är hela skälet den här filen finns.
+   */
+  wordmark?: string;
 }
 
 const PAPER = "#ffffff";
@@ -65,12 +82,12 @@ const LOOKS: Record<string, BrandLook> = {
   mio: { bg: "#b23a3a", fg: PAPER, type: "heavy" },
 
   // Designhusen — svart på papper, vid spärr. Deras identitet ÄR frånvaron av färg.
-  hay: { bg: PAPER, fg: INK, type: "wide", ring: true },
-  muuto: { bg: PAPER, fg: INK, type: "wide", ring: true },
+  hay: { bg: PAPER, fg: INK, type: "heavy", ring: true },
+  muuto: { bg: "#edece8", fg: "#7d7c78", type: "lower", ring: true },
   "&tradition": { bg: PAPER, fg: INK, type: "wide", ring: true },
   "ferm living": { bg: "#f3efe6", fg: INK, type: "wide", ring: true },
   vitra: { bg: INK, fg: PAPER, type: "wide" },
-  "fritz hansen": { bg: INK, fg: PAPER, type: "wide" },
+  "fritz hansen": { bg: "#e9e3d5", fg: "#2b2823", type: "wide" },
   gubi: { bg: INK, fg: PAPER, type: "wide" },
   "normann copenhagen": { bg: PAPER, fg: INK, type: "wide", ring: true },
   "louis poulsen": { bg: INK, fg: PAPER, type: "wide" },
@@ -78,17 +95,18 @@ const LOOKS: Record<string, BrandLook> = {
    * Modernisterna. Aalto och Massproductions sätter sina namn i geometrisk sans — samma släkt som
    * Futura — och det är den skillnaden mot designhusens neo-grotesk som gör dem igenkännliga.
    */
-  artek: { bg: PAPER, fg: INK, type: "geometric", ring: true },
+  // Artek sätter sitt namn i rött med gemener — den röda ordbilden ÄR märket.
+  artek: { bg: PAPER, fg: "#e2231a", type: "lower", ring: true },
   massproductions: { bg: PAPER, fg: INK, type: "geometric", ring: true },
   "west elm": { bg: INK, fg: PAPER, type: "wide" },
   bolia: { bg: PAPER, fg: INK, type: "wide", ring: true },
   sits: { bg: PAPER, fg: "#3f3b35", type: "wide", ring: true },
-  "string furniture": { bg: PAPER, fg: INK, type: "wide", ring: true },
+  "string furniture": { bg: "#141414", fg: PAPER, type: "lower", wordmark: "string" },
   "herman miller": { bg: INK, fg: PAPER, type: "wide" },
   stressless: { bg: "#2b2b2b", fg: PAPER, type: "wide" },
 
   // Arvet — antikva, dova toner.
-  "svenskt tenn": { bg: "#1f4b3f", fg: "#f2ede2", type: "serif" },
+  "svenskt tenn": { bg: "#123528", fg: "#c9a961", type: "serif" },
   källemo: { bg: "#2a2723", fg: "#f2ede2", type: "serif" },
   dux: { bg: "#232019", fg: "#f2ede2", type: "serif" },
   "carl malmsten": { bg: "#4a3f2f", fg: "#f4ece0", type: "serif" },
@@ -103,7 +121,7 @@ const LOOKS: Record<string, BrandLook> = {
    */
   "yngve ekström": { bg: "#4a3f2f", fg: "#f4ece0", type: "serif" },
   "josef frank": { bg: "#4a3f2f", fg: "#f4ece0", type: "serif" },
-  "carl hansen & søn": { bg: "#2a2723", fg: "#f2ede2", type: "serif" },
+  "carl hansen & søn": { bg: PAPER, fg: "#8a8880", type: "wide", ring: true },
   lammhults: { bg: "#2a2723", fg: "#f2ede2", type: "serif" },
   gärsnäs: { bg: "#2a2723", fg: "#f2ede2", type: "serif" },
 
@@ -165,10 +183,23 @@ const FAMILJER: Record<BrandType, string | undefined> = {
   wide: '"Helvetica Neue", Helvetica, Arial, Inter, sans-serif',
   geometric: 'Futura, "Century Gothic", "Avenir Next", Poppins, sans-serif',
   serif: 'Georgia, "Iowan Old Style", "Times New Roman", serif',
+  lower: '"Helvetica Neue", Helvetica, Arial, Inter, sans-serif',
   plain: undefined,
 };
 
 /** CSS för märkets bokstavsform. Samma regler används av brickan och av det valda märkets namn. */
+/**
+ * Om märket har en EGEN identitet i tabellen ovan, eller får en neutral ur Loopas palett.
+ *
+ * Finns för startsidans ordning: de märken vi kan visa i sin egen färg läggs först, så att rutnätet
+ * öppnar med igenkänning i stället för med trettio beigea rutor. Frågan ställs HÄR och inte genom att
+ * jämföra en look mot neutralerna hos anroparen — tabellen är privat, och en anropare som gissar sig
+ * till svaret gissar fel dagen någon lägger till en neutral som råkar likna en riktig.
+ */
+export function harEgenIdentitet(name: string): boolean {
+  return LOOKS[name.trim().toLowerCase()] !== undefined;
+}
+
 export function brandTypeStyle(type: BrandType): CSSProperties {
   const fontFamily = FAMILJER[type];
   switch (type) {
@@ -178,8 +209,22 @@ export function brandTypeStyle(type: BrandType): CSSProperties {
       return { fontFamily, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase" };
     case "geometric":
       return { fontFamily, fontWeight: 500, letterSpacing: "0.08em", textTransform: "uppercase" };
+    case "lower":
+      /**
+       * TVINGAT GEMENT, inte "orörd skiftning".
+       *
+       * Namnen står som "Artek" och "Muuto" i korpusen, för det är så en katalog skriver dem. Husen
+       * själva skriver "artek" och "muuto", och det är den ordbilden man känner igen. `none` hade
+       * lämnat versalen kvar och gjort typen verkningslös på precis de märken den finns för.
+       */
+      return { fontFamily, fontWeight: 400, letterSpacing: "0.22em", textTransform: "lowercase" };
     case "serif":
-      return { fontFamily, fontWeight: 600, letterSpacing: "0.01em" };
+      /**
+       * VERSALT OCH SPÄRRAT. Arvet sätter sina namn så — Svenskt Tenn, Carl Hansen & Søn, Källemo,
+       * DUX — och en antikva i gemener med tät spärr läser som brödtext i en bok, inte som ett
+       * märke på en möbel.
+       */
+      return { fontFamily, fontWeight: 600, letterSpacing: "0.11em", textTransform: "uppercase" };
     default:
       return { fontWeight: 700, letterSpacing: "0.01em" };
   }

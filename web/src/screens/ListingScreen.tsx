@@ -1,21 +1,20 @@
+import { useEffect, useState } from "react";
 import type { CardCover, CardDamage, ConditionResult } from "../types";
 import { damageStands } from "../lib/damages";
 import { ArrowLeftIcon } from "../components/icons";
-import LoopaIdBlock from "../components/LoopaIdBlock";
 import ListingView from "../components/ListingView";
 import SellWithLoopa from "../components/SellWithLoopa";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
-import { imageUrl } from "../api";
+import { imageUrl, saveListingDetails } from "../api";
 import DemandHook from "../kop/components/DemandHook";
 
 /**
  * Säljarens vy av sin annons.
  *
  * Själva kortet ritas av ListingView, som är samma vy det publika kortet använder — det säljaren
- * granskar här är exakt det en köpare ser på Loopa-ID:t. Runt kortet ligger det som bara är
- * säljarens: ID:t med vad det innebär, och vägen ut — "Sälj med Loopa", som lägger ut möbeln till
- * salu och lämnar över försäljningen till oss.
+ * granskar här är exakt det en köpare ser. Runt kortet ligger bara vägen ut — "Sälj med Loopa",
+ * som lägger ut möbeln till salu och lämnar över försäljningen till oss.
  *
  * En väg ut, inte två: "Se Blocket-annons" låg här som ett andra sätt att sälja, men det var inte
  * att sälja med Loopa — det var att få tillbaka annonsen som text att bära någon annanstans för
@@ -27,7 +26,7 @@ import DemandHook from "../kop/components/DemandHook";
  * det ingenting annat att trycka på.
  */
 export default function ListingScreen({
-  result,
+  result: initialResult,
   loopaId,
   onBack,
   onHome,
@@ -47,6 +46,20 @@ export default function ListingScreen({
   onMyListings?: () => void;
 }) {
   const t = useT();
+
+  /**
+   * Kortet som det ser ut just nu — inte som det såg ut när skärmen öppnades.
+   *
+   * Säljaren kan rätta måtten och beskrivningen härifrån, och varje sådan skrivning svarar med hela
+   * `ConditionResult`. Utan ett eget tillstånd hade vyn ritat om med propen, alltså med texten som
+   * gällde före ändringen — rättelsen hade sparats på servern och försvunnit på skärmen.
+   *
+   * Propen vinner fortfarande när den byts: App skickar in ett nytt resultat när man går via
+   * skickskärmen igen, och det är färskare än vårt.
+   */
+  const [result, setResult] = useState(initialResult);
+  useEffect(() => setResult(initialResult), [initialResult]);
+
   const listing = result.listing;
   usePageTitle("Annons");
   const card = listing?.result ?? null;
@@ -92,13 +105,24 @@ export default function ListingScreen({
             productImage={result.productImage}
             cover={sellerCover(result)}
             loopaId={loopaId}
+            /* Fällda sektioner, så att "Sälj med Loopa" ryms på första skärmen. Se `collapsible`
+               i ListingView för varför det gäller den här vyn och inte det publika kortet. */
+            collapsible
+            onSaveListing={async (patch) => setResult(await saveListingDetails(result.jobId, patch))}
           />
-          {/* ID:t före säljknappen: det står i annonstexten som skickas, och säljaren ska ha
-              sett vad de delar innan de trycker. */}
-          {loopaId && <LoopaIdBlock loopaId={loopaId} />}
           {/* Sist på kortet, efter allt som ska granskas: vägen ut. Det är det enda på den här
-              skärmen som lämnar appen, så den ska komma efter att säljaren läst vad som skickas. */}
-          <SellWithLoopa jobId={result.jobId} onMyListings={onMyListings} />
+              skärmen som lämnar appen, så den ska komma efter att säljaren läst vad som skickas.
+
+              LOOPA-ID:T STOD HÄR, i en egen ruta med kopieringsknapp och tre rader förklaring. Det
+              är en intern nyckel — den råkar stå i annonstexten, men säljaren har ingenting att
+              göra med den, och en kod med en kopieringsknapp mitt i en annons ser ut som något man
+              förväntas ta hand om. Kortet nås fortfarande på sitt ID; det behöver bara inte stå
+              framför den som säljer möbeln. */}
+          <SellWithLoopa
+            jobId={result.jobId}
+            coverUrl={sellerCover(result)?.url ?? null}
+            onMyListings={onMyListings}
+          />
         </>
       )}
 

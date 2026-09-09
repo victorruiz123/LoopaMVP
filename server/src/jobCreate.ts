@@ -27,7 +27,7 @@ export interface CreateJobBody {
   brand?: string | null;
   model?: string | null;
   /** Already curated by the client: selected video frames + any manual photos. No server-side selection. */
-  images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual" }>;
+  images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual"; role?: "cover" }>;
   /**
    * Affären skanningen tillhör (Trygg affär). Utelämnas för vanliga säljarjobb.
    *
@@ -78,12 +78,18 @@ export async function createConditionJob(
    * giltiga från en produktbild som från en filmning, för de handlar om vilken möbel det ÄR.
    */
   skipGrading = false,
+  /**
+   * Säljarens e-post, sparad på jobbet så att vi kan höra av oss när möbeln säljs. SIST i listan
+   * med flit: `affar/analysis.ts` skickar sina argument positionellt, och en ny parameter i mitten
+   * hade tyst gjort en `true` till en adress.
+   */
+  ownerEmail: string | null = null,
 ): Promise<{ jobId: string; imageCount: number } | { error: string }> {
   if (!Array.isArray(body.images) || body.images.length === 0) {
     return { error: "At least one image is required" };
   }
   const identity = readIdentity(body);
-  const job = await createJob(body.productContext ?? null, identity, ownerId);
+  const job = await createJob(body.productContext ?? null, identity, ownerId, ownerEmail);
   // Märkningen sätts före allt annat skrivande, så att inget mellanläge finns där jobbet är
   // besiktigat men ännu inte känt som privat.
   if (dealId || adDerived) {
@@ -98,7 +104,7 @@ export async function createConditionJob(
   const limited = body.images.slice(0, MAX_IMAGES_PER_JOB);
   const images: CapturedImage[] = [];
   for (let i = 0; i < limited.length; i++) {
-    const { dataUrl, viewLabel, source } = limited[i];
+    const { dataUrl, viewLabel, source, role } = limited[i];
     const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl);
     if (!match) continue;
     const [, mimeType, base64] = match;
@@ -111,6 +117,9 @@ export async function createConditionJob(
       id: randomUUID(),
       viewLabel: viewLabel ?? null,
       source: source ?? "manual",
+      // Bara "cover" släpps in. Fältet styr vad som blir annonsens ansikte och vad besiktningen får
+      // se, så en klient ska inte kunna hitta på en tredje roll som ingen kod nedströms känner igen.
+      ...(role === "cover" ? { role: "cover" as const } : {}),
       width,
       height,
       path: filename,

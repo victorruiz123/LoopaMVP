@@ -1,25 +1,38 @@
 # Produktbild
 
-Säljarens foto in — en produktbild mot rent vitt ut, med möbelns egna pixlar orörda.
+Säljarens foto in — en produktbild ut, med möbelns egna pixlar orörda.
 
 ```
 originals/<säljarens fil>          rörs aldrig
   → segmentera.ts   modellen svarar: hur mycket möbel per pixel
   → kant.ts         snäpp mot bildens kanter, öar bort, rummets färg ur kantbandet
   → kvalitet.ts     sju mått, varav två invarianter
-  → komposition.ts  beskärning, skala, vit duk, kontaktskugga
+  → komposition.ts  beskärning, skala, duk, kontaktskugga
 ```
 
-Gränssnittet är `bearbetaMobelbild(bild)` (även exporterad som `processFurnitureImage`) i
-`produktbild.ts`, som ger `{ processedImage, transparent, mask, qualityScore, needsReview, metadata }`.
-På jobbnivå: `byggOmslag()` i `omslag.ts`.
+Annonsen bär upp till FEM sådana bilder, inte en. En vy säljer inte en begagnad möbel: den som
+funderar på en soffa för sex tusen vill se ryggen, sitsen och benen, och den frågan besvaras annars
+av en mejlkonversation eller inte alls. Rutorna är redan filmade.
 
-## Ingen generativ modell
+Galleriets bilder ligger mot rent vitt. FÖRSTA bilden — annonsens ansikte — står i stället i en
+studio: ett tomt golv och en vägg, samma pixlar under varje annons i butiken. Se `studio.ts`.
 
-Det som frågas en modell är EN sak: vilka pixlar som är möbel. Färg, form, material, slitage och
-skador kommer från säljarens egen fil och går orörda igenom. Det kontrolleras mätbart i varje
-körning — `fargdrift` ska vara 0 och `inreOrord` ska vara 1 — och ett brott mot dem stoppar bilden.
-Ett löfte som bara hålls av att koden är rätt är ett löfte tills någon ändrar i koden.
+Gränssnittet är `bearbetaMobelbild(bild, { studio })` (även exporterad som `processFurnitureImage`) i
+`produktbild.ts`, som ger `{ processedImage, studioImage, transparent, mask, qualityScore,
+needsReview, metadata }`. På jobbnivå: `byggOmslag()` i `omslag.ts`, som väljer rutorna, bygger
+galleriet och skriver filerna.
+
+## Ingen generativ modell rör möbeln
+
+Det som frågas en modell OM MÖBELN är EN sak: vilka pixlar som är möbel. Färg, form, material,
+slitage och skador kommer från säljarens egen fil och går orörda igenom.
+
+Studiobakgrunden är ritad av en bildmodell, och den är undantaget som inte är ett undantag: modellen
+ritade ett TOMT RUM, en gång, till en incheckad fil. Möbeln läggs ovanpå den av samma aritmetik som
+lade den mot vitt. Skillnaden mot ett vitt fält är vad som ligger BAKOM urklippet, aldrig vad som är
+i det. Det kontrolleras mätbart i varje körning — `fargdrift` ska vara 0 och `inreOrord` ska vara 1 —
+och ett brott mot dem stoppar bilden. Ett löfte som bara hålls av att koden är rätt är ett löfte
+tills någon ändrar i koden.
 
 Enda stället kedjan skriver i färgkanaler är `dekontaminera` i `kant.ts`, och bara där alfa säger att
 pixeln är en BLANDNING av möbel och rum (0,02 < α < 0,98) — alltså pixlar som aldrig bar möbelns
@@ -72,7 +85,10 @@ stället för en soffa är precis lika säker som när den har rätt.
 Sju mått — täckning, beskuren, band, fragment, benförlust, färgdrift, inre orörd. Faller något
 sätts `needsReview`. Bilden byggs och sparas ändå (en människa ska kunna öppna den bredvid
 originalet) men går inte ut publikt av sig själv. Den frågan ställs på ETT ställe: `harGodkantOmslag`
-i `omslag.ts`, som både kortet, butikens rutnät och serverporten frågar.
+i `omslag.ts`, som både kortet, butikens rutnät och serverporten frågar — och `publikaGalleribilder`
+bredvid den, som ställer samma krav per galleribild. En flaggad vinkel faller ur bläddringen för sig;
+ett flaggat OMSLAG tar hela galleriet med sig, för en bläddring som börjar i en bild vi inte står för
+är värre än ingen bläddring.
 
 Lista de flaggade: `npx tsx scripts/bygg-produktbilder.ts --granska`
 
@@ -80,11 +96,29 @@ Lista de flaggade: `npx tsx scripts/bygg-produktbilder.ts --granska`
 
 ```
 originals/<säljarens fil>   rörs aldrig
-cover/cover.jpg             produktbilden mot rent vitt, 1600×1600
-cover/transparent.png       möbeln utan bakgrund, mot vilken botten som helst
-cover/mask.png              silhuetten
-cover/produktbild.json      modell, mått, kvalitetsdom, tid
+cover/cover.jpg             OMSLAGET: möbeln i studion, 1600×1600
+cover/galleri/1.jpg         samma bildruta som omslaget, mot rent vitt
+cover/galleri/2..N.jpg      annonsens övriga vinklar, mot rent vitt
+cover/transparent.png       omslagets möbel utan bakgrund, mot vilken botten som helst
+cover/mask.png              omslagets silhuett
+cover/produktbild.json      modell, mått, kvalitetsdom, tid — per byggd bild
 ```
+
+`cover.jpg` och `galleri/1.jpg` är samma möbel på samma plats med olika botten. Den vita finns kvar
+som reserv: går studiobakgrunden förlorad ligger den redan byggd, utan ett nytt modellvarv.
+
+## Studiobakgrunden
+
+En enda incheckad fil, `server/assets/studio/`, med sin prompt i sidofilen bredvid. Gör om den med
+
+```
+npx tsx scripts/studiobakgrund.ts --prov          # några förslag att titta på
+npx tsx scripts/studiobakgrund.ts --valj bench/studio/forslag-1.jpg
+```
+
+Fogen mellan vägg och golv MÅSTE ligga ovanför möbelns nederkant (0,925 av rutan), annars står
+möbeln på väggen. Höjden mäts på förslaget och ett som ligger fel underkänns — se `studio.ts`.
+Saknas filen byggs omslaget mot vitt, precis som innan studion fanns.
 
 ## Att byta modell
 

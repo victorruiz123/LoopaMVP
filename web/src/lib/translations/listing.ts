@@ -15,6 +15,13 @@ export const LISTING: Record<string, Translation> = {
     en: "The seller's own photo of the furniture, background removed",
     fr: "Photo du meuble prise par le vendeur, fond supprimé",
   },
+  "Säljarens egen bild av möbeln, mot vår studiobakgrund": {
+    en: "The seller's own photo of the furniture, on our studio backdrop",
+    fr: "Photo du meuble prise par le vendeur, sur notre fond de studio",
+  },
+  "Bilder av möbeln": { en: "Photos of the furniture", fr: "Photos du meuble" },
+  "Bild {nr}": { en: "Photo {nr}", fr: "Photo {nr}" },
+  "{namn}, bild {nr}": { en: "{namn}, photo {nr}", fr: "{namn}, photo {nr}" },
   "Produktbild av modellen — inte möbeln som säljs": {
     en: "Catalogue photo of the model — not the piece being sold",
     fr: "Photo catalogue du modèle — pas le meuble mis en vente",
@@ -83,6 +90,8 @@ export const LISTING: Record<string, Translation> = {
 
   // ---- sälj med Loopa ----
   "Sälj med Loopa": { en: "Sell with Loopa", fr: "Vendre avec Loopa" },
+  // Halva meningen, för knappen där "loopa" sätts i ordmärket och alltså inte kan ligga i strängen.
+  "Sälj med": { en: "Sell with", fr: "Vendre avec" },
   "Möbeln är till salu": { en: "The furniture is for sale", fr: "Le meuble est en vente" },
   "Loopa sköter försäljningen härifrån. Du får besked så fort möbeln är såld — du behöver inte göra något mer. Annonsen ligger uppe på Tradera, på Loopas konto.": {
     en: "Loopa takes the sale from here. You'll hear from us as soon as the piece sells — nothing more for you to do. The ad is up on Tradera, on Loopa's account.",

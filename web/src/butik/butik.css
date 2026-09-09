@@ -49,7 +49,7 @@
  * två oranger bredvid varandra gjorde punkten osynlig.
  */
 .butik-logo {
-  font-family: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--ordmark-font);
   font-size: 27px; line-height: 1; font-weight: 800; letter-spacing: -0.03em;
   color: var(--accent); text-decoration: none; flex: none;
 }

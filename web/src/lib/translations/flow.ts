@@ -9,6 +9,80 @@ import type { Translation } from "../translations";
  */
 export const FLOW: Record<string, Translation> = {
   // ---- startsidan ----
+  "Möbler i Stockholm": { en: "Furniture in Stockholm", fr: "Meubles à Stockholm" },
+  "Loopa AI · Möbler i Stockholm": { en: "Loopa AI · Furniture in Stockholm", fr: "Loopa AI · Meubles à Stockholm" },
+  Låt: { en: "Let", fr: "Laissez" },
+  "sälja din möbel.": { en: "sell your furniture.", fr: "vendre votre meuble." },
+  "AI identifierar, granskar och säljer din möbel. Möt aldrig köparen!": {
+    en: "AI identifies, inspects and sells your furniture. Never meet the buyer!",
+    fr: "L'IA identifie, inspecte et vend votre meuble. Ne rencontrez jamais l'acheteur !",
+  },
+  "Hur fungerar det?": { en: "How does it work?", fr: "Comment ça marche ?" },
+  "Vilket märke har din möbel?": { en: "What brand is your furniture?", fr: "Quelle est la marque de votre meuble ?" },
+  "Sök märke, t.ex. String eller HAY": { en: "Search brand, e.g. String or HAY", fr: "Chercher une marque, p. ex. String ou HAY" },
+  "{antal} märken": { en: "{antal} brands", fr: "{antal} marques" },
+  "{antal} träffar": { en: "{antal} matches", fr: "{antal} résultats" },
+  "Skrolla för fler ↓": { en: "Scroll for more ↓", fr: "Faites défiler ↓" },
+  "av försäljningspriset går till Loopa. Resten är ditt — och blir möbeln inte såld kostar det inget.": {
+    en: "of the sale price goes to Loopa. The rest is yours — and if it doesn't sell it costs nothing.",
+    fr: "du prix de vente revient à Loopa. Le reste est à vous — et si le meuble ne se vend pas, cela ne coûte rien.",
+  },
+
+  // ---- arket "Så fungerar Loopa" ----
+  "Så fungerar Loopa": { en: "How Loopa works", fr: "Comment fonctionne Loopa" },
+  "Hej. Välj märke och filma ett varv. Vi identifierar möbeln, granskar skicket och föreslår ett pris — du bekräftar. Sen säljer vi, hämtar hos dig och du får betalt.":
+    {
+      en: "Hi. Pick a brand and film one lap. We identify the piece, inspect its condition and suggest a price — you confirm. Then we sell it, collect it from you, and you get paid.",
+      fr: "Bonjour. Choisissez une marque et filmez un tour. Nous identifions le meuble, inspectons son état et proposons un prix — vous confirmez. Ensuite nous le vendons, le récupérons chez vous et vous êtes payé.",
+    },
+  "Vad kostar det?": { en: "What does it cost?", fr: "Combien ça coûte ?" },
+  "Hur får jag betalt?": { en: "How do I get paid?", fr: "Comment suis-je payé ?" },
+  "Träffar jag köparen?": { en: "Do I meet the buyer?", fr: "Est-ce que je rencontre l'acheteur ?" },
+  "Vilka möbler tar ni?": { en: "What furniture do you take?", fr: "Quels meubles acceptez-vous ?" },
+  "Tänker…": { en: "Thinking…", fr: "Réflexion…" },
+  "Fråga oss om processen…": { en: "Ask us about the process…", fr: "Posez-nous une question…" },
+  "Fråga oss om processen": { en: "Ask us about the process", fr: "Posez-nous une question sur le processus" },
+  "Skriver svar": { en: "Writing an answer", fr: "Rédaction de la réponse" },
+  "Jag kunde inte svara just nu. Försök igen om en stund.": {
+    en: "I couldn't answer just now. Try again in a moment.",
+    fr: "Je n'ai pas pu répondre. Réessayez dans un instant.",
+  },
+
+  // ---- chattens bilder ----
+  "Du får betalt": { en: "You get paid", fr: "Vous êtes payé" },
+  "Du får": { en: "You get", fr: "Vous recevez" },
+  "Du filmar möbeln": { en: "You film the furniture", fr: "Vous filmez le meuble" },
+  du: { en: "you", fr: "vous" },
+  vi: { en: "us", fr: "nous" },
+  Själv: { en: "On your own", fr: "Seul" },
+  Vi: { en: "Us", fr: "Nous" },
+  Du: { en: "You", fr: "Vous" },
+  Gratis: { en: "Free", fr: "Gratuit" },
+
+  // ---- omslagsbilden, sista steget på videovägen ----
+  "Ta annonsens omslagsbild": { en: "Take the listing's cover photo", fr: "Prenez la photo principale de l'annonce" },
+  "Håll telefonen i höjd med möbelns mitt — inte i brösthöjd — och luta den inte nedåt. Ställ dig snett framför så att framsidan och ena kortsidan syns.":
+    {
+      en: "Hold the phone level with the middle of the furniture — not at chest height — and don't tilt it down. Stand at an angle so you see the front and one side.",
+      fr: "Tenez le téléphone à hauteur du milieu du meuble — pas à hauteur de poitrine — sans l'incliner vers le bas. Placez-vous en biais pour voir la face avant et un côté.",
+    },
+  "Varvet är klart · sista bilden": { en: "Lap done · last photo", fr: "Tour terminé · dernière photo" },
+  "Blev den bra?": { en: "Happy with it?", fr: "Elle vous convient ?" },
+  "Den här blir annonsens omslag. Är möbeln sedd rakt från sidan och inte uppifrån?": {
+    en: "This becomes the listing's cover. Is the furniture seen from the side rather than from above?",
+    fr: "Elle deviendra la photo principale. Le meuble est-il vu de côté et non d'en haut ?",
+  },
+  "Omslagsbilden du tog": { en: "The cover photo you took", fr: "La photo principale que vous avez prise" },
+  "Ta omslagsbild": { en: "Take cover photo", fr: "Prendre la photo principale" },
+  "Använd bilden": { en: "Use this photo", fr: "Utiliser cette photo" },
+  "Ta om": { en: "Retake", fr: "Reprendre" },
+  Omslagsbild: { en: "Cover photo", fr: "Photo principale" },
+  "Ta omslagsbilden": { en: "Take the cover photo", fr: "Prendre la photo principale" },
+  // Raden högst upp när guiden är läst: kort nog att läsas i förbifarten medan man ramar in.
+  "Ta en omslagsbild": { en: "Take a cover photo", fr: "Prenez une photo principale" },
+  "Jag är redo": { en: "I'm ready", fr: "Je suis prêt" },
+
+  // ---- startsidan ----
   "SÄLJ MED LOOPA": { en: "SELL WITH LOOPA", fr: "VENDRE AVEC LOOPA" },
   // Rubriken är två rader, och andra raden bär accentfärgen. Franskan flyttar därför "la marque"
   // till andra raden: det är ordet som ska lysa, inte hjälpverbet.
@@ -455,6 +529,10 @@ export const FLOW: Record<string, Translation> = {
 
   // ---- analysen ----
   "Bilder förberedda": { en: "Photos prepared", fr: "Photos préparées" },
+  "Ingen kontakt med servern just nu — vi fortsätter försöka.": {
+    en: "No contact with the server right now — we keep trying.",
+    fr: "Pas de contact avec le serveur pour le moment — nous continuons d'essayer.",
+  },
   "Inspekterar möbeln": { en: "Inspecting the furniture", fr: "Inspection du meuble" },
   "Kontrollerar osäkra fynd": { en: "Checking uncertain findings", fr: "Vérification des constats incertains" },
   "Sammanställer skicket": { en: "Compiling the condition", fr: "Compilation de l'état" },

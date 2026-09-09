@@ -3,21 +3,26 @@ import { ArrowLeftIcon, CameraIcon, CloseIcon, FolderIcon, PhotosIcon, PlusIcon,
 import type { CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
 import { extractBestFrames, EXTRACTION_TARGET_MS } from "../lib/videoFrames";
-import { PHOTO_STATIONS } from "../lib/photoStations";
+import { OMSLAGSSTATION, PHOTO_STATIONS } from "../lib/photoStations";
 import { requestRotationPermission, startRotationTracking, type RotationTracker } from "../lib/rotationTracker";
 import { useViewMode } from "../lib/viewMode";
 import WalkaroundGuide from "../components/WalkaroundGuide";
 import PhotoGuide from "../components/PhotoGuide";
+import GuideScene from "../components/GuideScene";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
 const MAX_UPLOAD_WIDTH = 1280;
 /**
- * Måste följa MAX_IMAGES_PER_JOB i server/src/config.ts.
+ * Hur många BEDÖMDA bilder ett jobb får bära.
  *
  * Klienten tog tidigare tio bilder medan servern kapade vid sex, så bild sju till tio laddades upp,
  * skalades, visades i granskningsrutan — och kastades sedan tyst innan inspektionen. Säljaren såg tio
  * vyer och fick sex bedömda, utan att något sa det.
+ *
+ * OMSLAGSBILDEN RÄKNAS INTE HÄR. Serverns tak (MAX_IMAGES_PER_JOB) är sju: sex bedömda plus den. Den
+ * går aldrig in i inspektionsanropet — se `tillBedomning` i server/src/pipeline/run.ts — så den kan
+ * inte tränga ut en vy ur bedömningen, och den ska därför inte tävla om platserna heller.
  */
 const MAX_IMAGES = 6;
 const MAX_RECORD_MS = 60000; // hard ceiling only — a lap normally ends itself well before this
@@ -64,11 +69,22 @@ type Shot = {
   viewLabel: string | null;
   source: "video" | "manual";
   stationId?: string;
+  /**
+   * Satt bara på omslagsbilden. Följer med till servern och avgör där två saker: att bilden hålls
+   * utanför inspektionsanropet, och att den vinner omslagsvalet om urklippet av den håller måttet.
+   * Se `role` på CapturedImage i server/src/types.ts.
+   */
+  role?: "cover";
 };
-type Mode = "choose" | "photo" | "guided" | "video" | "processing" | "review";
+type Mode = "choose" | "photo" | "guided" | "video" | "processing" | "cover" | "review";
 
 /** Lägena där <video> finns i DOM:en och strömmen alltså ska fästas på den. */
-const CAMERA_MODES: Mode[] = ["photo", "guided", "video"];
+const CAMERA_MODES: Mode[] = ["photo", "guided", "video", "cover"];
+
+/** Bilderna som ska BEDÖMAS. Omslagsbilden är en sjunde bild och räknas inte mot MAX_IMAGES. */
+function bedomda(shots: Shot[]): Shot[] {
+  return shots.filter((s) => s.role !== "cover");
+}
 
 /**
  * Bilderna i vinkelordning: fotoguidens stationer först, i den ordning guiden går dem.
@@ -136,7 +152,9 @@ export default function CaptureScreen({
    * — men den är en utväg och inte vägen in.
    */
   const mode: Mode = videoOnly && pickedMode === "choose" ? "video" : pickedMode;
-  usePageTitle(mode === "guided" ? "Fotografera möbeln" : "Filma möbeln");
+  usePageTitle(
+    mode === "cover" ? "Ta omslagsbilden" : mode === "guided" ? "Fotografera möbeln" : "Filma möbeln",
+  );
   /** Vilken vinkel fotoguiden står på just nu. Bara meningsfull i läget "guided". */
   const [activeStation, setActiveStation] = useState(PHOTO_STATIONS[0].id);
   const [shots, setShots] = useState<Shot[]>(() =>
@@ -323,6 +341,96 @@ export default function CaptureScreen({
     if (dataUrl) addShot(dataUrl, "manual");
   }
 
+  // ---- omslagsbilden: ett steg, en bild -----------------------------------
+
+  /**
+   * Bilden säljaren just tog, innan den är godkänd. Null = kameran är framme.
+   *
+   * Ett mellanläge och inte ett direktskick, för det här är den enda bilden i flödet som har ETT
+   * försök och en synlig konsekvens: den blir annonsens ansikte. Att se den innan man skickar den är
+   * skillnaden mellan att ta en bild och att välja en. Varvets bildrutor har ingen motsvarighet — de
+   * väljs av koden, och det finns inget att godkänna.
+   */
+  const [omslagsforslag, setOmslagsforslag] = useState<string | null>(null);
+  /**
+   * Guiden före omslagsbilden, precis som filmguiden ligger före inspelningen.
+   *
+   * Den täcker bilden och ska därför bort INNAN säljaren ramar in: att komponera en bild genom en
+   * suddad ruta går inte, till skillnad från varvet där guiden bara behöver läsas en gång. Efter den
+   * står instruktionen kvar som en rad högst upp, så kameran är fri.
+   */
+  const [visaOmslagsguide, setVisaOmslagsguide] = useState(true);
+  /**
+   * Bildruteuttaget ur varvet, medan säljaren tar omslagsbilden.
+   *
+   * SÄLJAREN SKA ALDRIG SE "Bearbetar video". Uttaget tar sekunder, och de sekunderna finns redan —
+   * det är tiden det tar att ställa sig rätt och trycka av. Väntan flyttas alltså in i ett steg som
+   * ändå ska göras i stället för att läggas till före det. Löftet väntas in först när jobbet ska
+   * skickas (`slutforVarvet`); är det inte klart då visas bearbetningsrutan, vilket bara händer om
+   * säljaren hinner trycka av snabbare än avkodningen.
+   */
+  const bildrutorRef = useRef<Promise<Awaited<ReturnType<typeof extractBestFrames>>> | null>(null);
+  /** Sant när löftet ovan är löst, så väntan kan hoppas över utan att bearbetningsrutan blinkar till. */
+  const bildrutorKlaraRef = useRef(false);
+
+  function fangaOmslag() {
+    const dataUrl = grabFrame();
+    if (dataUrl) setOmslagsforslag(dataUrl);
+  }
+
+  /**
+   * Skickar varvet, med eller utan omslagsbild.
+   *
+   * Nyttolasten byggs ur LÖFTET och inte ur `shots`: bildrutorna läggs dit av uttaget ovan, och
+   * det kan landa i samma tick som säljaren trycker av. Samma fälla som `payloadOverride` i
+   * startAnalysis finns för — se den.
+   *
+   * OMSLAGSBILDEN LIGGER SIST. Inspektionen får listan utan den (`tillBedomning` på servern), och den
+   * listan är ett prefix av den här bara så länge omslagsbilden ligger efter varvets rutor. Läggs den
+   * först pekar inspektionens vy-val och varje bevisindex på fel bild.
+   *
+   * `dataUrl` null = vidare UTAN omslagsbild. Den vägen MÅSTE finnas: säljaren kan stå så att
+   * vinkeln inte går att ta — en byrå i en hall, en soffa mot ett fönster — och ett steg utan väg
+   * förbi hade gjort att varvet, som redan är filmat och klart, inte kommer fram. Utan omslagsbild
+   * väljs omslaget ur filmen precis som förut: sämre bild, aldrig ett stoppat jobb.
+   */
+  async function slutforVarvet(dataUrl: string | null) {
+    let frames: Awaited<ReturnType<typeof extractBestFrames>> = [];
+    const uttag = bildrutorRef.current;
+    if (uttag) {
+      // Bearbetningsrutan bara när den behövs: är uttaget redan klart syns den aldrig, och att
+      // vänta in ett löst löfte hade annars blinkat till en skärm som inte betyder något.
+      if (!bildrutorKlaraRef.current) setMode("processing");
+      try {
+        frames = await uttag;
+      } catch (err) {
+        setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
+        setMode("video");
+        return;
+      }
+    }
+    // Bilder som redan fanns före varvet — fotoguiden nås ur filmguidens överlägg — ligger kvar först.
+    // Varvets rutor filtreras bort ur dem: uttaget lägger dem i `shots` också, och om det hann landa
+    // före det här hade de annars kommit med två gånger.
+    const nya = new Set(frames.map((f) => f.dataUrl));
+    const payload: CapturedShot[] = [
+      ...bedomda(shots)
+        .filter((s) => !nya.has(s.dataUrl))
+        .map((s) => ({ dataUrl: s.dataUrl, viewLabel: s.viewLabel, source: s.source })),
+      ...frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })),
+      ...(dataUrl
+        ? [{ dataUrl, viewLabel: OMSLAGSSTATION.label, source: "manual" as const, role: "cover" as const }]
+        : []),
+    ];
+    if (dataUrl) {
+      setShots((prev) => [
+        ...prev,
+        { id: `s${shotCounter++}`, dataUrl, viewLabel: OMSLAGSSTATION.label, source: "manual", role: "cover" },
+      ]);
+    }
+    startAnalysis(payload);
+  }
+
   // ---- fotoguiden: en bild per vinkel -------------------------------------
 
   /**
@@ -336,7 +444,7 @@ export default function CaptureScreen({
     const station = PHOTO_STATIONS.find((s) => s.id === stationId);
     if (!station) return;
     const others = shots.filter((s) => s.stationId !== stationId);
-    if (others.length >= MAX_IMAGES) {
+    if (bedomda(others).length >= MAX_IMAGES) {
       setProcessingError(t("Högst {max} bilder bedöms — ta bort någon i granskningen först.", { max: MAX_IMAGES }));
       return;
     }
@@ -389,6 +497,13 @@ export default function CaptureScreen({
     e.target.value = ""; // så samma fil kan väljas igen efter ett misslyckat försök
     if (!file) return;
     setProcessingError(null);
+    /**
+     * FILMEN LADDAS ALDRIG UPP — bara bildrutorna.
+     *
+     * Uttolkningen sker här i webbläsaren, så en film på hundra megabyte kostar ingen överföring.
+     * Därför finns heller ingen storleksgräns: det som begränsar är vad webbläsaren orkar avkoda,
+     * och det säger den själv genom att inte ge oss några bildrutor.
+     */
     setMode("processing");
     try {
       const frames = await extractBestFrames(file);
@@ -399,7 +514,18 @@ export default function CaptureScreen({
       // faller på uppladdningen kan tas om utan att något filmas nytt.
       startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
     } catch (err) {
-      setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
+      /**
+       * En INSPELAD film kommer från vår egen kamera och går alltid att läsa. En VALD fil kan vara
+       * vad som helst — en HEVC-film från en iPhone, en skärminspelning, en fil som råkade heta
+       * .mov. Felet är detsamma, men råden är olika, så uppladdningen säger vad man kan göra i
+       * stället för att bara konstatera att det inte gick.
+       */
+      const bas = err instanceof Error ? err.message : t("Kunde inte bearbeta videon.");
+      setProcessingError(
+        /bildruta/i.test(bas)
+          ? t("Webbläsaren kunde inte läsa filmen. Prova en MP4, eller filma direkt i appen.")
+          : bas,
+      );
       setMode("choose");
     }
   }
@@ -407,7 +533,7 @@ export default function CaptureScreen({
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ""; // så samma filer kan väljas igen efter ett misslyckat försök
-    const room = MAX_IMAGES - shots.length;
+    const room = MAX_IMAGES - bedomda(shots).length;
     if (room <= 0) {
       setProcessingError(t("Redan {max} bilder valda — ta bort någon först.", { max: MAX_IMAGES }));
       return;
@@ -484,17 +610,36 @@ export default function CaptureScreen({
         setMode("video");
         return;
       }
-      setMode("processing");
-      try {
-        // Inspelningens egen längd följer med: en webm från MediaRecorder har ingen längd skriven i
-        // huvudet, och klockan här är det närmaste ett facit som finns om filen inte vill säga något.
-        const frames = await extractBestFrames(blob, undefined, recordedMs);
-        frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
-        startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
-      } catch (err) {
-        setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
-        setMode("video");
-      }
+      /**
+       * VARVET ÄR KLART — NU OMSLAGSBILDEN, direkt.
+       *
+       * Steget ligger HÄR och inte före varvet av två skäl. Möbeln är redan hittad och säljaren
+       * står kvar framför den, så det kostar ett tryck och inte en ny uppställning. Och den som
+       * just gått ett varv har sett möbeln från alla håll och vet vilken sida som är den snygga.
+       *
+       * INGEN BEARBETNINGSRUTA EMELLAN. Bildrutorna plockas ur filmen medan säljaren tar bilden —
+       * se bildrutorRef — så uttaget kostar ingen väntan alls i det vanliga fallet. Steget går att
+       * hoppa över, se `slutforVarvet(null)`.
+       */
+      setOmslagsforslag(null);
+      setVisaOmslagsguide(true);
+      setMode("cover");
+      // Inspelningens egen längd följer med: en webm från MediaRecorder har ingen längd skriven i
+      // huvudet, och klockan här är det närmaste ett facit som finns om filen inte vill säga något.
+      bildrutorKlaraRef.current = false;
+      const uttag = extractBestFrames(blob, undefined, recordedMs);
+      bildrutorRef.current = uttag;
+      uttag.then(
+        (frames) => {
+          bildrutorKlaraRef.current = true;
+          // Bildrutorna läggs i `shots` också, inte bara i löftet: backar säljaren ur inloggningen
+          // efter varvet är det de här bilderna granskningen öppnar med.
+          frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
+        },
+        // Felet sägs där jobbet skickas — se slutforVarvet. Att kasta ut säljaren ur omslagssteget
+        // mitt i inramningen hade tagit bilden hen just höll på att komponera.
+        () => {},
+      );
     };
     recorder.start();
     recorderRef.current = recorder;
@@ -649,9 +794,85 @@ export default function CaptureScreen({
         <div className="photo-controls">
           <button className="shutter-btn" onClick={capturePhoto} aria-label={t("Ta bild")} />
           <button className="btn btn-primary btn-green btn-done" disabled={shots.length === 0} onClick={() => setMode("review")}>
-            {t("Klar ({antal})", { antal: shots.length })}
+            {t("Klar ({antal})", { antal: bedomda(shots).length })}
           </button>
         </div>
+      </div>
+    );
+  }
+
+  // ---- omslagsbilden ----
+  /**
+   * Sista steget på videovägen: kameran fram igen, en enda bild, och en guide som säger var telefonen
+   * ska HÅLLAS. Se OMSLAGSSTATION i photoStations.ts för varför höjden är hela instruktionen.
+   *
+   * Tvådelad, precis som filmningen. Guiden täcker bilden med suddad bakgrund och läses EN gång;
+   * sedan är kameran fri och instruktionen krymper till en rad högst upp. Ett kort som ligger kvar
+   * mitt i rutan — som fotoguidens — går inte här: den här bilden ska komponeras, och man kan inte
+   * rama in en möbel bakom en ruta som täcker den.
+   */
+  if (mode === "cover") {
+    return (
+      <div className="screen screen-camera">
+        <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
+        {/* Förslaget ligger ÖVER kameran i stället för att ersätta den: strömmen ska inte startas om
+            när säljaren trycker "Ta om", och en kamera som slocknar och tänds läser som ett fel. */}
+        {omslagsforslag && <img className="cover-shot-preview" src={omslagsforslag} alt={t("Omslagsbilden du tog")} />}
+
+        {/* Guiden före bilden. Till skillnad från filmguiden tar den emot tryck: den ska STÄNGAS
+            innan man siktar, inte lämnas kvar över motivet. */}
+        {!omslagsforslag && visaOmslagsguide && (
+          <div className="capture-guide capture-guide-tappable">
+            <div className="capture-guide-inner">
+              <span className="capture-guide-subject">{t("Varvet är klart · sista bilden")}</span>
+              <h2 className="capture-guide-title">{t(OMSLAGSSTATION.title)}</h2>
+              <GuideScene at={OMSLAGSSTATION.at} />
+              <p className="capture-guide-cta">{t(OMSLAGSSTATION.instruction)}</p>
+              <button className="btn btn-primary btn-green" onClick={() => setVisaOmslagsguide(false)}>
+                {t("Jag är redo")}
+              </button>
+              {/* "Hoppa över" och inte ett kryss: steget är frivilligt, och det ska stå i klartext i
+                  stället för att gömmas i ett tecken man måste våga trycka på. */}
+              <button className="btn btn-text capture-guide-switch" onClick={() => void slutforVarvet(null)}>
+                {t("Hoppa över")}
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Guiden läst: bara en rad kvar, så hela bilden är kamerans. */}
+        {!visaOmslagsguide && (
+          <p className="capture-top-hint">{omslagsforslag ? t("Blev den bra?") : t("Ta en omslagsbild")}</p>
+        )}
+
+        {(cameraError ?? processingError) && (
+          <p className="error-text camera-error-overlay">{cameraError ?? processingError}</p>
+        )}
+
+        {omslagsforslag ? (
+          <div className="guided-controls">
+            <button className="btn btn-ghost guided-side" onClick={() => setOmslagsforslag(null)}>
+              {t("Ta om")}
+            </button>
+            <button className="btn btn-primary btn-green btn-done" onClick={() => void slutforVarvet(omslagsforslag)}>
+              {t("Använd bilden")}
+            </button>
+          </div>
+        ) : (
+          !visaOmslagsguide && (
+            <div className="guided-controls">
+              <button className="btn btn-ghost guided-side" onClick={() => void slutforVarvet(null)}>
+                {t("Hoppa över")}
+              </button>
+              {cameraAvailable ? (
+                <button className="shutter-btn" onClick={fangaOmslag} aria-label={t("Ta omslagsbild")} />
+              ) : (
+                <span className="guided-shutter-gap" />
+              )}
+              <span className="guided-side" aria-hidden="true" />
+            </div>
+          )
+        )}
       </div>
     );
   }
@@ -724,6 +945,7 @@ export default function CaptureScreen({
           <WalkaroundGuide
             subject={[identity.brand, identity.model].filter(Boolean).join(" ")}
             onSwitch={() => void enterGuided()}
+            onUploadVideo={() => videoFileInputRef.current?.click()}
           />
         )}
         {!recording && (
@@ -753,6 +975,21 @@ export default function CaptureScreen({
         )}
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
         {processingError && <p className="error-text video-error">{processingError}</p>}
+        {/*
+          Filväljaren finns även HÄR och inte bara på valskärmen.
+          
+          Skälet är att valskärmen inte visas i mobilvyn — och mobilvyn är tvingad i utvecklingsläget
+          (se lib/viewMode.ts), så den saknades i praktiken även på en dator. `accept="video/*"` utan
+          `capture` öppnar filerna och inte kameran, vilket är hela poängen: det är den färdiga filmen
+          vi är ute efter, inte en ny inspelning.
+        */}
+        <input
+          ref={videoFileInputRef}
+          type="file"
+          accept="video/*"
+          style={{ display: "none" }}
+          onChange={handleVideoFileUpload}
+        />
         <div className="video-controls">
           {!recording ? (
             <button className="record-btn record-btn-hint" onClick={startRecording} aria-label={t("Starta inspelning")} />
@@ -799,8 +1036,8 @@ export default function CaptureScreen({
     <div className="screen screen-light">
       <h2 className="screen-title">{t("Dessa vyer kommer att inspekteras")}</h2>
       <p className="muted">
-        {t("{antal} av högst {max} bilder valda.", { antal: shots.length, max: MAX_IMAGES })}
-        {!videoOnly && shots.length < MAX_IMAGES
+        {t("{antal} av högst {max} bilder valda.", { antal: bedomda(shots).length, max: MAX_IMAGES })}
+        {!videoOnly && bedomda(shots).length < MAX_IMAGES
           ? " " + t("Ser något håll ut att saknas? Lägg till fler nedan.")
           : ""}
       </p>
@@ -829,10 +1066,10 @@ export default function CaptureScreen({
       {/* Samma regel som på vägen in: i mobilvyn finns ingen väg att lägga till bilder ur filsystemet. */}
       {!videoOnly && (
         <div className="review-add-actions">
-          <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
+          <button className="btn btn-text icon-btn" disabled={bedomda(shots).length >= MAX_IMAGES} onClick={() => enterMode("photo")}>
             <PlusIcon size={15} /> {t("Ta fler bilder")}
           </button>
-          <button className="btn btn-text icon-btn" disabled={shots.length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
+          <button className="btn btn-text icon-btn" disabled={bedomda(shots).length >= MAX_IMAGES} onClick={() => fileInputRef.current?.click()}>
             <PlusIcon size={15} /> {t("Ladda upp")}
           </button>
           <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />

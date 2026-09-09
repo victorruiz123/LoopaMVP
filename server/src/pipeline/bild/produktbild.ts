@@ -9,7 +9,7 @@
  *     -> forfina           kant.ts         snäpp mot bildens kanter, öar bort, rummets färg ur kanten
  *     -> ramFor            komposition.ts  möbelns egen ram
  *     -> bedom             kvalitet.ts     sju mått, varav två invarianter
- *     -> komponera         komposition.ts  beskärning, skala, vit duk, kontaktskugga
+ *     -> komponera         komposition.ts  beskärning, skala, duk, kontaktskugga
  *
  * INGEN GENERATIV MODELL NÅGONSTANS I DEN KEDJAN. Det som frågas en modell är EN sak: vilka pixlar
  * som är möbel. Färgerna, formen, materialet, slitaget och skadorna kommer från säljarens egen fil
@@ -26,11 +26,21 @@ import { laddaArbetsbild, kartaFor, tillgangligModell } from "./segmentera.js";
 import type { Modell } from "./modeller.js";
 import { forfina } from "./kant.js";
 import { komponera, ramFor, tillTransparent, RUTA } from "./komposition.js";
+import { studiobotten } from "./studio.js";
 import { bedom, type Kvalitet } from "./kvalitet.js";
 
 export interface Produktbild {
-  /** Möbeln mot rent vitt, RUTA×RUTA, jpeg. Det som visas som omslag. */
+  /** Möbeln mot rent vitt, RUTA×RUTA, jpeg. Galleriets bilder, och reserven för omslaget. */
   processedImage: Buffer;
+  /**
+   * Samma möbel, samma placering, mot studiobakgrunden. Null när ingen bakgrund ligger på disk
+   * eller när anroparen inte bad om den.
+   *
+   * BYGGS UR SAMMA URKLIPP som `processedImage` och inte ur ett eget varv — det är samma alfakanal,
+   * samma skala och samma skugga, bara en annan duk. Två varv hade kostat en minut till per bild och
+   * gett en möbel som står någon pixel fel i förhållande till sin egen vita version.
+   */
+  studioImage: Buffer | null;
   /** Möbeln utan bakgrund, png med alfa, beskuren till möbelns ram. Går mot vilken botten som helst. */
   transparent: Buffer;
   /** Silhuetten som gråskale-png i arbetsstorlek. Sparas för att kunna granska ett urklipp i efterhand. */
@@ -66,14 +76,32 @@ export interface Metadata {
  * nedskalad kopia i minnet. Det är en förutsättning för att kortet alltid ska kunna visa köparen
  * vad säljaren faktiskt fotograferade.
  */
-export async function bearbetaMobelbild(src: string | Buffer): Promise<Produktbild | null> {
+export async function bearbetaMobelbild(
+  src: string | Buffer,
+  val: Val = {},
+): Promise<Produktbild | null> {
   const t0 = Date.now();
   const modell = await tillgangligModell();
   if (!modell) {
     console.info("[produktbild] ingen modellfil på disk — se scripts/fetch-models.sh");
     return null;
   }
-  return await medModell(src, modell, t0);
+  return await medModell(src, modell, t0, val);
+}
+
+/** Vad anroparen vill ha utöver den vita produktbilden. */
+export interface Val {
+  /**
+   * Bygg även versionen mot studiobakgrunden.
+   *
+   * AVSTÄNGT SOM STANDARD, för jämförelsen i bild-bench ska mäta det driften mäter och ingenting
+   * mer. Omslagsbygget slår PÅ den för varje kandidat, trots att bara en bild hamnar i studion:
+   * vilken av dem som blir omslag avgörs först EFTER att de byggts (se `valjOmslag` i omslag.ts),
+   * och att gå tillbaka efteråt hade kostat ett helt modellvarv till. Studioversionen är däremot
+   * ren aritmetik på ett urklipp som redan finns — en tiondels sekund — så att bygga den i onödan
+   * för fyra bilder är billigare än att bygga rätt en gång för sent.
+   */
+  studio?: boolean;
 }
 
 /**
@@ -86,6 +114,7 @@ export async function medModell(
   src: string | Buffer,
   modell: Modell,
   t0 = Date.now(),
+  val: Val = {},
 ): Promise<Produktbild | null> {
   const bild = await laddaArbetsbild(src);
   if (!bild) return null;
@@ -117,6 +146,17 @@ export async function medModell(
 
   const processedImage = await komponera(bild.rgb, alfa, bild.bredd, bild.hojd, ram);
   if (!processedImage) return null;
+
+  /**
+   * Studioversionen, när den bads om och bakgrunden finns.
+   *
+   * SAKNAD BAKGRUND ÄR INGET FEL. Utfallet är då `null` här och ett omslag mot vitt — precis det
+   * omslag systemet gav innan studion fanns. En bakgrundsfil som inte hunnit checkas in ska göra
+   * bilden tråkigare, aldrig jobbet trasigt.
+   */
+  const studioImage = val.studio
+    ? await komponera(bild.rgb, alfa, bild.bredd, bild.hojd, ram, await studiobotten())
+    : null;
   const transparent = await tillTransparent(bild.rgb, alfa, bild.bredd, bild.hojd, ram);
 
   const maskBytes = Buffer.alloc(alfa.length);
@@ -149,6 +189,7 @@ export async function medModell(
 
   return {
     processedImage,
+    studioImage,
     transparent,
     mask,
     qualityScore: kvalitet.poang,
@@ -160,44 +201,17 @@ export async function medModell(
 /** Engelskt namn på samma funktion, som gränssnittet är efterfrågat. Samma kod, ingen egen väg. */
 export const processFurnitureImage = bearbetaMobelbild;
 
-export interface Flerbild {
-  /** Index i indatalistan. */
-  index: number;
-  kalla: string;
-  bild: Produktbild | null;
-  /** Hur väl bilden duger som HUVUDBILD. Se `huvudbildspoang`. */
-  huvudbildspoang: number;
-}
-
-/**
- * Flera bilder av samma möbel: en produktbild var, plus vilken som ska vara huvudbild.
- *
- * Sekventiellt och inte parallellt. Modellen är samma session och tar 1–2 GB medan den räknar; att
- * köra sex bildrutor samtidigt är sex gånger minnet för att bli klar lika fort som en tråd med sex
- * uppgifter. På en burk som delar minne med prismotorn är det skillnaden mellan långsamt och nere.
- */
-export async function bearbetaMobelbilder(kallor: string[]): Promise<{
-  bilder: Flerbild[];
-  huvudbildIndex: number | null;
-}> {
-  const bilder: Flerbild[] = [];
-  for (let i = 0; i < kallor.length; i++) {
-    const bild = await bearbetaMobelbild(kallor[i]).catch(() => null);
-    bilder.push({ index: i, kalla: kallor[i], bild, huvudbildspoang: await huvudbildspoang(kallor[i], bild) });
-  }
-  const kandidater = bilder.filter((b) => b.bild && !b.bild.needsReview);
-  const valbara = kandidater.length > 0 ? kandidater : bilder.filter((b) => b.bild);
-  if (valbara.length === 0) return { bilder, huvudbildIndex: null };
-  valbara.sort((a, b) => b.huvudbildspoang - a.huvudbildspoang);
-  return { bilder, huvudbildIndex: valbara[0].index };
-}
-
 /**
  * Hur väl en bildruta duger som HUVUDBILD — en annan fråga än om urklippet blev bra.
  *
  * Den gamla vägen valde omslagsruta efter vad som visade SKICKET bäst, vilket ofta är en närbild på
  * ett armstöd. Det är rätt fråga för skickrapporten och fel för ett omslag: närbilden säger allt om
  * nötningen och ingenting om vilken möbel som säljs.
+ *
+ * STÄLLS EFTER BYGGET, och det är skillnaden mot `rutpoang` i omslag.ts. Den frågan ställs FÖRE, med
+ * den lilla modellen, och svarar på vilka bildrutor som är värda en dryg minut var av den stora. Den
+ * här ställs när urklippen finns och väljer omslaget bland dem — den vet vad som FAKTISKT blev bra,
+ * inte vad som såg lovande ut.
  *
  * Fem signaler, alla mätta och ingen frågad:
  *
@@ -209,7 +223,7 @@ export async function bearbetaMobelbilder(kallor: string[]): Promise<{
  * 4. UPPLÖSNING. En liten fil skalas upp till 1600 och blir grynig.
  * 5. FRAGMENT — lösa bitar betyder att något stod framför möbeln, en person eller en låda.
  */
-async function huvudbildspoang(kalla: string, bild: Produktbild | null): Promise<number> {
+export async function huvudbildspoang(kalla: string, bild: Produktbild | null): Promise<number> {
   if (!bild) return 0;
   const k = bild.metadata.kvalitet;
 

@@ -38,13 +38,25 @@ export default function AnalysisScreen({
   const [retryError, setRetryError] = useState<string | null>(null);
   /** Bumpas av ett omtag: pollningen stannar vid "error", så den måste startas om explicit. */
   const [attempt, setAttempt] = useState(0);
+  /**
+   * Sant när servern slutat svara på pollningen.
+   *
+   * MÅSTE SYNAS. Skärmen ritar `job?.progress.stage ?? "preparing"`, så ett jobb som aldrig kommer
+   * tillbaka ser exakt ut som ett jobb som står på sitt första steg: "Bilder förberedda", för evigt,
+   * medan pollningen tyst försöker igen i bakgrunden. Det är samma bild som en server som hängt sig,
+   * och skillnaden mellan dem är hela skillnaden mellan att vänta och att göra om.
+   */
+  const [tystServer, setTystServer] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    let misslyckade = 0;
     const poll = async () => {
       try {
         const j = await getJob(jobId);
         if (cancelled) return;
+        misslyckade = 0;
+        setTystServer(false);
         setJob(j);
         if (j.progress.stage === "done") {
           onDone();
@@ -54,7 +66,10 @@ export default function AnalysisScreen({
           setTimeout(poll, 500);
         }
       } catch {
-        if (!cancelled) setTimeout(poll, 1000);
+        if (cancelled) return;
+        // Ett tappat svar är brus — mobilen bytte mast. Fem i rad är ett besked.
+        if (++misslyckade >= 5) setTystServer(true);
+        setTimeout(poll, 1000);
       }
     };
     poll();
@@ -143,6 +158,11 @@ export default function AnalysisScreen({
             );
           })}
         </ul>
+        {tystServer && (
+          <p className="muted small analysis-note">
+            {t("Ingen kontakt med servern just nu — vi fortsätter försöka.")}
+          </p>
+        )}
       </div>
     </div>
   );

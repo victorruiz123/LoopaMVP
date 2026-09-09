@@ -8,8 +8,8 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { deliveryQuote } from "./delivery.js";
-import { abandonCheckout, checkoutConfigured, CheckoutError, chooseSlot, fulfilPaidOrder, parseWebhook, startCheckout } from "./checkout.js";
-import { getOrder, orderByReference, ordersForUser, updateOrder } from "./orders.js";
+import { abandonCheckout, checkoutConfigured, CheckoutError, fulfilPaidOrder, parseWebhook, requestSlots, startCheckout } from "./checkout.js";
+import { getOrder, orderByReference, ordersForUser, publikHistorik, updateOrder, type Order } from "./orders.js";
 import { createBevakning, deleteBevakning, listBevakningar } from "./bevakningar.js";
 import { aiSearchAvailable, interpretQuery, rateLimited } from "./aiSearch.js";
 import { allProducts, applyFilter, brandFacets, brandFacetsMerged, categoryFacetsOf, productById, typeFacetsMerged } from "./inventory.js";
@@ -330,16 +330,25 @@ export async function handleButikWrite(
     return true;
   }
 
-  // POST /api/butik/order/:id/leverans — välj tid efter betalningen.
+  /**
+   * POST /api/butik/order/:id/leverans — köparen lämnar UPP TILL TRE tider som passar.
+   *
+   * Kroppen tar `tider: [{datum, tid}]`. Den gamla formen med ett `datum` och ett `tid` tas
+   * fortfarande emot och tolkas som en lista med ett element — en köpare som står med en öppen flik
+   * från före ändringen ska inte mötas av ett fel.
+   */
   if (segments[0] === "order" && segments.length === 3 && segments[2] === "leverans" && req.method === "POST") {
     if (!identity) return json(res, 401, { error: "Logga in." }), true;
     try {
       const order = await getOrder(segments[1]);
       // 404 och inte 403: ett annat svar hade avslöjat att ordern finns.
       if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
-      const body = await jsonBody<{ datum?: string; tid?: string }>(req);
-      if (!body.datum || !body.tid) return json(res, 400, { error: "datum och tid krävs." }), true;
-      const updated = await chooseSlot(order.id, body.datum, body.tid);
+      const body = await jsonBody<{ datum?: string; tid?: string; tider?: Array<{ datum?: string; tid?: string }> }>(req);
+      const onskade = (body.tider ?? (body.datum && body.tid ? [{ datum: body.datum, tid: body.tid }] : []))
+        .filter((t): t is { datum: string; tid: string } => !!t.datum && !!t.tid)
+        .map((t) => ({ date: t.datum, window: t.tid }));
+      if (onskade.length === 0) return json(res, 400, { error: "Ange minst en tid som passar." }), true;
+      const updated = await requestSlots(order.id, onskade);
       json(res, 200, { order: updated });
     } catch (err) {
       const status = err instanceof CheckoutError ? err.status : 500;
@@ -450,7 +459,7 @@ export async function handleButikOrderRead(
     if (!identity?.userId) return json(res, 401, { error: "Logga in." }), true;
     const mine = await ordersForUser(identity.userId);
     const rows = await Promise.all(
-      mine.map(async (order) => ({ order, product: await productById(order.productId) })),
+      mine.map(async (order) => ({ order: forBuyer(order), product: await productById(order.productId) })),
     );
     json(res, 200, { orders: rows });
     return true;
@@ -461,8 +470,20 @@ export async function handleButikOrderRead(
     const order = (await getOrder(segments[1])) ?? (await orderByReference(segments[1]));
     if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
     const product = await productById(order.productId);
-    json(res, 200, { order, product });
+    json(res, 200, { order: forBuyer(order), product });
     return true;
   }
   return false;
+}
+
+/**
+ * Ordern som köparen får se den.
+ *
+ * HISTORIKEN FILTRERAS HÄR, på vägen ut, och inte i klienten. Panelen kan skriva interna
+ * anteckningar på en order — "budfirman svarar inte", "ring köparen" — och de raderna är till för
+ * oss. Ett filter i gränssnittet hade skickat dem till webbläsaren ändå, där de går att läsa i
+ * nätverksfliken. Den enda säkra platsen att sila på är den här.
+ */
+function forBuyer(order: Order): Order {
+  return { ...order, events: publikHistorik(order) };
 }

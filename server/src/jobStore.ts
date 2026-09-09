@@ -16,12 +16,14 @@ export async function createJob(
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
   ownerId: string | null = null,
+  ownerEmail: string | null = null,
 ): Promise<ConditionJob> {
   const id = randomUUID();
   const job: ConditionJob = {
     id,
     createdAt: new Date().toISOString(),
     ownerId,
+    ownerEmail,
     progress: { stage: "queued", message: "I kö…" },
     result: null,
     error: null,
@@ -46,6 +48,22 @@ export async function createJob(
  */
 export function ownerIdOf(job: { ownerId?: string | null }): string | null {
   return job.ownerId ?? (process.env.LEGACY_JOBS_OWNER || null);
+}
+
+/**
+ * Skriver säljarens adress på jobbet när den saknas eller ändrats.
+ *
+ * Tyst och utan att fela: det här är en bieffekt av att ägaren råkade hämta sitt eget jobb, inte en
+ * begäran de gjort. Ett fel här får aldrig påverka svaret de faktiskt bad om.
+ */
+export async function rememberOwnerEmail(job: ConditionJob, email: string | null): Promise<void> {
+  if (!email || job.ownerEmail === email) return;
+  try {
+    job.ownerEmail = email;
+    await persist(job);
+  } catch {
+    // Adressen hämtas igen nästa gång ägaren öppnar sidan.
+  }
 }
 
 export function getJobSync(id: string): ConditionJob | undefined {

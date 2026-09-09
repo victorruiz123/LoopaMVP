@@ -10,6 +10,56 @@ import type { CapturedImage, ListingAttribute, ModelCandidate, ProductImage } fr
 const CONDITION_WAIT_MS = 180_000;
 
 /**
+ * FÖRVÄRMNINGEN: fas 2 startas på toppkandidaten redan när valskärmen visas.
+ *
+ * VARFÖR. "Bygger annonsen…" var flödets längsta väntan — mätt på 60 sparade körningar tog
+ * generatorns fas 2 median 11,8 s och p90 27,1 s, och den väntan började först när säljaren tryckt.
+ * Sökningen bakom den är dessutom ogrundad på första försöket i 38 fall av 60, och just de körningarna
+ * kostar ett omförsök till: 9,9 s i median mot 3,6 s för dem som grundade direkt.
+ *
+ * Ingenting av det behöver ligga efter trycket. Modellen säljaren väljer är den ÖVERSTA i listan i 66
+ * fall av 92 — 72 % — så anropet går att göra medan de läser de fyra korten. Träffar det, är annonsen
+ * redan byggd när de trycker och skärmen går vidare direkt; missar det, kastas svaret och fas 2 går
+ * som förut. Väntan blir aldrig längre av att ha försökt.
+ *
+ * KOSTNADEN ÄR ETT BRÄNT ANROP i de 28 procenten. Det är avsikten: ett generatoranrop är billigt
+ * jämfört med tjugo sekunder som säljaren står och tittar på en snurra mitt i flödet.
+ *
+ * ETT PER JOBB, aldrig fler. Att förvärma alla fyra kandidaterna hade lagt fyra grundade sökningar på
+ * samma nyckel samtidigt, och den sökningen är känslig för just det — se `searchCandidates`, där två
+ * överlappande sökningar slog ut kandidaterna helt.
+ */
+const forvarmda = new Map<string, { model: string; call: Promise<SellerCall>; startedAt: number }>();
+/** Städning för jobb som aldrig når fas 2 — säljaren stängde fliken. Löftet är redan löst, det är kartan som ska bort. */
+const FORVARM_TTL_MS = 300_000;
+
+function forvarmFas2(
+  jobId: string,
+  brand: string | null,
+  top: ModelCandidate | undefined,
+  images: CapturedImage[],
+  dir: string,
+  prior: { researchText: string; sources: SourceRef[] } | undefined,
+): void {
+  if (!top?.model?.trim() || images.length === 0) return;
+  // Ett omval kan ha startat en ny kandidatsökning; då gäller den listan, inte den här.
+  if (forvarmda.has(jobId)) return;
+  const call = callSellerGenerate(
+    { brand, model: top.model },
+    images,
+    dir,
+    { kind: "seller_selected", selected: top },
+    prior,
+  );
+  // callSellerGenerate kastar aldrig, men ett obevakat löfte som ändå gjorde det hade fällt processen.
+  call.catch(() => {});
+  forvarmda.set(jobId, { model: top.model, call, startedAt: Date.now() });
+  const timer = setTimeout(() => forvarmda.delete(jobId), FORVARM_TTL_MS);
+  timer.unref?.();
+  console.info(`[identify] ${jobId.slice(0, 8)} förvärmer fas 2 på "${top.model}"`);
+}
+
+/**
  * Gav försöket något att välja bland?
  *
  * Att bara fråga efter `kind` räcker inte: generatorn svarar `needs_selection` även när den skrivit
@@ -29,26 +79,89 @@ function barren(call: SellerCall): boolean {
  * mått på. Alltså frågar vi en gång till — samma enda omförsök som förut, nu med en tröskel som ser
  * skillnad på "inget svar" och "ogrundat svar".
  */
-function settled(call: SellerCall): boolean {
+// Typvakt och inte bara ett villkor: ett grundat svar ÄR ett `needs_selection`, och den som frågat
+// ska kunna läsa dess kandidater och källor utan att fråga om samma sak en gång till.
+function settled(call: SellerCall): call is Extract<SellerCall, { kind: "needs_selection" }> {
   return call.kind === "needs_selection" && call.candidates.length > 0 && call.sources.length > 0;
 }
 
 /**
- * Två försök i serie, och det bättre av dem.
+ * Den första omgångens sökning — och BARA den, när den gav något att visa.
  *
- * Den första omgångens sökning. Ett omval bygger sin egen uthållighet ovanpå samma anrop — se
- * `collectNewCandidates`, som söker om tills fyra NYA namn står på skärmen.
+ * HÄR LÅG FLÖDETS DYRASTE VÄNTAN. Funktionen gjorde tidigare två anrop i serie och lämnade ifrån sig
+ * det bättre: kom det första tillbaka ogrundat — vilket det gör i 38 fall av 60 — stod säljaren kvar
+ * på "Letar upp modellen…" i ytterligare en hel sökning innan skärmen ens fick veta att det fanns
+ * fyra kandidater. Mätt i den koden: 9,9 s i median mot 3,6 s för de körningar som grundade direkt.
+ *
+ * Och de kandidaterna VAR redan färdiga. Omförsöket görs inte för att få bättre förslag utan för att
+ * få KÄLLOR — det som fas 2 ärver när dess egen sökning kommer tillbaka tom. Generatorns egen mätning
+ * på samma Mio-matgrupp, sex körningar: fyra ogrundade svar bar alla fyra KANDIDAT-rader med samma
+ * toppkandidat som de grundade körningarna gav. Förslagen är alltså inte det som saknas.
+ *
+ * Alltså: ett anrop, och sedan visas det som finns. Omförsöket lever kvar oförändrat men flyttat ur
+ * väntan — se `grundaIBakgrunden`. Bara när det första anropet gav NOLL kandidater finns det inget
+ * att visa, och då är omförsöket fortfarande säljarens enda väg framåt och görs här.
+ *
+ * FÖRSÖKEN KÖRS ALLTJÄMT I SERIE, aldrig bredvid varandra. Att överlappa dem gjorde väntan kortare på
+ * papperet men lät två grundade sökningar på samma nyckel gå samtidigt — och den grundade sökningen
+ * är känslig nog att det slog ut kandidaterna helt. Latens får inte köpas med den här sökningens
+ * träffsäkerhet; den köps här med ORDNINGEN i stället.
  */
 async function searchCandidates(jobId: string, brand: string, images: CapturedImage[], dir: string): Promise<SellerCall> {
   const call = await callSellerGenerate(brand, images, dir);
-  if (settled(call)) return call;
-  console.info(
-    `[identify] ${jobId.slice(0, 8)} ${barren(call) ? "inga kandidater" : "ogrundade kandidater"}` +
-      " på första försöket — försöker igen",
-  );
+  // Kandidater, grundade eller ej: det räcker för att fylla skärmen, och resten görs i bakgrunden.
+  if (!barren(call)) return call;
+  console.info(`[identify] ${jobId.slice(0, 8)} inga kandidater på första försöket — försöker igen`);
   const second = await callSellerGenerate(brand, images, dir);
-  // Behåll det bättre av de två: grundat slår ogrundat, ogrundade kandidater slår tomt.
-  return settled(second) || (barren(call) && !barren(second)) ? second : call;
+  return barren(second) ? call : second;
+}
+
+/**
+ * Grundningen som inte längre får kosta säljaren en väntan.
+ *
+ * Kandidaterna står redan på skärmen när det här börjar. Sökningen görs om av ett enda skäl — att få
+ * källor — och de används till två saker: fas 2:s reservunderlag (`identityResearch`) och
+ * bildhämtningens uppslag. Bilderna startar därför HÄR och inte tidigare, precis som förut: de
+ * hämtades aldrig innan det andra försöket landat, så deras tidpunkt är oförändrad. Väljarskärmen
+ * ritar skimrande platshållare under tiden och läser `imageUrl: undefined` som "fler är på väg".
+ *
+ * DEN VISADE LISTAN RÖRS ALDRIG. Ett omförsök som svarar med fyra andra namn får inte byta ut
+ * förslagen under fingret på någon som redan läser dem — och att den ogrundade listan duger är just
+ * vad mätningen ovan säger. Bara källorna tas emot.
+ */
+function grundaIBakgrunden(
+  jobId: string,
+  brand: string,
+  images: CapturedImage[],
+  dir: string,
+  visad: { candidates: ModelCandidate[]; sources: SourceRef[] },
+): void {
+  void (async () => {
+    // Har säljaren redan valt är fas 2 igång och har läst sitt underlag; en sökning till hade varit
+    // ett bränt anrop. Bilderna hämtas ändå — sidorna bär mått som annonsen fortfarande vill ha.
+    const innan = getJobSync(jobId) ?? (await getJob(jobId));
+    let sources = visad.sources;
+    if (innan?.identityStatus === "needs_selection") {
+      const extra = await callSellerGenerate(brand, images, dir);
+      if (settled(extra)) {
+        const job = getJobSync(jobId) ?? (await getJob(jobId));
+        // Bara om det fortfarande är DEN HÄR listan som står på skärmen. Ett omval under tiden har
+        // egna kandidater och egna källor, och de två hör inte ihop.
+        if (job && sameList(job.candidates ?? [], visad.candidates)) {
+          job.identityResearch = { researchText: extra.researchText, sources: extra.sources };
+          await persist(job);
+          sources = extra.sources;
+        }
+        console.info(`[identify] ${jobId.slice(0, 8)} grundning i bakgrunden gav ${extra.sources.length} källor`);
+      } else {
+        console.info(`[identify] ${jobId.slice(0, 8)} grundning i bakgrunden gav inga källor`);
+      }
+    }
+    attachCandidateImages(jobId, visad.candidates, sources);
+  })().catch((err) => {
+    console.warn(`[identify] ${jobId.slice(0, 8)} bakgrundsgrundningen föll — ${err instanceof Error ? err.message : String(err)}`);
+    attachCandidateImages(jobId, visad.candidates, visad.sources);
+  });
 }
 
 /** Samma lista, i samma ordning? Avgör om en sen bildhämtning fortfarande hör till det som visas. */
@@ -135,23 +248,11 @@ export async function runIdentify(jobId: string, brand: string, images: Captured
   const startedAt = Date.now();
 
   /**
-   * Ett nytt försök när sökningen inte kom tillbaka grundad.
+   * ETT anrop, och sedan visas det som finns.
    *
-   * Felet är inte en timeout utan att modellen ibland avstår från att söka: den svarar snabbt, med
-   * `sources=0`. Mätt över fyra körningar i rad gav två stycken tre kandidater vardera medan två gav
-   * noll, med samma bilder och samma märke. Generatorn räddar numera kandidaterna ur även en sådan
-   * körning, men inte källorna — och det är källorna omförsöket är till för.
-   *
-   * Vi har råd att fråga igen: identifieringen löper parallellt med skickbedömningen, som tar 20-40 s
-   * ändå. Ett andra försök kostar alltså ingenting på kritiska vägen. Ett, inte fler — svarar den
-   * likadant två gånger är det inte slumpen längre, och då ska säljaren få skriva namnet själv i
-   * stället för att vänta på ett tredje.
-   *
-   * FÖRSÖKEN KÖRS I SERIE, aldrig bredvid varandra. Att överlappa dem gjorde väntan kortare på
-   * papperet men lät två grundade sökningar på samma nyckel gå samtidigt — och den grundade sökningen
-   * är känslig nog att det slog ut kandidaterna helt. Samma sorts känslighet som bildtaket: se
-   * `MAX_LISTING_IMAGES` i listing.ts, där 6 bildrutor i stället för 3 tog kandidaterna i 8 fall av 10.
-   * Latens får inte köpas med den här sökningens träffsäkerhet.
+   * Omförsöket — det som hämtar hem källorna när sökningen svarade utan att söka (`sources=0`) —
+   * ligger inte längre mellan säljaren och skärmen. Se `searchCandidates` och `grundaIBakgrunden`
+   * för mätningen bakom flytten och för vad omförsöket får respektive inte får ändra på.
    */
   const call = await searchCandidates(jobId, brand, images, dir);
   const job = getJobSync(jobId) ?? (await getJob(jobId));
@@ -169,7 +270,12 @@ export async function runIdentify(jobId: string, brand: string, images: Captured
     );
     await persist(job);
 
-    attachCandidateImages(jobId, call.candidates, call.sources);
+    // Skärmen har sitt innehåll i och med raden ovan. Allt härunder är förbättringar av den, och
+    // ingenting av det väntas in: bilderna, källorna och fas 2 löper vidare av sig själva.
+    if (settled(call)) attachCandidateImages(jobId, call.candidates, call.sources);
+    else grundaIBakgrunden(jobId, brand, images, dir, call);
+    // Fas 2 på toppkandidaten startar HÄR, inte vid trycket. Se forvarmFas2.
+    forvarmFas2(jobId, brand, call.candidates[0], images, dir, job.identityResearch ?? undefined);
     return;
   } else if (call.kind === "ok") {
     /**
@@ -212,7 +318,11 @@ export async function runIdentify(jobId: string, brand: string, images: Captured
      * ska kunna se med en gång att namnet inte stämmer.
      */
     await persist(job);
-    if (job.candidates.length > 0) attachCandidateImages(jobId, job.candidates, r?.sources ?? []);
+    if (job.candidates.length > 0) {
+      attachCandidateImages(jobId, job.candidates, r?.sources ?? []);
+      // Den enda kandidaten är också den som kommer att väljas, om den väljs alls.
+      forvarmFas2(jobId, brand, job.candidates[0], images, dir, undefined);
+    }
     return;
   } else {
     job.identityStatus = "unavailable";
@@ -443,7 +553,13 @@ async function runCandidateRound(
       ` sökningar=${round.searches} avfärdade=${rejected.length} ms=${Date.now() - startedAt}`,
   );
 
-  if (found.length > 0) attachCandidateImages(jobId, found, round.sources);
+  if (found.length > 0) {
+    attachCandidateImages(jobId, found, round.sources);
+    // Den förra omgångens förvärmning gäller ett namn säljaren just avfärdat. Bort med den, och
+    // värm den nya listans toppkandidat i stället.
+    forvarmda.delete(jobId);
+    forvarmFas2(jobId, brand, found[0], images, dir, job.identityResearch ?? undefined);
+  }
 }
 
 /**
@@ -525,17 +641,39 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     return attributes === listing.result.attributes ? listing : { ...listing, result: { ...listing.result, attributes } };
   };
 
-  const generateOnce = () =>
-    callSellerGenerate({ brand, model }, images, dir, resolution, prior).then((call) =>
-      call.kind === "ok"
-        ? call.listing
+  /**
+   * Det förvärmda anropet, om det gäller MODELLEN SÄLJAREN VALDE.
+   *
+   * Bort ur kartan direkt, oavsett träff: en miss ska inte ligga kvar och råka konsumeras av ett
+   * senare försök, och en träff får bara användas en gång — omförsöken nedan är till för att fråga
+   * på nytt, inte för att läsa samma svar igen.
+   */
+  const forvarmd = forvarmda.get(jobId);
+  forvarmda.delete(jobId);
+  let vantande = forvarmd?.model === model ? forvarmd.call : null;
+  const varmstart = !!vantande;
+  if (forvarmd) {
+    console.info(
+      `[identify] ${jobId.slice(0, 8)} förvärmning ${vantande ? "träff" : "miss"}` +
+        ` (värmd="${forvarmd.model}" vald="${model}") försprång=${Date.now() - forvarmd.startedAt} ms`,
+    );
+  }
+
+  const generateOnce = () => {
+    // Förvärmningen gäller FÖRSTA försöket. Ett omförsök som läser samma löfte hade fått samma svar.
+    const call = vantande ?? callSellerGenerate({ brand, model }, images, dir, resolution, prior);
+    vantande = null;
+    return call.then((c) =>
+      c.kind === "ok"
+        ? c.listing
         : {
             status: "unavailable" as const,
-            unavailableReason: call.kind === "unavailable" ? call.reason : "Oväntat kandidatsvar i fas 2.",
+            unavailableReason: c.kind === "unavailable" ? c.reason : "Oväntat kandidatsvar i fas 2.",
             result: null,
             latencyMs: Date.now() - startedAt,
           },
     );
+  };
 
   // Uppskattade mått räknas inte som fynd. Annonsen bär dem alltid numera, och läste villkoret dem
   // som mått hade omförsöket — det som faktiskt hämtar hem de riktiga måtten — aldrig kört igen.
@@ -602,9 +740,13 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
       withPageSpecs(listing, await freshPageSpecs());
     let best = await enrich(await generateOnce());
     await publish(best, moreToCome(best, until));
+    // `ms` är SÄLJARENS väntan: från trycket på modellen till att annonsen ligger på jobbet. Skild
+    // från `listing.latencyMs`, som med en förvärmd träff räknar från långt före trycket och därför
+    // inte längre säger något om hur länge någon stod och väntade.
     console.info(
       `[identify] ${jobId.slice(0, 8)} väg=${resolution.kind} listing=${best.status} mått=${hasDimensions(best)}` +
-        ` medskickade_källor=${prior?.sources.length ?? 0} källor=${best.result?.sources?.length ?? 0} ms=${Date.now() - startedAt}`,
+        ` förvärmd=${varmstart} medskickade_källor=${prior?.sources.length ?? 0}` +
+        ` källor=${best.result?.sources?.length ?? 0} ms=${Date.now() - startedAt}`,
     );
 
     for (let attempt = 2; attempt <= 3; attempt++) {
@@ -714,12 +856,32 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   if (provaOm) {
     console.info(`[omslag] ${jobId.slice(0, 8)} omslaget är inte bekräftat ${farg} — söker om med färgen`);
   }
+  /**
+   * Sidhämtningen görs numera också för SPECIFIKATIONERNAS skull, inte bara omslagets.
+   *
+   * Den hoppades tidigare över så fort kandidaten redan bar en bild — och det är precis de fallen där
+   * annonsen ändå står utan mått eller material: sökningen grundade, struktureringen lät MÅTT-raderna
+   * falla, och sidorna som faktiskt skriver ut dem var redan hämtade och kastade. Mätt på 138 sparade
+   * annonser saknade 37 mått och 57 material.
+   *
+   * Kostar inget som säljaren märker: annonsen är redan publicerad här, hämtningen är HTTP och ingen
+   * modell, och det som hittas skrivs in i den annons som ligger på skärmen — samma väg som ett sent
+   * omförsök tar. Läses ur sidans egen HTML, aldrig gissat: se harvestSpecs.
+   */
+  const saknarSpecar =
+    !listing.result?.attributes.some((a) => !a.estimated && /(mått|bredd|djup|höjd|längd|diameter)/i.test(a.label)) ||
+    !listing.result?.attributes.some((a) => /(material|klädsel|stomme|träslag)/i.test(a.label));
 
-  void (gammal && !provaOm
+  /** Sant när hämtningen görs BARA för specarnas skull: omslaget är redan satt och bekräftat. */
+  const baraSpecar = !!gammal && !provaOm && saknarSpecar;
+
+  void (gammal && !provaOm && !saknarSpecar
     ? Promise.resolve({ image: gammal as ProductImage, specs: [] as ListingAttribute[] })
     : resolveProductPage({ brand, model }, listing.result?.sources ?? [], farg)
-        // Utebliven ny bild får inte kosta den gamla. Se resonemanget ovan.
-        .then((r) => (r.image ? r : { image: gammal, specs: r.specs }))
+        // Utebliven ny bild får inte kosta den gamla. Se resonemanget ovan. Och en hämtning som
+        // gjordes för MÅTTENS skull får inte byta ut ett omslag som redan är valt och bekräftat —
+        // den sidan är vald efter vad den skriver, inte efter vad den visar.
+        .then((r) => (baraSpecar || !r.image ? { image: gammal, specs: r.specs } : r))
   )
     .then(async ({ image, specs }: { image: ProductImage | null; specs: ListingAttribute[] }) => {
       const withCover = getJobSync(jobId) ?? (await getJob(jobId));

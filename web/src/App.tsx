@@ -40,7 +40,9 @@ type Screen =
   // Grinden: bilderna finns, kontot saknas. Ligger mellan filmningen och jobbet — se App nedan.
   // `resume` = sessionen tog slut med bilderna i handen, inte en ny säljare. Kontot finns redan,
   // så inloggningen ska öppna på rätt flik och inte be dem skapa ett till.
-  | { name: "signup"; identity: FurnitureIdentity; shots: CapturedShot[]; resume?: boolean }
+  // `shots` saknas när grinden slog till redan på märkesvalet — då finns ingen film att bära, och
+  // vägen ut ur inloggningen är kameran i stället för uppladdningen.
+  | { name: "signup"; identity: FurnitureIdentity; shots?: CapturedShot[]; resume?: boolean }
   // Uppladdningen. Egen skärm för att den kan följa direkt på en registrering.
   | { name: "starting"; identity: FurnitureIdentity; shots: CapturedShot[] }
   | { name: "identify"; jobId: string; identity: FurnitureIdentity; previewShots: CapturedShot[] }
@@ -298,7 +300,12 @@ function FlowApp() {
         <HomeScreen
           key={homeKey.current}
           dealId={dealId.current}
-          onStartScan={(identity) => setScreen({ name: "capture", identity })}
+          // Grinden ligger på märkesvalet: att välja märke är att börja sälja, och att sälja kräver
+          // ett konto. Den utloggade möts av inloggningen med registreringsfliken uppe, och märket
+          // följer med — efteråt öppnas kameran på det märke de redan tryckt på.
+          onStartScan={(identity) =>
+            setScreen(user ? { name: "capture", identity } : { name: "signup", identity })
+          }
           // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
           onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
         />
@@ -328,8 +335,19 @@ function FlowApp() {
           initialTab={screen.resume ? "signin" : undefined}
           // Rakt in i uppladdningen. Sessionen finns när det här anropas, så jobbet får sin token —
           // och säljaren får ingen kvittensskärm att trycka bort, bara flödet de redan var i.
-          onDone={() => setScreen({ name: "starting", identity: screen.identity, shots: screen.shots })}
-          onBack={() => setScreen({ name: "capture", identity: screen.identity, shots: screen.shots })}
+          onDone={() =>
+            setScreen(
+              screen.shots
+                ? { name: "starting", identity: screen.identity, shots: screen.shots }
+                : { name: "capture", identity: screen.identity },
+            )
+          }
+          onBack={() => {
+            // Utan film kom de hit från märkeslistan, och då är startsidan vägen tillbaka —
+            // kameran har de aldrig sett.
+            if (screen.shots) setScreen({ name: "capture", identity: screen.identity, shots: screen.shots });
+            else goHome();
+          }}
         />
       );
     case "login":

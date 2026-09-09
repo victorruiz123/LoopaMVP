@@ -6,15 +6,19 @@
  * svart (medelluminans 0, standardavvikelse 0) i fyra av dem. Den bilden gick vidare som omslag till
  * Tradera, som miniatyr på startsidan och som typunderlag till prismotorn.
  *
- * Två signaler, i den ordningen:
+ * Tre signaler, i den ordningen:
  *
  * 1. DUGLIGHET, mätt här med sharp. Svart, utbränd eller helt platt bildruta diskvalificeras. Det är
  *    aritmetik på pixlar och kan inte ha fel om det den mäter.
- * 2. VY, från inspektionsanropet, som ändå ser alla bildrutor och får peka ut den som visar möbeln
- *    framifrån. Gratis — inget extra anrop, ingen extra latens.
+ * 2. AVSIKT: bilden med rollen `cover` är den säljaren blev ombedd att komponera efter varvet — i
+ *    möbelns egen höjd, snett framifrån. Den slår vy-valet, för den är inte gissad ur en film utan
+ *    beställd och tagen.
+ * 3. VY, från inspektionsanropet, som ändå ser alla bildrutor och får peka ut den som visar möbeln
+ *    framifrån. Gratis — inget extra anrop, ingen extra latens. Gäller när ingen omslagsbild togs.
  *
- * Ordningen är inte godtycklig: en modell som pekar ut en svart bildruta ska köras över, medan en
- * mätning aldrig kan veta vilket håll möbeln står åt. Ingendera signalen räcker ensam.
+ * Ordningen är inte godtycklig: en modell som pekar ut en svart bildruta ska köras över, en beställd
+ * bild slår en gissad, och en mätning kan aldrig veta vilket håll möbeln står åt. Ingen av signalerna
+ * räcker ensam.
  */
 
 import path from "node:path";
@@ -81,8 +85,16 @@ export async function presentableImages(
 /**
  * Väljer omslagsbild. `suggestedIndex` är inspektionens vy-val och används bara om bildrutan duger.
  *
- * Faller tillbaka på första DUGLIGA bildrutan i filmningsordning, och först om ingen duger på
- * `images[0]` — då finns inget bättre att säga, och ett omslag måste det bli.
+ * TRE SIGNALER numera, och den nya står först: en bild med rollen `cover` är den säljaren blev
+ * ombedd att KOMPONERA — i möbelns egen höjd, snett framifrån, efter att varvet var filmat. Ingen
+ * mätning och ingen modell vet något som slår "vi bad om precis den här bilden, och den togs".
+ *
+ * DUGLIGHETSSPÄRREN GÄLLER ÄNDÅ. Att bilden var efterfrågad gör den inte exponerad: blir den svart
+ * eller utbränd faller den till samma reservkedja som allt annat. Det som är efterfrågat är
+ * avsikten, inte resultatet.
+ *
+ * Faller allt tillbaka på första DUGLIGA bildrutan i filmningsordning, och sist på `images[0]` — då
+ * finns inget bättre att säga, och ett omslag måste det bli.
  */
 export async function pickCoverImageId(
   images: CapturedImage[],
@@ -91,6 +103,9 @@ export async function pickCoverImageId(
 ): Promise<string | null> {
   if (images.length === 0) return null;
   const measured = await Promise.all(images.map((img) => measure(img, originalsDir)));
+
+  const bestalld = measured.find((m) => m.image.role === "cover");
+  if (bestalld?.usable) return bestalld.image.id;
 
   if (suggestedIndex !== null && suggestedIndex >= 0 && suggestedIndex < measured.length) {
     const suggested = measured[suggestedIndex];

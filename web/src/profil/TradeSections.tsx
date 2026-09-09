@@ -26,7 +26,8 @@ const SEK = (n: number | null | undefined) => (n === null || n === undefined ? "
 const ORDER_LABEL: Record<Order["status"], string> = {
   pending: "Kassan är påbörjad",
   paid: "Betald",
-  scheduled: "Leverans bokad",
+  booking: "Vi bokar frakt",
+  scheduled: "Frakt bokad",
   delivered: "Levererad",
   return_requested: "Retur begärd",
   returned: "Returnerad",
@@ -42,7 +43,7 @@ const ORDER_LABEL: Record<Order["status"], string> = {
  */
 const ORDER_TODO: Partial<Record<Order["status"], string>> = {
   pending: "Slutför köpet",
-  paid: "Välj leveranstid",
+  paid: "Välj tider för leveransen",
   return_requested: "Retur pågår",
 };
 

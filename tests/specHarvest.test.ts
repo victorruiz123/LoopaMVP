@@ -7,6 +7,29 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import nodePath from "node:path";
+import { createRequire } from "node:module";
+
+/**
+ * Egen katalog för miniatyrerna, av samma skäl som i candidateImages-testet: annars skriver provet
+ * påhittade modeller i driftens register.
+ */
+process.env.LOOPA_KANDIDATBILDER_DIR = mkdtempSync(nodePath.join(tmpdir(), "loopa-spec-"));
+
+const sharpLib = createRequire(new URL("../server/src/kandidatbild.ts", import.meta.url))(
+  "sharp",
+) as typeof import("../server/node_modules/sharp");
+
+/** Riktiga bytes: kedjan hämtar hem bilden och avkodar den, så en tom kropp betyder "ingen bild". */
+const BILDBYTES = await sharpLib({
+  create: { width: 600, height: 450, channels: 3, background: { r: 190, g: 175, b: 155 } },
+}).jpeg().toBuffer();
+
+/** Adressen en hämtad bild får hos oss — samma summa som kandidatbild.ts räknar. */
+const lokalBild = (url: string) => `/api/kandidatbild/${createHash("sha1").update(url).digest("hex")}.jpg`;
 import { harvestSpecs, htmlToText, mergeSpecs } from "../server/src/specHarvest.js";
 import type { ListingAttribute } from "../server/src/types.js";
 
@@ -161,13 +184,18 @@ test("kandidatens produktsida bär måtten vidare till kandidaten", async () => 
     <meta property="og:image" content="https://x.se/bild.jpg"></head>
     <body><table><tr><th>Bredd</th><td>40 cm</td></tr><tr><th>Sitthöjd</th><td>62 cm</td></tr></table></body></html>`;
   const realFetch = globalThis.fetch;
-  globalThis.fetch = (async () => new Response(html, { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
+  // Bildadressen lämnar ut bytes, sidan sin HTML. Mocken svarade förut med HTML på allt, och sedan
+  // kedjan hämtar hem bilden betyder det "ingen bild".
+  globalThis.fetch = (async (input: RequestInfo | URL) =>
+    String(input) === "https://x.se/bild.jpg"
+      ? new Response(BILDBYTES, { headers: { "content-type": "image/jpeg" } })
+      : new Response(html, { headers: { "content-type": "text/html" } })) as unknown as typeof fetch;
   try {
     const [candidate] = await resolveCandidateImages(
       [{ brand: "IKEA", model: "NORDVIKEN", variant: null, productType: null, confidence: "strong", distinguishingDetail: null }],
       [{ title: "ikea.com", url: "https://www.ikea.com/se/sv/p/nordviken/", qualityTier: 1 }],
     );
-    assert.equal(candidate.imageUrl, "https://x.se/bild.jpg", "bilden fungerar som förut");
+    assert.equal(candidate.imageUrl, lokalBild("https://x.se/bild.jpg"), "bilden fungerar som förut");
     assert.deepEqual(
       candidate.pageSpecs?.map((s) => `${s.label}=${s.value}`),
       ["Bredd=40 cm", "Sitthöjd=62 cm"],
@@ -175,6 +203,7 @@ test("kandidatens produktsida bär måtten vidare till kandidaten", async () => 
     assert.equal(candidate.pageSpecs?.[0].sourceUrl, "https://www.ikea.com/se/sv/p/nordviken/");
   } finally {
     globalThis.fetch = realFetch;
+    rmSync(process.env.LOOPA_KANDIDATBILDER_DIR!, { recursive: true, force: true });
   }
 });
 

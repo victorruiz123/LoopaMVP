@@ -15,6 +15,29 @@ export async function loadImageAsBase64(absPath: string, mimeType = "image/jpeg"
   return { mimeType, base64: buf.toString("base64") };
 }
 
+/**
+ * Samma bild, nedskalad och omkodad — för anrop där NYTTOLASTEN är latensen.
+ *
+ * Den grundade sökningen skalar brant med bildvikt (mätt i annonsgeneratorn: 2 bilder 3,6 s mot 5
+ * bilder 8,0 s), och identifieringen behöver inte pixlarna: den ska känna igen en MODELL, inte se en
+ * repa. Besiktningen läser fortfarande originalen — se `loadImageAsBase64`, som är oförändrad.
+ *
+ * `rotate()` först, för att omkodningen släcker EXIF: en mobilbild som bar sin vridning i metadata
+ * hade annars kommit fram liggande, och en möbel på sidan är en möbel modellen inte känner igen.
+ */
+export async function loadImageAsBase64Scaled(
+  absPath: string,
+  maxSide: number,
+  quality: number,
+): Promise<ImagePart> {
+  const buf = await sharp(absPath)
+    .rotate()
+    .resize({ width: maxSide, height: maxSide, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality })
+    .toBuffer();
+  return { mimeType: "image/jpeg", base64: buf.toString("base64") };
+}
+
 export async function getImageDimensions(absPath: string): Promise<{ width: number; height: number }> {
   const meta = await sharp(absPath).metadata();
   return { width: meta.width ?? 0, height: meta.height ?? 0 };

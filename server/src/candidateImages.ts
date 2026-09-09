@@ -2,6 +2,7 @@ import type { ListingAttribute, ModelCandidate } from "./types.js";
 import { countDimensions, harvestSpecs } from "./specHarvest.js";
 
 import { fargerI, fargPaslag } from "./pipeline/farg.js";
+import { lokalKandidatbild, registreradKandidatbild, registreraKandidatbilder } from "./kandidatbild.js";
 
 /** En källa den grundade sökningen pekade ut. */
 export interface SourceRef {
@@ -48,10 +49,8 @@ const SPEC_PROBE_HITS = 3;
 
 /** Så många bildadresser vi behåller per sida. Fler än så är varianter av samma bild. */
 const MAX_IMAGES_PER_PAGE = 4;
-/** Så många av dem som får kontrolleras innan sidan ger upp. */
+/** Så många av dem som får PRÖVAS — alltså hämtas hem — innan sidan ger upp. Se pickImages. */
 const MAX_IMAGE_CHECKS = 3;
-/** Kontrollen av en bildadress är ett litet anrop, men det ligger sist i kedjan och får inte hänga. */
-const IMAGE_CHECK_TIMEOUT_MS = 4000;
 /** En UTSKRIVEN miniatyr är inte produktbilden. Står ingen storlek säger det ingenting, och den passerar. */
 const MIN_IMG_PX = 200;
 
@@ -757,15 +756,60 @@ export async function resolveCandidateImages(
   const seen = new Set<string>();
   const toFetch = [...sources, ...claimed].filter((s) => !seen.has(s.url) && seen.add(s.url));
 
+  /** Modell -> den bildadress som faktiskt svarade som en bild. Fylls först ur registret, se nedan. */
+  const picked = new Map<string, string>();
+  /**
+   * Sidfördelningen är tom tills sidorna hämtats. Deklarerad här för att registerblocket nedan ska
+   * kunna lämna ett delresultat innan en enda sida hämtats — en modell vi redan har bilden till ska
+   * inte vänta på att de andra letas upp.
+   */
+  let assigned: Map<string, Ranked> = new Map();
+
+  /**
+   * REGISTRET FÖRST: modeller någon redan letat upp en bild till får den direkt.
+   *
+   * Letandet är det som tar tid — sidor att hämta, sökmotorer att fråga, träffar att rangordna, fem
+   * till tjugo sekunder — och det är den tiden säljaren står och tittar på ett skimmer. Men samma
+   * modell skannas om och om igen: IKEA EKTORP är inte en möbel utan en modell tusen personer
+   * säljer. Har någon sett den förut är bilden framme innan skärmen hunnit rita klart.
+   *
+   * Delresultatet skickas i samma andetag, före den första hämtningen. Annars låg bilderna färdiga i
+   * minnet medan väljaren skimrade i väntan på att jakten skulle bli klar för de ANDRA kandidaterna.
+   */
+  const franRegistret = await Promise.all(
+    candidates.map(async (c) => [c.model, await registreradKandidatbild(c.brand, c.model)] as const),
+  );
+  /**
+   * Registrets träffar hålls SKILDA från jaktens.
+   *
+   * Jakten tömmer `picked` mellan sina steg — sidfördelningen kan ha ändrats, så valet görs om från
+   * grunden — och det tog med sig registrets bilder. Följden syntes i delresultaten: tre kandidater
+   * hade bild, sedan två, sedan tre igen. En bild som försvinner och kommer tillbaka är värre än en
+   * som dröjer, för säljaren hann se den.
+   *
+   * De läggs därför tillbaka efter varje tömning, och jakten hoppar över dem helt: en modell vi
+   * redan har en bild till är inget att leta efter.
+   */
+  const registrerade = new Map<string, string>();
+  for (const [model, url] of franRegistret) if (url) registrerade.set(model, url);
+  for (const [model, url] of registrerade) picked.set(model, url);
+  if (picked.size > 0) {
+    console.info(`[bild] ${picked.size}/${candidates.length} ur registret — inget letande behövs`);
+    await onPartial?.(compose(candidates, assigned, picked, false));
+  }
+  /**
+   * Alla redan kända? Då finns ingenting att hämta, och kedjan är över innan den börjat.
+   * Sidorna hade bara gett `pageSpecs`, och de är inte värda tjugo sekunder av någons väntan.
+   */
+  if (picked.size === candidates.length) return compose(candidates, assigned, picked, true);
+
   const pages = (await Promise.all(toFetch.map(fetchSafely))).filter((p): p is FetchedPage => p !== null);
   console.info(
     `[bild] ${pages.length}/${toFetch.length} källor hämtade (${claimed.length} från kandidaterna själva)` +
       (pages.length ? `: ${pages.map((p) => `${p.title.slice(0, 40)}${p.images.length ? " [bild]" : ""}`).join(" | ")}` : ""),
   );
 
-  let assigned = assignPages(candidates, pages, farg);
-  /** Modell -> den bildadress som faktiskt svarade som en bild. */
-  const picked = new Map<string, string>();
+  assigned = assignPages(candidates, pages, farg);
   /**
    * Modeller vars bild kommer från en sida som bekräftar färgen.
    *
@@ -775,8 +819,8 @@ export async function resolveCandidateImages(
    */
   const bekraftad = new Set<string>();
   /** Adress -> är den bevisat död? Delas mellan rundorna, så ingen adress kontrolleras två gånger. */
-  const checked = new Map<string, Promise<boolean>>();
-  await pickImages(candidates, assigned, picked, checked, farg, bekraftad);
+  const checked = new Map<string, Promise<string | null>>();
+  await pickImages(candidates, assigned, picked, checked, farg, bekraftad, registrerade);
 
   /**
    * Hoppen: kandidaten saknar bild, men någon av de hämtade sidorna LEDER till den.
@@ -841,10 +885,19 @@ export async function resolveCandidateImages(
     // Fördelningen kan ha flyttat sidor mellan kandidaterna, så valet görs om från grunden. Det
     // kostar inga nya anrop: varje redan kontrollerad bildadress ligger kvar i `checked`.
     picked.clear();
-    await pickImages(candidates, assigned, picked, checked, farg, bekraftad);
+    for (const [model, url] of registrerade) picked.set(model, url);
+    await pickImages(candidates, assigned, picked, checked, farg, bekraftad, registrerade);
   }
 
   const out = compose(candidates, assigned, picked, true);
+  /**
+   * Ned i registret, så nästa säljare med samma modell slipper hela letandet. Väntas aldrig in av
+   * någon som står och tittar — men den här funktionen är redan klar när den anropas, så den kostar
+   * ingenting att invänta här och felen syns i loggen i stället för att försvinna.
+   */
+  await registreraKandidatbilder(
+    out.filter((c) => c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, url: c.imageUrl! })),
+  );
   for (const c of out) {
     const page = assigned.get(c.model)?.page;
     if (!page) {
@@ -898,14 +951,18 @@ async function pickImages(
   candidates: ModelCandidate[],
   assigned: Map<string, Ranked>,
   picked: Map<string, string>,
-  checked: Map<string, Promise<boolean>>,
+  /** Källadress → hämtad lokal adress (eller null). Delas mellan kandidater och över alla jaktsteg. */
+  checked: Map<string, Promise<string | null>>,
   /** Möbelns färg, kanonisk. Utan den beter sig rutinen exakt som förut. */
   farg: string | null = null,
   /** Modeller vars bild kommer från en sida som BEKRÄFTAR färgen. Fylls i här, läses av jakten. */
   bekraftad: Set<string> = new Set(),
+  /** Modeller som redan har en bild ur registret. De letas inte efter — se resolveCandidateImages. */
+  registrerade: Map<string, string> = new Map(),
 ): Promise<void> {
   await Promise.all(
     candidates.map(async (c) => {
+      if (registrerade.has(c.model)) return;
       const hit = assigned.get(c.model);
       if (!hit) return;
       /**
@@ -926,62 +983,38 @@ async function pickImages(
        */
       if (picked.has(c.model) && !(sidanBekraftar && !bekraftad.has(c.model))) return;
       const options = hit.images.slice(0, MAX_IMAGE_CHECKS);
-      for (const [i, url] of options.entries()) {
+      for (const url of options) {
         /**
-         * Den sista tas utan kontroll.
+         * HÄMTNINGEN ÄR KONTROLLEN.
          *
-         * Kontrollen finns för att kunna VÄLJA en annan bild på samma sida — den finns inte för att
-         * kasta den enda som erbjuds. En oprövad bild är fortfarande en bild; en kastad är garanterat
-         * en tom ruta. Sidor med en enda bildadress kostar därför inte ett enda extra anrop.
+         * Här stod ett HEAD-anrop som frågade om adressen levde, plus en regel om att den SISTA
+         * adressen togs oprövad — hellre en osäker bild än ingen. Båda hörde till en värld där
+         * telefonen hämtade bilden själv från butikens CDN.
+         *
+         * Nu hämtar servern hem den, skalar den till en miniatyr och lägger den hos oss (se
+         * kandidatbild.ts). Då är en oprövad adress värdelös: vi kan inte servera bytes vi inte har.
+         * Ett misslyckande betyder därför "ta nästa bild på sidan", och när ingen av dem går att
+         * hämta får kandidaten ingen bild — vilket är en stilla ruta hos säljaren i stället för ett
+         * skimmer som snurrar i tolv sekunder och sedan slocknar ändå.
+         *
+         * Sidans adress följer med som `referer`: flera butiker vägrar lämna ut bilder till en
+         * främmande sida, och en hämtning som ser ut att komma från produktsidan släpps igenom.
          */
-        if (i === options.length - 1) {
-          picked.set(c.model, url);
+        let hamtad = checked.get(url);
+        if (!hamtad) {
+          hamtad = lokalKandidatbild(url, hit.page.finalUrl);
+          checked.set(url, hamtad);
+        }
+        const lokal = await hamtad;
+        if (lokal) {
+          picked.set(c.model, lokal);
           if (sidanBekraftar) bekraftad.add(c.model);
           return;
         }
-        let verdict = checked.get(url);
-        if (!verdict) {
-          verdict = imageIsDead(url);
-          checked.set(url, verdict);
-        }
-        if (!(await verdict)) {
-          picked.set(c.model, url);
-          if (sidanBekraftar) bekraftad.add(c.model);
-          return;
-        }
-        console.info(`[bild] ${c.model}: adressen svarade inte som en bild — ${url.slice(0, 80)}`);
+        console.info(`[bild] ${c.model}: gick inte att hämta — ${url.slice(0, 80)}`);
       }
     }),
   );
-}
-
-/**
- * Svarar adressen som en bild?
- *
- * Bara ett BEVISAT nej diskvalificerar: 404/410, eller ett svar som lämnar ut ett DOKUMENT där en
- * bild skulle stått — en felsida med statuskod 200 är den vanligaste döda bilden av alla.
- *
- * Allt annat får passera. Ett CDN som vägrar HEAD, en timeout, ett 403 eller ett svar utan
- * innehållstyp säger ingenting om bilden, och en del CDN:er skickar riktiga bilder som
- * `application/octet-stream`. Att kasta en fungerande bild på en tveksam signal vore att göra precis
- * det den här funktionen ska förhindra.
- */
-const DOCUMENT_TYPE = /^(text\/|application\/(json|xml|xhtml))/;
-
-async function imageIsDead(url: string): Promise<boolean> {
-  try {
-    const res = await fetch(url, {
-      method: "HEAD",
-      signal: AbortSignal.timeout(IMAGE_CHECK_TIMEOUT_MS),
-      headers: { "user-agent": UA_BROWSER, accept: "image/*,*/*;q=0.8" },
-      redirect: "follow",
-    });
-    await res.body?.cancel().catch(() => {});
-    if (res.status === 404 || res.status === 410) return true;
-    return res.ok && DOCUMENT_TYPE.test((res.headers.get("content-type") ?? "").toLowerCase());
-  } catch {
-    return false;
-  }
 }
 
 /**

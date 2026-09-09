@@ -188,13 +188,24 @@ async function byggSkugga(
 }
 
 /**
- * Den färdiga produktbilden: möbeln, skuggan, och rent vitt.
+ * Den färdiga produktbilden: möbeln, skuggan, och en botten.
  *
- * RENT #FFFFFF. Inte kräm, inte en gradient, ingen antydan till miljö. Konventionen finns av ett
- * skäl: den gör jämförelsen mellan två kort till en jämförelse mellan två möbler och ingenting
- * annat. Ett tidigare försök la möbeln på säljarens EGEN bildruta, suddad och dämpad, i tron att
- * rummet bär ljus och storlek. Utfallet var att varje kort blev en bild av ett hem med en möbel i,
- * och rutnätet såg ut som en samling privata foton i stället för som en butik.
+ * BOTTEN ÄR RENT #FFFFFF NÄR INGEN ANNAN GES, och det är fortfarande normalfallet — varenda bild i
+ * annonsens galleri utom den första ligger mot vitt. Konventionen finns av ett skäl: den gör
+ * jämförelsen mellan två kort till en jämförelse mellan två möbler och ingenting annat. Ett tidigare
+ * försök la möbeln på säljarens EGEN bildruta, suddad och dämpad, i tron att rummet bär ljus och
+ * storlek. Utfallet var att varje kort blev en bild av ett hem med en möbel i, och rutnätet såg ut
+ * som en samling privata foton i stället för som en butik.
+ *
+ * `botten` FINNS FÖR STUDION, och skiljer sig från det försöket på den enda punkt som gjorde det
+ * dåligt: bakgrunden är inte säljarens rum, den är INTE OLIKA FRÅN GÅNG TILL GÅNG. Det är en enda
+ * incheckad bild av ett tomt fotostudiogolv, samma pixlar under varje annons i butiken (se
+ * studio.ts). Rutnätet blir därför fortfarande en jämförelse mellan möbler — alla står i samma rum,
+ * på samma golv, i samma ljus — precis som det vita gjorde, men med ett golv att stå på.
+ *
+ * Bufferten ska vara rå RGB i exakt RUTA×RUTA. Är den något annat faller bilden tillbaka på vitt i
+ * stället för att bli fel: en bakgrund i fel storlek ger en fog som inte är vågrät, och det ser
+ * värre ut än ingen studio alls.
  *
  * MÖBELN KAPAS ALDRIG. Skalningen är `fit: "inside"` mot innerrutan, alltså den största skala där
  * HELA möbeln får plats. Proportionerna behålls; ingen beskärning görs utöver den mot möbelns egen
@@ -206,6 +217,7 @@ export async function komponera(
   b: number,
   h: number,
   ram: Ram,
+  botten: Buffer | null = null,
 ): Promise<Buffer | null> {
   const rgba = tillRgba(rgb, alfa, b, h, ram);
 
@@ -237,9 +249,22 @@ export async function komponera(
   }
   lager.push({ input: skalad.data, left: vanster, top: Math.max(0, topp) });
 
-  return await sharp({
-    create: { width: RUTA, height: RUTA, channels: 3, background: { r: 255, g: 255, b: 255 } },
-  })
+  /**
+   * Duken: studiobakgrunden när den finns och håller måttet, annars rent vitt.
+   *
+   * Storleken prövas HÄR och inte hos den som skickar in. Skälet är att det här är det enda stället
+   * som vet vad en duk måste vara, och en bakgrund som är 1024 px hade tyst skalats av sharp till
+   * något annat än det granskade rummet — med en fog som inte längre ligger där möbelns fötter
+   * står.
+   */
+  const duk =
+    botten && botten.length === RUTA * RUTA * 3
+      ? sharp(botten, { raw: { width: RUTA, height: RUTA, channels: 3 } })
+      : sharp({
+          create: { width: RUTA, height: RUTA, channels: 3, background: { r: 255, g: 255, b: 255 } },
+        });
+
+  return await duk
     .composite(lager)
     // 4:4:4 utan färgunderabtastning: en möbelkant mot rent vitt är precis det mönster 4:2:0 gör
     // fransigt, och det syns som en färgad rand runt tunna ben.

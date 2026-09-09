@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
-import type { CardDamage, ListingViewData } from "../types";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import type { CardDamage, ListingAttribute, ListingViewData } from "../types";
 import { formatSek } from "../lib/price";
 import { severityLabel, typeLabel } from "../lib/labels";
 import { brandLook, brandTypeStyle } from "../lib/brandLook";
 import { archetypeFor, buildModel, parseDimensions, zoneForPart } from "../lib/furnitureModel";
 import GradeBadge from "./GradeBadge";
+import { ChevronRight } from "./icons";
 import FurnitureRender, { type RenderPin } from "./FurnitureRender";
 import ListingChat from "./ListingChat";
 import { useT } from "../lib/i18n";
@@ -38,13 +39,17 @@ export default function ListingView({
   grade,
   price,
   damages,
-  imageCount,
-  reviewed,
+  /* `imageCount` och `reviewed` kommer med i ListingViewData men plockas inte ut här längre: de bar
+     raden "12 vyer · två besiktningar" under betyget, som är siffror ur vår process och inte ur
+     möbeln. Fälten ligger kvar i typen — servern skickar dem, och adminvyn läser dem. */
   productImage,
   cover,
+  bilder,
   loopaId,
   hideHeader = false,
   hideSources = false,
+  collapsible = false,
+  onSaveListing,
   only,
 }: ListingViewData & {
   /**
@@ -97,9 +102,84 @@ export default function ListingView({
    * redovisning — där är källan halva poängen, för läsaren kontrollerar oss.
    */
   hideSources?: boolean;
+  /**
+   * Sektionerna som hopfällbara rader i stället för utfällda kort.
+   *
+   * SÄLJARENS SKÄRM, och bara den. Det säljaren gör här är att godkänna en annons och trycka på
+   * "Sälj med Loopa" — och den knappen låg tre skärmhöjder ned, bakom skickrapporten, beskrivningen
+   * och specifikationerna. Fällda rader gör hela beslutet synligt på en skärm, och den som vill
+   * granska en del fäller ut den.
+   *
+   * INTE på det publika kortet (/c/LP-XXXX-XXXX). Den sidan finns för att en köpare ska kunna
+   * kontrollera ett skickpåstående, och en rapport vars bevis kräver ett klick läser som ett
+   * påstående igen — samma skäl som står vid skadefotona nedan. Inte heller i butiken, som redan
+   * placerar sektionerna själv med `only`.
+   *
+   * Innehållet är detsamma i båda lägena. Det enda som skiljer är om raden börjar öppen.
+   */
+  collapsible?: boolean;
+  /**
+   * Säljarens rättelser: måtten och beskrivningen skrivs tillbaka härifrån.
+   *
+   * ALLT PÅ KORTET ÄR MASKINELLT FRAMTAGET — måtten ur en sidskörd eller uppskattade för möbeltypen,
+   * texten ur en generator — och den enda som VET är personen som står bredvid möbeln. Utan en väg
+   * att rätta är deras enda val att publicera något de vet är fel, eller att låta bli att sälja.
+   *
+   * Skicket rättas inte här. Det har sin egen väg på skickskärmen, där en ändring kan backas av ett
+   * foto och räknas om i betyget (se ResultScreen och pipeline/dispute.ts) — en skada är ett
+   * påstående om möbeln, inte en uppgift om den, och de två tål inte samma sorts redigering.
+   *
+   * Utelämnad = ingen redigering. Så ser det publika kortet och butiken ut: där är uppgifterna
+   * någon annans, och en penna vore ett löfte som inte går att infria.
+   */
+  onSaveListing?: (patch: {
+    attributes?: ListingAttribute[];
+    description?: string;
+    conditionText?: string;
+  }) => Promise<void>;
 }) {
   const t = useT();
   const [selected, setSelected] = useState<string | null>(null);
+
+  /**
+   * Redigeringen: vilken sektion som står öppen, och utkastet i den.
+   *
+   * UTKASTET ÄR EN KOPIA, inte kortets egna fält. Skriver man direkt i `card` ändras annonsen medan
+   * man skriver, och "Avbryt" har då ingenting att gå tillbaka till. Kopian tas när rutan öppnas och
+   * skickas i sin helhet när man sparar; svaret från servern blir det nya kortet.
+   */
+  const [redigerar, setRedigerar] = useState<null | "about" | "specs">(null);
+  const [sparar, setSparar] = useState(false);
+  const [sparfel, setSparfel] = useState<string | null>(null);
+  const [utkastText, setUtkastText] = useState({ description: "", conditionText: "" });
+  const [utkastAttr, setUtkastAttr] = useState<ListingAttribute[]>([]);
+
+  const oppnaText = () => {
+    setSparfel(null);
+    setUtkastText({
+      description: card.listing.description ?? "",
+      conditionText: card.listing.conditionText ?? "",
+    });
+    setRedigerar("about");
+  };
+  const oppnaAttr = () => {
+    setSparfel(null);
+    setUtkastAttr(card.attributes.map((a) => ({ ...a })));
+    setRedigerar("specs");
+  };
+  const spara = async (patch: Parameters<NonNullable<typeof onSaveListing>>[0]) => {
+    if (!onSaveListing) return;
+    setSparar(true);
+    setSparfel(null);
+    try {
+      await onSaveListing(patch);
+      setRedigerar(null);
+    } catch (e) {
+      setSparfel(e instanceof Error ? e.message : t("Ändringen kunde inte sparas."));
+    } finally {
+      setSparar(false);
+    }
+  };
 
   /**
    * Omslaget är MÖBELN SOM SÄLJS: säljarens egen bild framifrån, med rummet bortklippt och bakgrunden
@@ -160,6 +240,52 @@ export default function ListingView({
     return () => clearTimeout(id);
   }, [shown?.url, loadedUrl]);
 
+  /**
+   * Annonsens galleri, eller tom lista när det inte finns någon bläddring att göra.
+   *
+   * BARA NÄR OMSLAGET ÄR URKLIPPET. Är det som visas katalogbilden eller säljarens orörda bildruta
+   * har servern antingen inte lämnat något galleri, eller så har omslagets adress fallit här i vyn
+   * — och i båda fallen vore en bläddring en rad miniatyrer under en bild som inte hör till dem.
+   *
+   * En ensam bild räknas inte som ett galleri: prickar och bläddring under EN bild lovar något som
+   * inte finns.
+   */
+  const galleri = useMemo(() => {
+    if (shown?.kind !== "cutout") return [];
+    const kvar = (bilder ?? []).filter((b) => !dead.includes(b.url));
+    return kvar.length > 1 ? kvar : [];
+  }, [bilder, shown?.kind, dead]);
+
+  /**
+   * Vilken bild bläddringen står på. Läses UR remsan och styr den inte.
+   *
+   * Bläddringen är webbläsarens egen — `scroll-snap`, alltså ett svep på en telefon och ett drag med
+   * styrplattan på en dator, precis som varje annan bildkarusell användaren mött. Vyn räknar bara ut
+   * var den hamnade, för prickarna och bildtexten. Att i stället styra remsan från React hade
+   * inneburit att återuppfinna tröghet och fingersläpp, och göra dem sämre.
+   */
+  const remsa = useRef<HTMLDivElement | null>(null);
+  const [aktiv, setAktiv] = useState(0);
+  const vidRullning = () => {
+    const el = remsa.current;
+    if (!el) return;
+    const i = Math.round(el.scrollLeft / el.clientWidth);
+    setAktiv(Math.max(0, Math.min(galleri.length - 1, i)));
+  };
+
+  /**
+   * Tillbaka till första bilden när kortet byter möbel.
+   *
+   * Butiken är en enda sida som byter innehåll, så vyn lever vidare mellan två produkter. Utan det
+   * här stod bläddringen kvar på bild fyra för en möbel som har två — med en bildtext som beskrev en
+   * bild ingen tittade på, och en markerad miniatyr som inte fanns.
+   */
+  const galleriNyckel = galleri.map((b) => b.url).join("|");
+  useEffect(() => {
+    setAktiv(0);
+    remsa.current?.scrollTo({ left: 0 });
+  }, [galleriNyckel]);
+
   const name = card.identity.exactProduct ?? card.identity.variant ?? identity?.model ?? t("Möbel");
   const brand = card.identity.brand ?? identity?.brand ?? null;
 
@@ -177,14 +303,13 @@ export default function ListingView({
 
   const retail = card.pricing.retailPriceSek;
   const now = price?.status === "ok" ? price.default : null;
-  const discount = retail && now && retail > now ? Math.round((1 - now / retail) * 100) : null;
 
   const show = (section: ListingSection) => !only || only.includes(section);
 
   return (
     // `listing-bare` gör lådorna genomskinliga för layouten (display: contents), så delarna hamnar
     // direkt i anroparens rutnät i stället för i kortets egen kolumn.
-    <article className={only ? "listing listing-bare" : "listing"}>
+    <article className={only ? "listing listing-bare" : `listing ${collapsible ? "listing-kompakt" : ""}`}>
       {show("cover") && shown && (
         /* Bilden och dess härkomst är EN sak, och hålls ihop av ett element: på datorvyn är
            kolumnen ett rutnät, och två syskon hade lagt bildtexten i en egen rad långt under. */
@@ -200,29 +325,84 @@ export default function ListingView({
                 {grade.canonicalCondition}
               </span>
             )}
-            <img
-              key={shown.url}
-              className="listing-cover"
-              src={shown.url}
-              alt={name}
-              onLoad={() => setLoadedUrl(shown.url)}
-              onError={() => setDead((d) => (d.includes(shown.url) ? d : [...d, shown.url]))}
-            />
+            {galleri.length > 1 ? (
+              /* Bläddringen. Se `galleri` och `remsa` ovan för varför den är webbläsarens egen. */
+              <div className="listing-carousel" ref={remsa} onScroll={vidRullning}>
+                {galleri.map((b, i) => (
+                  <img
+                    key={b.url}
+                    className="listing-cover"
+                    src={b.url}
+                    alt={i === 0 ? name : t("{namn}, bild {nr}", { namn: name, nr: String(i + 1) })}
+                    /* Bara första bilden hämtas direkt: resten ligger utanför rutan tills någon
+                       bläddrar, och fem kvadrater på 1600 px är en halv megabyte var. */
+                    loading={i === 0 ? "eager" : "lazy"}
+                    decoding="async"
+                    onLoad={() => i === 0 && setLoadedUrl(b.url)}
+                    onError={() => setDead((d) => (d.includes(b.url) ? d : [...d, b.url]))}
+                  />
+                ))}
+              </div>
+            ) : (
+              <img
+                key={shown.url}
+                className="listing-cover"
+                src={shown.url}
+                alt={name}
+                onLoad={() => setLoadedUrl(shown.url)}
+                onError={() => setDead((d) => (d.includes(shown.url) ? d : [...d, shown.url]))}
+              />
+            )}
           </div>
+          {galleri.length > 1 && (
+            /*
+              Miniatyrerna, och de är KNAPPAR och inte prickar.
+              En rad prickar säger hur många bilder som finns; miniatyrer säger vad de visar. På en
+              annons där bild två är ryggen och bild tre är en fläck på sitsen är det skillnaden
+              mellan att bläddra och att leta. De fungerar dessutom som prickarna gjorde — den
+              aktiva är markerad — så ingenting är förlorat.
+            */
+            <div className="listing-thumbs" role="tablist" aria-label={t("Bilder av möbeln")}>
+              {galleri.map((b, i) => (
+                <button
+                  key={b.url}
+                  type="button"
+                  role="tab"
+                  aria-selected={i === aktiv}
+                  aria-label={t("Bild {nr}", { nr: String(i + 1) })}
+                  className={`listing-thumb ${i === aktiv ? "is-active" : ""}`}
+                  onClick={() =>
+                    remsa.current?.scrollTo({ left: i * remsa.current.clientWidth, behavior: "smooth" })
+                  }
+                >
+                  <img src={b.url} alt="" loading="lazy" decoding="async" />
+                </button>
+              ))}
+            </div>
+          )}
           {/* Vad bilden är, sagt rakt ut.
               Bildrutan: säljarens egen bild, orörd. Att den ÄR orörd är en uppgift och inte en
               självklarhet — kortet påstår att det redovisar möbeln som den är, och då ska det stå
-              vad bilden har varit med om.
-              Urklippet: möbeln är säljarens egen, men den vita bakgrunden är VÅR redigering, och ett
-              kort som räknar upp varje skråma får inte tiga om att det rört bilden. Ingen väg sätter
-              "cutout" när produktbildssystemet lyckats och kvalitetskontrollen godkänt resultatet;
-              annars är omslaget bildrutan och texten säger det.
+              vad bilden har varit med om. Ingen väg sätter "cutout" utan att produktbildssystemet
+              lyckats och kvalitetskontrollen godkänt resultatet; annars är omslaget bildrutan och
+              texten säger det.
               Katalogbilden: den visar inte ens möbeln som säljs, och då ska det stå — inte antas. */}
           {shown.kind === "photo" && (
             <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, orörd")}</p>
           )}
+          {/*
+              Urklippet: möbeln är säljarens egen, men bakgrunden är VÅR, och ett kort som räknar upp
+              varje skråma får inte tiga om att det rört bilden. Texten skiljer på de två sakerna vi
+              gör, för de är olika stora: på galleriets bilder är rummet BORTTAGET och ersatt med
+              vitt, medan annonsens första bild dessutom står i en studio vi själva låtit generera.
+              Att kalla båda "bakgrunden borttagen" hade varit sant om den ena och tyst om den andra.
+          */}
           {shown.kind === "cutout" && (
-            <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, bakgrunden borttagen")}</p>
+            <p className="listing-cover-note">
+              {aktiv === 0 && cover?.backdrop
+                ? t("Säljarens egen bild av möbeln, mot vår studiobakgrund")
+                : t("Säljarens egen bild av möbeln, bakgrunden borttagen")}
+            </p>
           )}
           {shown.kind === "product" && (
             <p className="listing-cover-note">
@@ -265,11 +445,11 @@ export default function ListingView({
             {/* Nypriset står med av samma skäl som i en annons för en ny möbel: det är referensen som
                 gör priset läsbart. Det VÄRDERAR inte möbeln — prisförslaget kommer från prismotorns
                 annonskorpus och har redan skickavdraget inräknat. */}
+            {/* Procenten är borttagen. Nypriset står kvar och gör samma jobb — den som ser
+                24 900 kr överstruket bredvid 8 400 kr behöver ingen som räknar ut skillnaden åt sig,
+                och ett rabattmärke i accentfärg drar dessutom blicken från priset det ska förklara. */}
             {retail && now && retail > now && (
-              <>
-                <span className="listing-price-was">{formatSek(retail)}</span>
-                <span className="listing-price-off">−{discount} %</span>
-              </>
+              <span className="listing-price-was">{formatSek(retail)}</span>
             )}
           </div>
           <p className="listing-price-note">
@@ -287,44 +467,89 @@ export default function ListingView({
         </div>
         )}
 
-        {show("specs") && card.attributes.length > 0 && (
-          <section className="listing-block">
-            <h3>{t("Specifikationer")}</h3>
-            <dl className="listing-specs">
-              {card.attributes.map((a) => (
-                <div key={a.key + a.label} className="listing-spec">
-                  <dt>{a.label}</dt>
-                  <dd>
-                    {a.value}
-                    {a.sourceUrl && !hideSources ? (
-                      <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
-                        {t("källa")}
-                      </a>
-                    ) : (
-                      // Uppskattningen står på källänkens plats, i grått och utan länk — det finns
-                      // ingen sida att gå till, och det är hela poängen med märkningen.
-                      a.estimated && <span className="card-est">{t("uppskattat")}</span>
-                    )}
-                  </dd>
-                </div>
-              ))}
-            </dl>
-          </section>
+        {show("about") && (
+        /*
+          BESKRIVNINGEN, UTAN RUBRIK OCH DIREKT UNDER PRISET.
+          Så står den i varje annons som är värd att läsa: man ser möbeln, ser vad den kostar, och
+          läser sedan om den. Här låg den sist av allt, under en etikett som stod "OM MÖBELN" —
+          en rubrik som bara säger vad texten under den uppenbarligen är.
+
+          ANNONSENS EGEN RUBRIK stod dessutom först i blocket, i fetstil, ovanför beskrivningen. Den
+          är en andra rubrik på ett kort som redan har en: möbeln heter något i huvudet, och det
+          namnet står överst. Rubriken som faktiskt publiceras ser säljaren i bekräftelsen, där den
+          betyder något (se SellWithLoopa).
+        */
+        <Block collapsible={collapsible} titel={t("Beskrivning")} className="listing-about">
+          {redigerar === "about" ? (
+            <div className="listing-edit">
+              <label className="listing-edit-falt">
+                <span>{t("Beskrivning")}</span>
+                <textarea
+                  rows={9}
+                  value={utkastText.description}
+                  onChange={(e) => setUtkastText((v) => ({ ...v, description: e.target.value }))}
+                />
+              </label>
+              {/* Skicktexten står som eget fält. Den är annonsens mening om slitaget och den enda
+                  text på kortet som säger något om möbelns skick i ord — klumpas den ihop med
+                  beskrivningen försvinner den för den som bara vill rätta en mening om färgen. */}
+              <label className="listing-edit-falt">
+                <span>{t("Om skicket")}</span>
+                <textarea
+                  rows={3}
+                  value={utkastText.conditionText}
+                  onChange={(e) => setUtkastText((v) => ({ ...v, conditionText: e.target.value }))}
+                />
+              </label>
+              <EditFot
+                sparar={sparar}
+                fel={sparfel}
+                onAvbryt={() => setRedigerar(null)}
+                onSpara={() => void spara({ description: utkastText.description, conditionText: utkastText.conditionText })}
+              />
+            </div>
+          ) : (
+            <>
+              <p className="card-listing-body">{card.listing.description}</p>
+              {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
+              {onSaveListing && (
+                <button type="button" className="listing-edit-knapp" onClick={oppnaText}>
+                  {t("Ändra texten")}
+                </button>
+              )}
+            </>
+          )}
+        </Block>
         )}
 
         {show("condition") && (
-        <section className="listing-block">
-          <h3>{t("Skickrapport")}</h3>
+        <Block
+          collapsible={collapsible}
+          titel={t("Skick")}
+          rubrik={t("Skick")}
+          /* Sammanfattningen på den fällda raden. Betyget och antalet — det är de två talen man
+             öppnar rapporten för att se, och står de redan i raden slipper många öppna den. */
+          sammanfattning={[
+            grade?.label,
+            damages.length === 1
+              ? t("{antal} anmärkning", { antal: damages.length })
+              : t("{antal} anmärkningar", { antal: damages.length }),
+          ]
+            .filter(Boolean)
+            .join(" · ")}
+        >
           <div className="listing-condition-head">
             {grade && <GradeBadge grade={grade.grade} size={44} />}
             <div>
               <div className="card-verdict-label">{grade?.label ?? "—"}</div>
+              {/* ANTALET, och inget mer. Här stod "· 12 vyer · två besiktningar" också — sant,
+                  men det är siffror ur vår process, och de gjorde raden till en revisionsnotering
+                  mitt i en annons. Den som vill veta hur noga vi tittat ser resultatet under: varje
+                  anmärkning med sitt foto. */}
               <div className="muted small">
                 {damages.length === 1
                   ? t("{antal} anmärkning", { antal: damages.length })
-                  : t("{antal} anmärkningar", { antal: damages.length })}{" "}
-                · {t("{antal} vyer", { antal: imageCount })} ·{" "}
-                {reviewed ? t("två besiktningar") : t("en besiktning")}
+                  : t("{antal} anmärkningar", { antal: damages.length })}
               </div>
             </div>
           </div>
@@ -387,19 +612,108 @@ export default function ListingView({
           )}
           {fotade.length > 0 && (
             <p className="listing-pin-note">
-              {t("Bilderna är säljarens egna, orörda så när som på markeringen. Numren är samma som i listan.")}
+              {t("Säljarens egna bilder, orörda så när som på markeringen.")}
             </p>
           )}
-        </section>
+        </Block>
         )}
 
-        {show("about") && (
-        <section className="listing-block">
-          <h3>{t("Om möbeln")}</h3>
-          <div className="listing-title-line">{card.listing.title}</div>
-          <p className="card-listing-body">{card.listing.description}</p>
-          {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
-        </section>
+        {/* `|| onSaveListing`: en möbel där generatorn inte hittade ett enda mått är precis den som
+            mest behöver att säljaren kan skriva in dem. Utan den här halvan fanns ingen sektion att
+            öppna, och "lägg till uppgift" gick inte att nå. */}
+        {show("specs") && (card.attributes.length > 0 || !!onSaveListing) && (
+          <Block collapsible={collapsible} titel={t("Mått och material")} rubrik={t("Specifikationer")}>
+            {redigerar === "specs" ? (
+              <div className="listing-edit">
+                <div className="listing-edit-rader">
+                  {utkastAttr.map((a, i) => (
+                    /* Nyckeln är RADENS PLATS och inte dess innehåll: etiketten är ett fält man
+                       skriver i, och en nyckel som ändras vid varje tangenttryck monterar om
+                       inmatningen och tappar markören. */
+                    <div className="listing-edit-rad" key={i}>
+                      <input
+                        className="listing-edit-etikett"
+                        value={a.label}
+                        placeholder={t("Uppgift")}
+                        aria-label={t("Uppgift")}
+                        onChange={(e) =>
+                          setUtkastAttr((v) => v.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)))
+                        }
+                      />
+                      <input
+                        className="listing-edit-varde"
+                        value={a.value}
+                        placeholder={t("Värde")}
+                        aria-label={t("Värde")}
+                        onChange={(e) =>
+                          setUtkastAttr((v) => v.map((x, j) => (j === i ? { ...x, value: e.target.value } : x)))
+                        }
+                      />
+                      <button
+                        type="button"
+                        className="listing-edit-bort"
+                        aria-label={t("Ta bort raden")}
+                        onClick={() => setUtkastAttr((v) => v.filter((_, j) => j !== i))}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  className="listing-edit-lagg"
+                  onClick={() => setUtkastAttr((v) => [...v, { key: "", label: "", value: "" }])}
+                >
+                  + {t("Lägg till uppgift")}
+                </button>
+                <EditFot
+                  sparar={sparar}
+                  fel={sparfel}
+                  onAvbryt={() => setRedigerar(null)}
+                  /* Tomma rader skickas inte med. Servern kastar dem också, men en rad man lämnat
+                     tom ska försvinna för att man lämnade den tom — inte för att servern städade. */
+                  onSpara={() =>
+                    void spara({ attributes: utkastAttr.filter((a) => a.label.trim() && a.value.trim()) })
+                  }
+                />
+              </div>
+            ) : (
+              <>
+                <dl className="listing-specs">
+                  {card.attributes.map((a) => (
+                    <div key={a.key + a.label} className="listing-spec">
+                      <dt>{a.label}</dt>
+                      <dd>
+                        {a.value}
+                        {/* Härkomsten, i fallande ordning av vad den binder oss vid: säljarens egen
+                            uppgift går först, för den ersätter både källan och uppskattningen — se
+                            `sellerEdited` i types.ts. */}
+                        {a.sellerEdited ? (
+                          <span className="card-est">
+                            {onSaveListing ? t("angivet av dig") : t("angivet av säljaren")}
+                          </span>
+                        ) : a.sourceUrl && !hideSources ? (
+                          <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
+                            {t("källa")}
+                          </a>
+                        ) : (
+                          // Uppskattningen står på källänkens plats, i grått och utan länk — det finns
+                          // ingen sida att gå till, och det är hela poängen med märkningen.
+                          a.estimated && <span className="card-est">{t("uppskattat")}</span>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {onSaveListing && (
+                  <button type="button" className="listing-edit-knapp" onClick={oppnaAttr}>
+                    {card.attributes.length ? t("Ändra uppgifterna") : t("Fyll i mått och material")}
+                  </button>
+                )}
+              </>
+            )}
+          </Block>
         )}
 
         {/* Sist, efter allt som går att läsa. Frågor uppstår när man läst skicket och beskrivningen —
@@ -415,6 +729,94 @@ export default function ListingView({
         )}
       </div>
     </article>
+  );
+}
+
+
+/**
+ * Foten i en redigeringsruta: felet, avbryt och spara.
+ *
+ * SPARA ÄR EN FYLLD KNAPP OCH AVBRYT ÄR TEXT, inte tvärtom och inte två likadana. Den som öppnat
+ * rutan har redan bestämt sig för att ändra något; att göra "spara" och "avbryt" lika tunga gör ett
+ * avslut till ett val mellan två okända.
+ *
+ * Felet står ÖVER knapparna och inte under. Ett fel under en knapp man just tryckt på hamnar under
+ * tummen på en telefon, och den som inte ser det trycker igen.
+ */
+function EditFot({
+  sparar,
+  fel,
+  onAvbryt,
+  onSpara,
+}: {
+  sparar: boolean;
+  fel: string | null;
+  onAvbryt: () => void;
+  onSpara: () => void;
+}) {
+  const t = useT();
+  return (
+    <>
+      {fel && <p className="listing-edit-fel">{fel}</p>}
+      <div className="listing-edit-fot">
+        <button type="button" className="btn btn-text" onClick={onAvbryt} disabled={sparar}>
+          {t("Avbryt")}
+        </button>
+        <button type="button" className="btn btn-primary btn-small" onClick={onSpara} disabled={sparar}>
+          {sparar ? t("Sparar…") : t("Spara")}
+        </button>
+      </div>
+    </>
+  );
+}
+
+/**
+ * En sektion på kortet — utfälld ruta eller hopfällbar rad.
+ *
+ * SAMMA INNEHÅLL I BÅDA LÄGENA, och det är hela villkoret för att den här komponenten får finnas.
+ * Skillnaden är om raden börjar öppen, inte vad som står i den. Så fort de två grenarna börjar visa
+ * olika saker har kortet två versioner av sanningen, och då är det inte längre ETT kort.
+ *
+ * `<details>` och inte en egen öppna/stäng-krets: webbläsaren ger tangentbord, skärmläsare och
+ * webbläsarens egen sidsökning ("hitta på sidan" hittar in i en stängd details i moderna
+ * webbläsare) utan en rad kod, och en accordion byggd på useState gör alla tre sämre.
+ */
+function Block({
+  collapsible,
+  titel,
+  rubrik,
+  sammanfattning,
+  className,
+  children,
+}: {
+  collapsible: boolean;
+  /** Raden när den är fälld. */
+  titel: string;
+  /** Rubriken när sektionen står öppen. Utelämnad = ingen rubrik alls, som för beskrivningen. */
+  rubrik?: string;
+  sammanfattning?: string;
+  className?: string;
+  children: ReactNode;
+}) {
+  if (!collapsible) {
+    return (
+      <section className={`listing-block ${className ?? ""}`}>
+        {rubrik && <h3>{rubrik}</h3>}
+        {children}
+      </section>
+    );
+  }
+  return (
+    <details className={`listing-block listing-fold ${className ?? ""}`}>
+      <summary>
+        <span className="listing-fold-titel">{titel}</span>
+        {sammanfattning && <span className="listing-fold-sam">{sammanfattning}</span>}
+        <span className="listing-fold-pil" aria-hidden="true">
+          <ChevronRight size={16} />
+        </span>
+      </summary>
+      <div className="listing-fold-kropp">{children}</div>
+    </details>
   );
 }
 

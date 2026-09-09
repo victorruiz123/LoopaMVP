@@ -17,6 +17,7 @@ import { access } from "node:fs/promises";
 import sharp from "sharp";
 import * as ort from "onnxruntime-node";
 import { MODELLER, RESERVKEDJA, valdModell, type Modell } from "./modeller.js";
+import { korModell, slappTraden } from "./inferens.js";
 
 const MODELLKATALOG = path.resolve(import.meta.dirname, "..", "..", "..", "models");
 
@@ -47,7 +48,11 @@ export interface Arbetsbild {
   originalHojd: number;
 }
 
-const sessioner = new Map<string, ort.InferenceSession>();
+/**
+ * Trådar åt modellen. En i drift som förut — men numera i EN EGEN TRÅD (inferens.ts), så den enda
+ * kärnan den tar är inte den som svarar säljaren. Benchmarken sätter fler via PRODUKTBILD_TRADAR.
+ */
+const TRADAR = Number(process.env.PRODUKTBILD_TRADAR ?? 1);
 
 function modellfil(namn: string): string {
   return path.join(MODELLKATALOG, `${namn}.onnx`);
@@ -84,32 +89,9 @@ export async function tillgangligModell(): Promise<Modell | null> {
   return null;
 }
 
-/**
- * Sessionen, laddad en gång per modell och delad.
- *
- * Kartan och inte en enda variabel: benchmarken kör fyra modeller om vartannat över samma bilder,
- * och att ladda om en 490 MB-fil mellan varje bild hade gjort jämförelsen till en mätning av disken.
- * I drift finns bara en nyckel i kartan.
- */
-async function session(m: Modell): Promise<ort.InferenceSession> {
-  const fanns = sessioner.get(m.namn);
-  if (fanns) return fanns;
-  const t0 = Date.now();
-  const s = await ort.InferenceSession.create(modellfil(m.namn), {
-    // En tråd i drift: servern kör besiktningar parallellt, och en modell som tar alla kärnor gör
-    // varje annat anrop långsammare. Benchmarken sätter fler via PRODUKTBILD_TRADAR.
-    intraOpNumThreads: Number(process.env.PRODUKTBILD_TRADAR ?? 1),
-    graphOptimizationLevel: "all",
-  });
-  sessioner.set(m.namn, s);
-  console.info(`[produktbild] modell ${m.namn} laddad på ${Date.now() - t0} ms`);
-  return s;
-}
-
 /** Släpper alla modeller ur minnet. För skript som kör en gång och ska avslutas. */
 export async function slappModeller(): Promise<void> {
-  for (const s of sessioner.values()) await s.release();
-  sessioner.clear();
+  await slappTraden();
 }
 
 /**
@@ -304,22 +286,26 @@ function lasKarta(rå: Float32Array, sida: number, m: Modell): Float32Array {
  */
 export async function kartaFor(bild: Arbetsbild, m: Modell): Promise<Karta | null> {
   const { tensor, skala, padX, padY } = await tillTensor(bild, m);
-  const s = await session(m);
-  const svar = await s.run({ [s.inputNames[0]]: tensor });
-
   /**
-   * FÖRSTA UTGÅNGEN, alltid — och det är inte självklart.
+   * Modellen körs i en EGEN TRÅD, och det är inte en optimering utan en förutsättning.
    *
-   * ISNet lämnar tolv kartor och U2Net sju (d0–d6). Bara den första är den sammanvägda; resten är
-   * mellansteg från olika djup i nätet, användbara under träning och missvisande här. En modell som
-   * plötsligt ser suddig ut är oftast en modell där fel utgång lästes.
+   * `run` räknar synkront på den tråd som anropar den. Låg den kvar här blockerade den hela servern
+   * i minuter — pollning, timers, nästa besiktning — och den enda symptomen säljaren såg var en
+   * skärm som stod kvar på "Bilder förberedda". Se inferens.ts.
+   *
+   * FÖRSTA UTGÅNGEN läses där borta, alltid — och det är inte självklart: ISNet lämnar tolv kartor
+   * och U2Net sju (d0–d6). Bara den första är den sammanvägda; resten är mellansteg från olika djup
+   * i nätet, användbara under träning och missvisande här. En modell som plötsligt ser suddig ut är
+   * oftast en modell där fel utgång lästes.
    */
-  const utnamn = s.outputNames[0];
-  const t = svar[utnamn];
-  // `type` finns i drift men inte i 1.20.1:s typdeklaration. Läses defensivt: en modell som svarar
-  // i halvprecision ska breddas, en som svarar i float32 ska inte röras.
-  const utTyp = (t as unknown as { type?: string }).type;
-  const rå = utTyp === "float16" ? franFloat16(t.data as unknown as Uint16Array) : (t.data as Float32Array);
+  const t = await korModell(modellfil(m.namn), TRADAR, {
+    typ: m.fp16 ? "float16" : "float32",
+    data: tensor.data as Float32Array | Uint16Array,
+    dims: [1, 3, m.sida, m.sida],
+  });
+  // Typen läses ur svaret: en modell som svarar i halvprecision ska breddas, en som svarar i
+  // float32 ska inte röras.
+  const rå = t.typ === "float16" ? franFloat16(t.data as Uint16Array) : (t.data as Float32Array);
   const n = m.sida * m.sida;
   if (rå.length < n) return null;
 

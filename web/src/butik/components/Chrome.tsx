@@ -3,6 +3,7 @@ import { useAuth } from "../../auth/AuthProvider";
 import { Link, SearchIcon, track } from "./Bits";
 import { navigate, useButikRoute } from "../router";
 import LoggaInGrind from "../../kop/components/LoggaInGrind";
+import Avatar from "../../components/Avatar";
 
 /**
  * Ramen kring köpsidan: topprad, innehåll, sidfot.
@@ -101,9 +102,9 @@ function ButikBar() {
       */}
       {user ? (
         <Link to={{ name: "profile" }} className="butik-avatar" aria-label="Min profil">
-          {profile?.avatar_url
-            ? <img src={profile.avatar_url} alt="" />
-            : <span>{initial(profile?.full_name || profile?.username || user.email)}</span>}
+          {/* Bild eller initial — regeln bor i components/Avatar, som säljflödets topplist ritar ur
+              samma. Storleken är den här brickans, se .butik-avatar. */}
+          <Avatar profile={profile} email={user.email} inloggad />
         </Link>
       ) : (
         <a className="butik-bar-logga-in" href="/butik?logga-in=1" onClick={(e) => {
@@ -121,11 +122,6 @@ function ButikBar() {
       </a>
     </header>
   );
-}
-
-/** Första bokstaven, versal. Namn före användarnamn före e-post — det mest personliga som finns. */
-function initial(namn: string | null | undefined): string {
-  return (namn ?? "?").trim().charAt(0).toUpperCase() || "?";
 }
 
 function ButikFooter() {

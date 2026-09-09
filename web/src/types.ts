@@ -128,6 +128,16 @@ export interface ListingAttribute {
   label: string;
   value: string;
   sourceUrl?: string | null;
+  /**
+   * Säljaren har skrivit in värdet själv.
+   *
+   * ERSÄTTER BÅDE KÄLLAN OCH "UPPSKATTAT", och gör det med flit: ett rättat mått är varken belagt av
+   * sidan det en gång hämtades från — den säger ju något annat nu — eller en gissning om möbeltypen.
+   * Det är en uppgift från personen som stod bredvid möbeln med ett måttband, vilket är den bästa
+   * källa ett mått kan ha och samtidigt en vi inte kan kontrollera. Kortet skriver ut den som vad
+   * den är i stället för att tiga eller låna någon annans trovärdighet. Se handleListingEdit.
+   */
+  sellerEdited?: boolean;
   /** Uppskattat värde, inte belagt: typiska mått för möbeltypen när ingen källa gav några. Visas märkt. */
   estimated?: boolean;
 }
@@ -276,6 +286,15 @@ export interface ProductImage {
 export interface CardCover {
   url: string;
   kind: "cutout" | "photo";
+  /**
+   * Vilken botten omslaget står på: studiobakgrundens namn, eller null för rent vitt.
+   *
+   * Finns för bildtexten, som ska kunna säga vad vi gjort med bilden utan att gissa. Annonser
+   * byggda före studion har ett omslag mot vitt och ska då säga "bakgrunden borttagen" — samma text
+   * som förut — medan de som står i studion ska säga det. Utan fältet hade vyn fått anta det ena
+   * eller det andra, och antagandet varit fel på halva lagret.
+   */
+  backdrop?: string | null;
 }
 
 /** Att ett urklipp finns, och ur vilken bildruta. Bilden själv hämtas på /api/jobs/:id/cover. */
@@ -517,12 +536,51 @@ export interface JobSummary {
   /** Försäljningen, när säljaren lagt ut möbeln. null = sparad, men aldrig utlagd. */
   sale: JobSale | null;
   /**
+   * Hur annonsen går: visningar, klick och köp. Null när mätningen inte kunde läsas.
+   *
+   * Samma siffror som adminpanelen ser. Säljaren får dem för att kunna skilja "ingen har sett den"
+   * från "många har sett den och ingen köpt" — två lägen med rakt motsatta åtgärder.
+   */
+  statistik: AnnonsStatistik | null;
+  /** Köpet, när möbeln sålts i Loopa Butik. Null för Tradera-affärer och osålda möbler. */
+  order: JobOrder | null;
+  /**
    * Möbelns läge i Loopa Butik. Null = aldrig inlagd där.
    *
    * Skilt från `sale`, som bara känner till Tradera. En möbel kan ligga i vår egen butik utan att
    * någonsin ha lagts ut på en marknadsplats, och det är två olika svar på "säljs den just nu".
    */
   shop: JobShopState | null;
+}
+
+/** Annonsens mätning, som den räknas i server/src/analys/store.ts. */
+export interface AnnonsStatistik {
+  visningar: number;
+  unikaVisningar: number;
+  listvisningar: number;
+  klick: number;
+  kassor: number;
+  kop: number;
+  /** Klick vidare till Tradera. Traderas EGNA visningar går inte att hämta — deras API ger dem inte. */
+  utgaende: number;
+  perHandelse: Record<string, number>;
+  forsta: string | null;
+  senaste: string | null;
+}
+
+/**
+ * Köpet som säljaren får se det.
+ *
+ * MEDVETET SMALT. Säljaren är inte part i leveransen och ska inte se köparens adress eller e-post —
+ * bara att affären rör sig, och vart den kommit. `senasteBesked` är sista publika raden ur orderns
+ * historik, alltså samma mening köparen läser.
+ */
+export interface JobOrder {
+  status: "paid" | "booking" | "scheduled" | "delivered" | "return_requested" | "returned";
+  reference: string;
+  deliveryDate: string | null;
+  deliveryWindow: string | null;
+  senasteBesked: string | null;
 }
 
 /** Vad butiken vet om möbeln — läge, när den lades in, och när och var den såldes. */
@@ -836,6 +894,19 @@ export interface ListingViewData {
   productImage: ProductImage | null;
   /** Möbeln som säljs, mot vitt. Går före produktbilden — se ListingView. */
   cover: CardCover | null;
+  /**
+   * Annonsens galleri: möbeln från flera håll, alla urklippta, omslaget först.
+   *
+   * Adresserna är räknade av servern (publicCard.ts) ur exakt den lista porten prövar mot. Vyn får
+   * alltså aldrig bygga en adress själv ur ett antal — en enda underkänd vinkel hade då gjort varje
+   * följande bild till en trasig ruta.
+   *
+   * Tom eller utelämnad betyder "bara omslaget", vilket är normalfallet för äldre annonser. Vyn
+   * visar då `cover` precis som förut, utan bläddring.
+   *
+   * Valfri, för att säljarens eget kort ritas ur ett jobbsvar som inte bär fältet.
+   */
+  bilder?: Array<{ url: string; kind: "cutout" }>;
 }
 
 /** Svaret från GET /api/cards/:loopaId — annonsen som vem som helst med ID:t kan läsa. */
@@ -892,4 +963,73 @@ export interface DebugTrace {
   gradeTrace: string[];
   geminiCalls: CallMeta[];
   totalLatencyMs: number;
+}
+
+// ---- orderpanelen (GET /api/admin/ordrar) ----
+
+/** En tid: köparens önskemål eller den bokade. Samma form som serverns OrderSlot. */
+export interface AdminOrderSlot {
+  date: string;
+  window: string;
+}
+
+export interface AdminOrderHandelse {
+  at: string;
+  status: string | null;
+  note: string;
+  actor: "buyer" | "admin" | "system";
+  publik: boolean;
+}
+
+/**
+ * En order som den står i panelen.
+ *
+ * `attGora` är radens hela existensberättigande: den säger vad VI ska göra härnäst, skrivet som en
+ * uppmaning. Är den null ligger bollen hos köparen eller ingen alls.
+ */
+export interface AdminOrderRad {
+  id: string;
+  reference: string;
+  productId: string;
+  titel: string;
+  status: "pending" | "paid" | "booking" | "scheduled" | "delivered" | "return_requested" | "returned" | "cancelled";
+  attGora: string | null;
+  priceSek: number;
+  deliveryFeeSek: number;
+  postalCode: string | null;
+  deliveryZone: string | null;
+  requestedSlots: AdminOrderSlot[];
+  deliveryDate: string | null;
+  deliveryWindow: string | null;
+  buyerEmail: string | null;
+  sellerEmail: string | null;
+  createdAt: string;
+  updatedAt: string;
+  vantatTimmar: number | null;
+}
+
+export interface AdminOrderDetalj extends AdminOrderRad {
+  handelser: AdminOrderHandelse[];
+  loopaId: string | null;
+}
+
+export interface AdminOrdrar {
+  rader: AdminOrderRad[];
+  summering: {
+    antal: number;
+    attGora: number;
+    betalda: number;
+    bokade: number;
+    levererade: number;
+    omsattning: number;
+  };
+}
+
+/** Vad panelen kan göra med en order. Se server/src/adminOrdrar.ts. */
+export interface OrderAtgard {
+  gor: "boka" | "levererad" | "anteckna";
+  datum?: string;
+  tid?: string;
+  text?: string;
+  publik?: boolean;
 }

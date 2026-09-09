@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, TruckIcon, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
 import AdminAdsScreen from "./AdminAdsScreen";
 import AdminTraderaPostScreen from "./AdminTraderaPostScreen";
+import AdminOrdrarScreen from "./AdminOrdrarScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera";
+export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -113,6 +114,14 @@ export default function AdminScreen({
         </button>
         <button
           role="tab"
+          aria-selected={flik === "ordrar"}
+          className={`admin-flik-knapp${flik === "ordrar" ? " vald" : ""}`}
+          onClick={() => setFlik("ordrar")}
+        >
+          <TruckIcon size={16} /> {t("Ordrar")}
+        </button>
+        <button
+          role="tab"
           aria-selected={flik === "tradera"}
           className={`admin-flik-knapp${flik === "tradera" ? " vald" : ""}`}
           onClick={() => setFlik("tradera")}
@@ -123,6 +132,8 @@ export default function AdminScreen({
 
       {flik === "annonser" ? (
         <AdminAdsScreen inbaddad onOpenAd={(rad) => onOpenAd?.(rad)} />
+      ) : flik === "ordrar" ? (
+        <AdminOrdrarScreen onOpenAd={onOpenAdId} />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : (

@@ -260,3 +260,48 @@ export async function restartTraderaItem(itemId: number): Promise<number> {
 export async function getTraderaItem(itemId: number): Promise<unknown> {
   return call("GET", `/listings/items/${itemId}`);
 }
+
+/**
+ * Hur annonsen går på Tradera, av det de faktiskt lämnar ut.
+ *
+ * VISNINGAR FINNS INTE. Det är värt att skriva rakt ut, för det är den siffra man först letar efter:
+ * `GET /listings/items/{id}` svarar med bud, pris, tider och status — men inte med hur många som
+ * tittat. Mätt mot ett skarpt svar 2026-09-07 innehåller fältlistan inget view- eller visningsfält
+ * alls. Loopas egna visningar räknas i analys/store.ts; Traderas är helt enkelt inte våra att visa,
+ * och att gissa fram dem ur bud vore en påhittad siffra.
+ *
+ * DET SOM FINNS är ändå det som avgör vad säljaren ska göra: antal bud säger om priset biter, och
+ * `ended` utan vinnare säger att annonsen gått ut och behöver läggas om.
+ */
+export interface TraderaLage {
+  totalBids: number;
+  maxBidSek: number | null;
+  ended: boolean;
+  gotBidders: boolean;
+  gotWinner: boolean;
+  endDate: string | null;
+}
+
+export async function getTraderaLage(itemId: number): Promise<TraderaLage | null> {
+  try {
+    const item = (await call<Record<string, unknown>>("GET", `/listings/items/${itemId}`)) ?? {};
+    const status = (item.status ?? {}) as Record<string, unknown>;
+    return {
+      totalBids: typeof item.totalBids === "number" ? item.totalBids : 0,
+      maxBidSek: typeof item.maxBid === "number" ? item.maxBid : null,
+      ended: status.ended === true,
+      gotBidders: status.gotBidders === true,
+      gotWinner: status.gotWinner === true,
+      endDate: typeof item.endDate === "string" ? item.endDate : null,
+    };
+  } catch {
+    /**
+     * Ett fel här får aldrig fälla säljarens sida.
+     *
+     * Anropet går till någon annans server mitt i en sidladdning. Null betyder "vi vet inte just nu"
+     * och ritas som ingenting — inte som noll bud, vilket hade varit ett påstående vi inte kan stå
+     * för.
+     */
+    return null;
+  }
+}

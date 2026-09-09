@@ -13,7 +13,7 @@
   padding: calc(10px + env(safe-area-inset-top)) var(--safe-right) 10px var(--safe-left);
   border-bottom: 1px solid var(--border);
 }
-.affar-logo { font-size: clamp(26px, 1.8vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
+.affar-logo { font-family: var(--ordmark-font); font-size: clamp(26px, 1.8vw, 32px); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); text-decoration: none; }
 .affar-logo span { color: var(--accent); }
 .affar-bar-link { font-size: var(--fs-md); font-weight: 600; color: var(--accent); text-decoration: none; }
 

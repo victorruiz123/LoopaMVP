@@ -17,7 +17,16 @@
 
 import Stripe from "stripe";
 import { claimForSale, release, reserve, store } from "./store.js";
-import { createOrder, getOrder, orderByStripeSession, updateOrder, type Order } from "./orders.js";
+import { notifyDelivered, notifyDeliveryBooked, notifyPurchase, notifySlotsRequested } from "./notiser.js";
+import {
+  createOrder,
+  getOrder,
+  orderByStripeSession,
+  recordOrderEvent,
+  updateOrder,
+  type Order,
+  type OrderSlot,
+} from "./orders.js";
 import { deliveryQuote, zoneFor } from "./delivery.js";
 import { productById, invalidate } from "./inventory.js";
 import { endTraderaItem } from "../integrations/tradera/tradera.js";
@@ -56,6 +65,9 @@ export class CheckoutError extends Error {
     public status = 400,
   ) {
     super(message);
+    // Namnet sätts uttryckligen: adminpanelen känner igen felet över en dynamisk import, där
+    // klassidentiteten inte nödvändigtvis är densamma som den anroparen importerade.
+    this.name = "CheckoutError";
   }
 }
 
@@ -201,13 +213,45 @@ export async function fulfilPaidOrder(orderId: string): Promise<Order | null> {
      * gick igenom.
      */
     console.error(`[butik] KRITISKT: order ${order.reference} betalades men ${order.productId} kunde inte säljas. Återbetalning krävs.`);
-    return updateOrder(order.id, { status: "cancelled" });
+    const avbruten = await recordOrderEvent(order.id, {
+      status: "cancelled",
+      note: "Betalningen gick igenom men möbeln var redan såld i en annan kanal. Återbetalning krävs.",
+      actor: "system",
+      publik: true,
+    });
+    void notifyDoubleSale(avbruten ?? order);
+    return avbruten;
   }
 
-  const updated = await updateOrder(order.id, { status: "paid" });
+  const updated = await recordOrderEvent(order.id, {
+    status: "paid",
+    note: "Betalningen är genomförd. Nästa steg är att välja tider för leveransen.",
+    actor: "system",
+    publik: true,
+  });
   invalidate();
   void delistFromTradera(order.productId);
+  /**
+   * Beskeden går EFTER att möbeln bytt ägare i lagret, och utan att invänta dem.
+   *
+   * Ordningen är inte godtycklig: ett kvitto på ett köp som sedan visade sig kollidera med en
+   * Tradera-försäljning vore värre än ett sent kvitto. Och `void` för att en SMTP-server som hänger
+   * aldrig får hålla kvar Stripes webhook — Stripe skickar om den då, och köpet hade fullföljts två
+   * gånger.
+   */
+  if (updated) void notifyPurchase(updated, sold, await titleFor(updated.productId));
   return updated;
+}
+
+/**
+ * Larmet när ett betalt köp inte kunde fullföljas.
+ *
+ * Det här är det enda stället i produkten där en människa MÅSTE agera manuellt och snabbt: pengar är
+ * dragna för en möbel som inte finns. Tidigare stod det bara i journalen, där ingen läser det.
+ */
+async function notifyDoubleSale(order: Order): Promise<void> {
+  const { notifyDoubleSaleLetter } = await import("./notiser.js");
+  await notifyDoubleSaleLetter(order, await titleFor(order.productId));
 }
 
 /** Tar bort annonsen på Tradera. Loggar och går vidare om det inte går — köpet är redan giltigt. */
@@ -228,17 +272,122 @@ async function delistFromTradera(productId: string): Promise<void> {
   }
 }
 
-/** Steg 3: köparen väljer leveranstid efter betalningen. */
-export async function chooseSlot(orderId: string, date: string, window: string): Promise<Order | null> {
+/**
+ * Steg 3: köparen lämnar UPP TILL TRE tider som passar.
+ *
+ * TRE OCH INTE EN, och det är inte en bekvämlighet — det är skillnaden mellan ett löfte vi kan hålla
+ * och ett vi hoppas på. Budfirman bokas av en människa hos oss, och en köpare som fått välja exakt
+ * en tid har fått ett besked vi inte kunde ge: att just den tiden är ledig. Med tre alternativ är
+ * sannolikheten hög att första försöket räcker, och köparen slipper en andra runda.
+ *
+ * ORDNINGEN BETYDER NÅGOT. Tiderna sparas i den ordning köparen angav dem, och panelen provar dem
+ * uppifrån. Förstahandsvalet är det köparen faktiskt vill ha.
+ *
+ * Ordern går till `booking` — "vi bokar frakt" — och INTE till `scheduled`. Ingen tid är utlovad
+ * förrän en människa bekräftat den, och att skriva in en önskad tid i `deliveryDate` hade betytt att
+ * köparen läser "Frakt bokad" på något ingen bokat.
+ */
+export async function requestSlots(orderId: string, slots: OrderSlot[]): Promise<Order | null> {
   const order = await getOrder(orderId);
   if (!order) return null;
-  if (order.status !== "paid" && order.status !== "scheduled") {
-    throw new CheckoutError("Ordern är inte betald.", 409);
+  if (order.status !== "paid" && order.status !== "booking") {
+    throw new CheckoutError("Ordern är inte betald, eller så är frakten redan bokad.", 409);
   }
   if (order.postalCode && !zoneFor(order.postalCode)) {
     throw new CheckoutError("Ordern har ingen leveranszon — vi hör av oss om upphämtning.", 409);
   }
-  return updateOrder(order.id, { deliveryDate: date, deliveryWindow: window, status: "scheduled" });
+  const rensade = slots
+    .filter((s) => /^\d{4}-\d{2}-\d{2}$/.test(s.date) && typeof s.window === "string" && s.window.length <= 12)
+    .slice(0, 3);
+  if (rensade.length === 0) throw new CheckoutError("Ange minst en tid som passar.", 400);
+
+  const uppdaterad = await recordOrderEvent(
+    order.id,
+    {
+      status: "booking",
+      note: `Vi bokar frakt. Vi försöker med ${rensade.length === 1 ? "tiden" : "dessa tider"} du valde.`,
+      actor: "buyer",
+      publik: true,
+    },
+    { requestedSlots: rensade },
+  );
+  if (uppdaterad) void notifySlotsRequested(uppdaterad, await titleFor(uppdaterad.productId));
+  return uppdaterad;
+}
+
+/**
+ * Frakten är bokad. Sätts av en admin, aldrig av köparen.
+ *
+ * Tiden behöver INTE vara en av köparens tre. Budfirman kan svara "onsdag går inte, men torsdag
+ * morgon" och då är det den tiden som gäller — panelen skriver in den, köparen får beskedet, och
+ * historiken visar båda: vad som önskades och vad som blev.
+ */
+export async function confirmDelivery(orderId: string, date: string, window: string, note?: string): Promise<Order | null> {
+  const order = await getOrder(orderId);
+  if (!order) return null;
+  if (order.status !== "paid" && order.status !== "booking" && order.status !== "scheduled") {
+    throw new CheckoutError(`Går inte att boka frakt från läget "${order.status}".`, 409);
+  }
+  const uppdaterad = await recordOrderEvent(
+    order.id,
+    {
+      status: "scheduled",
+      note: note?.trim() || `Frakt bokad: ${date} ${window}.`,
+      actor: "admin",
+      publik: true,
+    },
+    { deliveryDate: date, deliveryWindow: window },
+  );
+  if (uppdaterad) {
+    const record = await store().get(uppdaterad.productId);
+    void notifyDeliveryBooked(uppdaterad, record, await titleFor(uppdaterad.productId));
+  }
+  return uppdaterad;
+}
+
+/**
+ * Levererad. Flyttar ORDERN och MÖBELN i samma anrop.
+ *
+ * De två har glidit isär förut: panelens "levererad" flyttade bara butiksposten, medan ordern stod
+ * kvar på `scheduled` — och köparens stegrad tändes därför aldrig. Möbelns tillstånd och köpets
+ * tillstånd är två svar på olika frågor, men "den är framme" är samma händelse för båda.
+ */
+export async function markOrderDelivered(orderId: string): Promise<Order | null> {
+  const order = await getOrder(orderId);
+  if (!order) return null;
+  if (order.status !== "scheduled" && order.status !== "booking" && order.status !== "paid") {
+    throw new CheckoutError(`Går inte att leverera från läget "${order.status}".`, 409);
+  }
+  const uppdaterad = await recordOrderEvent(order.id, {
+    status: "delivered",
+    note: "Levererad och inburen.",
+    actor: "admin",
+    publik: true,
+  });
+  if (uppdaterad) {
+    const record = await store().get(uppdaterad.productId);
+    void notifyDelivered(uppdaterad, record, await titleFor(uppdaterad.productId));
+  }
+  return uppdaterad;
+}
+
+/**
+ * Möbelns rubrik för ett brev. Faller tillbaka på id:t.
+ *
+ * Breven ska kunna nämna möbeln vid namn — "Din möbel är såld" utan att säga vilken är ett dåligt
+ * besked för en säljare med tre annonser ute.
+ */
+async function titleFor(productId: string): Promise<string> {
+  try {
+    const record = await store().get(productId);
+    if (!record?.jobId) return productId;
+    const { getJob } = await import("../jobStore.js");
+    const job = await getJob(record.jobId);
+    const listing = job?.result?.listing ?? job?.listing ?? null;
+    return listing?.result?.listing.title ?? productId;
+  } catch {
+    return productId;
+  }
 }
 
 /** Avbruten kassa: köparen backade ur. Släpper möbeln direkt i stället för att vänta ut klockan. */

@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -88,6 +88,14 @@ export interface CapturedShot {
   dataUrl: string;
   viewLabel: string | null;
   source: "video" | "manual";
+  /**
+   * Satt bara på omslagsbilden, den enda bild säljaren blir ombedd att komponera.
+   *
+   * Servern läser fältet på två ställen och bedömningen är inte ett av dem: bilden hålls utanför
+   * inspektionsanropet (den kostar annars sekunder säljaren står och väntar) och den vinner
+   * omslagsvalet om urklippet av den håller måttet. Se `role` på CapturedImage i server/src/types.ts.
+   */
+  role?: "cover";
 }
 
 export async function createJob(
@@ -216,6 +224,25 @@ export async function fetchPublicCard(loopaId: string): Promise<PublicCard> {
  * läses av någon som kom från en annons. Servern bygger sitt underlag ur det publika kortet, så
  * frågan bär ingen kontext — bara ID:t avgör vad boten kan se.
  */
+/**
+ * Startsidans chatt. Ingen möbel, inget Loopa-ID — bara en fråga om hur tjänsten fungerar.
+ *
+ * Egen väg och inte `askListing` med tomt kort: den chatten svarar UR ett kort och märker varje svar
+ * med `source`, alltså om det står där eller inte. Den här har inget kort att stå på, och den
+ * märkningen vore meningslös. Två frågor, två vägar.
+ */
+export async function askSalj(
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<{ answer: string }> {
+  const res = await fetch("/api/salj/chat", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question, history }),
+  });
+  return json(res);
+}
+
 export async function askListing(
   loopaId: string,
   question: string,
@@ -298,6 +325,31 @@ export async function patchAnnons(loopaId: string, andring: AnnonsAndring): Prom
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(andring),
+    }),
+  );
+}
+
+/**
+ * Alla köp, med arbetslistan överst.
+ *
+ * En rad per ORDER och inte per annons: en möbel kan säljas mer än en gång om något går åter, och
+ * frågan panelen ställer här är "vad ska köras hem", inte "vad har vi fått in".
+ */
+export async function listaOrdrar(): Promise<AdminOrdrar> {
+  return json(await authFetch("/api/admin/ordrar"));
+}
+
+export async function getOrderDetalj(id: string): Promise<AdminOrderDetalj> {
+  return json(await authFetch(`/api/admin/ordrar/${encodeURIComponent(id)}`));
+}
+
+/** Bokar frakt, markerar levererad eller skriver en anteckning. Svaret är ordern som den blev. */
+export async function andraOrder(id: string, atgard: OrderAtgard): Promise<AdminOrderDetalj> {
+  return json(
+    await authFetch(`/api/admin/ordrar/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(atgard),
     }),
   );
 }
@@ -388,6 +440,26 @@ export async function addDamageFromPhoto(jobId: string, dataUrl: string): Promis
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ dataUrl }),
+  });
+  return json(res);
+}
+
+/**
+ * Säljarens rättelser av annonsens uppgifter — måtten och beskrivningen.
+ *
+ * Skickar bara de fält som ändrats: en tom `attributes` betyder "ta bort alla rader" och inte
+ * "rör dem inte", så en delvis patch måste vara delvis hela vägen ner. Svaret är hela
+ * `ConditionResult`, som resten av jobbets skrivningar — vyn byter ut sitt tillstånd mot det i
+ * stället för att gissa vad servern gjorde med indata.
+ */
+export async function saveListingDetails(
+  jobId: string,
+  patch: { attributes?: ListingAttribute[]; description?: string; conditionText?: string },
+): Promise<ConditionResult> {
+  const res = await authFetch(`/api/jobs/${jobId}/listing`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
   });
   return json(res);
 }

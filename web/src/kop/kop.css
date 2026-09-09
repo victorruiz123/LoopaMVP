@@ -350,7 +350,7 @@ body:has(.butik-skiss) .consent-inner {
   --scen-tra: hsl(28 32% 42%);
   --scen-tra-mork: hsl(28 34% 30%);
 }
-.scen-text { font-weight: 700; font-family: Poppins, Inter, sans-serif; }
+.scen-text { font-weight: 700; font-family: var(--ordmark-font); }
 .scen-text-betyg { font-size: 15px; letter-spacing: -0.01em; }
 .scen-text-pris { font-size: 15px; letter-spacing: -0.01em; }
 .scen-text-knapp { font-size: 14px; letter-spacing: -0.01em; }
@@ -531,7 +531,7 @@ body:has(.butik-skiss) .consent-inner {
   margin: 10px 0 0; font-size: clamp(15px, 1vw, 18px); line-height: 1.5;
   color: #605f5c; max-width: 46ch;
 }
-.marken-ordmark { flex: none; font-size: 23px; line-height: 1.2; letter-spacing: -0.015em; }
+.marken-ordmark { flex: none; font-family: var(--ordmark-font); font-size: 23px; line-height: 1.2; letter-spacing: -0.015em; }
 
 /*
  * Sökraden har heron:s fält — samma höjd, samma radie, samma skal. Den gick

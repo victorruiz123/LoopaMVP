@@ -22,7 +22,24 @@ const DESKTOP_QUERY = "(min-width: 900px) and (pointer: fine)";
 const SWITCHABLE_QUERY = "(min-width: 860px)";
 const STORAGE_KEY = "loopa.view-mode";
 
+/**
+ * MOBILVY SOM STANDARD I UTVECKLINGSLÄGET — tillfälligt.
+ *
+ * Startsidan byggs om, och mobilvyn är den som formges först; datorvyn anpassas efter den. Utan det
+ * här öppnar `npm run web:dev` på en laptop i datorvy, och den layout man håller på att bygga är
+ * inte den man ser.
+ *
+ * `import.meta.env.DEV` är sant BARA under `vite dev`. Ett produktionsbygge går genom `detect()`
+ * precis som förut, så den här raden kan inte följa med ut.
+ *
+ * ÖVERSTYRNINGEN VINNER ÄNDÅ. Kör `loopaSetViewMode("desktop")` i konsolen för att se datorvyn på
+ * samma skärm, och `loopaSetViewMode(null)` för att lämna tillbaka valet till automatiken.
+ *
+ * TA BORT NÄR DATORVYN ÄR GJORD. Ett utvecklingsläge som beter sig annorlunda än driften är en
+ * skillnad man glömmer att den finns, och det är därför den står utskriven här.
+ */
 function detect(): ViewMode {
+  if (import.meta.env.DEV) return "mobile";
   return window.matchMedia(DESKTOP_QUERY).matches ? "desktop" : "mobile";
 }
 

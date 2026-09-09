@@ -1,0 +1,9 @@
+{
+  "modell": "gemini-3-pro-image",
+  "prompt": "A completely empty professional furniture photography studio, photographed straight on. A pale warm grey wall fills the upper part of the frame and a slightly darker, smooth matte floor fills the lower part. The seam where the wall meets the floor is a soft horizontal line about 62% of the way down the image, perfectly level and running the full width. Even, soft, diffuse studio lighting with a gentle pool of light in the centre and a very subtle vignette in the corners. A faint, soft reflection on the floor in front of the wall. No furniture. No objects. No people. No plants. No lamps, light stands, softboxes, tripods, cables or equipment of any kind. No text, no watermark, no logo. No hard directional shadows. Nothing casting a shadow. Neutral colour, no colour cast, muted and understated. Photorealistic, shot on a full-frame camera with a 50mm lens at eye level, square 1:1 composition, high resolution.",
+  "ruta": 1600,
+  "horisontMal": 0.62,
+  "horisontMatt": 0.6587,
+  "ursprung": "forslag-1.jpg",
+  "skapad": "2026-09-08T16:39:33.517Z"
+}

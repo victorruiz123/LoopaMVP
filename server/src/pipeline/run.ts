@@ -43,6 +43,30 @@ class StageTimer {
   }
 }
 
+/**
+ * Bilderna BESIKTNINGEN ska titta på: allt utom omslagsbilden.
+ *
+ * Omslagsbilden är komponerad för annonsen, inte för bedömningen — säljaren blir ombedd att ta den
+ * efter varvet, i möbelns egen höjd och snett framifrån. Skicket avgörs av varvet, som redan sett
+ * möbeln från alla håll.
+ *
+ * SKÄLET ATT HÅLLA DEN UTANFÖR ÄR LATENS, och den är mätt: bildrutorna går i ETT inspektionsanrop där
+ * fyra bilder kostar 21 s och åtta kostar 37 s (se videoFrames.ts). En sjunde bild är alltså ett par
+ * sekunder som säljaren står och tittar på en snurra — betalt för en vy varvet redan täcker.
+ *
+ * INDEXEN FÖLJER MED. Modellen pekar ut bevis som `image_index` in i den lista den fick, och
+ * `mapRawDefect` slår upp i samma lista — så länge båda är den här. Att i stället filtrera efteråt
+ * hade flyttat varje index ett steg och satt bevisbilder på fel foto, vilket är ett fel man ser
+ * först på kortet, långt från koden som orsakade det.
+ */
+export function tillBedomning(images: CapturedImage[]): CapturedImage[] {
+  const bedomda = images.filter((i) => i.role !== "cover");
+  // Ett jobb som BARA bär en omslagsbild ska bedömas på den och inte på ingenting. Det kan inte hända
+  // via appen, som alltid filmar först, men en klient som skickar en enda bild med rollen satt ska
+  // få en besiktning och inte ett tomt anrop.
+  return bedomda.length > 0 ? bedomda : images;
+}
+
 export async function runConditionGrading(
   jobId: string,
   images: CapturedImage[],
@@ -64,12 +88,20 @@ export async function runConditionGrading(
     await updateProgress(jobId, { stage: "preparing", message: "Bilder förberedda." });
 
     await updateProgress(jobId, { stage: "inspecting", message: "Inspekterar möbeln…" });
-    const inspection = await inspectFurniture(images, dir, productContext);
+    const inspection = await inspectFurniture(tillBedomning(images), dir, productContext);
     track(inspection.callMeta);
     timer.lap("inspect");
 
     // Omslaget avgörs här, medan inspektionens vy-val fortfarande finns i handen. Duglighetsspärren
     // kör över det om bildrutan är svart eller utbränd — se cover.ts.
+    /**
+     * ALLA bilder, inte `tillBedomning`: omslagsbilden är själva poängen här.
+     *
+     * `coverImageIndex` pekar in i den lista inspektionen fick — alltså den utan omslagsbilden — och
+     * det stämmer fortfarande, för den listan är ett prefix av den här: omslagsbilden ligger sist,
+     * efter varvets bildrutor. Skulle den ordningen någon gång vändas pekar vy-valet på fel bild, och
+     * det är därför appen lägger omslagsbilden sist och inte först.
+     */
     const coverImageId = await pickCoverImageId(
       images,
       path.join(dir, "originals"),
@@ -248,10 +280,14 @@ export async function runConditionGrading(
 }
 
 /**
- * Urklippet av säljarens omslagsbildruta, startat och släppt.
+ * Annonsens produktbilder, startade och släppta.
  *
- * Ingen väntar på det: `void` med flit, och varje fel sväljs. Det som skulle hända annars är att en
- * modell som inte svarar tar med sig hela skickbedömningen, för en bild kortet klarar sig utan.
+ * Ingen väntar på dem: `void` med flit, och varje fel sväljs. Det som skulle hända annars är att en
+ * modell som inte svarar tar med sig hela skickbedömningen, för bilder kortet klarar sig utan.
+ *
+ * DET HÄR ÄR JOBBETS TYNGSTA EFTERARBETE. Galleriet är upp till fem varv med den stora modellen, en
+ * dryg minut styck, alltså flera minuter efter att säljaren redan fått sitt svar. Att det ligger
+ * utanför väntan är hela förutsättningen för att det får kosta så mycket.
  */
 function startCover(jobId: string, dir: string, images: CapturedImage[], coverImageId: string | null): void {
   if (!images.length || !COVER_CUTOUT_ENABLED) return;
@@ -260,11 +296,11 @@ function startCover(jobId: string, dir: string, images: CapturedImage[], coverIm
    *
    * `coverImageId` väljer den ruta som visar SKADORNA bäst — rätt för skickrapporten, fel för ett
    * omslag: en närbild på ett armstöd säger ingenting om vilken möbel som säljs. byggOmslag
-   * poängsätter varje ruta med den lilla modellen (en sekund styck) och bygger sedan produktbilden
-   * ur den bästa med den stora. Saknas urvalsmodellen används `coverImageId` — inspektionens egen
-   * vy-utpekning — i stället. Se pipeline/bild/omslag.ts.
+   * poängsätter varje ruta med den lilla modellen (en sekund styck), bygger produktbilder ur de
+   * bästa med den stora, och väljer omslaget bland dem som FAKTISKT blev bra. Saknas urvalsmodellen
+   * används `coverImageId` — inspektionens egen vy-utpekning — i stället. Se pipeline/bild/omslag.ts.
    *
-   * Null = det gick inte att göra en produktbild. Då visar kortet katalogbilden eller säljarens
+   * Null = det gick inte att göra en enda produktbild. Då visar kortet katalogbilden eller säljarens
    * bildruta som den är: hellre det än ett urklipp där soffan saknar ett ben.
    */
   void byggOmslag(jobId, dir, images, coverImageId)

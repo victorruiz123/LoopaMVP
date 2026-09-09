@@ -10,6 +10,14 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 process.env.BUTIK_DATA_DIR = mkdtempSync(path.join(tmpdir(), "loopa-checkout-test-"));
+/**
+ * Inga brev ut ur testerna.
+ *
+ * `fulfilPaidOrder` skickar numera kvitto, säljarbesked och arbetsorder (butik/notiser.ts), och
+ * förvalet `file` hade skrivit dem i repots outbox-mapp — en hög testbrev som växer för varje körning
+ * och som ser ut som riktig post. Testerna prövar tillstånden, inte utskicket; breven har egna prov.
+ */
+process.env.EMAIL_PROVIDER = "none";
 process.on("exit", () => rmSync(process.env.BUTIK_DATA_DIR!, { recursive: true, force: true }));
 
 const { zoneFor, deliveryQuote, slotsFor, normalizePostal } = await import("../server/src/butik/delivery.js");

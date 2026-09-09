@@ -114,7 +114,35 @@ export interface DeliveryQuote {
   checkoutConfigured: boolean;
 }
 
-export type OrderStatus = "pending" | "paid" | "scheduled" | "delivered" | "return_requested" | "returned" | "cancelled";
+/** Se server/src/butik/orders.ts — `booking` är "vi bokar frakt", `scheduled` är "frakt bokad". */
+export type OrderStatus =
+  | "pending"
+  | "paid"
+  | "booking"
+  | "scheduled"
+  | "delivered"
+  | "return_requested"
+  | "returned"
+  | "cancelled";
+
+/** En tid köparen kan ta emot möbeln. Samma form som serverns OrderSlot. */
+export interface OrderSlot {
+  date: string;
+  window: string;
+}
+
+/**
+ * En rad i orderns historik.
+ *
+ * Bara de publika raderna når hit — servern filtrerar (se butik/orders.ts `publikHistorik`), så
+ * interna anteckningar från panelen kan aldrig råka renderas för en köpare.
+ */
+export interface OrderEvent {
+  at: string;
+  status: OrderStatus | null;
+  note: string;
+  actor: "buyer" | "admin" | "system";
+}
 
 export interface Order {
   id: string;
@@ -124,9 +152,14 @@ export interface Order {
   deliveryFeeSek: number;
   postalCode: string | null;
   deliveryZone: string | null;
+  /** BOKAD tid. Null ända tills en människa bekräftat frakten. */
   deliveryDate: string | null;
   deliveryWindow: string | null;
+  /** Tiderna köparen sagt passar, i den ordning de valdes. */
+  requestedSlots: OrderSlot[];
   status: OrderStatus;
+  /** Historiken, nyast sist. Tom på gamla ordrar från före tidslinjen. */
+  events?: OrderEvent[];
   createdAt: string;
 }
 
@@ -171,8 +204,17 @@ export function fetchMyOrders(): Promise<{ orders: Array<{ order: Order; product
   return authJson("/api/butik/order");
 }
 
-export function bookSlot(orderId: string, datum: string, tid: string): Promise<{ order: Order }> {
-  return authJson(`/api/butik/order/${encodeURIComponent(orderId)}/leverans`, { method: "POST", body: JSON.stringify({ datum, tid }) });
+/**
+ * Köparen lämnar upp till tre tider som passar.
+ *
+ * Ordningen bevaras hela vägen: den första i listan är förstahandsvalet, och det är den panelen
+ * försöker boka först.
+ */
+export function requestSlots(orderId: string, tider: OrderSlot[]): Promise<{ order: Order }> {
+  return authJson(`/api/butik/order/${encodeURIComponent(orderId)}/leverans`, {
+    method: "POST",
+    body: JSON.stringify({ tider: tider.map((t) => ({ datum: t.date, tid: t.window })) }),
+  });
 }
 
 export function requestReturn(orderId: string): Promise<{ order: Order }> {

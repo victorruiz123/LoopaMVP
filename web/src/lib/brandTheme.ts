@@ -38,6 +38,7 @@ const FONT_AV_TYP: Record<BrandType, BrandFont> = {
   heavy: "grotesk",
   wide: "wide",
   geometric: "compact",
+  lower: "wide",
   serif: "serif",
   plain: "compact",
 };

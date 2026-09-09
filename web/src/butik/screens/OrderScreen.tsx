@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { bookSlot, fetchDelivery, fetchOrder, requestReturn, type DeliverySlot, type Order } from "../api";
+import { fetchDelivery, fetchOrder, requestReturn, requestSlots, type DeliverySlot, type Order } from "../api";
 import type { Product } from "../types";
 import { Link, SellCta, track } from "../components/Bits";
 
@@ -18,6 +18,13 @@ export default function OrderScreen({ id }: { id: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [slots, setSlots] = useState<DeliverySlot[]>([]);
+  /**
+   * Tiderna köparen kryssat i, i den ordning de kryssades.
+   *
+   * ORDNINGEN ÄR INFORMATION och inte en slump: den första är förstahandsvalet, och det är den vi
+   * försöker boka först. En `Set` hade tappat det.
+   */
+  const [valda, setValda] = useState<DeliverySlot[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tries, setTries] = useState(0);
@@ -29,7 +36,7 @@ export default function OrderScreen({ id }: { id: string }) {
         if (!live) return;
         setOrder(r.order);
         setProduct(r.product);
-        if (r.order.status === "paid" && r.order.postalCode) {
+        if ((r.order.status === "paid" || r.order.status === "booking") && r.order.postalCode) {
           fetchDelivery(r.order.postalCode).then((q) => live && setSlots(q.slots)).catch(() => undefined);
         }
         // Webhooken kan vara sekunder efter köparen. Pollar en kort stund i stället för att påstå
@@ -57,19 +64,40 @@ export default function OrderScreen({ id }: { id: string }) {
   }
   if (!order) return <div className="butik-skeleton" style={{ height: 220, margin: "30px 0" }} />;
 
+  /**
+   * Fyra steg, inte tre.
+   *
+   * "Vi bokar frakt" är ett eget steg för att det är ett eget tillstånd i verkligheten: köparen har
+   * sagt när de kan, och vi ringer en budfirma. Utan steget står köparen med ett betalt köp och en
+   * sida som inte rört sig sedan i förrgår, och den tystnaden tolkas alltid som att något gått fel.
+   */
   const steps: Array<{ key: Order["status"][]; label: string }> = [
-    { key: ["paid", "scheduled", "delivered", "return_requested", "returned"], label: "Bekräftad" },
-    { key: ["scheduled", "delivered", "return_requested", "returned"], label: "Planerad leverans" },
+    { key: ["paid", "booking", "scheduled", "delivered", "return_requested", "returned"], label: "Bekräftad" },
+    { key: ["booking", "scheduled", "delivered", "return_requested", "returned"], label: "Vi bokar frakt" },
+    { key: ["scheduled", "delivered", "return_requested", "returned"], label: "Frakt bokad" },
     { key: ["delivered", "return_requested", "returned"], label: "Levererad" },
   ];
 
-  const book = async (slot: DeliverySlot) => {
+  const isVald = (s: DeliverySlot) => valda.some((v) => v.date === s.date && v.window === s.window);
+
+  const toggle = (slot: DeliverySlot) => {
+    setValda((nu) => {
+      const finns = nu.some((v) => v.date === slot.date && v.window === slot.window);
+      if (finns) return nu.filter((v) => !(v.date === slot.date && v.window === slot.window));
+      // Taket är tre. Ett fjärde kryss ersätter det äldsta i stället för att bara nekas tyst.
+      return nu.length >= 3 ? [...nu.slice(1), slot] : [...nu, slot];
+    });
+  };
+
+  const skickaTider = async () => {
+    if (valda.length === 0) return;
     setBusy(true);
     try {
-      const r = await bookSlot(order.id, slot.date, slot.window);
+      const r = await requestSlots(order.id, valda.map((v) => ({ date: v.date, window: v.window })));
       setOrder(r.order);
+      setValda([]);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Kunde inte boka tiden.");
+      setError(e instanceof Error ? e.message : "Kunde inte skicka tiderna.");
     } finally {
       setBusy(false);
     }
@@ -121,25 +149,81 @@ export default function OrderScreen({ id }: { id: string }) {
 
           {order.status === "paid" && slots.length > 0 && (
             <section className="butik-explainer" style={{ padding: 18 }}>
-              <h2 style={{ fontSize: 18 }}>Välj leveranstid</h2>
-              <p style={{ marginBottom: 14 }}>Vi bär in möbeln till dörren. Välj en tid som passar — vi bekräftar den via SMS.</p>
+              <h2 style={{ fontSize: 18 }}>När passar det att vi kommer?</h2>
+              <p style={{ marginBottom: 14 }}>
+                Välj upp till tre tider. Vi bokar budfirman och återkommer med den tid som gäller — den första du
+                väljer försöker vi med först. Vi bär in möbeln till dörren.
+              </p>
               <div className="butik-field-row">
                 {slots.map((s) => (
-                  <button key={`${s.date}-${s.window}`} type="button" className="butik-chip" disabled={busy} onClick={() => book(s)}>
+                  <button
+                    key={`${s.date}-${s.window}`}
+                    type="button"
+                    className="butik-chip"
+                    aria-pressed={isVald(s)}
+                    style={isVald(s) ? { borderColor: "var(--accent)", background: "var(--accent-light)", color: "var(--accent)" } : undefined}
+                    disabled={busy}
+                    onClick={() => toggle(s)}
+                  >
+                    {isVald(s) ? `${valda.findIndex((v) => v.date === s.date && v.window === s.window) + 1}. ` : ""}
                     {s.label} {s.window}
                   </button>
                 ))}
               </div>
+              <button
+                type="button"
+                className="btn btn-small"
+                style={{ marginTop: 14 }}
+                disabled={busy || valda.length === 0}
+                onClick={skickaTider}
+              >
+                {valda.length === 0 ? "Välj minst en tid" : `Skicka ${valda.length} ${valda.length === 1 ? "tid" : "tider"}`}
+              </button>
+            </section>
+          )}
+
+          {order.status === "booking" && (
+            <section className="butik-explainer" style={{ padding: 18 }}>
+              <h2 style={{ fontSize: 18 }}>Vi bokar frakt</h2>
+              <p style={{ marginBottom: 10 }}>
+                Tack! Vi försöker med {order.requestedSlots.length === 1 ? "tiden" : "de här tiderna"} och hör av oss så
+                snart budfirman bekräftat. Du behöver inte göra något så länge.
+              </p>
+              <ul style={{ margin: 0, paddingLeft: 18 }}>
+                {order.requestedSlots.map((s, i) => (
+                  <li key={`${s.date}-${s.window}`}>
+                    {i === 0 ? <strong>{slotLabel(s.date)} {s.window}</strong> : <>{slotLabel(s.date)} {s.window}</>}
+                    {i === 0 ? " (förstahandsval)" : ""}
+                  </li>
+                ))}
+              </ul>
             </section>
           )}
 
           {order.deliveryDate && (
             <section className="butik-explainer" style={{ padding: 18 }}>
-              <h2 style={{ fontSize: 18 }}>Leverans bokad</h2>
+              <h2 style={{ fontSize: 18 }}>Frakt bokad</h2>
               <p style={{ margin: 0 }}>
-                {new Date(order.deliveryDate).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" })}, {order.deliveryWindow}.
-                Vi hör av oss dagen innan.
+                <strong>{slotLabel(order.deliveryDate)}, {order.deliveryWindow}.</strong> Vi hör av oss dagen innan.
               </p>
+            </section>
+          )}
+
+          {/* Historiken. Den svarar på "vad har hänt sedan jag betalade" utan att någon behöver fråga. */}
+          {(order.events?.length ?? 0) > 0 && (
+            <section className="butik-explainer" style={{ padding: 18 }}>
+              <h2 style={{ fontSize: 18 }}>Vad som hänt</h2>
+              <ol style={{ listStyle: "none", margin: 0, padding: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+                {[...(order.events ?? [])].reverse().map((e, i) => (
+                  <li key={`${e.at}-${i}`} style={{ display: "flex", gap: 10, alignItems: "baseline" }}>
+                    <span style={{ color: "var(--muted-soft)", fontSize: "var(--fs-xs)", whiteSpace: "nowrap", minWidth: 92 }}>
+                      {new Date(e.at).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}{" "}
+                      {new Date(e.at).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                    <span>{e.note}</span>
+                  </li>
+                ))}
+              </ol>
             </section>
           )}
 
@@ -179,4 +263,9 @@ export default function OrderScreen({ id }: { id: string }) {
       />
     </>
   );
+}
+
+/** "onsdag 9 september". Ett ISO-datum säger ingenting för den som ska vara hemma. */
+function slotLabel(date: string): string {
+  return new Date(`${date}T12:00:00`).toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "long" });
 }

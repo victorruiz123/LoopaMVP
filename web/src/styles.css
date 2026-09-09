@@ -141,6 +141,14 @@
   --brand-label: var(--ink-soft);
   --brand-cta: var(--accent);
   --brand-lift: var(--lift);
+
+  /* ORDMÄRKETS SNITT. Loopa skrivs i Poppins var det än står, och skälet är en enda bokstav:
+     Poppins gemena "a" är enkelvånings — en cirkel med en stapel till höger — medan Inters är
+     tvåvånings. Ordet vilar på den bokstaven, så ett "a" med våning gör logotypen till en annan
+     logotyp. Variabeln finns för att stacken används i fem filer; ändras snittet ändras det på
+     ett ställe. Inter står kvar som första reserv: faller Poppins ser märket ut som resten av
+     appen i stället för att ramla ned i systemsnittet. */
+  --ordmark-font: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
 }
 
 * { box-sizing: border-box; }
@@ -163,11 +171,8 @@ body {
    Här stod tidigare Poppins — en andra font som bara användes till fem bokstäver, laddades
    separat, och gjorde att logotypen i appen och logotypen på webben inte var samma form. */
 .app-wordmark, .auth-wordmark, .auth-wordmark-inline, .ordmark {
-  /* Ordmärket är det enda som lämnar Inter. Poppins gemena "a" är enkelvånings och rund, och det är
-     den bokstaven ordet vilar på — Inters tvåvånings-a gav "Loopa" en helt annan karaktär.
-     Inter står kvar som första reserv: faller Poppins ser ordmärket ut som resten av appen i stället
-     för att ramla ned i systemsnittet. */
-  font-family: Poppins, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  /* Ordmärket är det enda som lämnar Inter — se `--ordmark-font` för vilken bokstav det handlar om. */
+  font-family: var(--ordmark-font);
   font-weight: 800;
   color: var(--accent);
   /* Poppins är bredare och rundare än Inter, så den tål inte lika hård spärr: -0.03em lät de två
@@ -221,20 +226,6 @@ body {
 .app-bar-profile:active { opacity: 0.6; }
 .app-bar-profile:focus-visible { outline: none; box-shadow: var(--focus); }
 .app-bar-profile-name { max-width: 11ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-
-/* Vägen över till köpsidan. Medvetet samma sänkta piller som profilknappen och INTE den fyllda
-   orange knapp säljuppmaningen har i köpsidans topprad: där är sälj sidans mål, här är sälj hela
-   sidan, och två tävlande uppmaningar ovanför märkeslistan gör ingendera tydligare. */
-.app-bar-buy {
-  display: inline-flex; align-items: center;
-  border-radius: 999px; padding: 7px 14px; min-height: var(--tap);
-  background: var(--surface-sunk); color: var(--ink-soft);
-  font-size: var(--fs-md); font-weight: 600; letter-spacing: -0.01em;
-  text-decoration: none; white-space: nowrap;
-  transition: opacity var(--t) var(--ease-ui);
-}
-.app-bar-buy:active { opacity: 0.6; }
-.app-bar-buy:focus-visible { outline: none; box-shadow: var(--focus); }
 
 /* ---- knappar ---- */
 .btn {
@@ -503,8 +494,10 @@ body {
 /* ==========================================================================
    Startsidan
    ========================================================================== */
-.home { gap: 0; height: 100dvh; min-height: 100dvh; overflow: hidden; }
-.home .home-header { margin-bottom: 18px; flex-shrink: 0; }
+/* Startsidan RULLAR numera. Den var en fast skärmhöjd med märkeslistan som enda rullande
+   del; nu ligger listan i en egen ram med egen rullning (se .home-marken-ram), och sidan
+   under den bär avgiften och foten. En sida vars innehåll tar slut ska få ta slut. */
+.home { gap: 0; }
 .home-header { margin-bottom: 24px; }
 /* Ett ögonbryn, inte en etikett. "STEG 2 AV 4" i en orange pill konkurrerar med
    rubriken under sig om samma blick — den ska tala om var man är, inte utropa det. */
@@ -536,9 +529,374 @@ body {
    förstår erbjudandet, och svaret ska inte vänta till sista skärmen — men det är en
    uppgift och inte en affisch, så det står som text i brödstorlek och inte som ett
    diagram. Krymper inte: det är märkeslistan som är sidans elastiska del. */
-.home-fee-line {
-  flex-shrink: 0; margin: 2px 0 0; text-align: center;
-  font-size: var(--fs-sm); font-weight: 600; color: var(--ink); letter-spacing: -0.01em;
+
+
+/* ==========================================================================
+   Startsidan
+   ==========================================================================
+   Fyra block i en spalt: löftet, märkesvalet, priset, foten. Ordningen ÄR
+   argumentet — vad du får, hur du börjar, vad det kostar — och den läses
+   uppifrån och ned på samma sätt oavsett skärm. */
+
+/* ---- topplisten ---- */
+.home-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 30px; }
+/* Ordmärket i GEMENER och i accentfärgen. Det är så Loopa skriver sitt eget namn — samma
+   regel vi tillämpar på varje annat märke i rutnätet nedanför, och det vore underligt att
+   göra undantag för sitt eget. */
+.home-wordmark {
+  font-family: var(--ordmark-font);
+  font-size: 27px; font-weight: 800; letter-spacing: -0.035em; color: var(--accent); line-height: 1;
+}
+/* ---- profilbrickan ----
+   Rund och utan text: raden bär avsändaren till vänster och kontot till höger, och ett ord till
+   hade gjort den till en meny. Innehållet — bild, initial eller ikon — kommer från components/Avatar,
+   som butikens topplist också ritar ur; storleken bestäms här.
+
+   `overflow: hidden` och en bild som fyller brickan: en profilbild i fyrkant ska beskäras till
+   cirkeln, inte krympas in i den med vitt runt om. */
+.home-bar-profil {
+  display: grid; place-items: center; width: 48px; height: 48px; flex-shrink: 0; padding: 0;
+  border-radius: 999px; border: 1px solid var(--border); background: var(--surface);
+  color: var(--ink-soft); cursor: pointer; overflow: hidden;
+  font-family: inherit; font-size: 18px; font-weight: 700; letter-spacing: -0.01em;
+  transition: transform var(--t-fast) var(--ease-ui), box-shadow var(--t) var(--ease-ui),
+    background var(--t) var(--ease-ui);
+}
+.home-bar-profil img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.home-bar-profil:hover { background: var(--field); box-shadow: 0 4px 14px -6px hsl(var(--scrim) / 0.4); }
+.home-bar-profil:active { transform: scale(0.96); }
+.home-bar-profil:focus-visible { outline: none; box-shadow: var(--focus); }
+/*
+  INLOGGAD SER ANNORLUNDA UT ÄN UTLOGGAD, och det är hela brickans uppgift.
+
+  Utloggad är den en tom cirkel med en gubbe i — den läser som en plats där ett konto KAN finnas.
+  Inloggad fylls den: mörk botten med initialen, eller profilbilden som täcker hela ytan. Skillnaden
+  ska gå att se utan att läsa något, för frågan brickan svarar på är "är jag inne?".
+*/
+.home-bar-profil-inne {
+  background: var(--ink); color: var(--bg); border-color: transparent;
+}
+.home-bar-profil-inne:hover { background: var(--ink); border-color: var(--accent); }
+
+/* ---- heron ---- */
+.home-hero { margin-bottom: 34px; }
+.home-rubrik {
+  margin: 0; font-size: 38px; font-weight: 800; line-height: 1.06; color: var(--ink);
+  /* Stor text behöver dras ihop — utan negativ spärr ser en 38-punktare gles ut. */
+  letter-spacing: -0.038em;
+}
+/* Ordmärket mitt i rubriken: rubrikens storlek och vikt, men märkets eget snitt — annars står
+   "loopa" med ett tvåvånings-a mitt i den mening som är sidans löfte. */
+.home-rubrik-loopa { color: var(--accent); font-family: var(--ordmark-font); }
+.home-ingress {
+  margin: 14px 0 0; font-size: var(--fs-base); line-height: 1.45; color: var(--muted);
+  max-width: 36ch; letter-spacing: -0.012em;
+}
+/* Pillret. Kontur och inte fylld: det är sidans ANDRA handling — den första är att välja
+   märke — och en fylld knapp här hade tävlat med rutnätet om samma blick. Skenet under är
+   svagt nog att bara läsas som att knappen ligger ovanpå sidan. */
+.home-hur-knapp {
+  margin-top: 20px; padding: 13px 24px; border-radius: 999px; cursor: pointer;
+  border: 1.5px solid var(--accent); background: var(--surface); color: var(--ink);
+  font-family: inherit; font-size: var(--fs-base); font-weight: 700; letter-spacing: -0.01em;
+  box-shadow: 0 6px 18px -10px var(--accent);
+  transition: background var(--t) var(--ease-ui), transform var(--t-fast) var(--ease-ui);
+}
+.home-hur-knapp:hover { background: var(--accent-light); }
+.home-hur-knapp:active { transform: scale(0.98); }
+.home-hur-knapp:focus-visible { outline: none; box-shadow: var(--focus); }
+
+/* ---- märkesvalet ---- */
+.home-marken { margin-bottom: 28px; }
+.home-marken-rubrik {
+  margin: 0 0 14px; font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.022em; color: var(--ink);
+}
+.home-sok { position: relative; margin-bottom: 14px; }
+.home-sok-ikon {
+  position: absolute; left: 17px; top: 50%; transform: translateY(-50%);
+  display: flex; color: var(--muted-soft); pointer-events: none;
+}
+.home-sok input {
+  width: 100%; height: 54px; padding: 0 42px 0 46px; border: none; border-radius: 16px;
+  background: var(--field); color: var(--ink); font-family: inherit; font-size: var(--fs-field);
+  letter-spacing: -0.01em;
+}
+.home-sok input::placeholder { color: var(--muted-soft); }
+.home-sok input:focus { outline: none; background: var(--surface); box-shadow: var(--focus); }
+.home-sok-rensa {
+  position: absolute; right: 14px; top: 50%; transform: translateY(-50%);
+  display: grid; place-items: center; width: 22px; height: 22px; border: none;
+  border-radius: 999px; background: var(--surface-sunk); color: var(--muted); cursor: pointer;
+}
+
+/* RAMEN GÖR LISTAN TILL ETT OBJEKT.
+   Tvåhundra märken lagda rakt på sidan är en oändlig remsa: priset och foten hamnar utom
+   räckhåll, och den som inte ser sitt märke vet inte om det finns fler. Med en egen kant
+   och en egen rullning har listan ett slut, och raden under kan säga hur många som ligger
+   i den. Kanten är accentfärgen utspädd — den ska rama in, inte ropa. */
+.home-marken-ram {
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 22px; padding: 10px; background: var(--surface);
+}
+.home-marken-rutnat {
+  display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;
+  max-height: 430px; overflow-y: auto; overscroll-behavior: contain;
+  /* Rullningen tonar ut i underkanten i stället för att kapas av ramen. Det är det som gör
+     att man SER att listan fortsätter, vilket raden under bara påstår. */
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 calc(100% - 22px), transparent 100%);
+}
+.home-marke {
+  display: grid; place-items: center; min-height: 96px; padding: 12px;
+  border: none; border-radius: 15px; cursor: pointer; font-family: inherit;
+  transition: transform var(--t-fast) var(--ease-ui);
+}
+.home-marke:active { transform: scale(0.98); }
+.home-marke:focus-visible { outline: none; box-shadow: var(--focus); }
+/* Namnet får ta två rader hellre än att kapas mitt i ordet: ett märke man inte kan läsa
+   är ett märke man inte känner igen, och igenkänningen är hela skälet brickorna finns. */
+.home-marke-namn {
+  font-size: 17px; line-height: 1.15; text-align: center; overflow-wrap: anywhere;
+}
+.home-marke-namn-lang { font-size: 13px; }
+.home-marke-eget {
+  background: var(--field); color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--border) !important;
+}
+.home-marke-eget .home-marke-namn { font-size: var(--fs-sm); font-weight: 600; }
+
+.home-marken-fot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin-top: 10px; padding: 0 4px; font-size: var(--fs-sm); color: var(--muted);
+}
+.home-marken-mer { color: var(--muted-soft); }
+
+/* ---- vad det kostar ----
+   Talet är stort och avgiften står först, för det är den man vill veta. Andra halvan av
+   meningen — att ett misslyckande är gratis — är den som faktiskt sänker tröskeln, och
+   den står i samma stycke och inte som en fotnot. */
+.home-avgift {
+  display: flex; align-items: center; gap: 16px;
+  padding: 18px 20px; border-radius: 18px; background: var(--field); margin-bottom: 26px;
+}
+.home-avgift-tal {
+  flex-shrink: 0; font-size: 26px; font-weight: 800; color: var(--accent); letter-spacing: -0.03em;
+}
+.home-avgift p { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--ink-soft); }
+
+.home-fot {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: 20px; border-top: 1px solid var(--border);
+}
+.home-fot .home-wordmark { font-size: 21px; }
+.home-fot-ort { font-size: var(--fs-sm); color: var(--muted); }
+
+/* ==========================================================================
+   "Hur fungerar det?" — arket
+   ==========================================================================
+   Ett ark över startsidan, inte en egen sida: den som klickar står mitt i ett val och
+   har en fråga. Märkena ligger kvar under, dämpade men synliga, och stängningen lämnar
+   en precis där man var. */
+/*
+  MÖRKT LÄGE, och bara här.
+
+  Chatten är appens enda mörka yta. Det är avsiktligt och inte en inkonsekvens: resten av produkten
+  är en möbelbutik, där ljus botten och neutrala ytor låter möblernas egna färger vara det som syns.
+  Chatten visar inga möbler — den visar text — och en mörk yta gör den till ett eget rum man kliver
+  in i, med sidan kvar utanför.
+
+  Tokens definieras PÅ ARKET och inte i :root. Ett mörkt läge som läcker ut i paletten hade dragit
+  med sig varje annan skärm; här slutar det vid arkets kant, och `.hur-*`-reglerna nedan är de enda
+  som ser dem.
+*/
+.hur-overlay {
+  position: fixed; inset: 0; z-index: 60;
+  /*
+    INGEN egen höjd: `inset: 0` fyller layoutvyporten. Se `body:has(.hur-overlay)` nedan för remsan
+    bakom Safaris fält — den går inte att nå härifrån, hur hög rutan än görs.
+  */
+  display: flex; align-items: flex-end; justify-content: center;
+  /* Tyngre flor än förut: en ljus sida bakom en mörk chatt behöver dämpas mer för att chatten ska
+     läsa som förgrund och inte som ett hål i sidan. */
+  background: hsl(var(--scrim) / 0.58);
+  animation: hur-in var(--t) var(--ease-ui);
+}
+
+.hur-ark {
+  /* ---- arkets egen palett ---- */
+  /* Ytan. Varm nästan-svart snarare än neutralt grå: Loopas ljusa sida är krämvit, och en helt kall
+     grå chatt bredvid den läser som ett annat program. */
+  --hur-yta: #1e1d1b;
+  /* Ett steg upp ur ytan — frågebubblan och skrivrutan. Skillnaden ska kännas, inte synas. */
+  --hur-upphojd: #2e2c29;
+  --hur-text: #ededea;
+  --hur-text-svag: #a29c93;
+  --hur-linje: rgb(255 255 255 / 0.08);
+  /*
+    ORANGE PÅ MÖRKT ÄR INTE SAMMA ORANGE SOM PÅ LJUST.
+    Varumärkets #e4572e ger knappt fyra stegs kontrast mot den här ytan — nog för en fylld knapp med
+    vit text, för lite för text i orange. Detaljfärgen är därför ljusare, och den mättade används
+    bara som botten under vitt.
+  */
+  --hur-orange: #ff7a4d;
+  --hur-orange-fylld: #e4572e;
+
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 640px;
+  /* 63 % av den yta som syns. */
+  height: 63dvh;
+  background: var(--hur-yta); color: var(--hur-text);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -20px 60px -24px rgb(0 0 0 / 0.7);
+  animation: hur-upp var(--t-slow) var(--ease-spring);
+}
+
+/*
+  REMSAN BAKOM SAFARIS ADRESSFÄLT.
+
+  Ett `position: fixed`-element KAN INTE nå dit. På iOS klipps fixerade rutor till ytan mellan
+  webbläsarens fält. Det som syns där är SIDANS bakgrund, för dokumentet rullar under fältet — så
+  den målas om till chattens mörka så länge arket står uppe. `theme-color` byts från samma ställe,
+  i HurFungerarDet, så att fältet självt följer med; annars står en ljus list kvar mot en mörk remsa.
+
+  `:has()` och ingen klass från JavaScript: samma mönster som `body:has(.screen-camera)` och
+  `body:has(.grind)` redan använder i den här filen. Regeln kan inte hamna i otakt med om arket
+  faktiskt står uppe, för den frågar efter arket självt.
+*/
+body:has(.hur-overlay) { background: #1e1d1b; }
+
+@keyframes hur-in { from { opacity: 0; } }
+@keyframes hur-upp { from { transform: translateY(26px); } }
+
+.hur-topp {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 16px 14px; border-bottom: 1px solid var(--hur-linje); flex-shrink: 0;
+}
+.hur-topp h2 {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em; color: var(--hur-text);
+}
+/* Den orange pricken andas. Arkets enda ofrivilliga rörelse, och den säger att det sitter en maskin
+   i andra änden — inte ett hjälpavsnitt. */
+.hur-prick {
+  width: 8px; height: 8px; flex-shrink: 0; border-radius: 999px; background: var(--hur-orange);
+  box-shadow: 0 0 10px 0 var(--hur-orange-fylld);
+  animation: hur-andas 2.8s var(--ease-ui) infinite;
+}
+@keyframes hur-andas {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.72); }
+}
+.hur-stang {
+  display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0;
+  border: none; border-radius: 999px; background: transparent; color: var(--hur-text-svag);
+  cursor: pointer; transition: background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.hur-stang:hover { background: var(--hur-upphojd); color: var(--hur-text); }
+.hur-stang:focus-visible { outline: 2px solid var(--hur-orange); outline-offset: 2px; }
+
+/* ---- samtalet ----
+   Svaren står som löpande text UTAN bubbla; bara det man själv skrivit får en. Läsraden får därmed
+   hela bredden, vilket är vad ett svar man läser behöver. */
+.hur-flode {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 20px 18px 8px; display: flex; flex-direction: column; gap: 22px;
+}
+/* `pre-wrap` bär de numrerade raderna modellen skriver när ordningen ÄR svaret (se FORM i
+   server/src/saljChat.ts): radbrytningarna kommer i texten och ska överleva den. */
+.hur-svar {
+  margin: 0; white-space: pre-wrap;
+  font-size: var(--fs-lg); line-height: 1.65; letter-spacing: -0.011em; color: var(--hur-text);
+}
+/* Felet i en ljusare röd än appens: --danger-dark är gjord för vit botten och försvinner här. */
+.hur-svar-fel { color: #ff8a7a; }
+
+.hur-fraga {
+  margin: 0; align-self: flex-end; max-width: 76%;
+  padding: 11px 16px; border-radius: 20px; background: var(--hur-upphojd);
+  font-size: var(--fs-lg); line-height: 1.5; letter-spacing: -0.011em; color: var(--hur-text);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+
+.hur-vantar {
+  margin: 0; display: flex; align-items: center; gap: 9px;
+  font-size: var(--fs-md); color: var(--hur-text-svag);
+}
+/* Orange puls med ett svagt sken. Det är den "techiga" detaljen som får kosta något — den ligger
+   där blicken redan står och väntar. */
+.hur-puls {
+  width: 9px; height: 9px; flex-shrink: 0; border-radius: 999px; background: var(--hur-orange);
+  box-shadow: 0 0 12px 0 var(--hur-orange-fylld);
+  animation: hur-puls 1.4s var(--ease-ui) infinite;
+}
+@keyframes hur-puls {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(0.7); }
+}
+
+/* ---- förslagen ---- */
+.hur-forslag {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px 0; flex-shrink: 0;
+}
+.hur-forslag button {
+  padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--hur-linje); background: transparent; color: var(--hur-text-svag);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 500; letter-spacing: -0.01em;
+  transition: border-color var(--t) var(--ease-ui), color var(--t) var(--ease-ui),
+    background var(--t) var(--ease-ui);
+}
+/* Orange först vid beröring. En rad chips som redan lyser orange skriker; en som tänds när man är
+   på väg att trycka svarar. */
+.hur-forslag button:hover {
+  border-color: var(--hur-orange); color: var(--hur-orange); background: rgb(255 122 77 / 0.07);
+}
+.hur-forslag button:focus-visible { outline: 2px solid var(--hur-orange); outline-offset: 2px; }
+.hur-forslag button:disabled { opacity: 0.45; cursor: default; }
+
+/* ---- skrivrutan ----
+   Fältet och knappen ligger i EN rundad ram. Ramen är det man siktar på och det som visar fokus;
+   knappen är en detalj inuti den. */
+.hur-skriv {
+  display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
+  margin: 14px 16px calc(16px + env(safe-area-inset-bottom));
+  padding: 7px 7px 7px 16px; border-radius: 26px;
+  border: 1px solid var(--hur-linje); background: var(--hur-upphojd);
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+/* Fokus tänder en orange kant med ett svagt sken utanför. Det är samma gest som knappen: färgen
+   kommer fram när något är aktivt, inte hela tiden. */
+.hur-skriv:focus-within {
+  border-color: rgb(255 122 77 / 0.55);
+  box-shadow: 0 0 0 3px rgb(228 87 46 / 0.16);
+}
+.hur-skriv textarea {
+  flex: 1; min-width: 0; border: none; background: none; resize: none;
+  /* Höjden styrs av innehållet (se onInput). Taket gör att en lång fråga rullar i stället för att
+     äta upp samtalet ovanför. */
+  max-height: 132px; padding: 9px 0; margin: 0;
+  font-family: inherit; font-size: var(--fs-field); line-height: 1.45; color: var(--hur-text);
+  letter-spacing: -0.011em;
+}
+.hur-skriv textarea::placeholder { color: var(--hur-text-svag); }
+.hur-skriv textarea:focus { outline: none; }
+/* Skickaknappen är den enda fyllda orangea ytan i chatten. Den mättade varumärkesfärgen, inte
+   detaljfärgen: här står vitt ovanpå, och då är det botten som ska bära kontrasten. */
+.hur-skriv button {
+  display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0;
+  border: none; border-radius: 999px; background: var(--hur-orange-fylld); color: #fff;
+  cursor: pointer;
+  transition: opacity var(--t) var(--ease-ui), transform var(--t-fast) var(--ease-ui),
+    box-shadow var(--t) var(--ease-ui);
+}
+.hur-skriv button:not(:disabled) { box-shadow: 0 2px 14px -4px var(--hur-orange-fylld); }
+.hur-skriv button:disabled { background: var(--hur-linje); color: var(--hur-text-svag); cursor: default; }
+.hur-skriv button:not(:disabled):active { transform: scale(0.94); }
+.hur-skriv button:focus-visible { outline: 2px solid var(--hur-orange); outline-offset: 2px; }
+
+/* Rörelserna är få och små. Den som bett om mindre rörelse får dem stillastående; ingenting av det
+   som SÄGS sitter i en animation. */
+@media (prefers-reduced-motion: reduce) {
+  .hur-overlay, .hur-ark, .hur-puls, .hur-prick { animation: none; }
 }
 
 .brand-header { text-align: center; }
@@ -779,6 +1137,31 @@ body {
      nyper av kanterna men behåller merparten av bildvinkeln; inspelningen innehåller ändå allt. */
   transform: scale(1.18);
 }
+/* Omslagsförslaget, lagt ÖVER kameraströmmen.
+   Samma ruta och samma skalning som .camera-feed, så bilden ligger exakt där möbeln nyss stod —
+   trycker säljaren "Ta om" byts bara lagret bort, och kameran har aldrig slocknat. En ström som
+   stoppas och startas om ger en svart ruta och ett omfokus, vilket läser som ett fel.
+   Ingen `transform` här: förslaget ÄR redan den beskurna bildrutan (se grabFrame), och en skalning
+   till hade visat en annan bild än den som skickas. */
+.cover-shot-preview {
+  /* `inset: 0` och inte en egen höjd: .screen-camera är position: relative i båda vyerna, så
+     förslaget fyller exakt samma ruta som strömmen — 100dvh på telefonen, panelens höjd på datorn —
+     utan att höjden behöver upprepas på två ställen och glida isär. */
+  position: absolute; inset: 0; z-index: 1;
+  width: 100%; height: 100%; object-fit: contain; background: #000; display: block;
+}
+/* Kontrollerna över förslaget. `.cover-shot-preview` ligger på z-index 1, och ett lager med egen
+   z-index målas över allt utan — knapparna "Ta om" och "Använd bilden" hamnade under bilden och gick
+   inte att trycka på, så säljaren fastnade på sin egen omslagsbild utan väg vidare. */
+.guided-controls, .capture-top-hint { z-index: 2; }
+/* Instruktionen när guiden är läst: en rad högst upp, inte ett kort mitt i bilden. Motivet ska
+   kunna ramas in, och en ruta över möbeln är just det som gör det omöjligt. */
+.capture-top-hint {
+  position: absolute; top: var(--safe-top); left: var(--safe-left); right: var(--safe-right);
+  margin: 0; text-align: center; pointer-events: none;
+  color: #fff; font-size: var(--fs-md); font-weight: 600;
+  text-shadow: 0 1px 4px rgba(0,0,0,0.65);
+}
 .camera-placeholder { position: absolute; top: var(--safe-top); left: var(--safe-left); }
 .capture-mode-back { position: absolute; top: var(--safe-top); left: var(--safe-left); }
 .capture-top-bar {
@@ -874,6 +1257,9 @@ body {
   pointer-events: none;
   animation: guide-in 0.32s ease-out both;
 }
+/* Omslagsguiden stängs med en knapp i stället för att lämnas kvar: bilden under den ska komponeras,
+   inte bara ses en gång. Då måste rutan ta emot tryck. */
+.capture-guide-tappable { pointer-events: auto; z-index: 3; }
 /* Utan suddning måste mörkret bära läsbarheten ensamt. */
 @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
   .capture-guide { background: rgba(12, 10, 8, 0.74); }
@@ -1200,6 +1586,8 @@ body {
 .analysis-identity { font-size: var(--fs-base); font-weight: 700; margin-bottom: 12px; text-align: center; }
 .checklist { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 14px; text-align: left; }
 .checklist-item { display: flex; align-items: center; gap: 12px; font-size: var(--fs-lg); color: var(--on-dark); }
+/* Beskedet under stegen. Ljust mot den mörka analysskärmen, där `muted` är för svag för att läsas. */
+.analysis-note { margin: 14px 0 0; color: rgba(255,255,255,0.72); text-align: left; }
 .checklist-marker { display: flex; align-items: center; justify-content: center; width: 20px; flex-shrink: 0; }
 .checklist-dot {
   width: 9px; height: 9px; border-radius: 999px;
@@ -1653,9 +2041,15 @@ body {
    på Tradera" — marknadsplatsen är hur vi gör det, inte vad vi erbjuder. */
 .sell-block { display: flex; flex-direction: column; gap: 10px; }
 .sell-block .btn-primary { min-height: 50px; border-radius: var(--r); font-size: var(--fs-lg); }
+/* ORDMÄRKET I KNAPPEN. "Loopa" satt i knappens brödtext, alltså i Inter — samma ord som bär märket
+   överallt annars, skrivet med fel bokstav på det enda stället där någon lämnar över sin möbel till
+   oss. Här står det i Poppins 800 som på varje annan yta, och i vitt eftersom knappen är fylld.
+   Gemener och ingen punkt: `loopa.` med punkt är märket när det står för sig självt — mitt i en
+   mening läser punkten som ett meningsslut. */
+.ordmark-vit { color: #ffffff; }
+.sell-block .btn-primary .ordmark { font-size: 1.06em; }
 .sell-block p { margin: 0; }
 .sell-waiting { display: flex; align-items: center; gap: 12px; }
-.sell-plan { margin: 2px 0 0; }
 .sell-confirm-actions { display: flex; gap: 10px; align-items: center; }
 .sell-confirm-actions .btn-text { flex: 1; }
 .sell-confirm-actions .btn-primary { flex: 2; }
@@ -1718,9 +2112,68 @@ body {
   padding: 16px var(--safe-right) 22px var(--safe-left);
 }
 .sell-modal-body > p { margin: 0; }
-.sell-modal-body .card-block { display: flex; flex-direction: column; gap: 11px; }
-.sell-modal-body .card-block h3 { margin: 0; }
 .sell-modal-lede { font-size: var(--fs-base); line-height: 1.5; color: var(--ink-soft); }
+
+/* ---- annonsen, som en annons ----
+   Bekräftelsen visade förut planen som nio rader i en definitionslista. Det säljaren ska känna igen
+   är sin möbel, inte en blankett: bild, rubrik, pris — de tre saker en köpare kommer att se.
+   Bilden mot vitt och inte mot kortets creme, av samma skäl som annonsens egen bildruta: urklippen
+   är gjorda mot vitt, och en ton bredvid dem ritar en fyrkant runt möbeln. */
+.sell-preview {
+  display: flex; gap: 15px; align-items: center;
+  background: var(--surface); border-radius: var(--r-lg);
+  padding: 14px; box-shadow: var(--shadow-card);
+}
+.sell-preview-bild {
+  flex: none; width: 92px; height: 92px; border-radius: var(--r-sm);
+  background: #ffffff; overflow: hidden;
+}
+.sell-preview-bild img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.sell-preview-text { min-width: 0; display: flex; flex-direction: column; }
+/* Samma lilla versala etikett som startsidans brand-pill och kortets kicker — det är husets sätt
+   att säga vad man tittar på utan att lägga en rubrik i vägen. */
+.sell-preview-kicker {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.09em;
+  text-transform: uppercase; color: var(--accent);
+}
+.sell-preview-titel {
+  margin: 5px 0 0; font-size: var(--fs-lg); font-weight: 700;
+  letter-spacing: -0.02em; line-height: 1.25; color: var(--ink);
+}
+.sell-preview-pris {
+  margin-top: 7px; font-size: 24px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+}
+.sell-preview-delar { margin: 2px 0 0; font-size: var(--fs-xs); color: var(--muted); }
+
+/* Villkoren: en rad var, hårfin linje emellan. Inga rubriker och ingen vänsterkolumn — raderna ÄR
+   sina egna etiketter, och en dt/dd-tabell för fyra påståenden är en blankett igen. */
+.sell-villkor { list-style: none; margin: 0; padding: 0; }
+.sell-villkor li {
+  display: flex; align-items: flex-start; gap: 10px; padding: 11px 2px;
+  font-size: var(--fs-base); line-height: 1.45; color: var(--ink-soft);
+}
+.sell-villkor li + li { border-top: 1px solid var(--hairline); }
+.sell-villkor svg { flex: none; margin-top: 3px; color: var(--green); }
+
+/* ---- vad säljaren får ut ----
+   Tre rader, talen högerställda mot varandra så de går att läsa som en uträkning och inte som tre
+   fristående uppgifter. Summan är den enda feta raden: det är talet man kom hit för. Linjen sitter
+   ovanför den och inte mellan varje rad, precis som på ett kvitto. */
+.sell-delning { margin: 0; font-variant-numeric: tabular-nums; }
+.sell-delning > div {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 16px; padding: 9px 2px;
+}
+.sell-delning dt { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-base); color: var(--ink-soft); }
+/* Villkoret under etiketten — "20 %, högst 1 000 kr" — och inte i en egen rad: det förklarar talet
+   till höger, och ett avdrag vars motivering står någon annanstans läser som ett påhitt. */
+.sell-delning dt span { font-size: var(--fs-xs); color: var(--muted); }
+.sell-delning dd { margin: 0; font-size: var(--fs-base); color: var(--ink-soft); white-space: nowrap; }
+.sell-delning-sum { border-top: 1px solid var(--border); margin-top: 3px; padding-top: 12px !important; }
+.sell-delning-sum dt { font-weight: 700; color: var(--ink); }
+.sell-delning-sum dd {
+  font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+}
+.sell-delning-not { margin: 8px 2px 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; }
 /* Knapparna följer inte med rullningen. Det som ska tryckas ska aldrig behöva letas fram. */
 .sell-modal-actions {
   flex-shrink: 0; display: flex; align-items: center; gap: 10px;
@@ -1911,40 +2364,18 @@ body {
 .brand-search-clear svg { position: relative; }
 
 /* Listan rullar, sidan gör det inte — sökrutan och rubriken står stilla medan märkena passerar. */
-.brand-scroll {
-  flex: 1; min-height: 220px; overflow-y: auto; overscroll-behavior: contain;
-  display: flex; flex-direction: column; gap: 8px; padding-bottom: 8px;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
-  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent 100%);
-}
-
-.brand-tile {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  flex-shrink: 0; width: 100%; min-height: 62px; padding: 0 16px 0 18px;
-  border: none; border-radius: 16px; cursor: pointer; text-align: left;
-  font-family: inherit; box-shadow: 0 1px 2px rgba(42, 27, 18, 0.05);
-  transition: transform var(--t-fast) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
-}
 /* ---- surfplattan ----
    Mellan 640 och 900 px är layouten fortfarande telefonens — pekdonet är ett finger och
    flödet är ett steg i taget — men kolumnen är inte längre 480 px, och en lista med 204
    märken i en 600 px bred spalt är 204 rader man rullar förbi. Samma resonemang som i
    datorvyns mosaik, en våning ned: bredd som finns ska bli fler brickor. Reglerna gäller
    också över 900 px, där datorvyns egna (tyngre) regler tar över dem. */
-@media (min-width: 640px) {
-  .brand-scroll {
-    display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-    gap: 10px; align-content: start;
-  }
-  .brand-tile { min-height: 70px; }
-}
-
-.brand-tile:active { transform: scale(0.99); }
-.brand-tile:focus-visible { outline: none; box-shadow: var(--focus); }
-.brand-tile-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.brand-tile-go { display: flex; flex-shrink: 0; opacity: 0.75; }
-.brand-tile-custom { background: var(--brand-surface); color: var(--brand-ink-strong); border: 1px dashed var(--brand-border); }
-.brand-tile-custom .brand-tile-name { font-weight: 600; }
+/* MOBILVYN ÄR ALLTID TVÅ KOLUMNER, oavsett hur brett fönstret är.
+   Här låg en regel som gav tre kolumner över 640 px. Den var breddstyrd och inte vystyrd, så ett
+   brett fönster i mobilvy — vilket är precis vad man har när man bygger mobillayouten på en dator —
+   fick tre kolumner medan telefonen fick två. Antalet kolumner hör till LÄGET och inte till
+   fönstret: mobilvyn är en telefonlayout, och den ser likadan ut var man än öppnar den.
+   Datorvyn lägger till sin tredje kolumn för sig, se [data-view="desktop"]. */
 
 /* Fyra typografiska hållningar, alla ur systemstacken — en lista på 204 märken får inte dra in
    204 webbfonter, och det som skiljer dem åt i en lista är vikt, spärr och form, inte teckensnittet. */
@@ -1980,8 +2411,10 @@ body {
    produktkort. Bild, namn, pris, specifikationer, beskrivning — i den ordningen,
    som på en annons för en ny möbel. Skillnaden är att skicket står med. */
 .card-screen { gap: 14px; }
-.listing { display: flex; flex-direction: column; gap: 14px; }
-.listing-facts { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+/* LUFTEN ÄR HALVA RENHETEN. 14 px mellan sex vita rutor gör en sida som ser packad ut hur lite som
+   än står i den; 20 px gör samma innehåll till en annons man bläddrar i. */
+.listing { display: flex; flex-direction: column; gap: 20px; }
+.listing-facts { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
 
 /* ---- scenen: omslaget på en ljus yta ---- */
 .listing-cover-block { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
@@ -2005,6 +2438,35 @@ body {
    varje butik visar en produkt i — och en 4:3-ruta hade lagt vita bälten längs sidorna på en stående
    möbel i en redan vit bild. */
 .listing-stage-cutout .listing-cover { aspect-ratio: 1 / 1; padding: 0; }
+
+/* ---- bläddringen mellan annonsens bilder ----
+   Webbläsarens egen rullning med snäpp, inte en karusell byggd i JavaScript: svep på telefonen och
+   drag med styrplattan fungerar då som användaren redan vet att de gör, med tröghet och fingersläpp
+   vi inte behöver återuppfinna sämre. Vyn läser bara AV var remsan hamnade — se ListingView.
+   Rullningslisten göms; miniatyrerna under är det synliga handtaget. */
+.listing-carousel {
+  display: flex; overflow-x: auto; scroll-snap-type: x mandatory;
+  scrollbar-width: none; -ms-overflow-style: none;
+  overscroll-behavior-x: contain;
+}
+.listing-carousel::-webkit-scrollbar { display: none; }
+/* `flex: 0 0 100%` och inte `width: 100%`: i en flexrad krymper ett element med bredd 100 % ändå
+   ihop till sin andel av raden, och alla fem bilderna hade delat på en rutbredd. */
+.listing-carousel .listing-cover { flex: 0 0 100%; scroll-snap-align: center; }
+
+.listing-thumbs { display: flex; gap: 8px; padding: 0 2px; overflow-x: auto; scrollbar-width: none; }
+.listing-thumbs::-webkit-scrollbar { display: none; }
+.listing-thumb {
+  flex: 0 0 auto; width: 56px; height: 56px; padding: 0; cursor: pointer;
+  background: #ffffff; border: 1px solid var(--line); border-radius: var(--r-sm);
+  overflow: hidden; transition: border-color 120ms ease, opacity 120ms ease;
+  opacity: 0.6;
+}
+.listing-thumb img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.listing-thumb:hover { opacity: 1; }
+/* Den aktiva markeras med både ram OCH full opacitet. Enbart en färgad ram räcker inte för den som
+   inte skiljer färgerna åt, och enbart opacitet syns inte på en ljus bild mot en ljus botten. */
+.listing-thumb.is-active { opacity: 1; border-color: var(--ink); }
 /* Fast höjd oavsett bildens proportion: en stående fåtöljbild och en liggande soffbild ska ge kort
    som ser likadana ut. `contain` skalar in hela möbeln, så inget beskärs bort på köpet. */
 .listing-cover {
@@ -2109,17 +2571,137 @@ body {
   font-variant-numeric: tabular-nums; line-height: 1.05;
 }
 .listing-price-was { font-size: var(--fs-lg); color: var(--muted-soft); text-decoration: line-through; }
-.listing-price-off { font-size: var(--fs-base); font-weight: 700; color: var(--accent); }
 .listing-price-note { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
 
 /* ---- korten ---- */
 .listing-block {
   background: var(--surface); border-radius: var(--r-lg);
-  padding: 16px 18px; box-shadow: var(--shadow-card);
+  padding: 18px 20px; box-shadow: var(--shadow-card);
 }
 .listing-block h3 {
-  margin: 0 0 12px; font-size: var(--fs-2xs); font-weight: 600; letter-spacing: 0.08em;
+  margin: 0 0 14px; font-size: var(--fs-2xs); font-weight: 600; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);
+}
+/* Beskrivningen bär ingen rubrik — se ListingView. Utan den behöver texten inte heller det
+   översta mellanrummet en rubrik lämnar efter sig. */
+.listing-about .card-listing-body { margin-top: 0; }
+
+/* ---- hopfällbara sektioner ----
+   Säljarens vy fäller ihop skick, beskrivning och mått till tre rader, så att "Sälj med Loopa"
+   ryms utan att man scrollar. Byggt på <details>/<summary>: webbläsaren sköter tangentbord,
+   skärmläsare och sidsökning gratis, och en accordion på useState gör alla tre sämre.
+
+   Raden är hela ytan man trycker på och minst en tumme hög. En pil man ska pricka är en pil man
+   missar. */
+.listing-fold { padding: 0; }
+.listing-fold > summary {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 18px; min-height: var(--tap); cursor: pointer;
+  list-style: none; /* Firefox */
+}
+.listing-fold > summary::-webkit-details-marker { display: none; }
+.listing-fold > summary:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-lg); }
+/* `margin-right: auto` på titeln, inte `margin-left: auto` på sammanfattningen: raden ska se
+   likadan ut när sammanfattningen saknas, och pilen ska sitta i kanten i båda fallen. */
+.listing-fold-titel {
+  margin-right: auto; font-size: var(--fs-base); font-weight: 700;
+  letter-spacing: -0.01em; color: var(--ink);
+}
+.listing-fold-sam {
+  min-width: 0; font-size: var(--fs-md); color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.listing-fold-pil { flex: none; display: flex; color: var(--muted-soft); transition: transform var(--t) var(--ease-ui); }
+.listing-fold[open] > summary .listing-fold-pil { transform: rotate(90deg); }
+/* Linjen dyker upp först när raden är öppen — då skiljer den rubriken från innehållet. På en
+   stängd rad hade den bara ritat en fyrkant till. */
+.listing-fold[open] > summary { border-bottom: 1px solid var(--hairline); }
+.listing-fold-kropp { padding: 16px 18px 18px; }
+/* Rubriken inne i en öppnad sektion vore samma ord två gånger — raden ovanför säger det redan. */
+.listing-fold-kropp > h3:first-child { display: none; }
+
+/* ---- säljarens rättelser ----
+   Allt på kortet är maskinellt framtaget, och den enda som vet om det stämmer står bredvid möbeln.
+   Knappen är därför diskret men aldrig gömd: den sitter sist i sektionen den ändrar, som en länk
+   och inte som en åtgärd man måste leta rätt på i en meny. */
+.listing-edit-knapp {
+  margin-top: 12px; padding: 0; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-md); font-weight: 600; color: var(--accent);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.listing-edit-knapp:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
+
+.listing-edit { display: flex; flex-direction: column; gap: 12px; }
+.listing-edit-falt { display: flex; flex-direction: column; gap: 5px; }
+.listing-edit-falt > span {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+  text-transform: uppercase; color: var(--muted-soft);
+}
+/* Fälten ärver kortets typografi. En textruta i webbläsarens eget snitt mitt i en annons ser ut som
+   ett formulär någon klistrat in, och det är precis vad rättelsen inte ska kännas som. */
+.listing-edit textarea,
+.listing-edit input {
+  width: 100%; box-sizing: border-box; font-family: inherit; font-size: var(--fs-base);
+  line-height: 1.5; color: var(--ink); background: var(--field);
+  border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px;
+}
+.listing-edit textarea { resize: vertical; min-height: 72px; }
+.listing-edit textarea:focus, .listing-edit input:focus {
+  outline: none; border-color: var(--accent); background: var(--surface);
+}
+
+/* En rad per uppgift: etiketten smal, värdet brett, och krysset sist. Etiketten är också ett fält —
+   en möbel kan behöva "Sitthöjd" på en annons där generatorn aldrig hittade måttet. */
+.listing-edit-rader { display: flex; flex-direction: column; gap: 8px; }
+.listing-edit-rad { display: flex; gap: 8px; align-items: center; }
+.listing-edit-etikett { flex: 0 1 38%; min-width: 0; }
+.listing-edit-varde { flex: 1 1 62%; min-width: 0; }
+.listing-edit-bort {
+  flex: none; width: 32px; height: 32px; border-radius: 999px; cursor: pointer;
+  border: none; background: var(--surface-sunk); color: var(--muted);
+  font-size: 17px; line-height: 1;
+}
+.listing-edit-bort:hover { background: var(--danger-light); color: var(--danger-dark); }
+.listing-edit-bort:focus-visible { outline: none; box-shadow: var(--focus); }
+.listing-edit-lagg {
+  align-self: flex-start; padding: 8px 0; border: none; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-md); font-weight: 600; color: var(--accent);
+}
+.listing-edit-lagg:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r-sm); }
+
+.listing-edit-fel {
+  margin: 0; padding: 9px 11px; border-radius: var(--r-sm);
+  background: var(--danger-light); color: var(--danger-dark);
+  font-size: var(--fs-md); line-height: 1.45;
+}
+/* Spara fylld, avbryt som text: den som öppnat rutan har redan bestämt sig för att ändra något. */
+.listing-edit-fot { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.listing-edit-fot .btn { width: auto; }
+
+/* ---- kompakt kort ----
+   Allt utom bilden går att fälla ihop, så bilden är det som avgör om beslutet ryms på en skärm.
+   3:2 i stället för kvadrat tar bort ungefär en tredjedel av höjden utan att möbeln blir liten. */
+.listing-kompakt { gap: 12px; }
+.listing-kompakt .listing-facts { gap: 10px; }
+.listing-kompakt .listing-cover,
+.listing-kompakt .listing-stage-cutout .listing-cover { aspect-ratio: 3 / 2; padding: 10px; }
+.listing-kompakt .listing-cover-block { gap: 7px; }
+.listing-kompakt .listing-thumb { width: 46px; height: 46px; }
+.listing-kompakt .listing-head { padding-top: 0; }
+.listing-kompakt .listing-name { font-size: 24px; }
+.listing-kompakt .listing-price-now { font-size: 28px; }
+.listing-kompakt .listing-price-note { font-size: var(--fs-xs); }
+
+/* På en telefon är det HÖJDEN som saknas, inte bredden — och bilden är det enda på skärmen som
+   inte går att fälla ihop. Den får därför ge upp mer av den på korta fönster, och variantraden
+   under namnet går bort: den upprepar i praktiken det som står i "Mått och material".
+   Prisnoten står kvar med flit. Den säger varför priset är vad det är, och det är inte en detalj
+   att spara in på just när säljaren ska godkänna talet. */
+@media (max-height: 820px) {
+  .listing-kompakt .listing-cover,
+  .listing-kompakt .listing-stage-cutout .listing-cover { aspect-ratio: 16 / 9; }
+  .listing-kompakt .listing-variant { display: none; }
+  .listing-kompakt .listing-name { font-size: 22px; }
 }
 
 /* Etiketten ÖVER värdet, två i bredd — samma uppställning som produktkortet på loopa.se.
@@ -2161,7 +2743,6 @@ body {
 .pin-desc { font-size: var(--fs-md); line-height: 1.45; color: var(--ink-soft); }
 .listing-pin-note { margin: 12px 0 0; font-size: var(--fs-xs); color: var(--muted-soft); }
 
-.listing-title-line { font-size: var(--fs-lg); font-weight: 700; color: var(--ink); letter-spacing: -0.015em; }
 
 
 /* ==========================================================================
@@ -2186,26 +2767,6 @@ body {
 .app-bar-icon:active { opacity: 0.6; }
 .app-bar-icon:focus-visible { outline: none; box-shadow: var(--focus); }
 
-.loopa-id-block { display: flex; flex-direction: column; gap: 10px; }
-.loopa-id-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.loopa-id-value {
-  font-size: var(--fs-title); font-weight: 700; letter-spacing: 0.06em; color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-.loopa-id-copy {
-  display: inline-flex; align-items: center; gap: 6px; margin-left: auto;
-  border: none; border-radius: 999px; padding: 8px 14px; min-height: var(--tap); cursor: pointer;
-  background: var(--field); color: var(--ink-soft);
-  font-family: inherit; font-size: var(--fs-md); font-weight: 600;
-  transition: opacity var(--t) var(--ease-ui);
-}
-.loopa-id-copy:active { opacity: 0.6; }
-.loopa-id-copy:focus-visible { outline: none; box-shadow: var(--focus); }
-.loopa-id-link {
-  align-self: flex-start; font-size: var(--fs-md); font-weight: 600;
-  color: var(--accent); text-decoration: none;
-}
-.loopa-id-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
 .public-card-screen { display: flex; flex-direction: column; gap: 14px; }
 .public-card-head { display: flex; flex-direction: column; gap: 8px; }
@@ -2223,6 +2784,14 @@ body {
 .public-card-meta {
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
   padding-top: 6px; border-top: 1px solid var(--hairline);
+}
+/* ID:t på den publika sidan — och numera bara där. Säljarens vy hade en egen ruta för det med
+   kopieringsknapp och förklaring; den är borttagen, för säljaren har ingenting att göra med koden.
+   HÄR betyder den något: /c/LP-XXXX-XXXX ÄR adressen man slog upp, och talet på skärmen är kvittot
+   på att man landat på rätt kort. */
+.loopa-id-value {
+  font-size: var(--fs-title); font-weight: 700; letter-spacing: 0.06em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
 }
 .public-card-tradera { margin-top: 4px; }
 .public-card-cta {
@@ -2647,111 +3216,44 @@ body {
 [data-view="desktop"] .collapsible-title { transition: color var(--t) var(--ease-ui); }
 
 /* ==========================================================================
-   Startsidan — rutnät i stället för rulle
+   Startsidan på datorn — samma sida, mitt på skärmen
    ==========================================================================
-   Två spalter: vem vi är och vad som händer till vänster, märkesvalet till höger.
-   Märkeslistan är sidans enda handling, så den får den större halvan och rullar i
-   sig själv — sidan står stilla medan man letar, som en app och inte som ett dokument. */
+   Här låg tidigare ett tvåspaltsrutnät: berättelsen till vänster, märkeslistan till
+   höger, hela sidan låst till fönsterhöjden. Det byggdes när märkeslistan var sidans
+   enda innehåll och behövde all plats den kunde få.
+
+   Sidan har numera fyra saker att säga i ordning — löftet, märkesvalet, priset,
+   foten — och en ordning läses uppifrån och ned. En spalt som är samma på telefonen
+   och på datorn gör dessutom att det bara finns EN sida att formge; två layouter för
+   samma innehåll hann redan glida isär en gång. Bredden får i stället gå till
+   märkesrutnätet, som lägger till kolumner. */
 [data-view="desktop"] .home {
-  display: grid;
-  grid-template-columns: minmax(300px, 0.8fr) minmax(0, 1.2fr);
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
-  column-gap: clamp(60px, 4.4vw, 96px); row-gap: 14px;
-  /* dvh, inte vh: samma skäl som .screen — vh räknar med adressfältet som om det vore borta. */
-  height: 100dvh;
-  padding: clamp(28px, 2.2vw, 42px) clamp(40px, 3.2vw, 68px) clamp(34px, 2.4vw, 46px);
-  overflow: hidden;
+  max-width: 720px; margin: 0 auto;
+  padding: clamp(28px, 2.2vw, 40px) clamp(24px, 2.4vw, 40px) 40px;
 }
-[data-view="desktop"] .home > .app-bar { grid-column: 1 / -1; grid-row: 1; margin-bottom: 12px; }
-/* Rubriken sträcker sig över sökrutans rad och listans, så dess överkant hamnar i
-   linje med sökrutans — inte mitt i en rad som fältet ensamt bestämmer höjden på. */
-[data-view="desktop"] .home > .home-header {
-  grid-column: 1; grid-row: 2 / span 2; align-self: start; margin-bottom: 0;
-}
-[data-view="desktop"] .home > .brand-search { grid-column: 2; grid-row: 2; margin-bottom: 0; }
-[data-view="desktop"] .home > .brand-scroll { grid-column: 2; grid-row: 3; min-height: 0; }
-/* Priset står under mosaiken, i märkenas egen spalt och i dess fulla bredd — sista raden
-   i den kolumn man handlar i, inte en fotnot i den man läser. */
-[data-view="desktop"] .home > .home-fee-line { grid-column: 2; grid-row: 4; margin-top: 0; }
-/* Historiken ankras i nederkanten av vänsterspalten: den är ett arkiv, inte nästa steg. */
-[data-view="desktop"] .home > .collapsible-card { grid-column: 1; grid-row: 4; align-self: end; }
-
-/* Spalternas förhållande på en riktigt bred skärm. 0,8/1,2 är satt för en laptop, där
-   vänsterspalten behöver varenda punkt för att rubriken ska få plats på två rader. Vid
-   1600 px och uppåt har den plats över — och det som ska ha den är mosaiken, som är
-   sidans enda handling: samma förhållande där betyder bara en bredare tom yta under
-   stegen och en kolumn märken färre. */
-@media (min-width: 1600px) {
-  [data-view="desktop"] .home { grid-template-columns: minmax(320px, 0.64fr) minmax(0, 1.36fr); }
-}
-
-/* Rubriken skalar med fönstret. Datorläget börjar redan vid 900 px, och 54 punkter i en
-   304 px vänsterspalt spiller ut ur den — clamp ger samma rubrik en storlek den ryms i. */
-[data-view="desktop"] .home-title { font-size: clamp(38px, 3.6vw, 62px); letter-spacing: -0.042em; }
-[data-view="desktop"] .home-lede { font-size: clamp(18px, 1.15vw, 22px); max-width: 32ch; margin-top: 16px; }
-[data-view="desktop"] .brand-pill { font-size: var(--fs-xs); letter-spacing: 0.08em; }
-/* Pricken andas. Det är sidans enda ofrivilliga rörelse och den enda plats där en
-   sådan hör hemma — den säger att här finns en maskin som arbetar. */
-[data-view="desktop"] .brand-dot { animation: brand-dot-pulse 2.8s var(--ease-ui) infinite; }
-@keyframes brand-dot-pulse {
-  0%, 100% { opacity: 1; transform: scale(1); }
-  50% { opacity: 0.45; transform: scale(0.8); }
-}
-
-/* Tre steg, numrerade, bara på datorn. Vänsterspalten har plats att säga vad appen
-   gör innan man klickar; telefonen har det inte och ska slippa försöket. */
-[data-view="desktop"] .home-steps {
-  list-style: none; counter-reset: hstep; margin: 26px 0 0; padding: 0;
-  display: flex; flex-direction: column; gap: 13px; max-width: 30ch;
-}
-[data-view="desktop"] .home-steps li {
-  display: flex; align-items: center; gap: 12px;
-  font-size: var(--fs-base); font-weight: 500; color: var(--ink-soft); letter-spacing: -0.01em;
-}
-[data-view="desktop"] .home-steps li::before {
-  counter-increment: hstep; content: counter(hstep);
-  flex: 0 0 26px; height: 26px; border-radius: 999px;
-  background: var(--accent-light); color: var(--accent-ink);
-  display: grid; place-items: center;
-  font-size: var(--fs-xs); font-weight: 700; font-variant-numeric: tabular-nums;
-}
-
-/* ---- märkesmosaiken ----
-   Listan blir ett rutnät. 204 märken i en spalt på en bred skärm är en remsa man
-   rullar i minuter; i tre kolumner ryms tjugo i taget och man känner igen sitt märke
-   på färgen innan man har läst det. Det är också sidans lekfullhet: varje bricka bär
-   husets egen färg och typografi, och de lyfter under pekaren. */
-[data-view="desktop"] .brand-scroll {
-  display: grid;
-  /* auto-fill och inte ett antal: en bredare spalt ska ge FLER brickor, inte större.
-     Brickan bär ett märkesnamn och en chevron — den blir inte bättre av att vara 300 px.
-
-     MEN MINSTA MÅTTET VÄXER OCKSÅ, långsammare än spalten. Med 190 px låst gav en 1040 px
-     spalt fem brickor på 193 px, och då tog namnen slut mitt i ordet: "Svenskt Te…",
-     "Fritz Hans…", "Bruno Mat…". En mosaik man känner igen sitt märke i är inte en mosaik
-     med fler rutor, det är en där märket står skrivet — så brickan får bli bredare i
-     stället för att bli en till. */
-  grid-template-columns: repeat(auto-fill, minmax(clamp(190px, 11vw, 240px), 1fr));
-  gap: clamp(10px, 0.7vw, 16px); align-content: start;
-  padding: 3px 8px 26px 3px; overflow-y: auto;
-  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
-          mask-image: linear-gradient(to bottom, #000 calc(100% - 40px), transparent 100%);
-}
-[data-view="desktop"] .brand-tile {
-  min-height: 78px; border-radius: 18px; padding: 0 14px 0 18px;
+[data-view="desktop"] .home-rubrik { font-size: clamp(44px, 3.6vw, 58px); }
+[data-view="desktop"] .home-ingress { font-size: var(--fs-lg); }
+[data-view="desktop"] .home-marken-rutnat { grid-template-columns: repeat(3, 1fr); max-height: 460px; }
+[data-view="desktop"] .home-marke { min-height: 104px; }
+/* Brickan lyfter under pekaren. Sidans enda hover-rörelse, och den hör hemma just här:
+   brickorna ÄR sidans handling, och lyftet säger att de går att trycka på. */
+[data-view="desktop"] .home-marke {
   transition: transform var(--t-slow) var(--ease-spring), box-shadow var(--t-slow) var(--ease-ui);
 }
-[data-view="desktop"] .brand-tile:hover {
+[data-view="desktop"] .home-marke:hover {
   transform: translateY(-3px);
   box-shadow: 0 16px 30px -16px rgba(42, 27, 18, 0.45);
 }
-[data-view="desktop"] .brand-tile:active { transform: translateY(-1px) scale(0.99); }
-[data-view="desktop"] .brand-tile-go { transition: transform var(--t-slow) var(--ease-spring), opacity var(--t) var(--ease-ui); }
-[data-view="desktop"] .brand-tile:hover .brand-tile-go { opacity: 1; transform: translateX(4px); }
-[data-view="desktop"] .brand-tile-custom:hover { border-style: solid; border-color: var(--accent); }
-[data-view="desktop"] .brand-search input { height: 50px; font-size: var(--fs-field); }
-[data-view="desktop"] .brand-search input:hover { background: rgba(42, 27, 18, 0.08); }
-[data-view="desktop"] .brand-search input:focus:hover { background: #fff; }
+[data-view="desktop"] .home-marke:active { transform: translateY(-1px) scale(0.99); }
+/* Arket blir en ruta mitt på skärmen i stället för ett blad från underkanten: ett ark som
+   glider upp från golvet är telefonens gest, och på en 27-tums skärm hade det blivit en
+   remsa längst ned som man måste leta reda på. */
+[data-view="desktop"] .hur-overlay { align-items: center; }
+[data-view="desktop"] .hur-ark {
+  /* Datorn: en centrerad ruta. Inget adressfält ligger över sidan där, så det finns ingen remsa. */
+  max-width: 620px; border-radius: var(--r-xl);
+  height: auto; min-height: min(62vh, 560px); max-height: min(86vh, 820px);
+}
 
 /* ==========================================================================
    Inloggningen — två spalter
@@ -2969,7 +3471,6 @@ body {
 [data-view="desktop"] .listing-block { padding: 20px 22px; }
 [data-view="desktop"] .card-done { max-width: 360px; align-self: center; }
 [data-view="desktop"] .card-chat-stream { max-height: 420px; }
-[data-view="desktop"] .loopa-id-copy:hover { background: var(--surface-sunk); color: var(--ink); }
 [data-view="desktop"] .public-card-head,
 [data-view="desktop"] .public-card-search,
 [data-view="desktop"] .public-card-submit,

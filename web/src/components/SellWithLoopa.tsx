@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getTraderaState, publishToTradera } from "../api";
-import { CloseIcon } from "./icons";
+import { CheckIcon, CloseIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { formatSek } from "../lib/price";
+import { LOOPA_FEE_CAP_SEK, LOOPA_PERCENT, feeIsCapped, loopaFee, sellerPayout } from "../lib/fees";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
 import type { PriceLadder, TraderaPlan, TraderaState } from "../types";
 
@@ -11,13 +12,13 @@ import type { PriceLadder, TraderaPlan, TraderaState } from "../types";
  *
  * Knappen hette förut "Publicera på Tradera", och det var att sälja produkten på sin sämsta halva:
  * säljaren fick i uppgift att publicera något, på en marknadsplats de själva skulle hålla reda på.
- * Det Loopa gör är att SÄLJA möbeln. Att annonsen hamnar på Tradera, på vårt konto, är hur vi gör
- * det — inte vad säljaren beställer. Därför står erbjudandet i rubriken och marknadsplatsen som en
- * rad bland de andra i bekräftelsen: den ska gå att läsa, inte behöva förstås för att våga trycka.
+ * Det Loopa gör är att SÄLJA möbeln. VAR den hamnar är hur vi gör det, inte vad säljaren beställer,
+ * och står därför inte på skärmen alls längre — varken i rubriken eller i bekräftelsen. Säljaren
+ * lämnar över en försäljning; kanalen är vår sak, som budfirman är det.
  *
  * Knappen skickar ingenting nytt in i någon motor. Allt som läggs ut står redan på kortet ovanför:
- * annonstexten, specifikationerna, skicket och priset. Därför visar bekräftelsesteget exakt vad som
- * går iväg — särskilt kategorin, som är det enda säljaren inte kan läsa någon annanstans på skärmen.
+ * annonstexten, specifikationerna, skicket och priset. Bekräftelsen upprepar därför inte kortet —
+ * den visar annonsen som en annons och räknar upp villkoren man säger ja till.
  *
  * Ett klick lägger ut en riktig, publik annons. Det är också varför den har ett bekräftelsesteg: en
  * felaktig annons går att ta bort, men bara manuellt.
@@ -29,9 +30,18 @@ import type { PriceLadder, TraderaPlan, TraderaState } from "../types";
  */
 export default function SellWithLoopa({
   jobId,
+  coverUrl,
   onMyListings,
 }: {
   jobId: string;
+  /**
+   * Möbelns omslagsbild, till bekräftelsen.
+   *
+   * Bekräftelsen visade förut annonsen som en tabell med nio rader. En annons är en bild och ett
+   * pris — den som ska godkänna att den läggs ut ska se DEN, inte en specifikation av den. Valfri:
+   * blev det aldrig någon bild står förhandsvisningen på titeln och priset, vilket räcker.
+   */
+  coverUrl?: string | null;
   /** Vidare till profilen. Ritas bara i kvittot: dit går man när den här möbeln är avklarad. */
   onMyListings?: () => void;
 }) {
@@ -96,7 +106,7 @@ export default function SellWithLoopa({
         <h3>{t("Möbeln är till salu")}</h3>
         <p className="muted small">
           {t(
-            "Loopa sköter försäljningen härifrån. Du får besked så fort möbeln är såld — du behöver inte göra något mer. Annonsen ligger uppe på Tradera, på Loopas konto.",
+            "Loopa sköter försäljningen härifrån. Du får besked så fort möbeln är såld — du behöver inte göra något mer.",
           )}
         </p>
         {state.ladder && <LadderStatus ladder={state.ladder} shippingSek={plan?.shippingSek ?? 0} />}
@@ -120,22 +130,18 @@ export default function SellWithLoopa({
         <h3>{t("Annonsen granskas av Loopa")}</h3>
         <p className="muted small">
           {t(
-            "Vi tittar igenom annonsen innan den läggs ut, oftast samma dag. Sedan går den upp i Loopas butik och på Tradera, och vi hör av oss så fort möbeln är såld. Du behöver inte göra något mer.",
+            "Vi tittar igenom annonsen innan den läggs ut, oftast samma dag. Sedan hör vi av oss så fort möbeln är såld — du behöver inte göra något mer.",
           )}
         </p>
-        {/* Inte LadderStatus: den säger "ligger på", och inget ligger ute än. Stegen börjar räkna
-            när annonsen gått upp, så här står bara spannet säljaren valde. */}
+        {/* Inte LadderStatus: den säger "ligger på", och inget ligger ute än. En rad om prisplanen,
+            inte ett stycke — den fullständiga uppdelningen stod i bekräftelsen säljaren just läst. */}
         {ladderDrops(state.ladder) > 0 && plan && (
           <p className="muted small">
-            {t(
-              "Annonspriset börjar på {start} och sänks {andel} % i veckan ner till {golv}, där det stannar. De {frakt} för hemleveransen ligger kvar oförändrade hela vägen.",
-              {
-                start: formatSek(state.ladder!.startPrice + plan.shippingSek),
-                andel: Math.round(state.ladder!.weeklyDropPct * 100),
-                golv: formatSek(state.ladder!.floorPrice + plan.shippingSek),
-                frakt: formatSek(plan.shippingSek),
-              },
-            )}
+            {t("Priset börjar på {start} och sänks {andel} % i veckan ner till {golv}.", {
+              start: formatSek(state.ladder!.startPrice + plan.shippingSek),
+              andel: Math.round(state.ladder!.weeklyDropPct * 100),
+              golv: formatSek(state.ladder!.floorPrice + plan.shippingSek),
+            })}
           </p>
         )}
         {onMyListings && (
@@ -165,6 +171,10 @@ export default function SellWithLoopa({
   return (
     <>
       <section className="card-block sell-block">
+        {/* Ingen ordmärkning här. Rubriken är en versal etikett i samma form som "SPECIFIKATIONER"
+            och "SKICK" (.card-block h3), och `text-transform: uppercase` hade gjort märket till
+            LOOPA i Poppins — vilket är fel bokstavsform för det. Den läser som en avdelningsrubrik,
+            inte som avsändaren; märket står på knappen under och i bekräftelsens rubrik. */}
         <h3>{t("Sälj med Loopa")}</h3>
 
         {error && <p className="sell-error">{t("Annonsen kunde inte läggas ut: {fel}", { fel: error })}</p>}
@@ -173,29 +183,12 @@ export default function SellWithLoopa({
           <p className="muted small">{blocked}</p>
         ) : (
           <>
+            {/* EN MENING. Här stod två stycken — hela annonsplanen och hela prisstegen — ovanför en
+                knapp som ändå öppnar en bekräftelse där båda står igen. Det andra exemplaret var
+                inte information utan tvekan: det gav något att läsa i stället för att trycka. */}
             <p className="muted small">
-              {plan!.mode === "fixed"
-                ? t(
-                    "Vi lägger ut möbeln till salu till fast pris, med bilderna från skanningen och skicket från besiktningen. Sedan sköter vi annonsen — och hör av oss så fort den är såld.",
-                  )
-                : t(
-                    "Vi lägger ut möbeln till salu i {dagar} dagar, med bilderna från skanningen och skicket från besiktningen. Sedan sköter vi annonsen — och hör av oss så fort den är såld.",
-                    { dagar: plan!.durationDays ?? 0 },
-                  )}
+              {t("Vi lägger ut möbeln, sköter annonsen och hör av oss så fort den är såld.")}
             </p>
-            {ladderDrops(state.ladder) > 0 && (
-              <p className="muted small">
-                {t(
-                  "Annonspriset börjar på {start} och sänks {andel} % i veckan ner till {golv}, där det stannar. De {frakt} för hemleveransen ligger kvar oförändrade hela vägen.",
-                  {
-                    start: formatSek(state.ladder!.startPrice + plan!.shippingSek),
-                    andel: Math.round(state.ladder!.weeklyDropPct * 100),
-                    golv: formatSek(state.ladder!.floorPrice + plan!.shippingSek),
-                    frakt: formatSek(plan!.shippingSek),
-                  },
-                )}
-              </p>
-            )}
             {/* Knappen öppnar granskningen, den lägger inte ut något. Ordet är detsamma som i rutans
                 rubrik med flit: man trycker på erbjudandet och får se det i sin helhet. */}
             <button
@@ -205,7 +198,13 @@ export default function SellWithLoopa({
                 setConfirming(true);
               }}
             >
-              {publication?.status === "error" ? t("Försök igen") : t("Sälj med Loopa")}
+              {publication?.status === "error" ? (
+                t("Försök igen")
+              ) : (
+                <>
+                  {t("Sälj med")} <span className="ordmark ordmark-vit">loopa</span>
+                </>
+              )}
             </button>
           </>
         )}
@@ -214,6 +213,7 @@ export default function SellWithLoopa({
       {confirming && plan && (
         <SellConfirm
           plan={plan}
+          coverUrl={coverUrl ?? null}
           ladder={state.ladder}
           sending={sending}
           error={failure}
@@ -228,13 +228,36 @@ export default function SellWithLoopa({
 /**
  * Granskningen, i helskärm.
  *
- * Två saker och inget mer: vad som händer när man trycker, och exakt vad som läggs ut. Vad Loopa tar
- * står inte här utan sist på startsidan, innan man börjar — priset på tjänsten hör hemma före första
- * trycket, inte i rutan där man redan bestämt sig. Knapparna ligger stilla i underkanten medan
- * resten rullar, så "Ja, sälj den" aldrig är något man behöver leta efter.
+ * DEN VISAR ANNONSEN, INTE EN SPECIFIKATION AV DEN.
+ *
+ * Här stod förut nio rader i en definitionslista: rubrik, kategori, pris, prisplan, annonstyp,
+ * skick, bilder, marknadsplats, Loopa-ID. Allt var sant och tillsammans var det oläsbart — en
+ * blankett att kvittera, i det ögonblick säljaren ska känna igen sin möbel och säga ja. Ingen
+ * handlare visar en annons genom att räkna upp dess fält.
+ *
+ * Nu står annonsen som en annons: bilden, rubriken, priset. Det är de tre sakerna en köpare kommer
+ * att se, och därför de tre säljaren ska godkänna. Under dem ligger villkoren som korta rader —
+ * annonstypen, skicket, leveransen, prisplanen — för de svarar på "vad går jag med på", vilket är
+ * en annan fråga än "vad läggs ut".
+ *
+ * TVÅ RADER FÖLL BORT HELT. Marknadsplatsen: säljaren beställer en försäljning, inte en publicering
+ * på ett visst ställe, och vilket konto annonsen ligger på är vårt problem. Loopa-ID:t: det är en
+ * intern nyckel som råkar stå i annonstexten, och en kod utan uppgift på en bekräftelseskärm är
+ * precis den sortens detalj som får en enkel sida att kännas administrativ.
+ *
+ * EN RAD KOM TILLBAKA: vad säljaren får ut. Avgiften stod länge bara på startsidan, med motiveringen
+ * att priset på tjänsten hör hemma före första trycket och inte i rutan där man redan bestämt sig.
+ * Det stämmer om avgiften är en procentsats man kan räkna i huvudet — men den har ett tak, och ett
+ * tak går inte att gissa sig till. "20 %" på en möbel för 8 400 kr läser som 1 680 kr, och det är
+ * 680 kr fel. Uträkningen står därför här, med möbelns pris, vår del och summan säljaren får, för
+ * det är det sista talet man vill se innan man säger ja.
+ *
+ * Kategorin föll också: den säger var hos någon annan möbeln hamnar, vilket är samma svar som
+ * marknadsplatsen och lika ointressant för den som säljer soffan.
  */
 function SellConfirm({
   plan,
+  coverUrl,
   ladder,
   sending,
   error,
@@ -242,6 +265,7 @@ function SellConfirm({
   onConfirm,
 }: {
   plan: TraderaPlan;
+  coverUrl: string | null;
   ladder: PriceLadder | null;
   sending: boolean;
   error: string | null;
@@ -275,12 +299,37 @@ function SellConfirm({
     panel.current?.focus();
   }, []);
 
+  /**
+   * Villkoren, som korta rader.
+   *
+   * Byggs som en lista och inte som JSX i rad efter rad, för att raderna är villkorade var för sig
+   * och en hel del av dem saknas ofta: en möbel utan prisstege och utan skickuppgift ska ge tre
+   * rader, inte tre rader och två tomma hål.
+   */
+  const villkor = [
+    plan.mode === "fixed"
+      ? t("Fast pris — ingen budgivning")
+      : t("Auktion i {dagar} dagar", { dagar: plan.durationDays ?? 0 }),
+    plan.condition ? t("Skick: {skick}", { skick: plan.condition }) : null,
+    t("Hemleverans ingår för köparen"),
+    drops > 0
+      ? t("Priset sänks {andel} % i veckan ner till {golv}", {
+          andel: Math.round(ladder!.weeklyDropPct * 100),
+          golv: formatSek(ladder!.floorPrice + plan.shippingSek),
+        })
+      : null,
+  ].filter((v): v is string => v !== null);
+
   return (
     <div className="sell-modal-root" role="dialog" aria-modal="true" aria-labelledby="sell-modal-title">
       <div className="sell-modal-scrim" onClick={sending ? undefined : onCancel} />
       <div className="sell-modal-panel" ref={panel} tabIndex={-1}>
         <header className="sell-modal-head">
-          <h2 id="sell-modal-title">{t("Sälj med Loopa")}</h2>
+          {/* Ordmärket i accentfärg här, inte vitt: rubriken står på en ljus yta. Vitt hör till den
+              fyllda knappen. Samma märke, samma bokstav — bara den färg underlaget kräver. */}
+          <h2 id="sell-modal-title">
+            {t("Sälj med")} <span className="ordmark">loopa</span>
+          </h2>
           <button className="sell-modal-close" onClick={onCancel} disabled={sending} aria-label={t("Stäng")}>
             <CloseIcon size={15} />
           </button>
@@ -289,123 +338,83 @@ function SellConfirm({
         <div className="sell-modal-body">
           <p className="sell-modal-lede">
             {plan.mode === "fixed"
-              ? t(
-                  "Trycker du på ja går möbeln ut till salu direkt, till fast pris. Därifrån sköter Loopa annonsen och kontakten med köparen, och hör av sig när den är såld.",
-                )
-              : t(
-                  "Trycker du på ja går möbeln ut till salu direkt, som auktion i {dagar} dagar. Därifrån sköter Loopa annonsen och kontakten med köparen, och hör av sig när den är såld.",
-                  { dagar: plan.durationDays ?? 0 },
-                )}
+              ? t("Trycker du på ja går möbeln ut till salu direkt. Därifrån sköter vi resten.")
+              : t("Trycker du på ja går möbeln ut som auktion i {dagar} dagar. Därifrån sköter vi resten.", {
+                  dagar: plan.durationDays ?? 0,
+                })}
           </p>
 
           {error && <p className="sell-error">{t("Annonsen kunde inte läggas ut: {fel}", { fel: error })}</p>}
 
-          <section className="card-block">
-            <h3>{t("Det här läggs ut")}</h3>
-            <dl className="card-specs sell-plan">
-              <div className="card-spec">
-                <dt>{t("Rubrik")}</dt>
-                <dd>{plan.title}</dd>
+          {/* ANNONSEN. Bilden mot vitt precis som på kortet ovanför, så säljaren känner igen den. */}
+          <div className="sell-preview">
+            {coverUrl && (
+              <div className="sell-preview-bild">
+                <img src={coverUrl} alt="" />
               </div>
-              <div className="card-spec">
-                <dt>{t("Kategori")}</dt>
-                <dd>{plan.categoryName}</dd>
-              </div>
-              <div className="card-spec">
-                <dt>{plan.mode === "fixed" ? t("Pris (Köp Nu)") : t("Utropspris")}</dt>
-                <dd>
-                  {formatSek(plan.price)}
-                  {/* Delarna utskrivna: säljaren satte ett pris på MÖBELN och ska inte behöva räkna ut
-                      varför annonsen står på ett annat tal. */}
-                  <span className="muted small">
-                    {" — "}
-                    {t("{pris} för möbeln + {frakt} hemleverans", {
-                      pris: formatSek(plan.itemPrice),
-                      frakt: formatSek(plan.shippingSek),
-                    })}
-                    {plan.priceSource === "seller" && ` (${t("ditt startpris")})`}
-                    {plan.priceSource === "listing" && ` (${t("annonsgeneratorns förslag, utan skadeavdrag")})`}
-                  </span>
-                </dd>
-              </div>
-              {drops > 0 && (
-                <div className="card-spec">
-                  <dt>{t("Prisplan")}</dt>
-                  <dd>
-                    {t("−{andel} % i veckan ner till {golv}", {
-                      andel: Math.round(ladder!.weeklyDropPct * 100),
-                      golv: formatSek(ladder!.floorPrice + plan.shippingSek),
-                    })}
-                    <span className="muted small">
-                      {" — "}
-                      {t(
-                        drops === 1
-                          ? "golvet nås efter {antal} vecka. Sänkningen tar bara av möbelns pris, aldrig av frakten."
-                          : "golvet nås efter {antal} veckor. Sänkningen tar bara av möbelns pris, aldrig av frakten.",
-                        { antal: drops },
-                      )}
-                    </span>
-                  </dd>
-                </div>
-              )}
-              <div className="card-spec">
-                <dt>{t("Annonstyp")}</dt>
-                <dd>
-                  {plan.mode === "fixed"
-                    ? t("Endast Köp Nu — ingen budgivning")
-                    : t("Auktion, {dagar} dagar", { dagar: plan.durationDays ?? 0 })}
-                </dd>
-              </div>
-              {plan.condition && (
-                <div className="card-spec">
-                  <dt>{t("Skick")}</dt>
-                  <dd>{plan.condition}</dd>
-                </div>
-              )}
-              <div className="card-spec">
-                <dt>{t("Bilder")}</dt>
-                <dd>{t("{antal} st", { antal: plan.imageCount })}</dd>
-              </div>
-              {/* Marknadsplatsen står i bekräftelsen och inte i rubriken: säljaren beställer en
-                  försäljning, men ska kunna läsa var möbeln hamnar innan de trycker. */}
-              <div className="card-spec">
-                <dt>{t("Läggs ut på")}</dt>
-                <dd>
-                  Tradera
-                  <span className="muted small">
-                    {" — "}
-                    {t("på Loopas konto, du behöver inget eget")}
-                  </span>
-                </dd>
-              </div>
-              {/* Står i annonstexten, alltså i bekräftelsen: annonsen berättar att den är skapad av
-                  Loopa och pekar ut kortet där skicket går att kontrollera. */}
-              <div className="card-spec">
-                <dt>{t("Loopa-ID")}</dt>
-                <dd>
-                  {plan.loopaId}
-                  <span className="muted small">
-                    {" — "}
-                    {t("annonstexten hänvisar till det publika kortet")}
-                  </span>
-                </dd>
-              </div>
-              {/* Fast pris, samma på varje annons — men det ingår i priset ovan, och det är den
-                  halvan säljaren behöver se innan de trycker. */}
-              <div className="card-spec">
-                <dt>{t("Leverans")}</dt>
-                <dd>
-                  {t("Hemleverans ingår")}
-                  <span className="muted small">
-                    {" — "}
-                    {t("budfirma bokas efter köpet, ingen extra kostnad för köparen")}
-                  </span>
-                </dd>
-              </div>
-            </dl>
-          </section>
+            )}
+            <div className="sell-preview-text">
+              <span className="sell-preview-kicker">{t("Det här läggs ut")}</span>
+              <h3 className="sell-preview-titel">{plan.title}</h3>
+              <div className="sell-preview-pris">{formatSek(plan.price)}</div>
+              {/* Delarna utskrivna, men som en bildtext och inte som en rad i en tabell: säljaren
+                  satte ett pris på MÖBELN och ska inte behöva räkna ut varför annonsen står på ett
+                  annat tal. */}
+              <p className="sell-preview-delar">
+                {t("{pris} för möbeln + {frakt} hemleverans", {
+                  pris: formatSek(plan.itemPrice),
+                  frakt: formatSek(plan.shippingSek),
+                })}
+              </p>
+            </div>
+          </div>
 
-          <p className="muted small">{t("Annonsen går upp direkt och blir publik.")}</p>
+          <ul className="sell-villkor">
+            {villkor.map((rad) => (
+              <li key={rad}>
+                <CheckIcon size={14} />
+                <span>{rad}</span>
+              </li>
+            ))}
+          </ul>
+
+          {/*
+            VAD SÄLJAREN FÅR UT, uträknat.
+
+            Räknat på MÖBELNS pris och inte på annonspriset ovanför: hemleveransens kronor går rakt
+            vidare till budfirman och är ingen del av affären mellan säljaren och oss. Att de två
+            talen skiljer sig är därför inte ett fel utan hela poängen, och noten under säger det —
+            utan den läser skillnaden som ett räknefel i vår favör.
+
+            Taket är utskrivet bara när det faktiskt slagit till. "20 %, högst 1 000 kr" på en möbel
+            för 900 kr är en upplysning om ett läge säljaren inte är i.
+          */}
+          <dl className="sell-delning">
+            <div>
+              <dt>{t("Möbelns pris")}</dt>
+              <dd>{formatSek(plan.itemPrice)}</dd>
+            </div>
+            <div>
+              <dt>
+                {t("Loopas del")}
+                <span>
+                  {feeIsCapped(plan.itemPrice)
+                    ? t("{andel} %, högst {tak}", { andel: LOOPA_PERCENT, tak: formatSek(LOOPA_FEE_CAP_SEK) })
+                    : t("{andel} % av priset", { andel: LOOPA_PERCENT })}
+                </span>
+              </dt>
+              <dd>−{formatSek(loopaFee(plan.itemPrice))}</dd>
+            </div>
+            <div className="sell-delning-sum">
+              <dt>{t("Du får")}</dt>
+              <dd>{formatSek(sellerPayout(plan.itemPrice))}</dd>
+            </div>
+          </dl>
+          <p className="sell-delning-not">
+            {t("Hemleveransens {frakt} räknas inte in — de går vidare till budfirman.", {
+              frakt: formatSek(plan.shippingSek),
+            })}
+          </p>
         </div>
 
         <footer className="sell-modal-actions">

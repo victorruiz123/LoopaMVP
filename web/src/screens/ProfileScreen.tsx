@@ -331,6 +331,27 @@ function CardList({
                   <span className={`card-row-sale card-row-sale-${j.sale.status}`}>{t(SALE_LABEL[j.sale.status])}</span>
                 )
               )}
+              {/*
+                Vad som HÄNT med annonsen, på en rad.
+                
+                Ligger den ute visas visningar och klick — säljaren ska kunna skilja "ingen har sett
+                den" från "många har sett den och ingen köpt". Är den såld visas i stället var köpet
+                står, för då är intresset historia och leveransen det enda som gäller.
+              */}
+              {j.order ? (
+                <span className="card-row-meta" style={{ color: "var(--accent)" }}>
+                  {ORDER_STEG[j.order.status]}
+                  {j.order.deliveryDate ? ` · ${leveransDatum(j.order.deliveryDate)} ${j.order.deliveryWindow ?? ""}` : ""}
+                </span>
+              ) : (
+                j.shop?.state === "live" && j.statistik && j.statistik.visningar > 0 && (
+                  <span className="card-row-meta">
+                    {t("{antal} visningar", { antal: j.statistik.visningar })}
+                    {j.statistik.klick > 0 ? ` · ${t("{antal} klick", { antal: j.statistik.klick })}` : ""}
+                    {j.shop.listedAt ? ` · ${dagarUppe(j.shop.listedAt, t)}` : ""}
+                  </span>
+                )
+              )}
             </span>
             {j.grade && <GradeBadge grade={j.grade.grade} size={32} />}
             <span className="card-row-chevron">
@@ -358,4 +379,31 @@ function initials(name: string): string {
 
 function formatDate(iso: string, lang: string): string {
   return new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "short" });
+}
+
+/** Var köpet står, sagt för SÄLJAREN. Köparens adress och tider nämns aldrig. */
+const ORDER_STEG: Record<NonNullable<JobSummary["order"]>["status"], string> = {
+  paid: "Såld — köparen väljer leveranstid",
+  booking: "Såld — vi bokar frakt",
+  scheduled: "Såld — frakt bokad",
+  delivered: "Levererad till köparen",
+  return_requested: "Retur begärd",
+  returned: "Returnerad",
+};
+
+function leveransDatum(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
+}
+
+/**
+ * Hur länge annonsen legat ute.
+ *
+ * Dagar och inte datum: "utlagd 12 augusti" kräver att man räknar själv, och frågan säljaren
+ * faktiskt ställer är "hur länge har den legat".
+ */
+function dagarUppe(listedAt: string, t: (sv: string, vars?: Record<string, string | number>) => string): string {
+  const dagar = Math.max(0, Math.floor((Date.now() - new Date(listedAt).getTime()) / 86_400_000));
+  if (dagar === 0) return t("utlagd i dag");
+  if (dagar === 1) return t("uppe 1 dag");
+  return t("uppe {antal} dagar", { antal: dagar });
 }

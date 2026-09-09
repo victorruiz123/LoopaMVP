@@ -54,6 +54,24 @@ export interface CapturedImage {
   /** client-assigned, for display only (e.g. "Framifrån", "Höger sida", "Närbild") — never used for grading logic */
   viewLabel: string | null;
   source: "video" | "manual";
+  /**
+   * Vad bilden är TILL FÖR, till skillnad från `viewLabel` som säger vad den visar.
+   *
+   * `"cover"` sätts av appen på den enda bild säljaren blir ombedd att komponera: omslagsbilden, tagen
+   * i möbelns egen höjd och snett framifrån efter att varvet är filmat. Se omslagsbild.ts i webben.
+   *
+   * FÄLTET STYR TVÅ SAKER, och ingen av dem är bedömningen:
+   *
+   *   1. Bilden går INTE in i inspektionsanropet (`tillBedomning` i pipeline/run.ts). Den är ett
+   *      sjunde foto, och ett sjunde foto i anropet är sekunder säljaren står och väntar. Skicket
+   *      avgörs av varvet, precis som förut.
+   *   2. Den vinner omslagsvalet (pipeline/bild/omslag.ts) — men bara om urklippet av den håller
+   *      måttet. En komponerad bild som modellen ändå klipper sönder ska inte bli annonsens ansikte
+   *      bara för att den var efterfrågad.
+   *
+   * Odefinierat på allt annat, och på varje bild tagen före omslagssteget fanns.
+   */
+  role?: "cover";
   width: number;
   height: number;
   /** relative path under the job's data dir, e.g. "originals/img_0.jpg" */
@@ -220,6 +238,11 @@ export interface PriceEstimate {
   variantMethod: string | null;
   /** total deduction actually applied for the findings, as a share of the undamaged base */
   damageDeduction: number | null;
+  /**
+   * Vad ett buntpris delades med för att bli ett styckpris. Satt bara för stolar, och bara när
+   * kontrollen faktiskt sänkte talet — se stolPris.ts för varför stolar behöver den.
+   */
+  styckDivisor?: number | null;
   damageLines: PriceDamageLine[];
   unavailableReason: string | null;
   requestedAt: string;
@@ -232,6 +255,16 @@ export interface ListingAttribute {
   label: string;
   value: string;
   sourceUrl?: string | null;
+  /**
+   * Säljaren har skrivit in värdet själv.
+   *
+   * ERSÄTTER BÅDE KÄLLAN OCH "UPPSKATTAT", och gör det med flit: ett rättat mått är varken belagt av
+   * sidan det en gång hämtades från — den säger ju något annat nu — eller en gissning om möbeltypen.
+   * Det är en uppgift från personen som stod bredvid möbeln med ett måttband, vilket är den bästa
+   * källa ett mått kan ha och samtidigt en vi inte kan kontrollera. Kortet skriver ut den som vad
+   * den är i stället för att tiga eller låna någon annans trovärdighet. Se handleListingEdit.
+   */
+  sellerEdited?: boolean;
   /**
    * Sant när värdet är UPPSKATTAT och inte en uppgift om just den här möbeln.
    *
@@ -355,10 +388,31 @@ export interface ProductImage {
 }
 
 /**
- * Omslaget: säljarens egen bildruta, urklippt och lagd på vitt.
+ * En bild i annonsens galleri: säljarens egen bildruta, urklippt och lagd på rent vitt.
+ *
+ * `fil` är sökvägen RELATIVT jobbets `cover/`-mapp, alltså "galleri/2.jpg". Relativ med flit: den
+ * som läser posten ska inte kunna bygga en sökväg som pekar någon annanstans än i jobbets egen
+ * mapp, och porten sätter ihop den med jobbmappen själv.
+ *
+ * Kvalitetsdomen står PER BILD och inte bara på omslaget. Att den fjärde vinkeln fick en mask som
+ * tappade ett bordsben är inget skäl att undanhålla de tre som blev bra — den bilden faller ur den
+ * publika listan för sig. Se `publikaGalleribilder` i pipeline/bild/omslag.ts, som är den enda
+ * platsen den frågan besvaras.
+ */
+export interface GalleryBild {
+  /** Sökväg relativt jobbets cover/-mapp, t.ex. "galleri/2.jpg". */
+  fil: string;
+  /** Bildrutan urklippet är gjort ur. */
+  sourceImageId: string;
+  qualityScore: number;
+  needsReview: boolean;
+}
+
+/**
+ * Omslaget: säljarens egen bildruta, urklippt och lagd på studiobakgrunden.
  *
  * Filen ligger som `cover/cover.jpg` i jobbmappen och serveras på /api/jobs/:id/cover — posten här
- * säger bara ATT den finns, och ur vilken bildruta. Se pipeline/cutout.ts för hur den byggs och
+ * säger bara ATT den finns, och ur vilken bildruta. Se pipeline/bild/omslag.ts för hur den byggs och
  * varför den hellre uteblir än blir halv.
  */
 export interface CoverCutout {
@@ -398,6 +452,24 @@ export interface CoverCutout {
   needsReview?: boolean;
   /** Kvalitetskontrollens koder, för att kunna sortera fram vad som gick fel över hela lagret. */
   anmarkningar?: string[];
+  /**
+   * Vilken botten omslaget står på: studiobakgrundens namn, eller null för rent vitt.
+   *
+   * Fältet finns för att bakgrunden är VÅR redigering av bilden, och ett kort som räknar upp varje
+   * skråma ska kunna svara på vad det gjort med fotot. Det bär dessutom ombyggnaden: byts studion ut
+   * går de omslag som står i den gamla att sortera fram, precis som `provider` bär modellbytet.
+   *
+   * Saknas fältet är omslaget byggt innan studion fanns, och står alltså mot vitt.
+   */
+  backdrop?: string | null;
+  /**
+   * Annonsens övriga bilder, omslaget först. Tom eller saknad på omslag byggda före galleriet.
+   *
+   * Första posten är samma bildruta som `sourceImageId` — dess fil är omslagets VITA version, medan
+   * `cover/cover.jpg` är samma möbel i studion. Att båda finns är avsiktligt: den vita är reserven
+   * om bakgrunden går förlorad, och den kostar ingen modelltid att spara.
+   */
+  gallery?: GalleryBild[];
 }
 
 export interface ConditionResult {
@@ -536,6 +608,18 @@ export interface ConditionJob {
    * Valfri: jobb från före inloggningen saknar den, och de ska fortsätta gå att öppna.
    */
   ownerId?: string | null;
+  /**
+   * Säljarens e-post, sparad på jobbet.
+   *
+   * VARFÖR DEN LIGGER HÄR och inte slås upp vid behov: när möbeln säljs står ingen inloggad. Ett
+   * köp sker i köparens webbläsare, eller på Tradera medan säljaren sover, och `ownerId` är ett
+   * Supabase-id som bara går att växla mot en adress med en servicenyckel vi inte har. Utan den här
+   * raden kan vi alltså aldrig berätta för en säljare att deras möbel blivit såld.
+   *
+   * Skrivs när jobbet skapas och uppdateras när ägaren själv hämtar det — en säljare som byter
+   * adress i Supabase ska nås på den nya.
+   */
+  ownerEmail?: string | null;
   progress: JobProgress;
   result: ConditionResult | null;
   error: string | null;

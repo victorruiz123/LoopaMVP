@@ -120,6 +120,15 @@ export function ArrowLeftIcon({ size = 17 }: { size?: number }) {
   );
 }
 
+/** Uppåtpil. Skickaknappen i chatten — samma gest som varje modern chattruta har. */
+export function ArrowUpIcon({ size = 18 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base} strokeWidth={2.4}>
+      <path d="M12 19V5m0 0-6 6m6-6 6 6" />
+    </svg>
+  );
+}
+
 export function CardIcon({ size = 18 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>

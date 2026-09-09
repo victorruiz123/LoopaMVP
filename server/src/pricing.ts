@@ -8,6 +8,7 @@ import type {
   Severity,
 } from "./types.js";
 import { damageStands } from "./pipeline/grade.js";
+import { kanVaraStol, styckprisForStol } from "./stolPris.js";
 
 const PRICE_ENGINE_URL = (process.env.PRICE_ENGINE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 const PRICE_ENGINE_API_KEY = process.env.PRICE_ENGINE_API_KEY ?? null;
@@ -313,7 +314,7 @@ export async function estimatePrice(
   // the engine halved the deduction because its comparison set already carried damaged listings.
   const deduction = damage?.totalDeductionApplied ?? damage?.totalDeduction ?? null;
 
-  return {
+  const estimate: PriceEstimate = {
     status: data.default === null || data.default === undefined ? "no_data" : "ok",
     low: data.low ?? null,
     default: data.default ?? null,
@@ -333,6 +334,16 @@ export async function estimatePrice(
     requestedAt: new Date().toISOString(),
     latencyMs: Date.now() - startedAt,
   };
+
+  /**
+   * STOLAR PRISSÄTTS I BUNT I DATAN, och ska säljas styckvis här. Kontrollen ligger sist och bara
+   * för stolar: den kostar ett Gemini-anrop, och för soffor och bord finns ingenting att hämta.
+   * Faller den kommer motorns eget tal tillbaka orört — se stolPris.ts.
+   */
+  if (kanVaraStol({ brand, model }, estimate.variant)) {
+    return await styckprisForStol({ brand, model }, estimate);
+  }
+  return estimate;
 }
 
 /**

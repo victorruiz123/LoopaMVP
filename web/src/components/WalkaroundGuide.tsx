@@ -14,7 +14,23 @@ import GuideScene from "./GuideScene";
  * står här, ovanpå kameran, för att det är HÄR säljaren står när hen inser att ett varv inte går att
  * gå: soffan står mot en vägg, eller händerna är fulla.
  */
-export default function WalkaroundGuide({ subject, onSwitch }: { subject?: string; onSwitch?: () => void }) {
+export default function WalkaroundGuide({
+  subject,
+  onSwitch,
+  onUploadVideo,
+}: {
+  subject?: string;
+  onSwitch?: () => void;
+  /**
+   * Dörren till en färdig film ur telefonens eller datorns filer.
+   *
+   * STÅR HÄR AV SAMMA SKÄL SOM `onSwitch`: det här är platsen där säljaren inser att varvet inte går
+   * att gå just nu. Skillnaden mot fotoguiden är att den här vägen ger samma sorts underlag som ett
+   * riktigt varv — bildrutor valda ur rörelse — och därför ingen kvalitetsförlust alls, bara en film
+   * som spelats in vid ett annat tillfälle.
+   */
+  onUploadVideo?: () => void;
+}) {
   const t = useT();
   return (
     <div className="capture-guide">
@@ -30,6 +46,11 @@ export default function WalkaroundGuide({ subject, onSwitch }: { subject?: strin
           <li>{t("Filmen stannar själv när du är tillbaka där du började")}</li>
         </ol>
         <p className="capture-guide-cta">{t("Tryck på den röda knappen för att börja")}</p>
+        {onUploadVideo && (
+          <button className="btn btn-text capture-guide-switch" onClick={onUploadVideo}>
+            {t("Har du redan en film? Ladda upp den")}
+          </button>
+        )}
         {onSwitch && (
           <button className="btn btn-text capture-guide-switch" onClick={onSwitch}>
             {t("Går inte att gå runt? Ta bilder i stället")}

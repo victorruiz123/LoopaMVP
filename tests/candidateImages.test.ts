@@ -11,10 +11,52 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { createRequire } from "node:module";
 import { resolveCandidateImages, type SourceRef } from "../server/src/candidateImages.js";
+import { slappKandidatbildsregister } from "../server/src/kandidatbild.js";
 import type { ModelCandidate } from "../server/src/types.js";
 
 const IMAGE = "image/jpeg";
+
+/**
+ * EGEN KATALOG FÖR TESTET.
+ *
+ * Miniatyrerna skrivs till disk och modellerna skrivs i ett register. Utan den här raden hade
+ * körningen lagt "Sits NORDVIKEN" i driftens register, och nästa säljare med en NORDVIKEN hade fått
+ * en bild ur ett test. Katalogen töms mellan varje prov, så inget läcker mellan dem heller.
+ */
+process.env.LOOPA_KANDIDATBILDER_DIR = mkdtempSync(path.join(tmpdir(), "loopa-kandidatbild-"));
+
+const sharp = createRequire(new URL("../server/src/kandidatbild.ts", import.meta.url))(
+  "sharp",
+) as typeof import("../server/node_modules/sharp");
+
+/**
+ * Bytesen mocken lämnar ut för en bildadress.
+ *
+ * RIKTIGA BYTES, inte en tom kropp med rätt innehållstyp. Kedjan hämtar numera hem bilden, avkodar
+ * den och skalar den — det är den hämtningen som ÄR kontrollen (se kandidatbild.ts) — så en tom
+ * kropp betyder "ingen bild" och varenda prov hade fallit. 600 px, alltså över spärren mot ikoner.
+ */
+const BILDBYTES = await sharp({
+  create: { width: 600, height: 450, channels: 3, background: { r: 190, g: 175, b: 155 } },
+})
+  .jpeg()
+  .toBuffer();
+
+/**
+ * Adressen en hämtad bild får hos oss. Samma summa som kandidatbild.ts räknar.
+ *
+ * Proven pekar ut VILKEN källbild som ska väljas, och det är fortfarande det de mäter — bara att
+ * svaret nu är vår egen adress för den bilden i stället för butikens.
+ */
+function lokal(url: string): string {
+  return `/api/kandidatbild/${createHash("sha1").update(url).digest("hex")}.jpg`;
+}
 
 interface Reply {
   body?: string;
@@ -76,15 +118,19 @@ async function withWeb(routes: Record<string, Reply>, fn: (calls: string[]) => P
         { headers: { "content-type": "text/html" } },
       );
     }
-    return new Response(method === "HEAD" ? null : (reply.body ?? ""), {
-      status: reply.status ?? 200,
-      headers: { "content-type": reply.type ?? "text/html" },
-    });
+    const type = reply.type ?? "text/html";
+    // En bildadress lämnar ut riktiga bytes; allt annat sin text. Se BILDBYTES.
+    const kropp = method === "HEAD" ? null : type.startsWith("image/") ? BILDBYTES : (reply.body ?? "");
+    return new Response(kropp, { status: reply.status ?? 200, headers: { "content-type": type } });
   }) as unknown as typeof fetch;
   try {
     await fn(calls);
   } finally {
     globalThis.fetch = real;
+    // Nästa prov ska leta på nytt: en kvarliggande miniatyr eller registerpost hade gjort provet
+    // beroende av vilken ordning proven råkade köras i.
+    rmSync(process.env.LOOPA_KANDIDATBILDER_DIR!, { recursive: true, force: true });
+    slappKandidatbildsregister();
   }
 }
 
@@ -100,7 +146,7 @@ test("bilden hämtas ur JSON-LD när og-taggen saknas", async () => {
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("NORDVIKEN")], [source("https://butiken.se/p/nordviken")]);
-      assert.equal(c.imageUrl, "https://butiken.se/media/nordviken.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/media/nordviken.jpg"));
       assert.equal(c.imageSource, "https://butiken.se/p/nordviken", "påståendet ska gå att kontrollera");
     },
   );
@@ -121,7 +167,7 @@ test("saknar sidan metadata läses produktbilden ur den, aldrig loggan", async (
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("Impulse")], [source("https://butiken.se/impulse")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/impulse-stor.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/impulse-stor.jpg"));
     },
   );
 });
@@ -138,7 +184,7 @@ test("en död bildadress lämnar plats åt nästa bild på samma sida", async ()
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("Julia")], [source("https://butiken.se/julia")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/julia.jpg", "en 404 är en tom ruta hos säljaren");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/julia.jpg"), "en 404 är en tom ruta hos säljaren");
     },
   );
 });
@@ -153,7 +199,7 @@ test("en sida som avvisar robotnamnet hämtas om som en vanlig besökare", async
     },
     async (calls) => {
       const [c] = await resolveCandidateImages([candidate("Alex")], [source("https://butiken.se/alex")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/alex.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/alex.jpg"));
       assert.equal(calls.filter((c2) => c2 === "GET https://butiken.se/alex").length, 2, "ett försök till, inte fler");
     },
   );
@@ -183,8 +229,8 @@ test("den enda sida en kandidat kan använda tas inte av en som har fler val", a
         [candidate("Alex"), candidate("Julia")],
         [source("https://sits.se/kollektion", 1), source("https://butiken.se/stol/alex", 3)],
       );
-      assert.equal(out[0].imageUrl, "https://butiken.se/img/alex.jpg", "Alex har en egen sida och ska ta den");
-      assert.equal(out[1].imageUrl, "https://sits.se/img/kollektion.jpg", "Julia har bara kollektionssidan");
+      assert.equal(out[0].imageUrl, lokal("https://butiken.se/img/alex.jpg"), "Alex har en egen sida och ska ta den");
+      assert.equal(out[1].imageUrl, lokal("https://sits.se/img/kollektion.jpg"), "Julia har bara kollektionssidan");
       assert.notEqual(out[0].imageUrl, out[1].imageUrl, "två kandidater delar aldrig bild");
     },
   );
@@ -205,7 +251,7 @@ test("hoppet följer länktexten när adressen bara är ett artikelnummer", asyn
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("NORDVIKEN")], [source("https://butiken.se/barstolar")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/nordviken.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/nordviken.jpg"));
     },
   );
 });
@@ -226,7 +272,7 @@ test("två hopp i följd: startsidan bär ingen bild men vägen dit", async () =
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("NORDVIKEN")], [source("https://butiken.se/")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/nordviken.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/nordviken.jpg"));
     },
   );
 });
@@ -263,10 +309,10 @@ test("det som redan hittats skrivs ut innan resten letats upp", async () => {
         },
       );
       assert.equal(delar.length, 1, "ett delresultat, innan hoppet");
-      assert.equal(delar[0][0].imageUrl, "https://butiken.se/img/alex.jpg", "Alex bild ska inte vänta in Julia");
+      assert.equal(delar[0][0].imageUrl, lokal("https://butiken.se/img/alex.jpg"), "Alex bild ska inte vänta in Julia");
       assert.equal("imageUrl" in delar[0][1], false, "Julia letas fortfarande — inget besked ännu");
-      assert.equal(out[0].imageUrl, "https://butiken.se/img/alex.jpg");
-      assert.equal(out[1].imageUrl, "https://butiken.se/img/julia.jpg");
+      assert.equal(out[0].imageUrl, lokal("https://butiken.se/img/alex.jpg"));
+      assert.equal(out[1].imageUrl, lokal("https://butiken.se/img/julia.jpg"));
     },
   );
 });
@@ -313,8 +359,8 @@ test("en sida vars ström dör mitt i lämnar ifrån sig det som hanns läsas", 
         [candidate("Alex"), candidate("Julia")],
         [source("https://butiken.se/alex"), source("https://butiken.se/julia")],
       );
-      assert.equal(out[0].imageUrl, "https://butiken.se/img/alex.jpg", "huvudet hanns läsas — bilden står där");
-      assert.equal(out[1].imageUrl, "https://butiken.se/img/julia.jpg", "grannens sida rörs inte av att en annan föll");
+      assert.equal(out[0].imageUrl, lokal("https://butiken.se/img/alex.jpg"), "huvudet hanns läsas — bilden står där");
+      assert.equal(out[1].imageUrl, lokal("https://butiken.se/img/julia.jpg"), "grannens sida rörs inte av att en annan föll");
     },
   );
 });
@@ -368,7 +414,7 @@ test("hittas ingen sida frågas en sökmotor efter modellen", async () => {
     },
     async (calls) => {
       const [c] = await resolveCandidateImages([candidate("FRANKLIN")], []);
-      assert.equal(c.imageUrl, "https://butiken.se/img/franklin.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/franklin.jpg"));
       assert.ok(
         calls.some((call) => ENGINES.some((e) => call.includes(e))),
         "sökningen ska ha gjorts",
@@ -405,7 +451,7 @@ test("butikens sökruta leder till möbeln, och träfflistans egen bild lånas a
         [{ ...candidate("Oxford"), productType: "soffa", sourceUrl: "https://butiken.se/p/oxford-3-sits-soffa/999999" }],
         [],
       );
-      assert.equal(c.imageUrl, "https://butiken.se/img/oxford-soffa.jpg", "möbelns sida, inte klädselns");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/oxford-soffa.jpg"), "möbelns sida, inte klädselns");
       assert.equal(c.imageSource, "https://butiken.se/p/oxford-3-sits-soffa/2");
     },
   );
@@ -430,7 +476,7 @@ test("möbelns egen sida vinner över sidan om möbelns klädsel", async () => {
         // Klädselsidan står FÖRST och har högre källkvalitet — bara tillbehörsstraffet skiljer dem åt.
         [source("https://butiken.se/p/ektorp-kladsel", 1), source("https://butiken.se/p/ektorp-soffa", 3)],
       );
-      assert.equal(c.imageUrl, "https://butiken.se/img/soffa.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/soffa.jpg"));
     },
   );
 });
@@ -456,7 +502,7 @@ test("länkens frågesträng avkodas innan den hämtas", async () => {
     },
     async () => {
       const [c] = await resolveCandidateImages([candidate("Julia")], [source("https://butiken.se/soffor")]);
-      assert.equal(c.imageUrl, "https://butiken.se/img/julia.jpg");
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/julia.jpg"));
     },
   );
 });
@@ -490,7 +536,7 @@ test("när tiden är ute får den som saknar bild ett nej, inte fortsatt väntan
         // Budgeten är slut redan när slingan börjar — det är läget efter en lång första runda.
         0,
       );
-      assert.equal(out[0].imageUrl, "https://butiken.se/img/alex.jpg", "en tidsgräns kostar letandet, inte fynden");
+      assert.equal(out[0].imageUrl, lokal("https://butiken.se/img/alex.jpg"), "en tidsgräns kostar letandet, inte fynden");
       assert.equal(out[1].imageUrl, null, "ingen bild hittades — sagt rakt ut, så skärmen slutar vänta");
       assert.equal(
         calls.some((call) => ENGINES.some((e) => call.includes(e))),

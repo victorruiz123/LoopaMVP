@@ -1,6 +1,6 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { loadImageAsBase64 } from "./imageUtils.js";
+import { loadImageAsBase64, loadImageAsBase64Scaled } from "./imageUtils.js";
 import type { CapturedImage, FurnitureIdentity, ListingResult, ModelCandidate } from "./types.js";
 import type { SourceRef } from "./candidateImages.js";
 
@@ -20,23 +20,31 @@ const GENERATE_MODULE = pathToFileURL(
   path.resolve(import.meta.dirname, "..", "..", "loopa-landing-page-main", "functions", "api", "seller", "generate.ts"),
 ).href;
 
-/** Hur länge vi väntar. Generatorn har en egen inre deadline på 26 s; det här är bara ett skyddsnät. */
-const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 70000);
+/** Hur länge vi väntar. Generatorn har en egen inre deadline (nedan); det här är bara ett skyddsnät. */
+const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 40000);
 
 /**
- * Rundligare budgetar än loopa.nu kör med, av en enda anledning: identifieringen ligger INTE på vår
- * kritiska väg. Den löper parallellt med skickbedömningen, som tar 20-40 s ändå.
+ * Rundligare budgetar än loopa.nu kör med — men inte hur rundliga som helst.
  *
- * Deras 9 s mot en uppmätt latens på 6,2 s lämnade ingen marginal, och en fallen sökning kostar
- * källorna — och därmed måtten, som bara får läsas ur grundad text. Att spara sekunder som ändå går
- * åt någon annanstans var att betala med hela funktionen.
+ * SKÄLET ATT DE ÄR STÖRRE ÄN 9 s: en fallen sökning kostar källorna, och därmed måtten, som bara får
+ * läsas ur grundad text. Deras 9 s mot en uppmätt latens på 6,2 s lämnade ingen marginal alls.
+ *
+ * SKÄLET ATT DE INTE LÄNGRE ÄR 24/16/60: fas 2 ÄR säljarens kritiska väg. Fas 1 löper parallellt med
+ * skickbedömningen, men fas 2 börjar när säljaren tryckt på sin modell och slutar när annonsen står
+ * på skärmen — hela den tiden står de och tittar på "Bygger annonsen…". Mätt på 60 sparade körningar:
+ * research median 8,4 s, p85 13,9 s, p95 25,9 s, och en körning på 102 s som varken budget, deadline
+ * eller skyddsnät stoppade. Taket ligger nu strax ovanför p85, så nästan varje sökning som ändå
+ * skulle ha lyckats hinner klart, medan svansen inte längre kan äta en halv minut av flödet.
+ *
+ * TALEN HÄNGER IHOP: 16 + 9 + 8 s reserv åt struktureringen ryms i 34 s, så omförsöket — det som
+ * räddar grundningen i 38 fall av 60 — får fortfarande plats efter en långsam första sökning.
  */
 // Sätts i process.env, INTE i request-env. Generatorns budgetar är konstanter som utvärderas när
 // modulen laddas, och modulen laddas dynamiskt först vid första anropet — alltså efter de här raderna.
 // Skickade som request-env hade de aldrig fått någon effekt alls.
-process.env.SELLER_RESEARCH_BUDGET_MS ??= "24000";
-process.env.SELLER_RESEARCH_RETRY_BUDGET_MS ??= "16000";
-process.env.SELLER_OVERALL_DEADLINE_MS ??= "60000";
+process.env.SELLER_RESEARCH_BUDGET_MS ??= "16000";
+process.env.SELLER_RESEARCH_RETRY_BUDGET_MS ??= "9000";
+process.env.SELLER_OVERALL_DEADLINE_MS ??= "34000";
 // Bildtaket lämnas på generatorns 3. Att höja det till 6 såg ut som en gratis förbättring — fler
 // vinklar åt identifieringen, betald av en budget vi ändå inte använde. Mätt på samma IKEA-stol,
 // tio körningar per läge, gav taket 3 kandidater i 8 fall av 10 och taket 6 bara i 2 av 10: den
@@ -44,6 +52,54 @@ process.env.SELLER_OVERALL_DEADLINE_MS ??= "60000";
 // inga kandidater alls. Budgeten var aldrig det som begränsade.
 /** Generatorn tar högst 10 och beskär själv per steg. Fler bildrutor gör bara nyttolasten dyr. */
 const MAX_LISTING_IMAGES = 6;
+
+/**
+ * IDENTIFIERINGEN FÅR EN EGEN, LÄTTARE NYTTOLAST — och det är säljarens väntan det handlar om.
+ *
+ * Fas 1 är den enda punkt i flödet där säljaren står och tittar på "Letar upp modellen…" utan att
+ * något annat pågår som de ändå måste vänta ut. Allt som ligger i det anropet är alltså ren väntan,
+ * och två saker låg där utan att göra nytta:
+ *
+ *   SEX BILDER SKICKADES, TRE ANVÄNDES. Generatorns sökning tar `SELLER_RESEARCH_IMAGE_CAP` bilder
+ *   (3), och fas 1 svarar med kandidater UTAN att någonsin nå struktureringen som hade sett resten.
+ *   De tre andra kodades till base64 och kastades.
+ *
+ *   OCH DET VAR FEL TRE. Generatorn tar de tre FÖRSTA, och bildrutorna ligger i filmningsordning —
+ *   alltså tre närbilder ur samma ögonblick av varvet. Nu väljs de spridda över hela varvet, med
+ *   omslagsbilden först när den finns: den är tagen rakt framifrån i möbelns egen höjd och är den
+ *   enskilt bästa bilden att känna igen en modell ur.
+ *
+ * Vikten sänks dessutom: den grundade sökningen skalar brant med bildvikt (generatorns egen mätning,
+ * 2 bilder 3,6 s mot 5 bilder 8,0 s), och 1024 px räcker mer än väl för att avgöra VILKEN modell det
+ * är. Originalen rörs inte — besiktningen, som ska se repor, läser dem som förut.
+ *
+ * GÄLLER BARA IDENTIFIERINGEN. Fas 2 bygger annonsen och bedömer skick ur bilderna; den får sina sex
+ * i full kvalitet som tidigare. Villkoret är `resolution`, som är det som skiljer faserna åt.
+ */
+const IDENT_IMAGE_COUNT = 3;
+const IDENT_MAX_SIDE = 1024;
+const IDENT_JPEG_QUALITY = 80;
+
+/**
+ * Tre bildrutor spridda över varvet, omslagsbilden först.
+ *
+ * Sprids med jämna mellanrum över listan i stället för att tas från början: två bildrutor från samma
+ * sekund är inte två vinklar, och det är vinklar identifieringen behöver.
+ */
+export function identifieringsBilder(images: CapturedImage[]): CapturedImage[] {
+  const omslag = images.find((i) => i.role === "cover");
+  const varv = images.filter((i) => i !== omslag);
+  const valda = sprid(varv, IDENT_IMAGE_COUNT - (omslag ? 1 : 0));
+  return omslag ? [omslag, ...valda] : valda;
+}
+
+/** `n` element med jämna mellanrum ur `list`, ordningen bevarad. Färre än `n` ger hela listan. */
+function sprid<T>(list: T[], n: number): T[] {
+  if (n <= 0) return [];
+  if (list.length <= n) return list;
+  if (n === 1) return [list[Math.floor(list.length / 2)]];
+  return Array.from({ length: n }, (_, i) => list[Math.round((i * (list.length - 1)) / (n - 1))]);
+}
 
 type Handler = (context: { request: Request; env: Record<string, string | undefined> }) => Promise<Response>;
 
@@ -156,11 +212,20 @@ export async function callSellerGenerate(
     return { kind: "unavailable", reason: `Annonsgeneratorn gick inte att ladda: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}` };
   }
 
+  // Utan `resolution` är det identifieringen som frågar — och den får den lätta nyttolasten.
+  const identifierar = !resolution;
+  const valda = identifierar ? identifieringsBilder(images) : images.slice(0, MAX_LISTING_IMAGES);
+
   let payloadImages: Array<{ mimeType: string; dataBase64: string }>;
   try {
     payloadImages = await Promise.all(
-      images.slice(0, MAX_LISTING_IMAGES).map(async (img) => {
-        const part = await loadImageAsBase64(path.join(jobDir, "originals", img.path));
+      valda.map(async (img) => {
+        const abs = path.join(jobDir, "originals", img.path);
+        // Faller nedskalningen — trasig fil, sharp som inte känner igen formatet — är originalet rätt
+        // svar. En långsammare sökning är oändligt mycket bättre än ingen sökning.
+        const part = identifierar
+          ? await loadImageAsBase64Scaled(abs, IDENT_MAX_SIDE, IDENT_JPEG_QUALITY).catch(() => loadImageAsBase64(abs))
+          : await loadImageAsBase64(abs);
         return { mimeType: part.mimeType, dataBase64: part.base64 };
       }),
     );

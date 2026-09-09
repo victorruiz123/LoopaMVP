@@ -19,10 +19,14 @@
  * KÖR SEKVENTIELLT, och det är inte försiktighet — det är aritmetik. BiRefNet tar en dryg minut per
  * bild på processor och håller ett par gigabyte medan den räknar. Tjugo parallella är tjugo gånger
  * minnet för att bli klara lika fort som en tråd med tjugo uppgifter, på en burk som delar minne med
- * prismotorn. Räkna med ungefär två minuter per jobb: urvalet över sex bildrutor plus bygget.
+ * prismotorn.
+ *
+ * RÄKNA MED FEM TILL SEX MINUTER PER JOBB, inte två: sedan galleriet kom bygger varje jobb upp till
+ * fem produktbilder och inte en. `PRODUKTBILD_GALLERI=1` ger det gamla beteendet — en bild per jobb —
+ * för den som bara vill se om en modelländring blev bättre och inte har en eftermiddag.
  *
  * TAKET (`--antal`) finns för att man ska kunna se hur resultatet ser ut på fem möbler innan man
- * lägger en timme på hela lagret.
+ * lägger en kväll på hela lagret.
  */
 
 process.loadEnvFile(new URL("../server/.env", import.meta.url));

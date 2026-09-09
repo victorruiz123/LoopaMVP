@@ -1,7 +1,7 @@
 import { listJobs } from "./jobStore.js";
 import { damageStands } from "./pipeline/grade.js";
 import { loopaIdFor, normalizeLoopaId } from "./loopaId.js";
-import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
+import { harGodkantOmslag, publikaGalleribilder } from "./pipeline/bild/omslag.js";
 import type {
   CapturedImage,
   ConditionJob,
@@ -91,7 +91,24 @@ export interface PublicCard {
    * hamna i otakt: står det `cutout` här är det ett urklipp som kommer, och står det `photo` är det
    * bildrutan.
    */
-  cover: { url: string; kind: "cutout" | "photo" } | null;
+  cover: { url: string; kind: "cutout" | "photo"; backdrop: string | null } | null;
+  /**
+   * Annonsens galleri: möbeln från flera håll, alla urklippta, omslaget först.
+   *
+   * ADRESSERNA RÄKNAS HÄR OCH INTE I VYN. Kortet vet vilka bilder som passerat kvalitetskontrollen
+   * (`publikaGalleribilder`) och porten frågar samma funktion; en vy som i stället gissade adresser
+   * ur ett antal hade bett om bilder porten vägrar lämna ut så fort en enda vinkel underkänts.
+   *
+   * TOM LISTA ÄR NORMALT och betyder "bara omslaget" — jobb byggda före galleriet, jobb där bara en
+   * bildruta dög, och jobb vars omslag inte är godkänt. Vyn ska då visa `cover` precis som förut,
+   * inte en bläddring med ett enda kort i.
+   *
+   * BARA URKLIPP. Till skillnad från `cover`, som faller tillbaka på säljarens orörda bildruta när
+   * urklippet uteblir, innehåller den här listan aldrig ett rumsfoto. Bildrutorna är filmade i
+   * någons hem, och det som gör dem publicerbara är just att rummet är bortklippt — fem foton ur ett
+   * vardagsrum är en helt annan sak att lägga ut än ett.
+   */
+  bilder: Array<{ url: string; kind: "cutout" }>;
   /** Annonsen på Tradera, när kortet är publicerat dit. Kortet finns även utan den. */
   tradera: { status: string; url: string | null } | null;
 }
@@ -244,8 +261,29 @@ export function publicCardFor(job: ConditionJob): PublicCard | null {
         ? {
             url: `/api/cards/${loopaIdFor(job.id)}/cover`,
             kind: harGodkantOmslag(cutoutOf(job)) ? "cutout" : "photo",
+            /**
+             * Vilken botten porten faktiskt kommer att lämna ut, räknad ur samma post som byggde
+             * filen. Null på omslag byggda före studion — de står mot vitt, och bildtexten på
+             * kortet ska då säga just det i stället för att lova ett rum som inte finns i bilden.
+             */
+            backdrop: harGodkantOmslag(cutoutOf(job)) ? (cutoutOf(job)?.backdrop ?? null) : null,
           }
         : null,
+    /**
+     * Galleriet, på Loopa-ID och i samma ordning som filerna byggdes.
+     *
+     * Första bilden är omslagets adress och inte `galleri/1.jpg`: den filen är omslagets VITA
+     * version, och den som bläddrar ska börja i studiobilden — samma bild butikens rutnät visade
+     * innan hen klickade. Att låta bläddringens första kort vara en annan bild än det man klickade
+     * på läser som att man hamnat fel.
+     */
+    bilder: publikaGalleribilder(cutoutOf(job)).map((b, i) => ({
+      url:
+        i === 0
+          ? `/api/cards/${loopaIdFor(job.id)}/cover`
+          : `/api/cards/${loopaIdFor(job.id)}/bild/${i + 1}`,
+      kind: "cutout" as const,
+    })),
     tradera: job.tradera ? { status: job.tradera.status, url: job.tradera.url } : null,
   };
 }

@@ -17,7 +17,7 @@ import { createRequire } from "node:module";
 import { dekontaminera, mjukTroskel, rensaOar, styrtFilter, BAND_HOG } from "../server/src/pipeline/bild/kant.js";
 import { komponera, ramFor, RUTA } from "../server/src/pipeline/bild/komposition.js";
 import { bedom } from "../server/src/pipeline/bild/kvalitet.js";
-import { harGodkantOmslag } from "../server/src/pipeline/bild/omslag.js";
+import { harGodkantOmslag, publikaGalleribilder } from "../server/src/pipeline/bild/omslag.js";
 
 const sharp = createRequire(new URL("../server/src/pipeline/bild/kant.ts", import.meta.url))(
   "sharp",
@@ -275,4 +275,83 @@ test("harGodkantOmslag släpper inte igenom omslag utan mätt betyg", () => {
     harGodkantOmslag({ sourceImageId: "a", label: null, provider: "birefnet-general", createdAt: "", qualityScore: 0.2, needsReview: true }),
     false,
   );
+});
+
+test("komponera lägger möbeln på studiobakgrunden utan att röra möbeln", async () => {
+  const rgb = bild();
+  const a = ramMask();
+  const ram = ramFor(a, B, H)!;
+
+  /**
+   * En botten som INTE går att förväxla med något kompositionen själv ritar: rent grön.
+   * Skuggan är varmt grå och möbeln röd, så varje grön pixel i utfallet kommer ur bakgrunden och
+   * varje röd ur säljarens bild. Det gör de två påståendena nedan mätbara var för sig.
+   */
+  const botten = Buffer.alloc(RUTA * RUTA * 3);
+  for (let i = 0; i < RUTA * RUTA; i++) botten[i * 3 + 1] = 200;
+
+  const vit = await komponera(rgb, a, B, H, ram);
+  const studio = await komponera(rgb, a, B, H, ram, botten);
+  assert.ok(studio, "ingen produktbild mot studiobakgrunden");
+
+  const { data } = await sharp(studio!).raw().toBuffer({ resolveWithObject: true });
+
+  // Hörnen bär bakgrunden, inte vitt: duken har faktiskt bytts ut.
+  for (const [x, y] of [[2, 2], [RUTA - 3, 2], [2, RUTA - 3], [RUTA - 3, RUTA - 3]]) {
+    const i = (y * RUTA + x) * 3;
+    assert.ok(data[i + 1] > 150 && data[i] < 100, `hörnet ${x},${y} bär inte bakgrunden: ${data[i]},${data[i + 1]},${data[i + 2]}`);
+  }
+
+  /**
+   * MÖBELN STÅR PÅ EXAKT SAMMA STÄLLE som mot vitt.
+   *
+   * Det är hela skälet studioversionen byggs ur samma urklipp i stället för i ett eget varv: den
+   * ska vara samma bild med en annan botten, inte en andra fotografering. Glider placeringen isär
+   * blir bläddringen mellan omslaget och galleriets vita version ett hopp.
+   */
+  const ramar = async (buf: Buffer) => {
+    const { data: d } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
+    let minX = RUTA, minY = RUTA, maxX = -1, maxY = -1;
+    for (let y = 0; y < RUTA; y++) {
+      for (let x = 0; x < RUTA; x++) {
+        const i = (y * RUTA + x) * 3;
+        if (d[i] > 120 && d[i + 1] < 110 && d[i + 2] < 110) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+        }
+      }
+    }
+    return { minX, minY, maxX, maxY };
+  };
+  assert.deepEqual(await ramar(studio!), await ramar(vit!), "möbeln står inte likadant på de två bottnarna");
+
+  // En bakgrund i fel storlek ska falla tillbaka på vitt, inte bli en sträckt fog.
+  const fel = await komponera(rgb, a, B, H, ram, Buffer.alloc(64 * 64 * 3));
+  const { data: felData } = await sharp(fel!).raw().toBuffer({ resolveWithObject: true });
+  assert.ok(felData[0] > 250 && felData[1] > 250 && felData[2] > 250, "fel stor bakgrund gav inte vitt");
+});
+
+test("publikaGalleribilder släpper bara igenom bilder med mätt betyg", () => {
+  const godkant = { sourceImageId: "a", label: null, provider: "birefnet-general", createdAt: "", qualityScore: 0.8, needsReview: false };
+  const bra = { fil: "galleri/1.jpg", sourceImageId: "a", qualityScore: 0.8, needsReview: false };
+  const flaggad = { fil: "galleri/2.jpg", sourceImageId: "b", qualityScore: 0.3, needsReview: true };
+
+  // En flaggad vinkel faller ur listan för sig — den stoppar inte de bilder som blev bra.
+  assert.deepEqual(publikaGalleribilder({ ...godkant, gallery: [bra, flaggad] }), [bra]);
+
+  // Omslaget styr hela galleriet: duger inte annonsens första bild visas ingen bläddring alls.
+  assert.deepEqual(publikaGalleribilder({ ...godkant, needsReview: true, gallery: [bra] }), []);
+
+  // Ett saknat betyg är frånvaron av en kontroll, inte ett tyst godkännande. Samma regel som
+  // harGodkantOmslag lärde sig den hårda vägen — se kommentaren där.
+  assert.deepEqual(
+    publikaGalleribilder({ ...godkant, gallery: [{ fil: "galleri/1.jpg", sourceImageId: "a" } as never] }),
+    [],
+  );
+
+  // Omslag byggda före galleriet bär inget fält, och ska ge en tom lista och inte ett undantag.
+  assert.deepEqual(publikaGalleribilder(godkant), []);
+  assert.deepEqual(publikaGalleribilder(null), []);
 });

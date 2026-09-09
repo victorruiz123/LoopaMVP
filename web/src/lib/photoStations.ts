@@ -93,3 +93,44 @@ export const PHOTO_STATIONS: PhotoStation[] = [
     at: { t: -1.3, r: ORBIT_R * 0.75, y: 72 },
   },
 ];
+
+/**
+ * OMSLAGSBILDEN: den enda bild säljaren blir ombedd att komponera, tagen efter varvet.
+ *
+ * VARFÖR DEN FINNS. Bildrutor ur ett varv är tagna med telefonen i brösthöjd, riktad snett NEDÅT mot
+ * möbeln — det är så man håller en telefon när man går. Mot rent vitt syns det inte. Mot annonsens
+ * studiobakgrund, som är fotograferad i ögonhöjd med en horisont, syns det direkt: möbeln är sedd
+ * uppifrån och rummet bakom den rakt framifrån, och två kamerahöjder i samma bild läser som falskt
+ * hur bra urklippet än är. Ingen bildruta ur varvet kan lösa det, för hela varvet lutar likadant.
+ *
+ * DÄRFÖR ÄR HÖJDEN INSTRUKTIONEN, inte vinkeln. De sex stationerna ovan säger var man ska STÅ; den
+ * här säger var telefonen ska HÅLLAS, och det är den uppgift som saknades. `y` ligger vid möbelns
+ * egen mitthöjd i stället för `PHONE_Y`, så markören i guiden sjunker synligt ner mot sitshöjd — det
+ * är skillnaden man ska härma.
+ *
+ * SNETT FRAMIFRÅN och inte rakt: en möbel rakt framifrån blir en rektangel utan djup. Ett drygt
+ * trettiondels varv åt sidan visar framsidan och ena kortsidan samtidigt, vilket är vinkeln varenda
+ * möbelkatalog använder — och den som får en soffa att se ut som en möbel i stället för som en fasad.
+ */
+export const OMSLAGSSTATION: PhotoStation = {
+  id: "cover",
+  label: "Omslagsbild",
+  title: "Ta annonsens omslagsbild",
+  instruction:
+    "Håll telefonen i höjd med möbelns mitt — inte i brösthöjd — och luta den inte nedåt. Ställ dig snett framför så att framsidan och ena kortsidan syns.",
+  required: false,
+  /**
+   * Snett framifrån, i möbelns egen höjd.
+   *
+   * NEGATIVT `t`, alltså åt andra hållet än varvet går. Scenen ritar soffan vriden med `YAW = -0.62`
+   * (guideScene.ts), och den här vinkeln är samma vridning från andra sidan: telefonen hamnar mitt i
+   * rutan framför den sida av möbeln som redan är vänd mot betraktaren. Spegelvinkeln `+0.62` är
+   * geometriskt lika god men projiceras ut i vänsterkanten, 30 px från ramen — markören klämmer sig
+   * då mot kanten i stället för att stå framför möbeln, vilket läser som en vinkel man inte kommer åt.
+   *
+   * `y: 46` ligger vid möbelns egen midja (soffan i scenen är 82 cm hög) mot brösthöjdens 112. Det är
+   * den skillnaden som är hela instruktionen, och den syns: skaftet ner till golvet blir 29 px i
+   * stället för 73.
+   */
+  at: { t: -0.62, y: 46 },
+};

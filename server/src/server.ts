@@ -28,11 +28,12 @@ import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
 import { blocketAdFor } from "./integrations/blocket.js";
-import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
+import { getTraderaLage, missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
 import { cutoutOf, jobByLoopaId, publicCardFor, publikaBildrutor } from "./publicCard.js";
+import { publikaGalleribilder } from "./pipeline/bild/omslag.js";
 import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
 import { flyttadAdress } from "./butik/seo.js";
@@ -46,8 +47,10 @@ import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
 import { startTraderaMailWatch } from "./integrations/tradera/mailwatch.js";
 import { bearerToken } from "./supabaseAuth.js";
-import { avtryck, KLIENTHANDELSER, spara } from "./analys/store.js";
+import { avtryck, KLIENTHANDELSER, spara, allStatistik, type AnnonsStatistik } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
+import { answerSaljQuestion, MAX_QUESTION_CHARS as MAX_SALJ_QUESTION_CHARS } from "./saljChat.js";
+import { giltigtKandidatbildsnamn, kandidatbilderDir } from "./kandidatbild.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -190,7 +193,7 @@ async function handleCreateJob(req: IncomingMessage, res: ServerResponse, identi
     dealId = deal.id;
   }
 
-  const out = await createConditionJob(body, identity.id, dealId);
+  const out = await createConditionJob(body, identity.id, dealId, false, false, identity.email);
   if ("error" in out) return sendJson(res, 400, out);
 
   // Affären får veta vilket jobb som är dess. Skanningen är igång; tillståndsbytet till `scanned`
@@ -322,6 +325,20 @@ async function traderaState(job: ConditionJob) {
     // Prisspannet följer med: bekräftelsesteget ska kunna säga vad annonsen gör EFTER publiceringen,
     // och den publicerade vyn var priset står i dag och när det sänks nästa gång.
     ladder: job.priceLadder ?? null,
+    /**
+     * Hur annonsen går HOS TRADERA: bud och om den gått ut.
+     *
+     * Hämtas bara för en publicerad annons, och bara när den här vyn öppnas — inte i någon lista.
+     * Det är ett anrop till någon annans server, och att lägga det i profilens lista hade betytt ett
+     * anrop per annons vid varje sidladdning.
+     *
+     * Visningar går INTE att få (se getTraderaLage). Säljaren ser Loopas visningar och Traderas bud,
+     * och det är två olika saker som inte ska ritas som om de vore samma siffra.
+     */
+    lage:
+      job.tradera?.status === "published" && typeof job.tradera.itemId === "number" && traderaConfigured()
+        ? await getTraderaLage(job.tradera.itemId)
+        : null,
   };
 }
 
@@ -510,6 +527,66 @@ async function handleCardChat(loopaId: string, req: IncomingMessage, res: Server
   }
 }
 
+/**
+ * Modellväljarens miniatyrer.
+ *
+ * REN FILUTLÄMNING. Adressen bär ett filnamn och ingenting annat — inte en källadress — så porten
+ * kan inte förmås att hämta något åt den som frågar. Filerna är redan hämtade och nedskalade när
+ * kandidaterna publicerades (se kandidatbild.ts); det här steget läser bara från disk.
+ *
+ * Utanför grinden, som bilderna den ersätter: väljarskärmen visas innan jobbet har en ägare, och en
+ * miniatyr av en butiksprodukt bär ingenting privat.
+ *
+ * ETT ÅR I CACHEN. Namnet är en sha1-summa av källadressen, så innehållet kan aldrig ändras under
+ * ett namn — den starkaste formen av oföränderlighet en cache kan få. Bilden hämtas därmed en gång
+ * per telefon och aldrig igen, vilket är hela poängen med att göra den till vår.
+ */
+async function handleKandidatbild(namn: string, res: ServerResponse) {
+  if (!giltigtKandidatbildsnamn(namn)) return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  const abs = path.join(kandidatbilderDir(), namn);
+  try {
+    await stat(abs);
+  } catch {
+    return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  }
+  res.writeHead(200, {
+    "Content-Type": "image/jpeg",
+    "Cache-Control": "public, max-age=31536000, immutable",
+  });
+  res.end(await readFile(abs));
+}
+
+/**
+ * Startsidans chatt: "Hur fungerar det?".
+ *
+ * Öppen och FÖRE grinden, med flit. Den som står på startsidan och undrar vad det kostar har per
+ * definition inget konto — att kräva inloggning för att få veta vad tjänsten går ut på vore att
+ * svara på frågan med en grind.
+ *
+ * Ingen möbel, inget jobb, inget kort. Boten ser bara den faktaruta som står i saljChat.ts, alltså
+ * samma sak som finns tryckt på sidan. Det gör vägen ointressant som läcka: det finns ingenting
+ * bakom den att komma åt.
+ */
+async function handleSaljChat(req: IncomingMessage, res: ServerResponse) {
+  const limited = chatRateLimit(chatClientKey(req));
+  if (limited) return sendJson(res, 429, { error: limited });
+
+  const body = await readJsonBody<{ question?: unknown; history?: unknown }>(req, CHAT_BODY_BYTES);
+  const question = typeof body.question === "string" ? body.question.trim() : "";
+  if (!question) return sendJson(res, 400, { error: "Skriv en fråga." });
+  if (question.length > MAX_SALJ_QUESTION_CHARS) {
+    return sendJson(res, 400, { error: `Frågan får vara högst ${MAX_SALJ_QUESTION_CHARS} tecken.` });
+  }
+
+  try {
+    const { answer } = await answerSaljQuestion(question, readChatHistory(body.history));
+    sendJson(res, 200, { answer });
+  } catch (err) {
+    console.error("[salj-chat]", err);
+    sendJson(res, 503, { error: "Chatten kunde inte nås just nu. Försök igen om en stund." });
+  }
+}
+
 // ---- public API: /v1/condition, authenticated with x-api-key ---------------
 
 async function handleApiCreate(req: IncomingMessage, res: ServerResponse) {
@@ -582,6 +659,39 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
   } catch {
     // Utan butikslager är varje jobb bara en sparad annons, som förut. Profilen ska inte falla på det.
   }
+  /**
+   * Statistiken och ordrarna slås upp EN gång för hela listan, inte per rad.
+   *
+   * Samma skäl som i adminpanelen: en profil med trettio annonser hade annars läst orderfilen
+   * trettio gånger och byggt om mätningens index lika ofta. Faller någon av dem är det inte ett fel
+   * som ska fälla profilen — säljaren får sin lista utan siffror i stället för ingen lista alls.
+   */
+  const statistikPerAnnons = await allStatistik().catch(() => new Map<string, AnnonsStatistik>());
+  const ordrarPerJobb = new Map<string, { status: string; reference: string; deliveryDate: string | null; deliveryWindow: string | null; senasteBesked: string | null }>();
+  try {
+    const { allOrders, publikHistorik } = await import("./butik/orders.js");
+    const { store: butikStore } = await import("./butik/store.js");
+    const jobbPerProdukt = new Map<string, string>();
+    for (const r of await butikStore().all()) if (r.jobId) jobbPerProdukt.set(r.id, r.jobId);
+    for (const order of await allOrders()) {
+      if (order.status === "pending" || order.status === "cancelled") continue;
+      const jobId = jobbPerProdukt.get(order.productId);
+      if (!jobId) continue;
+      const publika = publikHistorik(order);
+      ordrarPerJobb.set(jobId, {
+        status: order.status,
+        reference: order.reference,
+        deliveryDate: order.deliveryDate,
+        deliveryWindow: order.deliveryWindow,
+        // Säljaren ser SENASTE beskedet, inte hela historiken. De är inte part i leveransen — de
+        // ska veta att den rör sig, inte följa varje steg i den.
+        senasteBesked: publika.length ? publika[publika.length - 1].note : null,
+      });
+    }
+  } catch {
+    // Utan ordrar är en såld möbel bara såld, som förut.
+  }
+
   sendJson(
     res,
     200,
@@ -613,6 +723,16 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
         sale: j.tradera ? { status: j.tradera.status, url: j.tradera.url } : null,
         // Loopa Butiks eget läge. Null = möbeln har aldrig lagts in i butiken.
         shop: shopByJob.get(j.id) ?? null,
+        /**
+         * Hur annonsen går: visningar, klick och hur länge den legat ute.
+         *
+         * MÄTNINGEN FANNS REDAN (analys/store.ts) men bara adminpanelen läste den. Säljaren såg sin
+         * annons ligga ute i tre veckor utan att veta om noll eller trehundra personer tittat på
+         * den, och det är skillnaden mellan "sänk priset" och "ha tålamod".
+         */
+        statistik: statistikPerAnnons.get(loopaIdFor(j.id)) ?? null,
+        /** Köpet, när möbeln sålts i vår egen butik. Null för Tradera-affärer och osålda möbler. */
+        order: ordrarPerJobb.get(j.id) ?? null,
       };
     }),
   );
@@ -769,6 +889,43 @@ async function handleGetPublicCover(loopaId: string, res: ServerResponse) {
   const image = imageId ? findImage(job, imageId) : undefined;
   if (!image) return sendJson(res, 404, { error: "Annonsen har ingen bild." });
   await streamFile(path.join(jobDir(job.id), "originals", image.path), res);
+}
+
+/**
+ * En bild ur annonsens galleri, publikt och slagen på Loopa-ID.
+ *
+ * Numret är ETTBASERAT och pekar in i den lista kortet självt lade ut (`bilder` i publicCard.ts).
+ * Det är alltså inte ett filnamn utan en plats i en granskad lista, och det är hela spärren: den som
+ * gissar ett nummer kan bara nå bilder som redan står på det publika kortet.
+ *
+ * TRE SPÄRRAR, samma sort som bevisbilderna har:
+ *
+ *   1. Kortet måste finnas publikt.
+ *   2. Omslaget måste vara godkänt, och den enskilda bilden måste vara det — `publikaGalleribilder`
+ *      svarar på båda, och det är samma funktion kortet räknade sina adresser ur. De två kan därför
+ *      inte hamna i otakt.
+ *   3. Filnamnet kommer ur posten på disk, aldrig ur adressen. Ett nummer kan inte bli en sökväg.
+ *
+ * Bild 1 hamnar aldrig här: kortet lägger ut omslagets adress för den, som lämnar studioversionen.
+ * Att den ändå går att be om är rätt — samma möbel mot vitt är ett fullgott svar, inte ett läckage.
+ */
+async function handleGetPublicGalleryImage(loopaId: string, nummer: string, res: ServerResponse) {
+  const job = await jobByLoopaId(loopaId);
+  if (!job || !publicCardFor(job)) {
+    return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  }
+  const n = Number(nummer);
+  const bilder = publikaGalleribilder(cutoutOf(job));
+  if (!Number.isInteger(n) || n < 1 || n > bilder.length) {
+    return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  }
+  const fil = bilder[n - 1].fil;
+  // Bältet till hängslet ovan: en post på disk som av någon anledning bär en sökväg uppåt får inte
+  // bli en filväg. Listan är vår egen, men den är också det enda som står mellan adressen och disken.
+  if (fil.includes("..") || path.isAbsolute(fil)) {
+    return sendJson(res, 404, { error: "Vi hittade ingen sådan bild." });
+  }
+  await streamFile(path.join(jobDir(job.id), "cover", fil), res);
 }
 
 /**
@@ -985,6 +1142,73 @@ async function handleAddDamage(jobId: string, req: IncomingMessage, res: ServerR
   sendJson(res, 200, job.result);
 }
 
+interface ListingEditBody {
+  attributes?: Array<{ key?: string; label?: string; value?: string }>;
+  description?: string;
+  conditionText?: string;
+}
+
+/** Så långt ett fält får vara. Generöst — det ska stoppa en klistrad bok, inte en utförlig säljare. */
+const MAX_ATTR_LEN = 120;
+const MAX_TEXT_LEN = 4000;
+const MAX_ATTRS = 40;
+
+const kort = (v: unknown, max: number): string => (typeof v === "string" ? v.trim().slice(0, max) : "");
+
+/**
+ * Säljaren rättar annonsens uppgifter: måtten och beskrivningen.
+ *
+ * VARFÖR DEN BEHÖVER FINNAS. Allt på kortet är maskinellt framtaget — måtten ur en sidskörd eller
+ * uppskattade för möbeltypen, texten ur en generator. Det blir fel ibland, och den enda som VET är
+ * personen som står bredvid möbeln med ett måttband. Utan den här vägen är deras enda alternativ att
+ * publicera något de vet är osant, eller att låta bli att sälja.
+ *
+ * ETT RÄTTAT VÄRDE TAPPAR SIN KÄLLA. Stod det "Bredd 212 cm" med en länk till tillverkarens sida och
+ * säljaren skriver 208, är 208 inte längre belagt av den sidan — det är säljarens egen uppgift, och
+ * att låta länken stå kvar vore att låna trovärdighet från någon som säger något annat. Samma sak
+ * med "uppskattat": ett mått säljaren skrivit in är inte längre en gissning om möbeltypen. Båda
+ * märkningarna ersätts därför av `sellerEdited`, som kortet skriver ut som vad det är.
+ *
+ * INGEN OMPRISSÄTTNING. Måtten går in i prismotorn, så en rättning KAN betyda att möbeln är värd
+ * något annat — men priset är säljarens eget val (se prisstegen), och ett pris som ändrar sig för att
+ * någon rättade ett djupmått med fyra centimeter är en överraskning, inte en tjänst. Skicket och
+ * betyget rörs inte alls: de kommer ur bilderna, inte ur den här texten.
+ */
+async function handleListingEdit(jobId: string, req: IncomingMessage, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job?.result?.listing?.result) return sendJson(res, 404, { error: "Job or listing not found" });
+
+  const body = await readJsonBody<ListingEditBody>(req);
+  const listing = job.result.listing.result;
+
+  if (Array.isArray(body.attributes)) {
+    const tidigare = new Map(listing.attributes.map((a) => [a.key, a]));
+    listing.attributes = body.attributes
+      .slice(0, MAX_ATTRS)
+      .map((a) => {
+        const label = kort(a.label, MAX_ATTR_LEN);
+        const value = kort(a.value, MAX_ATTR_LEN);
+        if (!label || !value) return null;
+        const key = kort(a.key, MAX_ATTR_LEN) || label.toLowerCase().replace(/\s+/g, "_");
+        const fore = tidigare.get(key);
+        // Orörd rad behåller allt den hade — källan är fortfarande sann om värdet inte ändrats.
+        if (fore && fore.label === label && fore.value === value) return fore;
+        return { key, label, value, sourceUrl: null, estimated: false, sellerEdited: true };
+      })
+      .filter((a): a is NonNullable<typeof a> => a !== null);
+  }
+
+  if (typeof body.description === "string") {
+    listing.listing.description = kort(body.description, MAX_TEXT_LEN);
+  }
+  if (typeof body.conditionText === "string") {
+    listing.listing.conditionText = kort(body.conditionText, MAX_TEXT_LEN);
+  }
+
+  await persist(job);
+  sendJson(res, 200, job.result);
+}
+
 const server = http.createServer(async (req, res) => {
   setCors(req, res);
   if (req.method === "OPTIONS") {
@@ -1065,11 +1289,24 @@ const server = http.createServer(async (req, res) => {
       if (segments[1] === "analys" && segments.length === 2 && req.method === "POST") {
         return await handleAnalys(req, res);
       }
+      /**
+       * Startsidans chatt, utanför grinden. Se handleSaljChat för varför den får ligga där.
+       */
+      if (segments[1] === "salj" && segments.length === 3 && segments[2] === "chat" && req.method === "POST") {
+        return await handleSaljChat(req, res);
+      }
+      /** Modellväljarens miniatyrer, utanför grinden. Se handleKandidatbild. */
+      if (segments[1] === "kandidatbild" && segments.length === 3 && req.method === "GET") {
+        return await handleKandidatbild(segments[2], res);
+      }
       if (segments[1] === "cards" && segments.length === 4 && segments[3] === "chat" && req.method === "POST") {
         return await handleCardChat(segments[2], req, res);
       }
       if (segments[1] === "cards" && segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
         return await handleGetPublicCover(segments[2], res);
+      }
+      if (segments[1] === "cards" && segments.length === 5 && segments[3] === "bild" && req.method === "GET") {
+        return await handleGetPublicGalleryImage(segments[2], segments[4], res);
       }
       if (segments[1] === "cards" && segments.length === 5 && segments[3] === "skada" && req.method === "GET") {
         return await handleGetPublicDamageImage(segments[2], segments[4], res);
@@ -1212,6 +1449,37 @@ const server = http.createServer(async (req, res) => {
             return sendJson(res, 200, await andraAnnons(segments[3], patch, identity.id));
           } catch (err) {
             if (err instanceof AndringsFel) return sendJson(res, 400, { error: err.message });
+            throw err;
+          }
+        }
+        /**
+         * Orderpanelen: alla köp, med arbetslistan överst.
+         *
+         * EGEN FLIK OCH INTE EN KOLUMN i annonslistan. En annons och en order är två olika saker med
+         * två olika livslängder — möbeln finns i ett exemplar för alltid, köpet kan bli fler än ett
+         * om något går åter — och frågan "vad ska köras hem i veckan" ställs aldrig samtidigt som
+         * "vad har vi fått in".
+         */
+        if (segments[2] === "ordrar" && segments.length === 3 && req.method === "GET") {
+          const { listaOrdrar } = await import("./adminOrdrar.js");
+          return sendJson(res, 200, await listaOrdrar());
+        }
+        if (segments[2] === "ordrar" && segments.length === 4 && req.method === "GET") {
+          const { orderDetalj } = await import("./adminOrdrar.js");
+          const detalj = await orderDetalj(segments[3]);
+          if (!detalj) return sendJson(res, 404, { error: "Ordern finns inte." });
+          return sendJson(res, 200, detalj);
+        }
+        if (segments[2] === "ordrar" && segments.length === 4 && req.method === "PATCH") {
+          const { andraOrder, OrderFel } = await import("./adminOrdrar.js");
+          try {
+            const atgard = await readJsonBody<Parameters<typeof andraOrder>[1]>(req, 32 * 1024);
+            const detalj = await andraOrder(segments[3], atgard, identity.id);
+            if (!detalj) return sendJson(res, 404, { error: "Ordern finns inte." });
+            return sendJson(res, 200, detalj);
+          } catch (err) {
+            if (err instanceof OrderFel) return sendJson(res, 400, { error: err.message });
+            if (err instanceof Error && err.name === "CheckoutError") return sendJson(res, 409, { error: err.message });
             throw err;
           }
         }
@@ -1381,6 +1649,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (segments.length === 4 && segments[3] === "damages" && req.method === "POST") {
         return await handleAddDamage(segments[2], req, res);
+      }
+      // Säljarens rättelser av annonsens uppgifter — måtten och beskrivningen. Se handleListingEdit.
+      if (segments.length === 4 && segments[3] === "listing" && req.method === "POST") {
+        return await handleListingEdit(segments[2], req, res);
       }
       if (segments.length === 6 && segments[3] === "damages" && segments[5] === "dispute" && req.method === "POST") {
         return await handleDispute(segments[2], segments[4], req, res);
