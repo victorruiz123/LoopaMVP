@@ -40,6 +40,8 @@ export default function SellWithLoopa({
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /** Säljaren har stängt vänterutan. Publiceringen fortsätter — det är bara vyn som tystnar. */
+  const [avfardad, setAvfardad] = useState(false);
   const timer = useRef<number | null>(null);
 
   /** Pollar bara medan marknadsplatsens kö arbetar — annonsen går upp på 10-60 s. */
@@ -70,6 +72,8 @@ export default function SellWithLoopa({
   async function publish() {
     setSending(true);
     setFailure(null);
+    // Ett nytt försök ska synas, även om förra rutan stängdes.
+    setAvfardad(false);
     try {
       setState(await publishToTradera(jobId));
       setConfirming(false);
@@ -81,16 +85,15 @@ export default function SellWithLoopa({
     }
   }
 
-  // Ingen integration konfigurerad på servern: visa ingenting alls. En knapp som inte kan göra något
-  // är sämre än ingen knapp.
-  //
-  // NÅGON kanal räcker. Villkoret var förut Traderas ensamt, och då försvann hela rutan så fort
-  // Tradera saknade nycklar — även när Blocket kunde lägga ut annonsen. Knappen publicerar på alla
-  // kanaler som kan ta emot den, så det är den frågan som ska styra om den syns.
+  // Rutan syns ALLTID. Den har gömts två gånger av samma sorts villkor — först bakom Traderas
+  // nycklar, sedan bakom "någon kanal konfigurerad" — och båda gångerna blev följden att säljaren
+  // stod på en skärm utan väg vidare, utan att kunna veta varför. En osynlig knapp förklarar
+  // ingenting. Saknas nycklarna står det i klartext under knappen, och trycket får serverns eget
+  // svar om vad som fattas.
   if (!state) return null;
   const channels = state.channels ?? [];
   const anyConfigured = channels.length > 0 ? channels.some((c) => c.configured) : state.configured;
-  if (!anyConfigured) return null;
+  const saknadeNycklar = Array.from(new Set(channels.flatMap((c) => c.missingEnv ?? [])));
 
   const publication = state.publication;
   const plan = state.plan;
@@ -143,22 +146,27 @@ export default function SellWithLoopa({
   }
 
   if (publication?.status === "publishing" || blocketPub?.status === "publishing") {
-    const viaRobot = blocketPub?.status === "publishing";
-    // Blocket-roboten loggar varje steg. Under en körning som tar minuter är det senaste steget den
-    // enda skillnaden mellan "det går framåt" och "det har hängt sig".
-    const senasteSteg = viaRobot ? (blocketPub?.steps ?? []).at(-1)?.name ?? null : null;
+    // Publiceringen körs på SERVERN. Vyn är bara ett fönster mot den, så att stänga rutan avbryter
+    // ingenting — och säljaren ska inte behöva stå kvar och titta i flera minuter.
+    //
+    // Vad som medvetet INTE står här längre: att Blocket saknar API, att en robot fyller i deras
+    // formulär, och vilket steg roboten står på. Det var byggets insida, synlig för fel person —
+    // sist stod det "Startar TORRKÖRNING — sista knappen trycks inte" mitt i säljarens kvitto.
+    // Den som säljer sin fåtölj ska veta att det är gjort. Stegen finns kvar i jobbet och i
+    // serverloggen, där de hör hemma.
+    if (avfardad) return null;
     return (
       <section className="card-block sell-block">
-        <h3>{t("Lägger ut möbeln till salu…")}</h3>
+        <h3>{t("Tack för att du säljer med Loopa!")}</h3>
         <div className="sell-waiting">
           <div className="spinner spinner-small" />
           <p className="muted small">
-            {viaRobot
-              ? t("Blocket har inget API — annonsen fylls i av en robot i deras eget formulär. Det tar ett par minuter.")
-              : t("Annonsen köas och bilderna laddas upp. Det tar oftast under en minut.")}
+            {t("Vi lägger ut möbeln till salu nu. Det tar ett par minuter, men du behöver inte vänta här — det fortsätter i bakgrunden.")}
           </p>
         </div>
-        {senasteSteg && <p className="muted small">{senasteSteg}</p>}
+        <button className="btn btn-text sell-mine" onClick={() => setAvfardad(true)}>
+          {t("Stäng")}
+        </button>
       </section>
     );
   }
@@ -207,6 +215,14 @@ export default function SellWithLoopa({
                 {t("Blocket: torrkörningen är klar — annonsen fylldes i men publicerades inte.")}
                 {(blocketPub.steps ?? []).some((s) => s.status === "warning" || s.status === "error") &&
                   ` ${t("Några steg varnade — se serverloggen.")}`}
+              </p>
+            )}
+            {/* Ingen kanal påkopplad: knappen står kvar, men säg varför den inte kan lägga ut något.
+                Att tiga hade gjort trycket obegripligt — felet kommer ändå, men först efteråt. */}
+            {!anyConfigured && (
+              <p className="muted small">
+                {t("Ingen marknadsplats är påkopplad på servern än, så trycket kommer att svara med vad som saknas.")}
+                {saknadeNycklar.length > 0 && ` (${saknadeNycklar.join(", ")})`}
               </p>
             )}
             {/* Knappen öppnar granskningen, den lägger inte ut något. Ordet är detsamma som i rutans
