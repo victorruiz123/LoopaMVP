@@ -23,6 +23,12 @@ import type { CapturedImage, FurnitureIdentity } from "./types.js";
 
 export interface CreateJobBody {
   productContext?: string | null;
+  /**
+   * Säljarens muntliga beskrivning under filmningen, transkriberad (röstrundan, se VOICE-TOUR.md).
+   * Ledtråd om VAR inspektionen ska titta extra noga — aldrig ett bevis i sig. Valfri: utan den är
+   * inspektionsprompten byte-identisk med förut, så Gemini-cachen berörs inte.
+   */
+  sellerNotes?: string | null;
   /** Brand + model as the seller typed them. Optional: grading works without them, pricing does not. */
   brand?: string | null;
   model?: string | null;
@@ -83,7 +89,7 @@ export async function createConditionJob(
     return { error: "At least one image is required" };
   }
   const identity = readIdentity(body);
-  const job = await createJob(body.productContext ?? null, identity, ownerId);
+  const job = await createJob(body.productContext ?? null, identity, ownerId, body.sellerNotes ?? null);
   // Märkningen sätts före allt annat skrivande, så att inget mellanläge finns där jobbet är
   // besiktigat men ännu inte känt som privat.
   if (dealId || adDerived) {
@@ -138,7 +144,7 @@ export async function createConditionJob(
   // Två spår, parallellt. Besiktningen behöver inte modellen och identifieringen behöver inte
   // betyget — de delar bara bildrutorna. Kedjade hade de lagt sina tider ovanpå varandra.
   if (!skipGrading) {
-    void runConditionGrading(job.id, images, body.productContext ?? null, identity);
+    void runConditionGrading(job.id, images, body.productContext ?? null, identity, body.sellerNotes ?? null);
   } else {
     // Utan besiktning blir jobbet aldrig "done" av sig självt — inget spår sätter det. Identiteten
     // driver resten, och klienten läser den direkt (se analysisStatus).

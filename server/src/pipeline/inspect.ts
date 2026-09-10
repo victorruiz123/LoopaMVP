@@ -399,7 +399,7 @@ export interface InspectionResult {
   callMeta: CallMeta;
 }
 
-export async function inspectFurniture(images: CapturedImage[], jobDir: string, productContext: string | null): Promise<InspectionResult> {
+export async function inspectFurniture(images: CapturedImage[], jobDir: string, productContext: string | null, sellerNotes: string | null = null): Promise<InspectionResult> {
   const originalsDir = path.join(jobDir, "originals");
   // Parallellt: varje bild är en oberoende diskläsning plus en base64-kodning, och seriellt lades
   // deras tider ihop rakt av innan Gemini ens fick frågan.
@@ -409,7 +409,13 @@ export async function inspectFurniture(images: CapturedImage[], jobDir: string, 
 
   const imageList = images.map((img, i) => `Bild ${i}: ${img.source === "manual" ? "manuellt foto" : "video-vy"}${img.viewLabel ? ` (${img.viewLabel})` : ""}`).join(", ");
   const contextLine = productContext ? `\nKänd produktinfo (kan vara ofullständig): ${productContext}` : "";
-  const userPrompt = `Här är ${images.length} bilder av samma möbel: ${imageList}.${contextLine}\nInspektera systematiskt enligt instruktionerna och rapportera enligt schemat.`;
+  // Röstrundans transkript (VOICE-TOUR.md). Uppmärksamhetsstyrning, inte bevis: blocket säger uttryckligen
+  // att beviskravet står kvar, så en nämnd skada som inte syns i bild fortfarande inte får rapporteras.
+  // Utan sellerNotes är prompten byte-identisk med förut — cachenyckeln i gemini.ts berörs inte.
+  const notesBlock = sellerNotes
+    ? `\nSäljarens muntliga beskrivning under filmningen (transkriberad, kan innehålla felhörda ord): """${sellerNotes}"""\nAnvänd beskrivningen som ledtråd om VAR du ska titta extra noga — särskilt delar och skador den nämner, och närbilderna. Beviskravet gäller oförändrat: rapportera bara det du faktiskt ser i bilderna, och hitta aldrig på ett fynd för att beskrivningen nämner det.`
+    : "";
+  const userPrompt = `Här är ${images.length} bilder av samma möbel: ${imageList}.${contextLine}${notesBlock}\nInspektera systematiskt enligt instruktionerna och rapportera enligt schemat.`;
 
   const { data, tokensUsed, cached, modelUsed, latencyMs } = await callGeminiStructured<RawInspectionResponse>({
     purpose: "main_inspection",

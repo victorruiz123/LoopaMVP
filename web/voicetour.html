@@ -1,0 +1,27 @@
+<!doctype html><html lang="sv"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"><title>Röstrundan</title>
+<link rel="stylesheet" href="/src/styles.css"></head>
+<body style="background:#faf7f1;color:#14110d">
+<div id="root"><p style="font-family:sans-serif;padding:24px;margin:0">Laddar Röstrundan… <small>(står detta kvar dog skriptet — läs den röda rutan)</small></p></div>
+<script>
+// Felöverlagring för telefontestning: en krasch i modulkedjan ger annars bara en tom sida, och på
+// en iPhone finns ingen konsol att öppna. Skriver felet rakt på skärmen i stället.
+(function () {
+  function show(msg) {
+    var el = document.getElementById("vt-err");
+    if (!el) {
+      el = document.createElement("pre");
+      el.id = "vt-err";
+      el.style.cssText = "position:fixed;top:0;left:0;right:0;z-index:99999;background:#7f1d1d;color:#fff;padding:12px;font-size:12px;white-space:pre-wrap;margin:0;max-height:60vh;overflow:auto";
+      document.body.appendChild(el);
+    }
+    el.textContent += msg + "\n";
+  }
+  window.addEventListener("error", function (e) {
+    show("FEL: " + (e.message || e.type) + (e.filename ? "\n  " + e.filename + ":" + e.lineno : ""));
+  });
+  window.addEventListener("unhandledrejection", function (e) {
+    show("PROMISE-FEL: " + (e.reason && (e.reason.stack || e.reason.message) || e.reason));
+  });
+})();
+</script>
+<script type="module" src="/src/__dev/voice-tour.tsx"></script></body></html>

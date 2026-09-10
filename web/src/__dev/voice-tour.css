@@ -1,0 +1,293 @@
+/* Röstrundans egna stilar. Bygger HELT på tokens i styles.css — ingen egen palett, inga egna
+   radier, inga egna typsnittssteg. Sidan ska se ut som Loopa, inte som en testbänk som råkar ligga
+   i samma repo, och en avvikande färg här hade varit en avvikelse att underhålla.
+
+   Klassprefixet vt- finns för att filen laddas tillsammans med hela appens stilmall: en klass som
+   heter .panel eller .steps hade kolliderat med något förr eller senare. */
+
+/* ---------------------------------------------------------------- startsidan ---- */
+
+.vt-lede {
+  font-size: var(--fs-base);
+  color: var(--muted);
+  margin: 0 0 18px;
+}
+
+/* Stegen. En numrerad lista i stället för de tre styckena som stod här förut: instruktionen läses
+   EN gång, stående i en möbelaffär, och tre rader man kan överblicka slår ett stycke man ska hinna
+   igenom. Siffrorna bär ordningen, så texten slipper säga "sedan" och "därefter". */
+.vt-steps {
+  list-style: none;
+  margin: 0 0 20px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.vt-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.vt-step-n {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--accent-light);
+  color: var(--accent-ink);
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+.vt-step-body { min-width: 0; }
+.vt-step-title {
+  font-size: var(--fs-base);
+  font-weight: 600;
+  color: var(--ink);
+  letter-spacing: -0.01em;
+}
+.vt-step-sub {
+  font-size: var(--fs-sm);
+  color: var(--muted);
+  margin-top: 1px;
+}
+
+/* Fältet. Egen etikett i stället för en placeholder — en placeholder som ÄR etiketten försvinner
+   precis när man börjar skriva och behöver den som mest. */
+.vt-label {
+  display: block;
+  font-size: var(--fs-2xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted-soft);
+  margin-bottom: 6px;
+}
+.vt-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border-radius: var(--r);
+  border: 1px solid var(--border);
+  background: var(--field);
+  color: var(--ink);
+  /* Aldrig under 16px: iOS zoomar in hela sidan när ett mindre fält får fokus. */
+  font-size: var(--fs-field);
+  font-family: inherit;
+}
+.vt-input:focus-visible { outline: none; box-shadow: var(--focus); border-color: var(--accent); }
+
+/* Mikrofontestet. Låg som en SVART ruta mitt i det cremevita kortet — ett främmande föremål på
+   sidan, och dessutom svårläst. Nu en nedsänkt yta i sidans egen färgvärld, med tillståndet buret
+   av tonade bakgrunder i stället för av en svart låda. */
+.vt-mic {
+  border-radius: var(--r-lg);
+  padding: 14px;
+  margin-bottom: 16px;
+  background: var(--field);
+  border: 1px solid var(--hairline);
+  transition: background var(--t) var(--ease-ui), border-color var(--t) var(--ease-ui);
+}
+.vt-mic-ok { background: var(--green-light); border-color: hsl(140 30% 84%); }
+.vt-mic-warn { background: var(--amber-light); border-color: hsl(42 60% 82%); }
+.vt-mic-bad { background: var(--danger-light); border-color: hsl(8 60% 88%); }
+.vt-mic-text {
+  font-size: var(--fs-sm);
+  color: var(--ink-soft);
+  margin: 0 0 10px;
+  text-align: center;
+}
+.vt-mic-ok .vt-mic-text { color: var(--green-dark); font-weight: 600; }
+.vt-mic-warn .vt-mic-text { color: var(--amber-ink); }
+.vt-mic-bad .vt-mic-text { color: var(--danger-dark); }
+
+/* ---------------------------------------------------------------- nivåmätaren ---- */
+
+/* Staplarna som rör sig med rösten. Höjden sätts i en rAF-slinga direkt på elementen (se
+   LevelMeter) — därför bara utseendet här.
+
+   Färgen bär EN upplysning: grå när det är tyst, grön när det hörs tal. Ett tyst rum och en
+   talande säljare ska inte se likadana ut, och grönt är samma grönt som taltidslinjen och
+   skadekvittot använder — "det här räknas" har en färg i hela flödet. */
+.vt-meter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 34px;
+}
+.vt-meter-bar {
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--muted-soft);
+  transition: height 70ms linear, background var(--t) var(--ease-ui);
+}
+.vt-meter-live .vt-meter-bar { background: var(--green); }
+/* På kameran ligger mätaren på mörk botten och behöver ljusare vilofärg. */
+.vt-meter-dark .vt-meter-bar { background: var(--on-dark-faint); }
+.vt-meter-dark.vt-meter-live .vt-meter-bar { background: hsl(142 55% 55%); }
+
+/* Taltidslinjen: en ruta per sekund, ifylld där det hördes tal. */
+.vt-strip {
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+  align-items: center;
+  height: 10px;
+}
+.vt-strip-tick {
+  width: 3px;
+  height: 3px;
+  border-radius: 999px;
+  background: var(--on-dark-faint);
+  transition: height var(--t-fast) var(--ease-ui);
+}
+.vt-strip-spoke { height: 10px; background: hsl(142 55% 55%); }
+
+/* ---------------------------------------------------------------- filmningen ---- */
+
+/* Hörselpanelen. Frostat glas i stället för den grå plattan som låg här: bildrutan ska fortsätta
+   synas igenom, annars äter panelen upp den nedre tredjedelen av det säljaren filmar.
+   backdrop-filter saknas i äldre webbläsare — därför en mörk grundfärg som duger ensam. */
+.vt-hearing {
+  position: absolute;
+  left: var(--safe-left);
+  right: var(--safe-right);
+  bottom: calc(128px + env(safe-area-inset-bottom));
+  padding: 10px 14px;
+  border-radius: var(--r-xl);
+  background: hsl(var(--scrim) / 0.55);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #fff;
+}
+.vt-hearing-text {
+  font-size: var(--fs-xs);
+  text-align: center;
+  color: var(--on-dark-strong);
+}
+.vt-hearing-text b { color: #fff; font-weight: 700; }
+.vt-hearing-heard {
+  font-size: var(--fs-xs);
+  text-align: center;
+  color: var(--on-dark);
+  font-style: italic;
+  /* En lång mening får inte växa panelen och putta kontrollerna: en rad, resten klipps. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Guidningen. Ärver appens .capture-guidance och lägger bara på tillståndsfärgen — så att
+   röstrundans ruta och appens ruta är samma ruta, med samma placering och typografi. */
+.vt-guide-ok { background: hsl(142 48% 27% / 0.86); }
+.vt-guide-warn { background: hsl(28 66% 29% / 0.86); }
+.vt-guide-danger { background: hsl(4 62% 40% / 0.86); }
+/* Innehållet byts var åttonde sekund. Ett hårt byte läser som en glitch; en kort intoning läser
+   som att något nytt sagts. Nyckeln på elementet gör att React monterar om det vid varje byte. */
+.vt-guide-in { animation: vt-fade var(--t-slow) var(--ease-ui) both; }
+.vt-guide-say {
+  font-size: 0.85em;
+  opacity: 0.88;
+  margin-top: 4px;
+}
+
+/* Kvittot på förra möbeln, transkriberat medan nästa filmas. Glider in ovanifrån — den kommer
+   oväntat, och en ruta som bara materialiseras mitt i bilden läser som ett fel. */
+.vt-piece-toast {
+  position: absolute;
+  left: var(--safe-left);
+  right: var(--safe-right);
+  top: calc(96px + env(safe-area-inset-top));
+  padding: 10px 14px;
+  border-radius: var(--r-lg);
+  font-size: var(--fs-xs);
+  text-align: center;
+  color: #fff;
+  background: hsl(142 48% 27% / 0.9);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  animation: vt-drop var(--t-slow) var(--ease-sheet) both;
+}
+.vt-piece-toast-bad { background: hsl(4 62% 40% / 0.9); }
+
+.vt-hint {
+  color: var(--on-dark);
+  font-size: var(--fs-xs);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- resultatet ---- */
+
+.vt-result-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.vt-result-title { margin: 0; font-size: var(--fs-title); letter-spacing: -0.02em; }
+.vt-result-sub { font-size: var(--fs-sm); color: var(--muted); margin-top: 1px; }
+
+/* Miniatyrerna. Närbilderna bär en accentram — de är säljarens egna utpekanden och den enda
+   bilden på kortet som har en historia bakom sig. */
+.vt-thumbs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  margin-bottom: 10px;
+  scrollbar-width: none;
+}
+.vt-thumbs::-webkit-scrollbar { display: none; }
+.vt-thumb {
+  height: 72px;
+  border-radius: var(--r-sm);
+  flex: none;
+  object-fit: cover;
+}
+.vt-thumb-closeup { box-shadow: 0 0 0 2px var(--accent); }
+
+/* Citatet. Ett indraget citat och inte en vanlig rad: det är säljarens ord, inte appens. */
+.vt-quote {
+  border-left: 2px solid var(--border);
+  padding-left: 10px;
+  margin: 6px 0 12px;
+}
+.vt-quote-text { font-size: var(--fs-md); color: var(--ink-soft); margin: 0; }
+.vt-quote-meta { font-size: var(--fs-xs); color: var(--muted-soft); margin: 3px 0 0; }
+
+/* Avstämningen talat -> funnet. */
+.vt-check { display: flex; gap: 8px; font-size: var(--fs-md); margin: 5px 0; align-items: baseline; }
+.vt-check-mark { flex: none; font-size: var(--fs-sm); }
+.vt-check-found .vt-check-mark { color: var(--green); }
+.vt-check-missing .vt-check-mark { color: var(--amber); }
+.vt-check-body { color: var(--muted); min-width: 0; }
+.vt-check-said { color: var(--ink-soft); }
+
+.vt-status { display: flex; align-items: center; gap: 8px; font-size: var(--fs-md); color: var(--muted); }
+
+/* ---------------------------------------------------------------- rörelse ---- */
+
+@keyframes vt-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes vt-drop {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Samma respekt som resten av appen visar: den som bett om mindre rörelse ska inte få en ruta
+   som glider in var åttonde sekund. Informationen sitter i texten, inte i resan dit. */
+@media (prefers-reduced-motion: reduce) {
+  .vt-guide-in, .vt-piece-toast { animation: none; }
+  .vt-meter-bar, .vt-strip-tick { transition: none; }
+}

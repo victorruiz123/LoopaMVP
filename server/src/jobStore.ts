@@ -16,6 +16,7 @@ export async function createJob(
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
   ownerId: string | null = null,
+  sellerNotes: string | null = null,
 ): Promise<ConditionJob> {
   const id = randomUUID();
   const job: ConditionJob = {
@@ -26,6 +27,7 @@ export async function createJob(
     result: null,
     error: null,
     productContext,
+    sellerNotes,
     identity,
   };
   jobs.set(id, job);

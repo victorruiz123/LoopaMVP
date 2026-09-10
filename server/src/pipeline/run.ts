@@ -48,6 +48,7 @@ export async function runConditionGrading(
   images: CapturedImage[],
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
+  sellerNotes: string | null = null,
 ): Promise<void> {
   const dir = jobDir(jobId);
   const startedAt = Date.now();
@@ -64,7 +65,7 @@ export async function runConditionGrading(
     await updateProgress(jobId, { stage: "preparing", message: "Bilder förberedda." });
 
     await updateProgress(jobId, { stage: "inspecting", message: "Inspekterar möbeln…" });
-    const inspection = await inspectFurniture(images, dir, productContext);
+    const inspection = await inspectFurniture(images, dir, productContext, sellerNotes);
     track(inspection.callMeta);
     timer.lap("inspect");
 
