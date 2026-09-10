@@ -10,7 +10,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blocketAdFor } from "../server/src/integrations/blocket.js";
+import { blocketAdFor } from "../server/src/integrations/blocket/ad.js";
 import { traderaPriceWithShipping } from "../server/src/integrations/tradera/shipping.js";
 import { loopaIdFor } from "../server/src/loopaId.js";
 import type { ConditionJob, Damage, GeneratedListing } from "../server/src/types.js";

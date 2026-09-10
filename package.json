@@ -3,13 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Condition grading: ConditionInput -> ConditionResult. Frist\u00e5ende besiktningsmotor f\u00f6r begagnade m\u00f6bler.",
+  "description": "Condition grading: ConditionInput -> ConditionResult. Fristående besiktningsmotor för begagnade möbler.",
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "baseline": "tsx tests/baseline.ts",
     "regress": "tsx tests/baseline.ts --check",
     "fixture:add": "tsx tests/fixtureAdd.ts",
     "verify:impact": "tsx tests/verify-impact.ts",
+    "voice:impact": "tsx tests/voice-notes-impact.ts",
     "record": "tsx tests/record.ts",
     "server:dev": "npm --prefix server run dev",
     "server:check": "npm --prefix server run check",
@@ -19,7 +20,9 @@
     "web:build": "npm --prefix web run build",
     "install:all": "npm install && npm --prefix server install && npm --prefix web install",
     "tradera:lookup": "tsx server/src/integrations/tradera/reference-lookup.ts",
-    "candidate:path": "tsx tests/candidate-path.ts"
+    "candidate:path": "tsx tests/candidate-path.ts",
+    "blocket:prov": "tsx server/src/integrations/blocket/prov.ts",
+    "blocket:logga-in": "tsx server/src/integrations/blocket/logga-in.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

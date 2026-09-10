@@ -427,6 +427,66 @@ export interface TraderaPlan {
   durationDays: number | null;
 }
 
+/** Ett steg i Blocket-robotens körning. Visas bara när något gick fel eller varnade. */
+export interface BlocketStep {
+  name: string;
+  status: "ok" | "warning" | "error" | "running";
+  at: string;
+}
+
+/**
+ * Annonsen på Blocket.
+ *
+ * Två fält som Tradera-motsvarigheten inte har, och båda följer av att Blocket inte är ett API:
+ * `dryRun` (roboten fyllde i allt men tryckte aldrig på sista knappen) och `receiptUrl` (kvittosidan
+ * är inte annonsen, och ibland är den allt vi får). Det finns inget itemId: Blocket ger oss aldrig
+ * något id, bara en adress.
+ */
+export interface BlocketPublication {
+  status: "publishing" | "published" | "dry-run" | "error";
+  url: string | null;
+  receiptUrl: string | null;
+  dryRun: boolean;
+  error: string | null;
+  startedAt: string;
+  publishedAt: string | null;
+  steps: BlocketStep[];
+}
+
+export interface BlocketPlan {
+  title: string;
+  loopaId: string;
+  category: { main: string; sub: string | null; product: string | null };
+  /** MÖBELNS pris, utan hemleverans — på Blocket säljer säljaren själv och kör inte hem något. */
+  price: number;
+  priceSource: "seller" | "condition" | "listing";
+  condition: string | null;
+  imageCount: number;
+  dryRun: boolean;
+}
+
+export interface BlocketState {
+  configured: boolean;
+  missingEnv: string[];
+  /** Nycklarna finns men sessionsfilen gör det inte — lagas genom att logga in, inte i .env. */
+  sessionMissing: boolean;
+  dryRun: boolean;
+  publication: BlocketPublication | null;
+  plan: BlocketPlan | null;
+  blockedReason: string | null;
+}
+
+/** Vad ett tryck på knappen skulle göra, kanal för kanal. */
+export interface ChannelPlan {
+  channel: "tradera" | "blocket";
+  configured: boolean;
+  missingEnv: string[];
+  ready: boolean;
+  reason: string | null;
+  alreadyRunning: boolean;
+  dryRun: boolean;
+}
+
 /** Svaret från GET/POST /api/jobs/:id/tradera. */
 export interface TraderaState {
   configured: boolean;
@@ -436,6 +496,12 @@ export interface TraderaState {
   blockedReason: string | null;
   /** Säljarens prisspann, när det är satt. Driver både bekräftelsesteget och den publicerade vyn. */
   ladder: PriceLadder | null;
+  /**
+   * Blocket-kanalen. Valfri: ett svar från en äldre server saknar den, och knappen ska fungera ändå.
+   */
+  blocket?: BlocketState | null;
+  /** Alla kanaler och vad var och en skulle göra. Saknas i äldre svar. */
+  channels?: ChannelPlan[];
 }
 
 export interface ConditionJob {

@@ -4,7 +4,7 @@ import { CloseIcon } from "./icons";
 import { useT } from "../lib/i18n";
 import { formatSek } from "../lib/price";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
-import type { PriceLadder, TraderaPlan, TraderaState } from "../types";
+import type { BlocketPlan, ChannelPlan, PriceLadder, TraderaPlan, TraderaState } from "../types";
 
 /**
  * "Sälj med Loopa" — sista steget i annonsen.
@@ -50,7 +50,9 @@ export default function SellWithLoopa({
     try {
       const next = await getTraderaState(jobId);
       setState(next);
-      if (next.publication?.status === "publishing") {
+      // Båda kanalerna pollas. Blocket-roboten klickar i ett riktigt formulär och tar minuter, inte
+      // sekunder — slutar pollningen när Tradera är klar står vyn kvar och ser ut som att inget händer.
+      if (next.publication?.status === "publishing" || next.blocket?.publication?.status === "publishing") {
         timer.current = window.setTimeout(refresh, 2500);
       }
     } catch {
@@ -81,10 +83,19 @@ export default function SellWithLoopa({
 
   // Ingen integration konfigurerad på servern: visa ingenting alls. En knapp som inte kan göra något
   // är sämre än ingen knapp.
-  if (!state || !state.configured) return null;
+  //
+  // NÅGON kanal räcker. Villkoret var förut Traderas ensamt, och då försvann hela rutan så fort
+  // Tradera saknade nycklar — även när Blocket kunde lägga ut annonsen. Knappen publicerar på alla
+  // kanaler som kan ta emot den, så det är den frågan som ska styra om den syns.
+  if (!state) return null;
+  const channels = state.channels ?? [];
+  const anyConfigured = channels.length > 0 ? channels.some((c) => c.configured) : state.configured;
+  if (!anyConfigured) return null;
 
   const publication = state.publication;
   const plan = state.plan;
+  const blocket = state.blocket ?? null;
+  const blocketPub = blocket?.publication ?? null;
 
   if (publication?.status === "published" && publication.url) {
     return (
@@ -110,20 +121,50 @@ export default function SellWithLoopa({
     );
   }
 
-  if (publication?.status === "publishing") {
+  // Blocket-annonsen som gick upp, när Tradera inte gjorde det. Adressen är den publika — kvittosidan
+  // fungerar bara för den inloggade.
+  if (blocketPub?.status === "published" && blocketPub.url) {
+    return (
+      <section className="card-block sell-block sell-done">
+        <h3>{t("Möbeln är till salu")}</h3>
+        <p className="muted small">
+          {t("Annonsen ligger uppe på Blocket, på ditt eget konto. Priset är möbelns — utan hemleverans, som du själv sköter.")}
+        </p>
+        <a className="btn btn-primary sell-link" href={blocketPub.url} target="_blank" rel="noreferrer">
+          {t("Se annonsen")}
+        </a>
+        {onMyListings && (
+          <button className="btn btn-text sell-mine" onClick={onMyListings}>
+            {t("Till dina annonser")}
+          </button>
+        )}
+      </section>
+    );
+  }
+
+  if (publication?.status === "publishing" || blocketPub?.status === "publishing") {
+    const viaRobot = blocketPub?.status === "publishing";
+    // Blocket-roboten loggar varje steg. Under en körning som tar minuter är det senaste steget den
+    // enda skillnaden mellan "det går framåt" och "det har hängt sig".
+    const senasteSteg = viaRobot ? (blocketPub?.steps ?? []).at(-1)?.name ?? null : null;
     return (
       <section className="card-block sell-block">
         <h3>{t("Lägger ut möbeln till salu…")}</h3>
         <div className="sell-waiting">
           <div className="spinner spinner-small" />
-          <p className="muted small">{t("Annonsen köas och bilderna laddas upp. Det tar oftast under en minut.")}</p>
+          <p className="muted small">
+            {viaRobot
+              ? t("Blocket har inget API — annonsen fylls i av en robot i deras eget formulär. Det tar ett par minuter.")
+              : t("Annonsen köas och bilderna laddas upp. Det tar oftast under en minut.")}
+          </p>
         </div>
+        {senasteSteg && <p className="muted small">{senasteSteg}</p>}
       </section>
     );
   }
 
   const blocked = !plan ? (state.blockedReason ?? t("Möbeln går inte att lägga ut till salu än.")) : null;
-  const error = failure ?? publication?.error ?? null;
+  const error = failure ?? publication?.error ?? blocketPub?.error ?? null;
 
   return (
     <>
@@ -159,6 +200,15 @@ export default function SellWithLoopa({
                 )}
               </p>
             )}
+            {/* En avklarad torrkörning är varken framgång eller fel: annonsen fylldes i men lades
+                aldrig ut. Den ska synas, och knappen ska stå kvar så att den går att köra om. */}
+            {blocketPub?.status === "dry-run" && (
+              <p className="muted small">
+                {t("Blocket: torrkörningen är klar — annonsen fylldes i men publicerades inte.")}
+                {(blocketPub.steps ?? []).some((s) => s.status === "warning" || s.status === "error") &&
+                  ` ${t("Några steg varnade — se serverloggen.")}`}
+              </p>
+            )}
             {/* Knappen öppnar granskningen, den lägger inte ut något. Ordet är detsamma som i rutans
                 rubrik med flit: man trycker på erbjudandet och får se det i sin helhet. */}
             <button
@@ -168,7 +218,9 @@ export default function SellWithLoopa({
                 setConfirming(true);
               }}
             >
-              {publication?.status === "error" ? t("Försök igen") : t("Sälj med Loopa")}
+              {publication?.status === "error" || blocketPub?.status === "error" || blocketPub?.status === "dry-run"
+                ? t("Försök igen")
+                : t("Sälj med Loopa")}
             </button>
           </>
         )}
@@ -178,6 +230,8 @@ export default function SellWithLoopa({
         <SellConfirm
           plan={plan}
           ladder={state.ladder}
+          channels={channels}
+          blocketPlan={blocket?.plan ?? null}
           sending={sending}
           error={failure}
           onCancel={() => setConfirming(false)}
@@ -199,6 +253,8 @@ export default function SellWithLoopa({
 function SellConfirm({
   plan,
   ladder,
+  channels,
+  blocketPlan,
   sending,
   error,
   onCancel,
@@ -206,6 +262,10 @@ function SellConfirm({
 }: {
   plan: TraderaPlan;
   ladder: PriceLadder | null;
+  /** Alla kanaler och vad var och en skulle göra. Tom lista = en äldre server som bara kan Tradera. */
+  channels: ChannelPlan[];
+  /** Blockets egen plan, för priset — det är ett ANNAT tal än Traderas. */
+  blocketPlan: BlocketPlan | null;
   sending: boolean;
   error: string | null;
   onCancel: () => void;
@@ -214,6 +274,9 @@ function SellConfirm({
   const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   const drops = ladderDrops(ladder);
+  const körs = channels.filter((c) => c.configured && c.ready && !c.alreadyRunning);
+  // Går ingenting ut på riktigt ska rutan inte påstå att möbeln läggs ut till salu.
+  const baraTorrkörning = körs.length > 0 && körs.every((c) => c.dryRun);
 
   // Sidan bakom får inte rulla med medan rutan ligger över den.
   useEffect(() => {
@@ -261,7 +324,56 @@ function SellConfirm({
                 )}
           </p>
 
+          {baraTorrkörning && (
+            <p className="muted small">
+              {t(
+                "Just nu är enda kanalen en TORRKÖRNING: annonsen fylls i hos Blocket men sista knappen trycks aldrig, och ingenting blir publikt.",
+              )}
+            </p>
+          )}
+
           {error && <p className="sell-error">{t("Annonsen kunde inte läggas ut: {fel}", { fel: error })}</p>}
+
+          {/* Vilka kanaler som faktiskt körs, och till vilket pris var och en.
+              Utan den här raden hade rutan visat Traderas pris — möbeln plus 600 kr hemleverans — även
+              när den enda kanal som körs är Blocket, där säljaren säljer själv och inget levereras.
+              Två olika tal för samma möbel, och bara det ena stämde. */}
+          {channels.length > 0 && (
+            <section className="card-block">
+              <h3>{t("Läggs ut på")}</h3>
+              <dl className="card-specs sell-plan">
+                {channels.map((kanal) => (
+                  <div className="card-spec" key={kanal.channel}>
+                    <dt>{kanal.channel === "tradera" ? "Tradera" : "Blocket"}</dt>
+                    <dd>
+                      {!kanal.configured ? (
+                        <span className="muted small">
+                          {t("hoppas över — inte konfigurerad på servern ({saknas})", { saknas: kanal.missingEnv.join(", ") })}
+                        </span>
+                      ) : kanal.alreadyRunning ? (
+                        <span className="muted small">{t("ligger redan uppe, eller är på väg")}</span>
+                      ) : !kanal.ready ? (
+                        <span className="muted small">{kanal.reason}</span>
+                      ) : kanal.channel === "blocket" ? (
+                        <>
+                          {blocketPlan ? formatSek(blocketPlan.price) : ""}
+                          <span className="muted small">
+                            {blocketPlan ? ` — ${t("möbeln, utan hemleverans")}` : ""}
+                            {kanal.dryRun ? ` · ${t("torrkörning, inget publiceras")}` : ""}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          {formatSek(plan.price)}
+                          <span className="muted small">{` — ${t("möbeln + hemleverans")}`}</span>
+                        </>
+                      )}
+                    </dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
 
           <section className="card-block">
             <h3>{t("Det här läggs ut")}</h3>

@@ -15,10 +15,10 @@
  *    att leveransen ingår där; här finns ingen leverans att räkna in.
  */
 
-import { adImages, adTitle, composeAd, publicCardUrl, renderAdPlain, resolveAdPrice } from "../adContent.js";
-import { medRattelser } from "../butik/overrides.js";
-import { loopaIdFor } from "../loopaId.js";
-import type { ConditionJob } from "../types.js";
+import { adImages, adTitle, composeAd, publicCardUrl, renderAdPlain, resolveAdPrice } from "../../adContent.js";
+import { medRattelser } from "../../butik/overrides.js";
+import { loopaIdFor } from "../../loopaId.js";
+import type { ConditionJob } from "../../types.js";
 
 /** En bildruta säljaren ska ladda upp. Ordningen är annonsens — den första blir omslaget. */
 export interface BlocketAdImage {

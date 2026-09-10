@@ -27,8 +27,11 @@ import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
-import { blocketAdFor } from "./integrations/blocket.js";
+import { blocketAdFor } from "./integrations/blocket/ad.js";
 import { missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
+import { markBlocketPublishing, planBlocketPublish, runBlocketPublish } from "./integrations/blocket/publish.js";
+import { blocketConfigured, blocketLivePublishing, missingBlocketEnv, sessionFileExists } from "./integrations/blocket/blocket.js";
+import { markChannelsPublishing, planAutoPublish, runAutoPublish } from "./integrations/autoPublish.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
@@ -47,6 +50,7 @@ import { startButikSweeper } from "./butik/sweeper.js";
 import { bearerToken } from "./supabaseAuth.js";
 import { avtryck, KLIENTHANDELSER, spara } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
+import { handleTranscribeTour, type TranscribeBody } from "./voiceTour.js";
 import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
@@ -229,7 +233,7 @@ async function handleRetry(id: string, res: ServerResponse) {
   job.error = null;
   job.progress = { stage: "queued", message: "I kö…" };
   await persist(job);
-  void runConditionGrading(job.id, images, job.productContext ?? null, job.identity ?? null);
+  void runConditionGrading(job.id, images, job.productContext ?? null, job.identity ?? null, job.sellerNotes ?? null);
   sendJson(res, 202, { jobId: job.id, imageCount: images.length });
 }
 
@@ -324,40 +328,61 @@ async function traderaState(job: ConditionJob) {
   };
 }
 
+/**
+ * Läget för hela publiceringen, inte bara Traderas.
+ *
+ * Adressen heter `/tradera` för att det är den klienten redan pollar. Innehållet är numera båda
+ * kanalerna: Tradera-fälten ligger kvar på toppnivå så den befintliga vyn fungerar oförändrad, och
+ * Blocket plus `channels` ligger bredvid. Utan det här kunde gränssnittet inte veta att en annons går
+ * att lägga ut fastän Tradera saknar nycklar — och dolde då knappen helt.
+ */
 async function handleGetTradera(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  sendJson(res, 200, await traderaState(job));
+  const auto = await planAutoPublish(job);
+  sendJson(res, 200, { ...(await traderaState(job)), blocket: await blocketPublishState(job), channels: auto.channels });
 }
 
 /**
  * Startar publiceringen och svarar direkt.
  *
- * Tradera KÖAR annonsen — publiceringen tar 10–60 s och kan inte hållas i ett HTTP-svar. Jobbet
- * markeras som "publicerar" innan bakgrundsarbetet startar, så en andra tryckning inte kan lägga upp
- * samma möbel två gånger, och klienten pollar GET på samma väg.
+ * PUBLICERAR PÅ ALLA KANALER SOM KAN TA EMOT ANNONSEN, inte bara Tradera. Rutten heter fortfarande
+ * `/tradera` därför att det är den klienten redan trycker på, och att byta adress hade gjort en
+ * beteendeändring till en trasig knapp. Vad som faktiskt händer står i `channels` i svaret.
+ *
+ * Ingen kanal kan hållas i ett HTTP-svar: Tradera köar annonsen i 10–60 s, och Blocket-roboten tar
+ * minuter. Jobbet markeras som "publicerar" innan bakgrundsarbetet startar, så en andra tryckning
+ * inte kan lägga upp samma möbel två gånger, och klienten pollar GET på samma väg.
+ *
+ * Svaret behåller Tradera-fälten på toppnivå av samma skäl — den befintliga vyn läser dem — och
+ * lägger Blocket bredvid i stället för att bygga om formen.
  */
-async function handlePublishTradera(jobId: string, res: ServerResponse) {
+async function handlePublishAd(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
 
-  if (!traderaConfigured()) {
-    return sendJson(res, 503, {
-      error: `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`,
-      ...(await traderaState(job)),
-    });
-  }
-  if (job.tradera?.status === "publishing") return sendJson(res, 202, await traderaState(job));
-  if (job.tradera?.status === "published") {
-    return sendJson(res, 409, { error: "Annonsen är redan publicerad på Tradera.", ...(await traderaState(job)) });
+  const auto = await planAutoPublish(job);
+  const svar = async () => ({ ...(await traderaState(job)), blocket: await blocketPublishState(job), channels: auto.channels });
+
+  if (auto.willPublish.length === 0) {
+    // Ingen kanal kan ta emot annonsen. Skilj på "inget är påkopplat" (503, servern saknar
+    // konfiguration) och "annonsen duger inte" (409, jobbet saknar något) — de lagas på olika håll.
+    const running = auto.channels.filter((c) => c.alreadyRunning);
+    if (running.length === auto.channels.length) {
+      return sendJson(res, 409, { error: "Annonsen är redan publicerad, eller håller på att publiceras.", ...(await svar()) });
+    }
+    const unconfigured = auto.channels.filter((c) => !c.configured);
+    if (unconfigured.length === auto.channels.length) {
+      const saknas = unconfigured.map((c) => `${c.channel}: ${c.missingEnv.join(", ")}`).join(" — ");
+      return sendJson(res, 503, { error: `Ingen publiceringskanal är konfigurerad på servern. Saknar ${saknas}.`, ...(await svar()) });
+    }
+    const reason = auto.channels.find((c) => c.configured && !c.ready)?.reason ?? "Annonsen går inte att publicera.";
+    return sendJson(res, 409, { error: reason, ...(await svar()) });
   }
 
-  const readiness = await planTraderaPublish(job);
-  if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...(await traderaState(job)) });
-
-  await markTraderaPublishing(job);
-  void runTraderaPublish(job.id);
-  sendJson(res, 202, await traderaState(job));
+  await markChannelsPublishing(job, auto.willPublish);
+  void runAutoPublish(job.id, auto.willPublish);
+  sendJson(res, 202, await svar());
 }
 
 // ---- Blocket: annonsen färdig att föra över för hand ----------------------
@@ -374,6 +399,69 @@ async function handleGetBlocket(jobId: string, res: ServerResponse) {
   if (!job) return sendJson(res, 404, { error: "Job not found" });
   await resolveCoverImageId(job);
   sendJson(res, 200, await blocketAdFor(job));
+}
+
+// ---- Blocket: lägger upp annonsen med en robot i Blockets eget formulär ----
+
+/**
+ * Allt klienten behöver för att rita knappen, speglat mot `traderaState`.
+ *
+ * Två fält som Tradera-motsvarigheten inte har, och båda finns för att Blocket inte är ett API:
+ * `sessionMissing` (nycklarna räcker inte — någon måste ha loggat in för hand) och `dryRun` (knappen
+ * fyller i allt men publicerar inte, tills BLOCKET_PUBLICERA=1 är satt på servern).
+ */
+async function blocketPublishState(job: ConditionJob) {
+  const readiness = await planBlocketPublish(job);
+  return {
+    configured: blocketConfigured(),
+    missingEnv: missingBlocketEnv(),
+    sessionMissing: blocketConfigured() && !sessionFileExists(),
+    dryRun: !blocketLivePublishing(),
+    publication: job.blocket ?? null,
+    plan: readiness.ok ? readiness.plan : null,
+    blockedReason: readiness.ok ? null : readiness.reason,
+  };
+}
+
+async function handleGetBlocketPublish(jobId: string, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  sendJson(res, 200, await blocketPublishState(job));
+}
+
+/**
+ * Publicerar BARA på Blocket.
+ *
+ * Vid sidan av den gemensamma knappen, inte i stället för den: den här vägen finns för att kunna göra
+ * om en Blocket-körning som gick fel utan att röra en Tradera-annons som redan ligger uppe.
+ */
+async function handlePublishBlocket(jobId: string, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+
+  if (!blocketConfigured()) {
+    return sendJson(res, 503, {
+      error: `Blocket är inte konfigurerat på servern. Saknar ${missingBlocketEnv().join(", ")}.`,
+      ...(await blocketPublishState(job)),
+    });
+  }
+  if (!sessionFileExists()) {
+    return sendJson(res, 503, {
+      error: "Sessionsfilen som BLOCKET_SESSION pekar på finns inte. Logga in på Blocket för hand och exportera om den.",
+      ...(await blocketPublishState(job)),
+    });
+  }
+  if (job.blocket?.status === "publishing") return sendJson(res, 202, await blocketPublishState(job));
+  if (job.blocket?.status === "published") {
+    return sendJson(res, 409, { error: "Annonsen ligger redan uppe på Blocket.", ...(await blocketPublishState(job)) });
+  }
+
+  const readiness = await planBlocketPublish(job);
+  if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...(await blocketPublishState(job)) });
+
+  await markBlocketPublishing(job);
+  void runBlocketPublish(job.id);
+  sendJson(res, 202, await blocketPublishState(job));
 }
 
 // ---- Publik annons: /api/cards/:loopaId, utan inloggning --------------
@@ -1289,6 +1377,13 @@ const server = http.createServer(async (req, res) => {
         return await handlePreliminaryPrice(req, res);
       }
 
+      // Röstrundan (VOICE-TOUR.md): hela rundans ljud in, transkript med segment-tidsstämplar ut.
+      // Bakom samma inloggningsgrind som allt annat — anropet kostar riktiga Aqua-pengar.
+      if (segments[1] === "voice-tour" && segments.length === 3 && segments[2] === "transcribe" && req.method === "POST") {
+        const body = await readJsonBody<TranscribeBody>(req);
+        return await handleTranscribeTour(body, res);
+      }
+
       if (segments[1] === "jobs") {
       if (segments.length === 2 && req.method === "POST") return await handleCreateJob(req, res, identity);
       if (segments.length === 2 && req.method === "GET") return await handleListJobs(res, identity);
@@ -1309,11 +1404,19 @@ const server = http.createServer(async (req, res) => {
         return await handleSetPricePlan(segments[2], req, res);
       }
       if (segments.length === 4 && segments[3] === "tradera") {
-        if (req.method === "POST") return await handlePublishTradera(segments[2], res);
+        // POST publicerar på ALLA kanaler som kan ta emot annonsen, inte bara Tradera. Adressen är
+        // kvar för att klienten redan trycker på den; se handlePublishAd.
+        if (req.method === "POST") return await handlePublishAd(segments[2], res);
         if (req.method === "GET") return await handleGetTradera(segments[2], res);
       }
       if (segments.length === 4 && segments[3] === "blocket" && req.method === "GET") {
         return await handleGetBlocket(segments[2], res);
+      }
+      // /blocket är upptagen av den MANUELLA annonsen ovan — den som klistras in för hand. Roboten
+      // ligger ett steg ner, så att båda kan finnas samtidigt.
+      if (segments.length === 5 && segments[3] === "blocket" && segments[4] === "publicering") {
+        if (req.method === "POST") return await handlePublishBlocket(segments[2], res);
+        if (req.method === "GET") return await handleGetBlocketPublish(segments[2], res);
       }
       if (segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
         return await handleGetCover(segments[2], res);

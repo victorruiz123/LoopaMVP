@@ -514,6 +514,43 @@ export interface TraderaPublication {
   publishedAt: string | null;
 }
 
+/**
+ * Ett steg i Blocket-körningen. Sparas på jobbet därför att en publicering som gick fel bara går att
+ * förstå i efterhand: robotens väg genom formuläret är inte synlig någonstans annars.
+ *
+ * Skärmbilder ligger INTE här. De hör hemma på disk — ett jobb-JSON med sex base64-bilder i blir
+ * megabyte stort och läses vid varje statusfråga.
+ */
+export interface BlocketStep {
+  name: string;
+  status: "ok" | "warning" | "error" | "running";
+  at: string;
+  details?: Record<string, unknown>;
+}
+
+/**
+ * Annonsen på Blocket.
+ *
+ * Skild från `TraderaPublication` på tre punkter, och alla tre följer av att det inte finns något
+ * API: `dryRun` (körningen kan ha stannat före sista knappen med flit), `receiptUrl` (kvittosidan är
+ * inte annonsen, och ibland är den allt vi får) och `steps` (utan dem går ett tyst felval inte att
+ * spåra). Det finns inget `itemId`: Blocket ger oss aldrig något id, bara en adress.
+ */
+export interface BlocketPublication {
+  status: "publishing" | "published" | "dry-run" | "error";
+  /** Den publika adressen till annonsen. Null i torrkörning och vid fel. */
+  url: string | null;
+  /** Kvittosidan körningen landade på. Bevismaterial när `url` inte gick att härleda. */
+  receiptUrl: string | null;
+  /** Sant när körningen fyllde i allt men aldrig tryckte på sista knappen. Ingen annons finns då. */
+  dryRun: boolean;
+  error: string | null;
+  startedAt: string;
+  publishedAt: string | null;
+  /** Körningens steg, senast först kapade till de sista 60. */
+  steps: BlocketStep[];
+}
+
 export interface ConditionJob {
   id: string;
   createdAt: string;
@@ -529,6 +566,12 @@ export interface ConditionJob {
   error: string | null;
   /** optional free-text product context (name/category) the caller may supply; grading must work without it */
   productContext: string | null;
+  /**
+   * Säljarens muntliga beskrivning under filmningen, transkriberad (röstrundan, VOICE-TOUR.md).
+   * Ledtråd till inspektionen om var den ska titta — aldrig ett bevis. Sparas på jobbet så att ett
+   * omtag spelar upp den tillsammans med bildrutorna. Valfri; äldre jobb saknar fältet.
+   */
+  sellerNotes?: string | null;
   /** what the seller typed on the start screen — carried so a re-price after a correction has it */
   identity: FurnitureIdentity | null;
   /**
@@ -582,6 +625,16 @@ export interface ConditionJob {
   listing?: ListingResult | null;
   /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
   tradera?: TraderaPublication | null;
+  /**
+   * Annonsen på Blocket, när säljaren valt att publicera den dit.
+   *
+   * Vid sidan av `tradera` och inte i stället för den: samma möbel kan ligga på båda, och kanalerna
+   * bär olika pris av ett skäl som står i integrations/blocket/ad.ts — på Tradera säljer Loopa med
+   * hemleveransen inräknad, på Blocket säljer säljaren själv utan leverans. Fältet är också det som
+   * fryser prisstegen: en stege som sänker Tradera-priset medan Blocket-annonsen står still låter
+   * samma möbel glida isär till två priser av sig själv (se priceLadder.ts `ladderIsRunning`).
+   */
+  blocket?: BlocketPublication | null;
   /**
    * Säljarens prisspann och den veckovisa sänkningen genom det. Saknas fältet är priset fast: ett
    * jobb från före stegen ska inte börja sjunka av sig självt.

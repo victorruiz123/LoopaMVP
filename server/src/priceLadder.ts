@@ -185,7 +185,25 @@ export async function armPriceLadder(
 export function ladderIsRunning(job: ConditionJob): boolean {
   const ladder = job.priceLadder;
   if (!ladder || !ladder.nextDropAt || ladder.floorReachedAt) return false;
+  if (ladderFrozenByBlocket(job)) return false;
   return job.tradera?.status === "published" && typeof job.tradera.itemId === "number";
+}
+
+/**
+ * Stegen står stilla medan samma möbel ligger uppe på Blocket.
+ *
+ * Sänkningen går bara att göra på ETT ställe: Tradera har ett API för det, Blocket har ingenting —
+ * annonsen där är klickad dit av en robot och kan inte redigeras i efterhand. Fick stegen fortsätta
+ * ändå skulle Tradera-priset falla 15 % i veckan medan Blocket-annonsen stod kvar på ursprungspriset,
+ * och efter fem veckor låg samma möbel ute till två priser med halva mellanskillnaden emellan — utan
+ * att någon bestämt det.
+ *
+ * Frysning och inte avstängning: `nextDropAt` rörs inte, så stegen fortsätter där den stod den dag
+ * Blocket-annonsen tas ner. Regeln är avsiktligt en enda rad och lätt att ta bort igen, den dag det
+ * finns en väg att sänka priset på Blocket också.
+ */
+export function ladderFrozenByBlocket(job: ConditionJob): boolean {
+  return job.blocket?.status === "published";
 }
 
 async function applyDrop(job: ConditionJob, now: number): Promise<boolean> {
