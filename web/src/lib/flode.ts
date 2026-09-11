@@ -10,10 +10,18 @@
  * tillbaka en vecka senare och filmar en till möbel är ett nytt flöde, inte en fortsättning på det
  * gamla. sessionStorage tömmer sig själv när fliken stängs, vilket är precis den livslängden.
  *
- * INGEN IDENTITET, någonsin. Id:t är slumpat, betyder ingenting utanför besöket och kopplas aldrig
- * till ett konto. Frågornas TEXT lämnar aldrig webbläsaren — bara vilken sorts fråga det var. Det är
- * skillnaden mellan att veta att folk undrar över priset och att föra ett arkiv över vad enskilda
- * personer skrivit.
+ * SÄLJAREN KNYTS PÅ NÄR DEN FINNS. Här stod tidigare "ingen identitet, någonsin", och flödet var
+ * därför oläsbart på den enda fråga som spelar roll för intaget: vem av VÅRA säljare fastnade var.
+ * Ett slumpat sessions-id svarar på hur tratten ser ut i stort, men aldrig på om det är samma person
+ * som påbörjat fyra annonser och släppt alla fyra på modellvalet. Kontots id skickas med så fort
+ * inloggningen finns (`knytTillSaljare`), och stegen FÖRE den knyts på i efterhand genom sessionen.
+ *
+ * Id:t är kontots, inte ett spår vid sidan av det: det står redan på varje annons säljaren lagt upp.
+ * Anonymt är fortfarande normalläget — den som bara tittar på startsidan har inget konto att bära.
+ *
+ * FRÅGORNAS TEXT går numera också in, men INTE härifrån: "Hur fungerar det?"-samtalen sparas på
+ * servern där de ändå passerar (server/src/data/samtal.ts). Den här filen bär fortfarande bara
+ * kategorin, så att en fråga som ställdes i ett steg går att räkna utan att texten dubbellagras.
  */
 
 const NYCKEL = "loopa.flode.sess";
@@ -61,9 +69,32 @@ export function knytTillJobb(jobId: string | null): void {
   skicka("steg", { steg: aktivt ?? undefined, ms: 0 });
 }
 
+/**
+ * Säljaren, när inloggningen finns.
+ *
+ * Sätts av App.tsx så fort ett konto är känt och följer sedan med varje rad. Stegen som hann ske
+ * INNAN inloggningen bär den inte — märkesvalet och filmningen sker före grinden — men de hör till
+ * samma `sess`, och servern knyter dem till kontot på sessionen precis som den gör med jobbet.
+ *
+ * Raden som skickas här är därför inte överflödig: utan den hade ett flöde som loggade in och sedan
+ * stängde fliken saknat sitt konto helt.
+ */
+let saljaren: string | null = null;
+
+export function knytTillSaljare(uid: string | null): void {
+  if (!uid || saljaren === uid) return;
+  saljaren = uid;
+  skicka("saljare", { steg: aktivt ?? undefined });
+}
+
+/** Flödessessionen. Chattarna märker sina samtal med den, så att ett samtal går att läsa i sitt steg. */
+export function sessionId(): string {
+  return sess();
+}
+
 function skicka(event: string, props: Record<string, unknown>): void {
   try {
-    const kropp = JSON.stringify({ sess: sess(), jobId: jobbet, event, props });
+    const kropp = JSON.stringify({ sess: sess(), jobId: jobbet, uid: saljaren, event, props });
     if (navigator.sendBeacon) {
       navigator.sendBeacon("/api/data/flode", new Blob([kropp], { type: "application/json" }));
     } else {

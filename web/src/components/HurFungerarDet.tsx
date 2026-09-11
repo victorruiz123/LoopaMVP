@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { askSalj } from "../api";
-import { chipTryckt, guideFraga } from "../lib/flode";
+import { chipTryckt, guideFraga, sessionId } from "../lib/flode";
+import { useAuth } from "../auth/AuthProvider";
 import { ArrowUpIcon, CloseIcon } from "./icons";
 import { useT } from "../lib/i18n";
 
@@ -72,8 +73,28 @@ const FORSLAG = ["Vad kostar det?", "Hur får jag betalt?", "Träffar jag köpar
  */
 const MORK_YTA = "#1e1d1b";
 
+/**
+ * Samtalets id.
+ *
+ * ETT ÖPPNAT ARK = ETT SAMTAL. Servern sparar varje fråga och svar (server/src/data/samtal.ts), och
+ * utan en nyckel hade de blivit lösryckta rader i en fil: en uppföljningsfråga är obegriplig utan
+ * frågan före den. Id:t slumpas när arket öppnas och betyder ingenting utanför samtalet — det är
+ * inte en identitet, det är en tråd.
+ *
+ * ETT PER MONTERING och inte ett per öppning: repliker ligger kvar när arket stängs och skickas med
+ * som historik nästa gång. Ett nytt id vid varje öppning hade delat en fortsättning i två trådar,
+ * där den andra börjar mitt i ett resonemang som inte står någonstans.
+ */
+function samtalsId(): string {
+  const bytes = new Uint8Array(12);
+  crypto.getRandomValues(bytes);
+  return [...bytes].map((b) => b.toString(16).padStart(2, "0")).join("");
+}
+
 export default function HurFungerarDet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const t = useT();
+  const { user } = useAuth();
+  const samtal = useRef(samtalsId());
   const [meddelanden, setMeddelanden] = useState<Meddelande[]>([]);
   const [fraga, setFraga] = useState("");
   const [vantar, setVantar] = useState(false);
@@ -183,12 +204,17 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
     // Frågan syns direkt. Ett svar tar ett par sekunder, och en ruta som töms utan att visa vad man
     // skrev läser som att trycket inte gick fram.
     const historik = meddelanden.filter((m) => !m.failed).map((m) => ({ role: m.role, content: m.content }));
-    // Mätningen får veta VILKEN SORTS fråga det var och i vilket steg — aldrig vad som skrevs.
-    // Se web/src/lib/flode.ts.
+    // Mätningen får veta VILKEN SORTS fråga det var och i vilket steg. Texten skrivs ned på servern,
+    // där den ändå passerar för att kunna besvaras — se server/src/data/samtal.ts.
     guideFraga("start", q);
     setMeddelanden((m) => [...m, { role: "user", content: q }]);
     try {
-      const svar = await askSalj(q, historik);
+      const svar = await askSalj(q, historik, {
+        samtal: samtal.current,
+        sess: sessionId(),
+        uid: user?.id ?? null,
+        steg: "home",
+      });
       setMeddelanden((m) => [...m, { role: "assistant", content: svar.answer }]);
     } catch {
       /**

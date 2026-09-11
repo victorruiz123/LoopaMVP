@@ -89,6 +89,56 @@ test("tratten: nådde-hit och avhopp räknas på sessioner, inte på rader", asy
   assert.equal(capture?.stannade, 1);
 });
 
+test("säljaren: kontot knyts till hela sessionen, även raderna som skrevs före inloggningen", async () => {
+  flode.nollstall();
+  const sess = "cccccccccccccccc";
+  // Märkesvalet och filmningen sker före grinden: de raderna bär inget konto.
+  await flode.spara(sess, null, "steg", { steg: "home", ms: 3_000 });
+  await flode.spara(sess, null, "steg", { steg: "capture", ms: 40_000 });
+  await flode.spara(sess, null, "saljare", { steg: "signup" }, "konto-abc123");
+  await flode.spara(sess, "job-9", "steg", { steg: "identify", ms: 7_000 }, "konto-abc123");
+
+  const s = await flode.flodeForJobb("job-9");
+  assert.ok(s);
+  assert.equal(s.uid, "konto-abc123", "kontot ska gälla hela flödet, inte bara raderna efter inloggningen");
+  assert.equal(s.besokta[0], "home");
+});
+
+test("säljaren: ett uid som inte har kontoformen kastas i stället för att bli en fri textrad", async () => {
+  flode.nollstall();
+  await flode.spara("dddddddddddddddd", null, "steg", { steg: "home", ms: 1 }, "a@b.se");
+  const rad = JSON.parse((await readFile(path.join(dir, "flode.jsonl"), "utf-8")).trim().split("\n").pop() as string);
+  assert.equal(rad.uid, null, "en e-postadress är inte ett konto-id och får aldrig nå filen");
+});
+
+test("avhoppen: en påbörjad annons skiljs från ett besök, och intygade flöden står inte med", async () => {
+  flode.nollstall();
+  // Ett besök: bara startsidan.
+  await flode.spara("eeeeeeeeeeeeeeee", null, "steg", { steg: "home", ms: 4_000 });
+  // En påbörjad annons som släpptes på modellvalet.
+  await flode.spara("ffffffffffffffff", null, "steg", { steg: "home", ms: 2_000 }, "konto-ffffffff");
+  await flode.spara("ffffffffffffffff", null, "steg", { steg: "capture", ms: 51_000 }, "konto-ffffffff");
+  await flode.spara("ffffffffffffffff", null, "steg", { steg: "identify", ms: 22_000 }, "konto-ffffffff");
+  await flode.spara("ffffffffffffffff", null, "avhopp", { steg: "identify" }, "konto-ffffffff");
+  // Ett flöde som gick hela vägen. Ska inte finnas bland avhoppen.
+  await flode.spara("gggggggggggggggg", null, "steg", { steg: "home", ms: 1_000 });
+  await flode.spara("gggggggggggggggg", null, "intygat", { steg: "listing" });
+
+  const mina = (await flode.allaSessioner()).filter((s) => /^[efg]/.test(s.sess));
+  const avhopp = flode.avhoppen(mina);
+  assert.equal(avhopp.length, 2, "det intygade flödet är inget avhopp");
+
+  const slapptes = avhopp.find((a) => a.sess.startsWith("ffff"));
+  assert.ok(slapptes);
+  assert.equal(slapptes.paborjad, true);
+  assert.equal(slapptes.sistaSteg, "identify", "steget de stod i när de tryckte bort");
+  assert.equal(slapptes.sistaStegMs, 22_000);
+  assert.equal(slapptes.uid, "konto-ffffffff");
+
+  const besok = avhopp.find((a) => a.sess.startsWith("eeee"));
+  assert.equal(besok?.paborjad, false, "den som bara öppnade startsidan har inte avbrutit någonting");
+});
+
 test("rättelserna: ett oförändrat fält blir ingen rad, ett ändrat blir en", async () => {
   rattelser.nollstall();
   await rattelser.noteraFalt(

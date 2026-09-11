@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { fragaData, listData } from "../api";
+import { fragaData, listData, listSamtal, listUsers } from "../api";
 import { CardIcon, SendIcon, SparkIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { useT } from "../lib/i18n";
-import type { DataFalt, DataFynd, DataObjekt, DataSvar } from "../types";
+import type { DataFalt, DataFynd, DataObjekt, DataSaljare, DataSvar, Samtal } from "../types";
 
 /**
  * Datafliken: allt vi vet om varje möbel, med AI:ns ord skilda från människans.
@@ -31,6 +31,14 @@ export default function AdminDataScreen() {
   const [query, setQuery] = useState("");
   const [baraRattade, setBaraRattade] = useState(false);
   const [visaLuckor, setVisaLuckor] = useState(false);
+  /**
+   * Namnen bakom konto-id:na.
+   *
+   * Mätningen bär bara id:t — den ska inte vara ett personregister, se server/src/data/flode.ts —
+   * och en panel full av 36 tecken slumpmässig hexadecimal är oläsbar för en människa. Namnet hämtas
+   * därför där det redan finns, ur kontolistan, och bara för den admin som ändå får se den.
+   */
+  const [namn, setNamn] = useState<Map<string, string>>(new Map());
 
   const ladda = useCallback(() => {
     listData()
@@ -39,6 +47,18 @@ export default function AdminDataScreen() {
   }, []);
 
   useEffect(ladda, [ladda]);
+
+  useEffect(() => {
+    // Faller tyst: datafliken ska gå att läsa även om kontotjänsten inte svarar. Då står id:t kvar.
+    listUsers()
+      .then((svar) => setNamn(new Map(svar.users.map((u) => [u.id, u.name || u.email || u.id]))))
+      .catch(() => undefined);
+  }, []);
+
+  const namnFor = useCallback(
+    (uid: string | null) => (uid ? (namn.get(uid) ?? `${uid.slice(0, 8)}…`) : null),
+    [namn],
+  );
 
   const rader = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -110,6 +130,12 @@ export default function AdminDataScreen() {
           </section>
 
           <Tratten data={data} />
+
+          <Saljarna saljare={data.saljare} namnFor={namnFor} />
+
+          <Avhoppen data={data} namnFor={namnFor} />
+
+          <Samtalen namnFor={namnFor} />
 
           <div className="admin-verktyg">
             <input
@@ -248,6 +274,246 @@ function Tratten({ data }: { data: DataSvar }) {
           antal: data.avhoppUtanJobb,
         })}
       </p>
+    </section>
+  );
+}
+
+/**
+ * Säljarna, en rad var.
+ *
+ * TRATTEN OVANFÖR OCH DEN HÄR LISTAN SVARAR PÅ OLIKA FRÅGOR. Tratten säger att en tredjedel
+ * försvinner på modellvalet — ett tal om en genomsnittssäljare som inte finns. Listan säger att det
+ * är fyra personer, att tre av dem gjorde om försöket samma kväll och att en av dem har fem
+ * påbörjade annonser och noll publicerade. Det första är en statistik. Det andra går att ringa upp.
+ *
+ * VANLIGASTE VÄGGEN är kolumnen fliken finns för: samma säljare som fastnar på samma steg tre gånger
+ * är inte en slump, och det syns inte i något medelvärde.
+ *
+ * "PÅSTÅTT" står utskrivet när inget av kontots flöden gick att styrka mot ett jobb. Flödesraderna
+ * bär ett konto som webbläsaren påstått (se server/src/data/flode.ts), och en rad som ser ut som ett
+ * faktum men är ett påstående är värre än ingen rad alls.
+ */
+function Saljarna({
+  saljare,
+  namnFor,
+}: {
+  saljare: DataSaljare[];
+  namnFor: (uid: string | null) => string | null;
+}) {
+  const t = useT();
+  const [alla, setAlla] = useState(false);
+  if (!saljare.length) {
+    return (
+      <section className="data-tratt">
+        <h3 className="data-rubrik">{t("Säljarna")}</h3>
+        <p className="admin-note">
+          {t("Ingen säljare är mätt än. Raden skapas när någon loggar in och börjar lägga upp en möbel.")}
+        </p>
+      </section>
+    );
+  }
+  const visade = alla ? saljare : saljare.slice(0, 12);
+  return (
+    <section className="data-tratt">
+      <h3 className="data-rubrik">{t("Säljarna")}</h3>
+      <div className="data-tabell-rull">
+        <table className="data-tabell">
+          <thead>
+            <tr>
+              <th>{t("Säljare")}</th>
+              <th>{t("Påbörjade")}</th>
+              <th>{t("Intygade")}</th>
+              <th>{t("Avbrutna")}</th>
+              <th>{t("Vanligaste väggen")}</th>
+              <th>{t("Annonser")}</th>
+              <th>{t("Sålda")}</th>
+              <th>{t("Samtal")}</th>
+              <th>{t("Senast")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {visade.map((s) => {
+              const vagg = Object.entries(s.perSistaSteg).sort((a, b) => b[1] - a[1])[0];
+              return (
+                <tr key={s.uid}>
+                  <td>
+                    {namnFor(s.uid)}
+                    {s.floden > 0 && s.styrkta === 0 && (
+                      <span className="admin-tag data-tag-svag" title={t("Kontot är påstått av webbläsaren, inte styrkt mot en annons.")}>
+                        {t("påstått")}
+                      </span>
+                    )}
+                  </td>
+                  <td>{s.paborjade}</td>
+                  <td>{s.intygade}</td>
+                  <td className={s.avbrutna > 0 ? "data-tal-avhopp" : undefined}>{s.avbrutna}</td>
+                  <td>{vagg ? `${stegNamn(vagg[0])} (${vagg[1]})` : "—"}</td>
+                  <td>{s.annonser}</td>
+                  <td>{s.salda}</td>
+                  <td>{s.samtal}</td>
+                  <td>{s.senaste ? new Date(s.senaste).toLocaleDateString("sv-SE", { day: "numeric", month: "short" }) : "—"}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {saljare.length > 12 && (
+        <button className="btn btn-text btn-small" onClick={() => setAlla((v) => !v)}>
+          {alla ? t("Visa färre") : t("Visa alla {antal}", { antal: saljare.length })}
+        </button>
+      )}
+    </section>
+  );
+}
+
+/**
+ * De avbrutna annonserna, en rad var — vem, när, och i vilket steg de tryckte bort.
+ *
+ * DET HÄR ÄR DEN ENDA VYN I PRODUKTEN som visar något som inte blev av. Allt annat — annonslistan,
+ * ordrarna, butiken — förutsätter att det finns en möbel att visa, och en säljare som släppte taget
+ * på filmningen lämnade ingen. Utan listan är de osynliga, och det som är osynligt går inte att
+ * åtgärda.
+ *
+ * BESÖKEN LIGGER UNDER EN KNAPP. Den som öppnade startsidan och stängde den igen har inte avbrutit
+ * någonting, och att blanda in dem hade gjort listan till en besöksstatistik där de fyra raderna som
+ * betyder något drunknar.
+ */
+function Avhoppen({ data, namnFor }: { data: DataSvar; namnFor: (uid: string | null) => string | null }) {
+  const t = useT();
+  const [medBesok, setMedBesok] = useState(false);
+  const [alla, setAlla] = useState(false);
+  const rader = useMemo(
+    () => data.avhopp.filter((a) => medBesok || a.paborjad),
+    [data.avhopp, medBesok],
+  );
+  const visade = alla ? rader : rader.slice(0, 25);
+  const paborjade = data.avhopp.filter((a) => a.paborjad).length;
+
+  return (
+    <section className="data-tratt">
+      <h3 className="data-rubrik">{t("Avbrutna annonser")}</h3>
+      <p className="admin-note">
+        {t("{antal} påbörjade annonser tog slut utan ett intygat kort. Steget är det de stod i när de försvann.", {
+          antal: paborjade,
+        })}
+      </p>
+      {!rader.length ? (
+        <p className="admin-note">{t("Inget avhopp är mätt än.")}</p>
+      ) : (
+        <ul className="data-avhopp">
+          {visade.map((a) => (
+            <li key={`${a.sess}-${a.slut}`} className={a.paborjad ? "data-avhopp-rad" : "data-avhopp-rad data-avhopp-besok"}>
+              <span className="admin-tag data-avhopp-steg">{a.sistaSteg ? stegNamn(a.sistaSteg) : t("okänt steg")}</span>
+              <span className="data-avhopp-vem">{namnFor(a.uid) ?? t("utloggad")}</span>
+              <span className="data-avhopp-om">
+                {new Date(a.slut).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}
+                {" · "}
+                {t("{tid} i steget", { tid: a.sistaStegMs !== null ? kortTid(a.sistaStegMs) : "—" })}
+                {" · "}
+                {t("{tid} totalt", { tid: kortTid(a.totaltMs) })}
+                {a.enhet ? ` · ${a.enhet}` : ""}
+                {a.antalFragor > 0 ? ` · ${t("{antal} frågor", { antal: a.antalFragor })}` : ""}
+                {a.jobId ? ` · ${t("hann bli ett jobb")}` : ""}
+              </span>
+              {/* Vägen dit står under: samma sista steg kan nås på två vägar, och den ena är en omväg. */}
+              <span className="data-avhopp-vag">{a.besokta.map(stegNamn).join(" → ")}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="admin-verktyg">
+        <label className="admin-sok">
+          <input type="checkbox" checked={medBesok} onChange={(e) => setMedBesok(e.target.checked)} />{" "}
+          {t("Visa även besök som aldrig påbörjade en annons")}
+        </label>
+        {rader.length > 25 && (
+          <button className="btn btn-text btn-small" onClick={() => setAlla((v) => !v)}>
+            {alla ? t("Visa färre") : t("Visa alla {antal}", { antal: rader.length })}
+          </button>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/**
+ * Samtalen i "Hur fungerar det?", ord för ord.
+ *
+ * VARFÖR DE STÅR I KLARTEXT och inte som kategorier. "Process" säger att någon undrade över hur det
+ * går till. Meningen säger att hen undrade om hon måste vara hemma när vi hämtar — vilket är en
+ * invändning med ett svar, och svaret hör hemma på startsidan och inte i en chatt. Det är också den
+ * enda vägen att se när boten svarat fel: den står först i säljflödet och läses annars av ingen.
+ *
+ * HÄMTAS FÖR SIG. Samtalen har sällan en möbel och hör inte hemma i datasetets tyngsta anrop; de
+ * laddas när fliken öppnas och står hopfällda tills någon vill läsa ett.
+ */
+function Samtalen({ namnFor }: { namnFor: (uid: string | null) => string | null }) {
+  const t = useT();
+  const [samtal, setSamtal] = useState<Samtal[] | null>(null);
+  const [fel, setFel] = useState<string | null>(null);
+  const [alla, setAlla] = useState(false);
+
+  useEffect(() => {
+    listSamtal()
+      .then((svar) => setSamtal(svar.samtal))
+      .catch((err: unknown) => setFel(err instanceof Error ? err.message : "Kunde inte hämta samtalen."));
+  }, []);
+
+  if (fel) return <p className="public-card-error">{fel}</p>;
+  if (!samtal) return <p className="admin-note">{t("Hämtar samtalen…")}</p>;
+
+  const visade = alla ? samtal : samtal.slice(0, 15);
+  const turer = samtal.reduce((n, s) => n + s.turer.length, 0);
+
+  return (
+    <section className="data-tratt">
+      <h3 className="data-rubrik">{t("Samtalen i \"Hur fungerar det?\"")}</h3>
+      {!samtal.length ? (
+        <p className="admin-note">
+          {t("Inget samtal är sparat än. De fylls på från nästa fråga någon ställer på startsidan.")}
+        </p>
+      ) : (
+        <>
+          <p className="admin-note">
+            {t("{samtal} samtal, {turer} frågor.", { samtal: samtal.length, turer })}
+          </p>
+          <ul className="data-samtal">
+            {visade.map((s) => (
+              <li key={s.id}>
+                <details>
+                  <summary>
+                    <span className="data-samtal-vem">{namnFor(s.uid) ?? t("utloggad")}</span>
+                    <span className="data-samtal-om">
+                      {new Date(s.start).toLocaleDateString("sv-SE", { day: "numeric", month: "short" })}
+                      {" · "}
+                      {t("{antal} frågor", { antal: s.turer.length })}
+                      {s.turer.some((tu) => tu.fel) ? ` · ${t("boten föll")}` : ""}
+                    </span>
+                    {/* Första frågan står i sammanfattningen: det är den som säger vad samtalet handlade om. */}
+                    <span className="data-samtal-forsta">{s.turer[0]?.fraga}</span>
+                  </summary>
+                  <div className="data-samtal-turer">
+                    {s.turer.map((tu, i) => (
+                      <div key={i} className="data-samtal-tur">
+                        <p className="data-samtal-fraga">{tu.fraga}</p>
+                        <p className={tu.fel ? "data-samtal-svar data-samtal-fel" : "data-samtal-svar"}>
+                          {tu.fel ? t("Boten kunde inte svara.") : tu.svar}
+                        </p>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </li>
+            ))}
+          </ul>
+          {samtal.length > 15 && (
+            <button className="btn btn-text btn-small" onClick={() => setAlla((v) => !v)}>
+              {alla ? t("Visa färre") : t("Visa alla {antal}", { antal: samtal.length })}
+            </button>
+          )}
+        </>
+      )}
     </section>
   );
 }

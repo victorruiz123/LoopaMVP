@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -253,11 +253,19 @@ export async function fetchPublicCard(loopaId: string): Promise<PublicCard> {
 export async function askSalj(
   question: string,
   history: Array<{ role: "user" | "assistant"; content: string }>,
+  /**
+   * Vad samtalet hör ihop med.
+   *
+   * Servern skriver ned frågan och svaret (server/src/data/samtal.ts). `samtal` håller ihop turerna
+   * till en tråd, `sess` lägger tråden bredvid flödesstegen den fördes i, och `uid` finns bara för
+   * den som redan loggat in — de flesta som frågar har inte det, och ska inte behöva det.
+   */
+  spar: { samtal: string; sess: string | null; uid: string | null; steg: string | null } | null = null,
 ): Promise<{ answer: string }> {
   const res = await fetch("/api/salj/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question, history }),
+    body: JSON.stringify({ question, history, ...(spar ?? {}) }),
   });
   return json(res);
 }
@@ -541,6 +549,16 @@ export async function addDamage(
  */
 export async function listData(): Promise<DataSvar> {
   return json(await authFetch("/api/admin/data"));
+}
+
+/**
+ * Samtalen i "Hur fungerar det?".
+ *
+ * Egen väg och inte ett fält i `listData`: de flesta samtal har ingen möbel, och panelens tyngsta
+ * anrop ska inte växa med varje fråga någon ställer. Se server/src/data/samtal.ts.
+ */
+export async function listSamtal(): Promise<{ samtal: Samtal[] }> {
+  return json(await authFetch("/api/admin/data/samtal"));
 }
 
 export async function getDataObjekt(id: string): Promise<DataObjekt> {

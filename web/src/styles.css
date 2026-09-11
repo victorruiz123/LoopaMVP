@@ -3360,6 +3360,64 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .data-tratt-avhopp { color: #96271C; font-style: normal; }
 .data-tratt-tid { color: var(--muted-soft); }
 
+/* ---- säljarna, avhoppen och samtalen ----
+   Tre listor under tratten, alla med samma uppgift: göra ett medelvärde till enskilda rader. Se
+   AdminDataScreen för varför de finns. */
+
+/* Tabellen får rulla för sig själv. Nio kolumner ryms inte på en telefon, och en panel som rullar
+   i sidled i sin helhet är oläsbar — resten av fliken ska stå still. */
+.data-tabell-rull { overflow-x: auto; margin-top: 4px; }
+.data-tabell { width: 100%; border-collapse: collapse; font-size: var(--fs-xs); }
+.data-tabell th {
+  text-align: left; padding: 6px 10px 6px 0; white-space: nowrap;
+  font-weight: 700; color: var(--muted); border-bottom: 1px solid var(--hairline);
+}
+.data-tabell td {
+  padding: 7px 10px 7px 0; white-space: nowrap;
+  border-bottom: 1px solid var(--hairline); color: var(--ink-soft);
+  font-variant-numeric: tabular-nums;
+}
+.data-tabell td:first-child { color: var(--ink); font-weight: 600; }
+.data-tal-avhopp { color: #96271C; }
+/* Etiketten för ett påstått konto: samma form som andra märken, men dämpad — den säger "läs det här
+   med en nypa salt", inte "här hände något". */
+.data-tag-svag { background: var(--field); color: var(--muted); }
+
+.data-avhopp { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.data-avhopp-rad {
+  display: grid; grid-template-columns: auto 1fr; gap: 2px 8px; align-items: baseline;
+  padding: 9px 11px; border-radius: var(--r-sm); background: var(--field); font-size: var(--fs-xs);
+}
+/* Steget först och i accentfärgen: det är kolumnen man läser listan för. */
+.data-avhopp-steg { margin-left: 0; grid-row: span 2; align-self: center; }
+.data-avhopp-vem { color: var(--ink); font-weight: 600; }
+.data-avhopp-om { grid-column: 2; color: var(--muted); }
+.data-avhopp-vag { grid-column: 2; color: var(--muted-soft); font-size: var(--fs-2xs); }
+/* Ett besök som aldrig blev en annons ligger med, men dämpat: det är bakgrund, inte ett fall. */
+.data-avhopp-besok { opacity: 0.62; }
+
+.data-samtal { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.data-samtal > li { border-radius: var(--r-sm); background: var(--field); }
+.data-samtal summary {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px;
+  padding: 9px 11px; cursor: pointer; font-size: var(--fs-xs);
+}
+.data-samtal summary::-webkit-details-marker { display: none; }
+.data-samtal-vem { color: var(--ink); font-weight: 600; }
+.data-samtal-om { color: var(--muted); }
+/* Första frågan tar hela raden under: den säger vad samtalet handlade om, och en avhuggen mening
+   mitt i en rad av metadata går inte att läsa. */
+.data-samtal-forsta { flex-basis: 100%; color: var(--muted-soft); }
+.data-samtal-turer { padding: 0 11px 11px; display: flex; flex-direction: column; gap: 10px; }
+/* Frågan i en bubbla, svaret som löpande text — samma form som chatten själv har, så att den som
+   läser ser samtalet ungefär som säljaren såg det. */
+.data-samtal-fraga {
+  margin: 0; padding: 7px 10px; border-radius: var(--r-sm);
+  background: var(--surface); color: var(--ink); font-size: var(--fs-xs); line-height: 1.45;
+}
+.data-samtal-svar { margin: 6px 0 0; color: var(--muted); font-size: var(--fs-xs); line-height: 1.5; }
+.data-samtal-fel { color: #96271C; }
+
 .data-steg-tider { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .data-steg-chip {
   padding: 4px 9px; border-radius: 999px; background: var(--field);
@@ -3952,15 +4010,23 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 [data-view="desktop"] .public-card-submit,
 [data-view="desktop"] .public-card-error { max-width: 520px; }
 
-/* ---- bekräftelsen: en centrerad dialog, inte en helskärmsruta ----
-   På telefonen ÄR skärmen rutan. På en dator vore samma sak ett fönsterbyte; här räcker
-   det att allt annat sjunker undan bakom blädden. */
-[data-view="desktop"] .sell-modal-root { align-items: center; padding: 32px; }
+/* ---- bekräftelsen: hela skärmen, också på en dator ----
+   Den låg förut som ett centrerat fönster över blädden, och genom blädden syntes knappen man
+   nyss tryckte på — erbjudandet konkurrerade med sin egen knapp. Rutan tar hela ytan i stället,
+   men texten stannar i samma smala spalt: bakgrunden går ut i kanterna, innehållet gör det inte. */
+[data-view="desktop"] .sell-modal-root { align-items: stretch; padding: 0; }
 [data-view="desktop"] .sell-modal-panel {
-  max-width: 560px; max-height: min(88vh, 880px);
-  border-radius: var(--r-xl); overflow: hidden; box-shadow: var(--shadow-raised);
+  max-width: none; max-height: 100%;
   animation-name: sell-modal-pop; animation-duration: 260ms; animation-timing-function: var(--ease-ui);
 }
+/* Spalten mitt i ytan utan en extra behållare: sidopaddingen växer tills det som står kvar
+   mellan den är 560px brett. Huvudets och fotens ytor och linjer går ändå kant i kant. */
+[data-view="desktop"] .sell-modal-head,
+[data-view="desktop"] .sell-modal-body,
+[data-view="desktop"] .sell-modal-actions {
+  padding-inline: max(var(--safe-left), calc((100% - 560px) / 2));
+}
+[data-view="desktop"] .sell-modal-body { padding-block: 24px 32px; }
 
 /* ==========================================================================
    Märkesväljaren — dialog i stället för bottensheet

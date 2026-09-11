@@ -1,5 +1,9 @@
 node_modules/
-data/
+# Driftkatalogen server/data/ — jobb, bilder, loggar. ANKRAD med ett inledande snedstreck: utan det
+# matchar mönstret varje katalog som heter "data" på varje djup, och då försvann server/src/data/ —
+# hela datafliken, fyra källfiler — tyst ur versionshanteringen. De låg oincheckade tills någon
+# råkade titta.
+/data/
 .env
 
 # Segmenteringsmodellerna. u2net.onnx är 168 MB — över GitHubs 100 MB-gräns per fil, och Git LFS

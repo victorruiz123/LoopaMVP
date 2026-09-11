@@ -1328,8 +1328,69 @@ export interface DataSvar {
   };
   tratt: DataTrattSteg[];
   avhoppUtanJobb: number;
+  /** De avbrutna flödena, ett i taget. Se server/src/data/flode.ts. */
+  avhopp: DataAvhopp[];
+  /** En rad per säljare, över alla deras flöden. Se server/src/data/dataset.ts. */
+  saljare: DataSaljare[];
   /** Fält som inte samlas in än, med skälet. Visas som de är — aldrig som nollor. */
   luckor: Array<{ falt: string; skal: string }>;
+}
+
+/**
+ * Ett flöde som tog slut utan ett intygat kort.
+ *
+ * `paborjad` skiljer en påbörjad annons från ett besök: den som öppnade startsidan och stängde den
+ * har inte avbrutit något, den som valde märke och började filma har det.
+ */
+export interface DataAvhopp {
+  sess: string;
+  uid: string | null;
+  jobId: string | null;
+  start: string;
+  slut: string;
+  totaltMs: number;
+  sistaSteg: string | null;
+  besokta: string[];
+  sistaStegMs: number | null;
+  paborjad: boolean;
+  antalFragor: number;
+  enhet: string | null;
+  plattform: string | null;
+  vy: string | null;
+}
+
+/** En säljare, summerad över alla sina flöden och annonser. */
+export interface DataSaljare {
+  uid: string;
+  floden: number;
+  paborjade: number;
+  intygade: number;
+  avbrutna: number;
+  perSistaSteg: Record<string, number>;
+  /** Flöden där kontot kunde styrkas ur jobbets ägarskap, inte bara påstås av webbläsaren. */
+  styrkta: number;
+  annonser: number;
+  salda: number;
+  samtal: number;
+  forsta: string | null;
+  senaste: string | null;
+  enheter: string[];
+}
+
+/**
+ * Ett samtal i "Hur fungerar det?", ord för ord.
+ *
+ * Fritext skriven av en människa — den enda i hela datafliken. Se server/src/data/samtal.ts för vad
+ * det innebär och varför den ändå sparas.
+ */
+export interface Samtal {
+  id: string;
+  sess: string | null;
+  uid: string | null;
+  chatt: string;
+  start: string;
+  slut: string;
+  turer: Array<{ at: string; steg: string | null; fraga: string; svar: string; fel: boolean }>;
 }
 
 /**

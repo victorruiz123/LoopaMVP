@@ -293,6 +293,16 @@ function FlowApp() {
     flode.enhet(getViewMode());
     return flode.startaAvhoppsvakt();
   }, []);
+  /**
+   * Kontot knyts på så fort inloggningen finns.
+   *
+   * Egen effekt och inte en rad i den ovan: inloggningen sker mitt i flödet — grinden ligger på
+   * märkesvalet — och stegen före den hör ändå till samma säljare. Servern gör hopkopplingen på
+   * flödessessionen, precis som den gör med jobbet, men behöver se kontot på minst en rad.
+   */
+  useEffect(() => {
+    flode.knytTillSaljare(user?.id ?? null);
+  }, [user?.id]);
   useEffect(() => {
     flode.stegIn(screen.name);
     const jobId = "jobId" in screen ? screen.jobId : null;

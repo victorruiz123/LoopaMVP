@@ -817,19 +817,57 @@ async function handleSaljChat(req: IncomingMessage, res: ServerResponse) {
   const limited = chatRateLimit(chatClientKey(req));
   if (limited) return sendJson(res, 429, { error: limited });
 
-  const body = await readJsonBody<{ question?: unknown; history?: unknown }>(req, CHAT_BODY_BYTES);
+  const body = await readJsonBody<{
+    question?: unknown;
+    history?: unknown;
+    /** Samtalets id, sessionen, kontot och steget — allt frivilligt, allt prövat i data/samtal.ts. */
+    samtal?: unknown;
+    sess?: unknown;
+    uid?: unknown;
+    steg?: unknown;
+  }>(req, CHAT_BODY_BYTES);
   const question = typeof body.question === "string" ? body.question.trim() : "";
   if (!question) return sendJson(res, 400, { error: "Skriv en fråga." });
   if (question.length > MAX_SALJ_QUESTION_CHARS) {
     return sendJson(res, 400, { error: `Frågan får vara högst ${MAX_SALJ_QUESTION_CHARS} tecken.` });
   }
 
+  /**
+   * Samtalet skrivs ned, och det är en ändring av vad den här vägen är.
+   *
+   * Frågan passerar ändå för att kunna besvaras; anteckningen är ett `appendFile` efter att svaret
+   * gått iväg, aldrig före. Skälet står i data/samtal.ts: kategorin "process" säger att folk undrar,
+   * meningen säger vad de undrar över — och den är det enda sättet att se när boten svarat fel.
+   *
+   * SKRIVNINGEN FÅR INTE FÄLLA SVARET. En disk som är full är ett problem för oss, inte för den som
+   * står på startsidan och väntar på ett svar.
+   */
+  const anteckna = async (svar: string, fel: boolean) => {
+    try {
+      const { spara: sparaSamtal } = await import("./data/samtal.js");
+      await sparaSamtal({
+        samtal: body.samtal,
+        sess: body.sess,
+        uid: body.uid,
+        chatt: "start",
+        steg: body.steg,
+        fraga: question,
+        svar,
+        fel,
+      });
+    } catch {
+      // Tyst. Se ovan.
+    }
+  };
+
   try {
     const { answer } = await answerSaljQuestion(question, readChatHistory(body.history));
     sendJson(res, 200, { answer });
+    await anteckna(answer, false);
   } catch (err) {
     console.error("[salj-chat]", err);
     sendJson(res, 503, { error: "Chatten kunde inte nås just nu. Försök igen om en stund." });
+    await anteckna("", true);
   }
 }
 
@@ -1066,11 +1104,31 @@ async function handleAnalys(req: IncomingMessage, res: ServerResponse) {
  */
 async function handleFlodesHandelse(req: IncomingMessage, res: ServerResponse) {
   try {
-    const body = await readJsonBody<{ sess?: string; jobId?: string | null; event?: string; props?: Record<string, unknown> }>(req, 8 * 1024);
+    const body = await readJsonBody<{
+      sess?: string;
+      jobId?: string | null;
+      uid?: string | null;
+      event?: string;
+      props?: Record<string, unknown>;
+    }>(req, 8 * 1024);
     const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
     if (typeof body.sess === "string" && typeof body.event === "string" && !ROBOT.test(ua)) {
       const { spara: sparaFlode } = await import("./data/flode.js");
-      await sparaFlode(body.sess, typeof body.jobId === "string" ? body.jobId : null, body.event, body.props ?? {});
+      await sparaFlode(
+        body.sess,
+        typeof body.jobId === "string" ? body.jobId : null,
+        body.event,
+        body.props ?? {},
+        /**
+         * Kontot som klienten påstår.
+         *
+         * PRÖVAS INTE HÄR, och det är ett medvetet val med en gräns. Raderna kommer ofta via
+         * `sendBeacon` när fliken stängs — den kan inte bära ett Authorization-huvud — så ett krav
+         * på token hade tyst kastat just de rader mätningen finns för. Påståendet duger till en
+         * tratt; det styrkta ägarskapet tas ur jobbet vid läsningen. Se data/dataset.ts.
+         */
+        typeof body.uid === "string" ? body.uid : null,
+      );
     }
   } catch {
     // En trasig kropp är inte värd ett felmeddelande. Se anropsstället.
@@ -1981,6 +2039,18 @@ const server = http.createServer(async (req, res) => {
             console.error("[data-chat]", err);
             return sendJson(res, 503, { error: "Chatten kunde inte nås just nu. Försök igen om en stund." });
           }
+        }
+        /**
+         * Samtalen i "Hur fungerar det?", ord för ord.
+         *
+         * EGEN VÄG OCH INTE ETT FÄLT I DATASETET. Datasetet är en rad per MÖBEL; de här samtalen har
+         * ofta ingen möbel alls — de flesta förs av någon som ännu inte bestämt sig — och att lägga
+         * dem i samma svar hade betytt att panelens tyngsta anrop växte med varje fråga någon
+         * ställer. Måste ligga FÖRE den generiska /data/:id nedan, som annars slukar "samtal".
+         */
+        if (segments[2] === "data" && segments[3] === "samtal" && segments.length === 4 && req.method === "GET") {
+          const { allaSamtal } = await import("./data/samtal.js");
+          return sendJson(res, 200, { samtal: await allaSamtal() });
         }
         if (segments[2] === "data" && segments.length === 4 && req.method === "GET") {
           const { objektFor } = await import("./data/dataset.js");
