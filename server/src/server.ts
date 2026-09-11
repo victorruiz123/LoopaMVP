@@ -306,9 +306,29 @@ async function handleDeleteJob(id: string, res: ServerResponse) {
   const itemId = job.tradera?.itemId ?? null;
   if (itemId && (job.tradera?.status === "published" || job.tradera?.status === "publishing")) {
     try {
-      const { endTraderaItem } = await import("./integrations/tradera/tradera.js");
-      await endTraderaItem(itemId);
-      console.log(`[tradera] ${loopaId}: annons ${itemId} togs ner — säljaren tog bort annonsen.`);
+      const { endTraderaItem, getTraderaLage } = await import("./integrations/tradera/tradera.js");
+      /**
+       * EN AVSLUTAD AUKTION GÅR INTE ATT TA NER, och ska inte heller behöva det.
+       *
+       * Tradera svarar med ett fel på DELETE mot en annons som redan löpt ut — det finns ingenting
+       * kvar att avsluta. Utan kontrollen nedan blev det felet en 502 härifrån, och säljaren kunde
+       * INTE TA BORT SIN ANNONS ALLS: märkningen i steg 3 nås aldrig, så annonsen låg kvar i
+       * profilen och i butiken hur många gånger de än tryckte. Det gällde varje möbel vars auktion
+       * hunnit gå ut, alltså förr eller senare varenda en — och bara i drift, där annonser faktiskt
+       * publiceras. En Swedese Lamino vars auktion tog slut 2026-09-11 16:39 var den som visade det.
+       *
+       * Grinden nedan är därför inte "hoppa över när det är krångligt": en utgången annons är inte
+       * köpbar, och det är just köpbarheten 502:an finns för att skydda. Går läget inte att läsa
+       * (null, t.ex. ett tillfälligt fel hos Tradera) försöker vi ta ner som förut — då vet vi inte
+       * att den är ofarlig, och då ska säljaren hellre få försöka igen.
+       */
+      const lage = await getTraderaLage(itemId);
+      if (lage?.ended) {
+        console.log(`[tradera] ${loopaId}: annons ${itemId} hade redan löpt ut — inget att ta ner.`);
+      } else {
+        await endTraderaItem(itemId);
+        console.log(`[tradera] ${loopaId}: annons ${itemId} togs ner — säljaren tog bort annonsen.`);
+      }
     } catch (err) {
       const detalj = err instanceof Error ? err.message : String(err);
       console.error(`[tradera] ${loopaId}: kunde inte ta ner annons ${itemId}:`, detalj);
