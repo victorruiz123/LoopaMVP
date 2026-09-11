@@ -608,16 +608,22 @@ async function pickCondition(page: Page, condition: string | null, logga: Logga)
 /**
  * Annonstexten för Blocket. Motsvarigheten till `buildDescription` i tradera/publish.ts.
  *
- * SAMMA FLAGGOR SOM TRADERA, och det är själva poängen: Loopa säljer möbeln och kör hem den på båda
+ * SAMMA LÖFTEN SOM TRADERA, och det är själva poängen: Loopa säljer möbeln och kör hem den på båda
  * kanalerna, hemleveransen är inräknad i priset på båda, och en köpare som jämför de två annonserna
  * ska hitta samma löften. Skillnaden är renderingsformen — Tradera tar HTML, Blockets
  * beskrivningsfält är en textarea.
+ *
+ * `infoPage: false` ÄR DEN ENDA FLAGGA SOM SKILJER. Länken till den köpfria annonssidan ligger på
+ * Tradera ensam så länge den prövas: två kanaler som får den samtidigt ger inget att jämföra
+ * utfallet mot. Den bär inget löfte om affären, så pariteten ovan är orörd — Loopa-ID:t och den
+ * publika uppslagssidan står kvar i båda texterna. Ska den hit är det ett `true` här och en rad i
+ * paritetstestet, inte en omskrivning.
  *
  * Egen funktion och inte en rad inuti körningen, så att pariteten går att PRÖVA utan att starta en
  * webbläsare (tests/traderaListing.test.ts).
  */
 export function buildBlocketDescription(job: ConditionJob): string {
-  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true }));
+  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true, infoPage: false }));
 }
 
 export function isAdUrl(url: string): boolean {

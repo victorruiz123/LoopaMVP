@@ -32,6 +32,8 @@ export default function ButikApp() {
         {route.name === "type" && <TypeScreen slug={route.slug} />}
         {route.name === "brand" && <BrandScreen slug={route.slug} />}
         {route.name === "product" && <ProductScreen id={route.id} />}
+        {/* Samma skärm, köprutan utbytt. Se ProductScreen och router.ts för varför den finns. */}
+        {route.name === "info" && <ProductScreen id={route.id} utanKop />}
         {route.name === "search" && <SearchScreen q={route.q} />}
         {route.name === "order" && <OrderScreen id={route.id} />}
         {route.name === "annons" && <MinAnnons jobId={route.id} />}
@@ -48,6 +50,8 @@ function titleFor(route: ReturnType<typeof useButikRoute>["route"]): string {
     case "type": return "Begagnade möbler – Loopa Butik";
     case "brand": return `${route.slug} secondhand – Loopa Butik`;
     case "product": return "Möbel – Loopa Butik";
+    // Ingen "Butik" i titeln: fliken tillhör en annons någon läser på Tradera, inte vårt rutnät.
+    case "info": return "Möbeln i annonsen – Loopa";
     case "search": return route.q ? `${route.q} – Loopa Butik` : "Alla möbler – Loopa Butik";
     case "order": return "Din order – Loopa";
     case "annons": return "Din annons – Loopa";

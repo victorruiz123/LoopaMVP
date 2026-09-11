@@ -275,11 +275,21 @@ test("Blocket-annonsen säger att Loopa är säljaren, precis som Tradera-annons
 });
 
 /**
- * Samma innehåll, olika form. Det är den enda skillnad som får finnas mellan kanalernas texter: en
- * textarea tar ingen HTML, och en `<strong>` i Blockets beskrivningsfält hade stått som taggar.
+ * Samma innehåll, olika form — plus EN uppgift som bara Tradera bär.
+ *
+ * Renderingen är fortfarande den enda formskillnaden: en textarea tar ingen HTML. Undantaget i
+ * innehållet är länken till den köpfria sidan (/butik/info/<loopaId>), som ligger på Tradera och
+ * ska prövas där ensam först. Den skalas därför bort ur HTML-texten innan jämförelsen — och att den
+ * faktiskt bara står på den ena kanalen prövas av testet under det här, inte av det här.
+ *
+ * PARITETEN SOM BETYDER NÅGOT ÄR OFÖRÄNDRAD. Skälet den finns för är att en köpare som ser samma
+ * möbel på två marknadsplatser inte ska mötas av två priser eller två leveranslöften; en länk till
+ * vår egen besiktning är varken. Allt det testet skyddade skyddas fortfarande, tecken för tecken.
  */
-test("skillnaden mot Tradera-texten är renderingen och ingenting annat", () => {
-  const html = buildDescription(job());
+const INFO_STYCKE = /<p>Se möbeln med alla bilder[^<]*<\/p>\n?/;
+
+test("skillnaden mot Tradera-texten är renderingen och länken till infosidan", () => {
+  const html = buildDescription(job()).replace(INFO_STYCKE, "");
   const text = buildBlocketDescription(job());
   assert.ok(!text.includes("<"), "Blockets fält är ren text — ingen märkning ska följa med");
   /**
@@ -341,6 +351,37 @@ test("Loopa-ID:t står i annonsen, med vad det går att göra med det", () => {
   assert.match(html, new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
   assert.match(html, /Varje annons hos Loopa är publik/);
   assert.match(html, /Sök på Loopa-ID:t/);
+});
+
+/**
+ * Den köpfria sidan — länken som gör besiktningen till en klick i stället för ett ID att skriva av.
+ *
+ * BARA TRADERA, och det är påståendet som ska gå sönder om någon sätter `infoPage: true` på
+ * Blocket-vägen utan att mena det. Blocket-annonsen är ordagrant Traderas i allt annat (se
+ * paritetstestet ovan), så just den här raden är den enda som skiljer dem — och en skillnad som
+ * ingen prövar slutar vara ett beslut och blir en slump.
+ */
+test("länken till den köpfria sidan står i Tradera-annonsen och bara där", () => {
+  const before = process.env.LOOPA_PUBLIC_URL;
+  process.env.LOOPA_PUBLIC_URL = "https://app.loopa.nu/";
+  const html = buildDescription(job());
+  assert.match(html, new RegExp(`https://app.loopa.nu/butik/info/${loopaIdFor(JOB_ID)}`));
+  // Sidan får inte läsas som ett andra ställe att köpa på — då är länken i någon annans annons ett
+  // försök att ta affären därifrån.
+  assert.match(html, /Sidan är bara information — köpet gör du här i annonsen/);
+  assert.doesNotMatch(buildBlocketDescription(job()), /\/butik\/info\//);
+  if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
+  else process.env.LOOPA_PUBLIC_URL = before;
+});
+
+test("infolänken uteblir helt när servern inte vet sin adress", () => {
+  const before = process.env.LOOPA_PUBLIC_URL;
+  delete process.env.LOOPA_PUBLIC_URL;
+  // Ingen adress, ingen mening om en sida: ett stycke som lovar en sida utan att kunna peka på den
+  // är sämre än tystnad.
+  assert.doesNotMatch(buildDescription(job()), /Se möbeln med alla bilder/);
+  if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
+  else process.env.LOOPA_PUBLIC_URL = before;
 });
 
 test("adressen till kortet skrivs ut bara när servern vet vilken den är", () => {

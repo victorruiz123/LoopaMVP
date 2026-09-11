@@ -59,6 +59,20 @@ export interface AdOptions {
    * köpare som tror att de handlar av en privatperson gissar fel om både frakt och ansvar.
    */
   loopaSells: boolean;
+  /**
+   * Om den köpfria annonssidan ska stå med i texten.
+   *
+   * SANT BARA PÅ TRADERA. Sidan (/butik/info/<loopaId>) är besiktningen utan köpruta, och den är
+   * byggd för just den läsaren: någon som står mitt i ett bud och vill kontrollera att skicket i
+   * annonsen stämmer. Den ska inte kunna köpa av oss i stället — då hade länken flyttat affären ur
+   * kanalen den ligger i.
+   *
+   * FALSKT PÅ BLOCKET, tills vidare. Inte för att sidan vore fel där, utan för att länken är ny och
+   * ska prövas på ett ställe i taget: Blocket-annonsen är ordagrant Traderas (se publish.ts), och
+   * går texten ut på båda samtidigt finns inget att jämföra utfallet mot. Loopa-ID:t och den
+   * publika uppslagssidan står kvar i båda.
+   */
+  infoPage: boolean;
 }
 
 // Allvarsgraden står mitt i en mening i annonstexten och är gemen därför; skadetyperna inleder sin
@@ -85,6 +99,21 @@ const DIMENSION_HINT = /(m[åa]tt|bredd|djup|h[öo]jd|l[äa]ngd|diameter|dimensi
 function publicCardUrl(loopaId: string): string | null {
   const base = process.env.LOOPA_PUBLIC_URL?.trim().replace(/\/+$/, "");
   return base ? `${base}/c/${loopaId}` : null;
+}
+
+/**
+ * Den köpfria annonssidan — möbeln som den står i butiken, utan köpruta.
+ *
+ * SKILD FRÅN /c/ MED FLIT, fast båda visar samma besiktning. Uppslagssidan svarar på "vad betyder
+ * det här Loopa-ID:t" och börjar därför i en sökruta; den här svarar på "vad är det för möbel jag
+ * tittar på" och börjar i möbeln — bilden, skicket, skadorna, måtten. Det är två olika frågor, och
+ * den som klickar på en länk i en annons ställer den andra.
+ *
+ * Samma bas och samma sena avläsning som ovan, av samma skäl.
+ */
+function infoPageUrl(loopaId: string): string | null {
+  const base = process.env.LOOPA_PUBLIC_URL?.trim().replace(/\/+$/, "");
+  return base ? `${base}/butik/info/${loopaId}` : null;
 }
 
 /**
@@ -337,6 +366,31 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
       },
     ]),
   );
+
+  /**
+   * Den köpfria sidan, som EGEN rad och sist.
+   *
+   * EN LÄNK MAN KAN KLICKA PÅ, inte ett ID man ska skriva av. Stycket ovanför ber läsaren slå upp
+   * ett ID, vilket är ett arbetsmoment — och de flesta gör det inte. Raden här är samma
+   * besiktning en klick bort, och den säger rakt ut att sidan inte är ett andra ställe att köpa
+   * på: annars läser en Loopa-länk i en Tradera-annons som ett försök att ta affären därifrån,
+   * vilket både köparen och Tradera skulle ha rätt att irritera sig på.
+   *
+   * Faller adressen bort (ingen LOOPA_PUBLIC_URL) står stycket inte alls — en mening om en sida
+   * utan sidan är sämre än tystnad.
+   */
+  const info = options.infoPage ? infoPageUrl(loopaId) : null;
+  if (info) {
+    blocks.push(
+      paragraph([
+        {
+          text:
+            `Se möbeln med alla bilder, måtten och varje skada utpekad: ${info} ` +
+            "Sidan är bara information — köpet gör du här i annonsen.",
+        },
+      ]),
+    );
+  }
 
   return blocks;
 }

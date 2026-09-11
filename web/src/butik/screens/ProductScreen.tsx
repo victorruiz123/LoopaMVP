@@ -37,11 +37,16 @@ import { useViewItem } from "../components/ProductGrid";
  *
  * "Får den plats?" ligger under båda spalterna med flit. Den är sista frågan man ställer sig innan
  * man trycker på köp, och den behöver hela bredden för sitt svar.
+ *
+ * SAMMA SKÄRM RITAR DEN KÖPFRIA VERSIONEN (`utanKop`, /butik/info/<id>). Det är EN prop och inte en
+ * egen skärm, av samma skäl som säljarens annons är säljverktygets kort: möbeln är densamma och
+ * sanningen om den är densamma, och två filer hade glidit isär den vecka någon la till en rad i den
+ * ena. Det som skiljer är högerspalten — vad man GÖR — och det är precis vad propen byter ut.
  */
 
 const SEK = new Intl.NumberFormat("sv-SE");
 
-export default function ProductScreen({ id }: { id: string }) {
+export default function ProductScreen({ id, utanKop = false }: { id: string; utanKop?: boolean }) {
   const [product, setProduct] = useState<Product | null>(null);
   const [card, setCard] = useState<PublicCard | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -104,7 +109,17 @@ export default function ProductScreen({ id }: { id: string }) {
       {sold && (
         <div className="butik-notice" role="status">
           <span aria-hidden="true">●</span>
-          <span>Den här möbeln är såld. Berätta vad du letar efter, så hör vi av oss när något liknande kommer in.</span>
+          {/*
+            Två meningar för två sidor. Raden på köpsidan lovar nästa steg — "berätta vad du letar
+            efter" — och det steget finns bara där: den köpfria sidan har ingen sådan ruta under sig
+            (se foten), och en hänvisning till något som inte står någonstans är ett löfte i tomma
+            luften. Kvar blir uppgiften själv, som är det den som kontrollerar en annons kom för.
+          */}
+          <span>
+            {utanKop
+              ? "Den här möbeln är såld och annonsen är avslutad. Uppgifterna nedan står kvar som de var när den låg ute."
+              : "Den här möbeln är såld. Berätta vad du letar efter, så hör vi av oss när något liknande kommer in."}
+          </span>
         </div>
       )}
 
@@ -139,7 +154,9 @@ export default function ProductScreen({ id }: { id: string }) {
 
         <aside className="butik-pdp-side">
           <div className="butik-slot butik-slot-buy">
-            {loopa ? (
+            {utanKop ? (
+              <InfoBox product={product} sold={sold} tradera={card?.tradera ?? null} />
+            ) : loopa ? (
               <BuyBox product={product} sold={sold} reserved={reserved} />
             ) : (
               <TraderaPanel product={product} />
@@ -164,10 +181,83 @@ export default function ProductScreen({ id }: { id: string }) {
         Tradera-annons har ingen sådan ruta, och utan undantaget för `loopa` hade just den sidan —
         en död länk till någon annans avslutade annons — blivit den enda utan väg vidare.
       */}
-      {!(sold && loopa) && <LetarDuMobel varifran={`/butik/objekt/${product.id}`} />}
+      {!utanKop && !(sold && loopa) && <LetarDuMobel varifran={`/butik/objekt/${product.id}`} />}
 
-      <SellCta categorySlug={product.categorySlug} brand={product.brand} />
+      {/*
+        INGEN VÄRVNING PÅ DEN KÖPFRIA SIDAN — varken "berätta vad du letar efter" eller "har du en
+        liknande möbel?". Läsaren kom hit mitt i någon annans annons för att kontrollera EN uppgift:
+        stämmer skicket. Varje ruta som i stället ber dem beskriva en annan möbel eller sälja sin
+        egen är en uppmaning att lämna den annonsen, och det är inte vår sida att be om det på.
+      */}
+      {!utanKop && <SellCta categorySlug={product.categorySlug} brand={product.brand} />}
     </>
+  );
+}
+
+/**
+ * Upplysningsrutan — den köpfria sidans högerspalt.
+ *
+ * DEN TAR KÖPRUTANS PLATS OCH INTE DESS FORM. Samma ram och samma position som `BuyBox`, för att
+ * priset hör hemma där ögat letar efter det — men utan postnummer, utan kassa och utan knapp som
+ * gör något med pengar. Rubriken säger varför: sidan är besiktningen bakom annonsen, inte ett andra
+ * ställe att göra affären på.
+ *
+ * PRISET STÅR MED, och det är ett medvetet val. Att utelämna det hade gjort sidan svårare att lita
+ * på — en köpare som ser ett skick men inget pris vet inte om de läser om samma möbel som annonsen
+ * de kom ifrån. Det står som UPPGIFT: "Annonsen ligger på 2 400 kr", inte som ett anbud.
+ *
+ * LÄNKEN TILLBAKA TILL ANNONSEN är det enda den här sidan ber någon göra. Utan den är sidan en
+ * återvändsgränd för den som blev övertygad — och att skicka dem tillbaka dit budet redan ligger är
+ * motsatsen till att fånga in köpet hit.
+ */
+function InfoBox({
+  product,
+  sold,
+  tradera,
+}: {
+  product: Product;
+  sold: boolean;
+  tradera: PublicCard["tradera"];
+}) {
+  const annonsUrl = tradera?.status === "published" ? tradera.url : null;
+
+  return (
+    <section className="butik-buybox">
+      <h2 className="butik-buybox-titel">Om den här möbeln</h2>
+      <div className="butik-buybox-price">
+        <span className="butik-price" style={{ fontSize: 30 }}>
+          {product.priceSek !== null ? `${SEK.format(product.priceSek)} kr` : "Pris saknas"}
+        </span>
+        {/* Vem talet tillhör. Samma siffra utan avsändare läser som en kassa. */}
+        <span className="butik-price-was">Priset i annonsen</span>
+      </div>
+
+      <TrustRow />
+
+      <div
+        className="butik-notice"
+        style={{ background: "var(--field)", color: "var(--ink-soft)", margin: "12px 0" }}
+      >
+        <span aria-hidden="true">ℹ</span>
+        <span>
+          Den här sidan är <strong>besiktningen bakom annonsen</strong> — skicket, varje skada, måtten
+          och källorna. Du köper inte här: möbeln säljs i annonsen du kom ifrån.
+        </span>
+      </div>
+
+      {!sold && annonsUrl && (
+        <a
+          className="btn btn-primary"
+          href={annonsUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ display: "inline-flex", justifyContent: "center", marginTop: 8 }}
+          onClick={() => track("info_tillbaka_till_annons", { item_id: product.id })}
+        >
+          Tillbaka till annonsen →
+        </a>
+      )}
+    </section>
   );
 }
 

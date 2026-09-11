@@ -182,6 +182,13 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
           {annons.saknas.length > 0 && (
             <p className="public-card-error">Kan inte godkännas än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
           )}
+          {/*
+            FELET STÅR OCKSÅ HÄR, bredvid knappen som avvisades.
+            Det ritas längst upp på sidan (se `fel` ovan), och godkännanderutan ligger en bra bit ner
+            — ett avvisat tryck såg därför ut som att ingenting hände. Ett besked som hamnar utanför
+            skärmen är inget besked.
+          */}
+          {fel && <p className="public-card-error">{fel}</p>}
           <button
             className="btn btn-primary"
             disabled={sparar || annons.saknas.length > 0}

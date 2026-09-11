@@ -47,8 +47,11 @@ function ButikBar() {
    * sökresultat — inte för att bläddra i lagret. På en telefon är toppraden dessutom det enda som
    * syns tillsammans med möbeln, och en sökruta där är en inbjudan att lämna den möbel man nyss
    * öppnade. På datorn står listan bredvid ändå, så där är förslaget billigare.
+   *
+   * Gäller den köpfria sidan (`info`) av samma skäl, fast starkare: den läsaren står mitt i någon
+   * annans annons och har följt en länk hit för att kontrollera EN uppgift.
    */
-  const doljSok = useViewMode() === "mobile" && route.name === "product";
+  const doljSok = useViewMode() === "mobile" && (route.name === "product" || route.name === "info");
   const [sokOppen, setSokOppen] = useState(false);
   const [q, setQ] = useState(route.name === "search" ? route.q : "");
   const faltet = useRef<HTMLInputElement>(null);

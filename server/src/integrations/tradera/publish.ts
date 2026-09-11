@@ -342,7 +342,7 @@ async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
  * renderingsform. Blocket får samma block renderade som ren text (blocket/publish.ts).
  */
 export function buildDescription(job: ConditionJob): string {
-  return renderAdHtml(composeAd(job, { delivery: true, loopaSells: true }));
+  return renderAdHtml(composeAd(job, { delivery: true, loopaSells: true, infoPage: true }));
 }
 
 export { traderaConfigured };

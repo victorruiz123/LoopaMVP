@@ -31,6 +31,18 @@ export type ButikRoute =
    * de ställde när de tryckte på sin egen rad.
    */
   | { name: "annons"; id: string }
+  /**
+   * Den köpfria annonsen: /butik/info/<loopaId>.
+   *
+   * SAMMA MÖBEL SOM `product`, UTAN KÖPRUTAN. Adressen står i Tradera-annonsen och ingen annanstans:
+   * den som läser den har redan en plats att köpa på, och en köpknapp här hade bett dem lämna budet
+   * de står mitt i för att göra om affären hos oss. Kvar blir det de faktiskt kom för — bilden,
+   * skicket, varje skada, måtten och texten.
+   *
+   * INGEN VÄG HIT INIFRÅN LOOPA. Butikens rutnät, profilen och sökningen pekar alla på `product`,
+   * som är sidan där möbeln går att köpa. Den här nås bara genom att följa länken i annonsen.
+   */
+  | { name: "info"; id: string }
   /** Profilen. SAMMA skärm som säljverktygets — se screens/ProfileScreen.tsx. */
   | { name: "profile" };
 
@@ -64,6 +76,7 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   if (head === "order" && tail) return { name: "order", id: decodeURIComponent(tail) };
   if (head === "sok") return { name: "search", q: params.get("q") ?? "" };
   if (head === "annons" && tail) return { name: "annons", id: decodeURIComponent(tail) };
+  if (head === "info" && tail) return { name: "info", id: decodeURIComponent(tail) };
   if (head === "profil") return { name: "profile" };
   // Okänd väg under /butik: hela lagret. En död länk till en borttagen kategori ska landa i
   // butiken, inte i ingenting.
@@ -79,6 +92,7 @@ export function butikHref(route: ButikRoute): string {
     case "order": return `${BUTIK_ROOT}/order/${encodeURIComponent(route.id)}`;
     case "search": return `${BUTIK_ROOT}/sok?q=${encodeURIComponent(route.q)}`;
     case "annons": return `${BUTIK_ROOT}/annons/${encodeURIComponent(route.id)}`;
+    case "info": return `${BUTIK_ROOT}/info/${encodeURIComponent(route.id)}`;
     case "profile": return `${BUTIK_ROOT}/profil`;
   }
 }

@@ -852,6 +852,53 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
     };
   }
 
+  /**
+   * Den köpfria annonssidan — /butik/info/<loopaId>.
+   *
+   * NOINDEX, ALLTID. Sidan är en näradubblett av produktsidan: samma möbel, samma skick, samma
+   * mått, allt utom köprutan. Två indexerade sidor om samma soffa konkurrerar med varandra om
+   * samma fråga, och den av dem vi vill vinna är den där möbeln går att köpa.
+   *
+   * SJÄLVKANONISK ändå, i stället för en canonical mot /butik/objekt/. Att peka vidare OCH säga
+   * noindex är två motsatta besked om samma adress — "räkna den här som den där" och "räkna den
+   * inte" — och Google väljer då själv vilket som gäller. Robots-taggen räcker: adressen ska
+   * fungera, delas och läsas, bara inte rankas.
+   *
+   * Kroppen finns kvar för sekunden innan appen startat, och för den som läser utan JavaScript. Den
+   * länkar INTE vidare in i butiken, till skillnad från produktsidans: den som kom hit från en
+   * annons ska inte mötas av en väg bort från möbeln de kontrollerar.
+   */
+  if (head === "info" && tail) {
+    const product = await productById(decodeURIComponent(tail));
+    if (!product) {
+      return { title: `Möbeln finns inte – ${SITE}`, description: "Möbeln är såld eller borttagen.", canonical, noindex: true };
+    }
+    const dims = [product.dimensions.widthMm, product.dimensions.depthMm, product.dimensions.heightMm]
+      .map((mm) => (mm === null ? null : Math.round(mm / 10)))
+      .filter((v): v is number => v !== null);
+    return {
+      title: `${product.title} – besiktningen bakom annonsen – Loopa`,
+      description:
+        `${product.title}: skicket, varje skada och måtten som Loopas AI hittade dem. ` +
+        `${product.condition ? `${product.condition.label}. ` : ""}${dims.length ? `Mått ${dims.join(" × ")} cm.` : ""}`.trim(),
+      canonical,
+      image: product.imageUrl,
+      /*
+       * INGEN Product-markering och inget Offer. Sidan säljer inte, och ett Offer med pris och
+       * availability är just ett säljerbjudande — det skulle be Google visa ett produktkort som
+       * leder till en sida utan köpknapp. Produktsidan bär den markeringen och ska fortsätta göra
+       * det ensam.
+       */
+      noindex: true,
+      body:
+        `<h1>${esc(product.title)}</h1>` +
+        `<p>Den här sidan är besiktningen bakom annonsen. Möbeln säljs i annonsen du kom ifrån.</p>` +
+        (product.condition ? `<p>Skick: ${esc(product.condition.label)} — ${esc(product.condition.rationale)}</p>` : "") +
+        (dims.length ? `<p>Mått: ${dims.join(" × ")} cm</p>` : "") +
+        `<p>Pris i annonsen: ${esc(prisText(product))}</p>`,
+    };
+  }
+
   if (head === "sok") {
     const q = new URLSearchParams(search).get("q") ?? "";
     return {
