@@ -167,3 +167,19 @@ zone_name = "loopa.nu"
 [[routes]]
 pattern = "loopa.nu/api/session*"
 zone_name = "loopa.nu"
+
+# Mätningen av flödet. Klienten skickar den med `navigator.sendBeacon` (web/src/lib/flode.ts), och
+# en beacon rapporterar aldrig att den misslyckades — utan den här raden svarade marknadssajten 405
+# och varje steg en säljare tog på loopa.nu föll i tysthet. Det var inte synligt någonstans: sidan
+# fungerade, siffrorna bara saknades, och de saknades mest för den domän vi flyttat allt till.
+[[routes]]
+pattern = "loopa.nu/api/data/*"
+zone_name = "loopa.nu"
+
+# Frågan om processen, som säljaren får efter ett lyckat ja. Samma fälla som /api/salj/chat ovan:
+# utan raden svarar marknadssajtens egna Pages Functions, och rutan säger att anropet misslyckades
+# på precis det ställe vi ber om förtroende. Adminpanelens läsning ligger under /api/admin/feedback
+# och täcks redan av admin-raden.
+[[routes]]
+pattern = "loopa.nu/api/feedback*"
+zone_name = "loopa.nu"
