@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, AdminEfterlysning, EfterlysningKandidat } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -563,4 +563,33 @@ export async function fragaData(
       body: JSON.stringify({ fraga, id, historik }),
     }),
   );
+}
+
+/**
+ * Säljarens omdöme om processen, från kvittot.
+ *
+ * FÅR INTE KASTA. Rutan öppnas efter att möbeln redan är överlämnad, i ett flöde där säljaren inte
+ * har något ärende kvar — ett fel här är alltså ett fel i något de gjorde oss en tjänst med. Svaret
+ * är därför ett ja eller ett nej, och rutan tackar likadant i båda fallen.
+ */
+export async function skickaFeedback(input: {
+  jobId?: string | null;
+  betyg: number | null;
+  text: string | null;
+}): Promise<boolean> {
+  try {
+    const res = await authFetch("/api/feedback", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/** Alla omdömen, nyast först, med snittbetyget. Adminpanelens feedbackflik. */
+export async function listaFeedback(): Promise<AdminFeedbackSvar> {
+  return json(await authFetch("/api/admin/feedback"));
 }

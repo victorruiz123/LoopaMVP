@@ -121,6 +121,27 @@ export default function ListingScreen({
         <ArrowLeftIcon /> {backLabel ?? t("Tillbaka till skicket")}
       </button>
 
+      {/*
+        Annonsens Loopa-ID, för säljaren.
+
+        EN RAD OCH INTE EN RUTA. ID:t stod en gång längre ned i en egen ruta med kopieringsknapp och
+        tre rader om vad det publika kortet visar — mitt i annonsen, som en uppgift säljaren
+        förväntades ta hand om. Det var därför den rutan togs bort. Men att inte visa ID:t alls
+        lämnade säljaren utan svar på en fråga som ÄR deras: annonsen på Tradera bär koden, vårt
+        stöd frågar efter den, och den som har flera möbler ute kan inte säga vilken av dem en
+        annons är utan att slå upp den. Raden ligger därför högst upp, där man identifierar vad man
+        tittar på, och gör ingenting — ingen knapp, ingen förklaring, bara vilken annons det här är.
+
+        Villkorad, av samma skäl som chatten: ID:t kommer med jobbsvaret (server sätter det, se
+        loopaId.ts) och saknas i ett svar hämtat innan dess. Då står raden inte där, i stället för
+        att stå tom.
+      */}
+      {loopaId && (
+        <p className="card-loopa-id">
+          {t("Loopa-ID")} <span>{loopaId}</span>
+        </p>
+      )}
+
       {!listing || listing.status === "unavailable" ? (
         <section className="card-panel">
           <div className="card-kicker">{t("Annons")}</div>
@@ -169,11 +190,10 @@ export default function ListingScreen({
           {/* Sist på kortet, efter allt som ska granskas: vägen ut. Det är det enda på den här
               skärmen som lämnar appen, så den ska komma efter att säljaren läst vad som skickas.
 
-              LOOPA-ID:T STOD HÄR, i en egen ruta med kopieringsknapp och tre rader förklaring. Det
-              är en intern nyckel — den råkar stå i annonstexten, men säljaren har ingenting att
-              göra med den, och en kod med en kopieringsknapp mitt i en annons ser ut som något man
-              förväntas ta hand om. Kortet nås fortfarande på sitt ID; det behöver bara inte stå
-              framför den som säljer möbeln. */}
+              LOOPA-ID:T STOD HÄR, i en egen ruta med kopieringsknapp och tre rader förklaring — en
+              kod som såg ut som något man förväntades ta hand om, mitt i annonsen. Rutan är borta.
+              ID:t självt står kvar högst upp på skärmen som en rad bland de andra: säljaren behöver
+              kunna säga VILKEN annons det här är, men inte göra något åt den. */}
           <SellWithLoopa
             jobId={result.jobId}
             coverUrl={sellerCover(result)?.url ?? null}

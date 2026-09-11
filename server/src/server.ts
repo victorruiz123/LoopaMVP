@@ -1759,6 +1759,35 @@ const server = http.createServer(async (req, res) => {
       }
 
       /**
+       * Säljarens omdöme om processen, skickat från kvittot.
+       *
+       * Innanför grinden: raden ska ha en avsändare. Ett anonymt omdöme går inte att följa upp, och
+       * en öppen väg som tar emot fritext är en skrivbar disk för vem som helst på internet.
+       *
+       * Ett fel här får ALDRIG synas som ett fel i flödet — se feedback.ts och rutan i klienten.
+       * Säljaren har redan lämnat över möbeln; att möta deras omdöme med en röd ruta är att göra det
+       * sista de minns av oss till ett haveri i något som inte ens var deras ärende.
+       */
+      if (segments[1] === "feedback" && segments.length === 2 && req.method === "POST") {
+        const { sparaFeedback, FeedbackFel } = await import("./feedback.js");
+        try {
+          const body = await readJsonBody<{ jobId?: string; betyg?: number | null; text?: string }>(req, 32 * 1024);
+          await sparaFeedback({
+            jobId: body.jobId ?? null,
+            betyg: body.betyg ?? null,
+            text: body.text ?? null,
+            userId: identity.id,
+            epost: identity.email,
+          });
+          return sendJson(res, 200, { sparat: true });
+        } catch (err) {
+          if (err instanceof FeedbackFel) return sendJson(res, 400, { error: err.message });
+          console.error("[feedback]", err);
+          return sendJson(res, 500, { error: "Omdömet kunde inte sparas." });
+        }
+      }
+
+      /**
        * Adminpanelen. Ligger bakom samma inloggning som allt annat under /api, med rollen prövad en
        * gång här — och svarar 404 för alla andra, av samma skäl som ägarskapet nedan gör det.
        */
@@ -1938,6 +1967,18 @@ const server = http.createServer(async (req, res) => {
           const objekt = await objektFor(segments[3]);
           if (!objekt) return sendJson(res, 404, { error: "Objektet finns inte." });
           return sendJson(res, 200, objekt);
+        }
+
+        /**
+         * Feedbackfliken: vad säljarna tyckte om processen.
+         *
+         * Bara läsning. Omdömena besvaras inte härifrån — den som vill höra av sig har adressen på
+         * raden och skriver ett riktigt mejl. En svarsknapp här hade gjort en läslista till en
+         * arbetskö utan att någon bestämt att den skulle vara det.
+         */
+        if (segments[2] === "feedback" && segments.length === 3 && req.method === "GET") {
+          const { listaFeedback } = await import("./feedback.js");
+          return sendJson(res, 200, await listaFeedback());
         }
 
         /**

@@ -1331,3 +1331,28 @@ export interface DataSvar {
   /** Fält som inte samlas in än, med skälet. Visas som de är — aldrig som nollor. */
   luckor: Array<{ falt: string; skal: string }>;
 }
+
+/**
+ * Ett omdöme om processen, som adminpanelen läser det. Se server/src/feedback.ts.
+ *
+ * Betyg OCH text är var för sig valfria, och därför båda null-bara: säljaren som bara tryckte på en
+ * fyra sa något, och raden ska bära det utan att låtsas att det fanns ord också.
+ */
+export interface AdminFeedback {
+  id: string;
+  jobId: string | null;
+  loopaId: string | null;
+  titel: string | null;
+  userId: string;
+  epost: string | null;
+  betyg: number | null;
+  text: string | null;
+  skapad: string;
+}
+
+/** Feedbacklistan med snittet färdigräknat på servern — det ska vila på alla rader, inte på de visade. */
+export interface AdminFeedbackSvar {
+  poster: AdminFeedback[];
+  snitt: number | null;
+  antalBetyg: number;
+}

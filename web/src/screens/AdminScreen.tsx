@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChatIcon, ChevronRight, MailIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
 import AdminAdsScreen from "./AdminAdsScreen";
@@ -8,10 +8,11 @@ import AdminTraderaPostScreen from "./AdminTraderaPostScreen";
 import AdminOrdrarScreen from "./AdminOrdrarScreen";
 import AdminDataScreen from "./AdminDataScreen";
 import AdminEfterlysningarScreen from "./AdminEfterlysningarScreen";
+import AdminFeedbackScreen from "./AdminFeedbackScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar";
+export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -137,6 +138,20 @@ export default function AdminScreen({
           <SearchIcon size={16} /> {t("Efterlysningar")}
         </button>
         {/*
+          Feedbacken står efter arbetslistorna och före Data.
+          Den är ingendera: inget ska göras med en rad, och den säger ingenting om modellen. Det är
+          vad SÄLJARNA tycker om flödet, och den läses av samma skäl som datafliken läses — för att
+          se om det vi byggt blir bättre — bara med ord i stället för med tal.
+        */}
+        <button
+          role="tab"
+          aria-selected={flik === "feedback"}
+          className={`admin-flik-knapp${flik === "feedback" ? " vald" : ""}`}
+          onClick={() => setFlik("feedback")}
+        >
+          <ChatIcon size={16} /> {t("Feedback")}
+        </button>
+        {/*
           Datafliken sist bland flikarna och först i ordningen av skäl: den läses inte för att få
           något gjort idag, utan för att se om modellen blir bättre. Den som öppnar panelen för att
           jobba ska inte behöva passera den.
@@ -167,6 +182,8 @@ export default function AdminScreen({
         <AdminOrdrarScreen onOpenAd={onOpenAdId} />
       ) : flik === "efterlysningar" ? (
         <AdminEfterlysningarScreen />
+      ) : flik === "feedback" ? (
+        <AdminFeedbackScreen />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : (

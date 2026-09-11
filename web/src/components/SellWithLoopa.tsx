@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { getTraderaState, publishToTradera } from "../api";
 import { CheckIcon, CloseIcon } from "./icons";
+import ProcessFeedback from "./ProcessFeedback";
+import LegalLink from "./LegalLink";
 import { useT } from "../lib/i18n";
 import { formatSek } from "../lib/price";
 import { LOOPA_FEE_CAP_SEK, LOOPA_PERCENT, feeIsCapped, loopaFee, sellerPayout } from "../lib/fees";
@@ -59,6 +61,15 @@ export default function SellWithLoopa({
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+  /**
+   * Frågan om processen, öppnad av ja:et och av ingenting annat.
+   *
+   * Ligger HÄR och inte i kvittot, trots att den ritas ovanpå det: den hör till TRYCKET, inte till
+   * skärmen efter. Kvittot ritas om varje gång pollningen svarar och kan stå kvar i timmar medan
+   * annonsen granskas — en ruta som ägdes av kvittot hade behövt veta vilken av de visningarna som
+   * följde på ett ja, och hade dykt upp igen vid fel tillfälle den dagen den inte visste.
+   */
+  const [fragarOmProcessen, setFragarOmProcessen] = useState(false);
   const timer = useRef<number | null>(null);
 
   /** Pollar bara medan marknadsplatsens kö arbetar — annonsen går upp på 10-60 s. */
@@ -94,6 +105,9 @@ export default function SellWithLoopa({
     try {
       setState(await publishToTradera(jobId));
       setConfirming(false);
+      // Först när annonsen faktiskt gått iväg. Ett ja som föll på ett serverfel är inte en avslutad
+      // process, och att fråga vad säljaren tyckte om den mitt i felet vore ett hån.
+      if (!feedbackAvklarad(jobId)) setFragarOmProcessen(true);
       void refresh();
     } catch (err) {
       setFailure(err instanceof Error ? err.message : String(err));
@@ -108,6 +122,23 @@ export default function SellWithLoopa({
 
   const publication = state.publication;
   const plan = state.plan;
+
+  /**
+   * Rutan ritas i VARJE utfall efter ett ja, inte bara i kvittot för annonsen i kö.
+   *
+   * Vilken skärm som möter ett ja beror på var kön står just då — "granskas", "läggs ut" eller en
+   * annons som redan är uppe — och det är en tillfällighet i maskineriet, inte något säljaren gjort
+   * olika. Frågan ska ställas likadant i alla tre.
+   */
+  const processfragan = fragarOmProcessen ? (
+    <ProcessFeedback
+      jobId={jobId}
+      onStang={() => {
+        markeraFeedbackAvklarad(jobId);
+        setFragarOmProcessen(false);
+      }}
+    />
+  ) : null;
 
   if (publication?.status === "published" && publication.url) {
     return (
@@ -125,6 +156,7 @@ export default function SellWithLoopa({
         {/* Kvittot gäller EN möbel. Frågorna som kommer efter det — vad har jag ute nu, och kan jag
             göra det här igen — besvaras i profilen och i ett nytt varv. */}
         <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} />
+        {processfragan}
       </section>
     );
   }
@@ -155,6 +187,7 @@ export default function SellWithLoopa({
           <h1 id="sell-kvitto-rubrik">{t("Vi tar över försäljningen")}</h1>
           <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} framtradande />
         </div>
+        {processfragan}
       </div>
     );
   }
@@ -167,6 +200,7 @@ export default function SellWithLoopa({
           <div className="spinner spinner-small" />
           <p className="muted small">{t("Annonsen köas och bilderna laddas upp. Det tar oftast under en minut.")}</p>
         </div>
+        {processfragan}
       </section>
     );
   }
@@ -227,8 +261,37 @@ export default function SellWithLoopa({
           onConfirm={publish}
         />
       )}
+      {processfragan}
     </>
   );
+}
+
+/**
+ * Märket som gör att frågan ställs EN gång per möbel.
+ *
+ * Lokalt i webbläsaren med flit. Det styr ingenting och skyddar ingenting — det finns bara för att
+ * ett omladdat kvitto inte ska be om samma omdöme igen. En serverflagga hade betytt en tabell, en
+ * väg och en synkronisering för att lösa ett problem som är precis så stort som det låter.
+ *
+ * Kastas det (privat läge, avstängd lagring) är utfallet att frågan kan komma en gång till. Det är
+ * ett mycket mindre fel än en ruta som kraschar flödet, och därför är båda anropen tysta.
+ */
+const FEEDBACK_NYCKEL = (jobId: string) => `loopa.feedback.${jobId}`;
+
+function feedbackAvklarad(jobId: string): boolean {
+  try {
+    return window.localStorage.getItem(FEEDBACK_NYCKEL(jobId)) !== null;
+  } catch {
+    return false;
+  }
+}
+
+function markeraFeedbackAvklarad(jobId: string): void {
+  try {
+    window.localStorage.setItem(FEEDBACK_NYCKEL(jobId), new Date().toISOString());
+  } catch {
+    // Lagringen är en bekvämlighet. Går den inte att skriva har ingenting gått sönder.
+  }
 }
 
 /**
@@ -324,6 +387,21 @@ function SellConfirm({
   const t = useT();
   const panel = useRef<HTMLDivElement>(null);
   const drops = ladderDrops(ladder);
+
+  /**
+   * De två kryssen.
+   *
+   * Villkoren ovanför är sådant vi talar om; de här två är sådant säljaren intygar, och därför är de
+   * kryss och inte rader. Det andra finns för att en möbel som ligger kvar till salu någon annanstans
+   * kan bli såld två gånger, och det är köparen och budfirman som får betala för det — inte något vi
+   * kan se från vår sida, bara något säljaren kan svara på.
+   *
+   * Två separata kryss och inte ett gemensamt: det är två olika åtaganden, och ett kryss som betyder
+   * båda är ett kryss man inte har läst.
+   */
+  const [godkannerVillkor, setGodkannerVillkor] = useState(false);
+  const [harTagitBortAndra, setHarTagitBortAndra] = useState(false);
+  const fårSälja = godkannerVillkor && harTagitBortAndra;
 
   // Sidan bakom får inte rulla med medan rutan ligger över den.
   useEffect(() => {
@@ -464,13 +542,36 @@ function SellConfirm({
               frakt: formatSek(plan.shippingSek),
             })}
           </p>
+
+          <div className="sell-intyg">
+            <label>
+              <input
+                type="checkbox"
+                checked={godkannerVillkor}
+                onChange={(e) => setGodkannerVillkor(e.target.checked)}
+                disabled={sending}
+              />
+              <span>
+                {t("Jag godkänner Loopas")} <LegalLink doc="terms">{t("användarvillkor")}</LegalLink>
+              </span>
+            </label>
+            <label>
+              <input
+                type="checkbox"
+                checked={harTagitBortAndra}
+                onChange={(e) => setHarTagitBortAndra(e.target.checked)}
+                disabled={sending}
+              />
+              <span>{t("Jag tar bort mina andra publicerade annonser av möbeln")}</span>
+            </label>
+          </div>
         </div>
 
         <footer className="sell-modal-actions">
           <button className="btn btn-text" onClick={onCancel} disabled={sending}>
             {t("Avbryt")}
           </button>
-          <button className="btn btn-primary" onClick={onConfirm} disabled={sending}>
+          <button className="btn btn-primary" onClick={onConfirm} disabled={sending || !fårSälja}>
             {sending ? t("Lägger ut…") : t("Ja, sälj den")}
           </button>
         </footer>

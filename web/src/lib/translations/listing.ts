@@ -177,6 +177,12 @@ export const LISTING: Record<string, Translation> = {
     en: "The ad goes up straight away and becomes public.",
     fr: "L'annonce est publiée immédiatement et devient publique.",
   },
+  "Jag godkänner Loopas": { en: "I accept Loopa's", fr: "J'accepte les" },
+  användarvillkor: { en: "terms of use", fr: "conditions d'utilisation de Loopa" },
+  "Jag tar bort mina andra publicerade annonser av möbeln": {
+    en: "I will remove my other published ads for this piece",
+    fr: "Je retire mes autres annonces publiées pour ce meuble",
+  },
   "Ja, sälj den": { en: "Yes, sell it", fr: "Oui, vendez-le" },
   "Lägger ut…": { en: "Publishing…", fr: "Publication…" },
   "Ligger på": { en: "Currently at", fr: "Actuellement à" },

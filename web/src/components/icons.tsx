@@ -317,3 +317,18 @@ export function TruckIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/**
+ * Pratbubblan: säljarnas omdömen i adminpanelen.
+ *
+ * En bubbla och inte en stjärna, trots att fliken också bär betyg. Stjärnan säger "recensioner" —
+ * något som ställs ut och räknas ihop — och det här är tvärtom: någon sa något till oss, och det
+ * ska läsas.
+ */
+export function ChatIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" aria-hidden="true" {...base}>
+      <path d="M20.2 12.3c0 3.9-3.5 7-7.9 7a9 9 0 0 1-2.7-.4l-4.9 1.5 1.6-4A6.6 6.6 0 0 1 4.4 12c0-3.9 3.5-7 7.9-7s7.9 3.1 7.9 7z" />
+    </svg>
+  );
+}

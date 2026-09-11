@@ -2313,6 +2313,20 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
   font-size: 22px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
 }
 .sell-delning-not { margin: 8px 2px 0; font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; }
+/* ---- de två kryssen ----
+   Sist i rutan, direkt ovanför knappen: det är det sista man gör innan man säger ja, och ett intyg
+   som står ovanför uträkningen läses innan man vet vad man intygar om. Hela raden är klickbar —
+   en 16-pixels ruta är ett för litet mål på en telefon för att vara det som står mellan säljaren
+   och knappen. */
+.sell-intyg { margin-top: 18px; border-top: 1px solid var(--hairline); }
+.sell-intyg label {
+  display: flex; align-items: flex-start; gap: 11px; padding: 12px 2px; cursor: pointer;
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--ink-soft);
+}
+.sell-intyg label + label { border-top: 1px solid var(--hairline); }
+.sell-intyg input { flex: none; width: 21px; height: 21px; margin: 0; accent-color: var(--green); }
+.sell-intyg a { color: inherit; text-underline-offset: 2px; }
+
 /* Knapparna följer inte med rullningen. Det som ska tryckas ska aldrig behöva letas fram. */
 .sell-modal-actions {
   flex-shrink: 0; display: flex; align-items: center; gap: 10px;
@@ -2924,12 +2938,22 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
   display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap;
   padding-top: 6px; border-top: 1px solid var(--hairline);
 }
-/* ID:t på den publika sidan — och numera bara där. Säljarens vy hade en egen ruta för det med
-   kopieringsknapp och förklaring; den är borttagen, för säljaren har ingenting att göra med koden.
-   HÄR betyder den något: /c/LP-XXXX-XXXX ÄR adressen man slog upp, och talet på skärmen är kvittot
-   på att man landat på rätt kort. */
+/* ID:t på den publika sidan, i stor stil: /c/LP-XXXX-XXXX ÄR adressen man slog upp, och talet på
+   skärmen är kvittot på att man landat på rätt kort. Det är sidans svar, inte en detalj på den. */
 .loopa-id-value {
   font-size: var(--fs-title); font-weight: 700; letter-spacing: 0.06em; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Samma ID på SÄLJARENS kort, och medvetet i motsatt tonläge: där är koden ingen rubrik utan en
+   etikett på annonsen man har framför sig — dämpad, på en rad, utan ruta omkring. Bara själva
+   talet får kortets bläck och avståndet mellan tecknen, så att det går att läsa högt och skriva av
+   ur en annons; ordet framför är bara vad talet heter. */
+.card-loopa-id {
+  margin: -4px 0 0; font-size: var(--fs-xs); color: var(--muted);
+}
+.card-loopa-id span {
+  margin-left: 6px; font-weight: 700; letter-spacing: 0.06em; color: var(--ink-soft);
   font-variant-numeric: tabular-nums;
 }
 .public-card-tradera { margin-top: 4px; }
@@ -4709,3 +4733,76 @@ body:has(.grind) .consent { display: none; }
 .fraga-bygger {
   margin: 10px 4px 0; font-size: var(--fs-sm); color: var(--muted-soft); text-align: center;
 }
+
+/* --------------------------------------------------------------------------
+   Frågan om processen, och feedbackfliken
+   --------------------------------------------------------------------------
+   Rutan lånar hela bekräftelsens skal (.sell-modal-*) och inte ett eget. Det är samma sorts avbrott
+   på samma ställe i flödet — helskärm på telefonen, en spalt på en bred ruta — och två olika
+   modalformer med sekunders mellanrum läser som två olika produkter.
+   -------------------------------------------------------------------------- */
+
+/* Skalan: fem lika stora tryckytor på en rad. Inga stjärnor — se AdminFeedbackScreen.tsx. */
+.feedback-skala { display: flex; gap: 8px; }
+.feedback-steg {
+  flex: 1; min-height: 52px; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-lg); font-weight: 600; color: var(--ink-soft);
+  background: var(--field); border: 1px solid var(--border); border-radius: var(--r-sm);
+  transition: background var(--t) var(--ease-ui), border-color var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.feedback-steg:hover:not(:disabled) { border-color: var(--muted-soft); }
+.feedback-steg.vald { background: var(--accent); border-color: var(--accent); color: #fff; }
+.feedback-steg:focus-visible { outline: none; box-shadow: var(--focus); }
+.feedback-steg:disabled { cursor: default; opacity: 0.6; }
+
+/* Bara ändarna namnges: mellanstegen är ett intryck, inte en språkbedömning. */
+.feedback-skala-andar {
+  display: flex; justify-content: space-between; margin-top: -6px;
+  font-size: var(--fs-sm); color: var(--muted);
+}
+
+.feedback-text { display: flex; flex-direction: column; gap: 6px; }
+.feedback-text > span { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.feedback-text textarea {
+  width: 100%; box-sizing: border-box; resize: vertical; min-height: 92px;
+  font-family: inherit; font-size: var(--fs-base); line-height: 1.5; color: var(--ink);
+  background: var(--field); border: 1px solid var(--border); border-radius: var(--r-sm); padding: 10px 12px;
+}
+.feedback-text textarea:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+
+/* Tacket är en enda rad och stänger sig självt. Panelen krymper till sitt innehåll i stället för att
+   behålla formulärets höjd — en tom ruta med en mening i skulle läsa som att något saknas. */
+.feedback-tack {
+  align-items: center; justify-content: center; gap: 12px;
+  padding: 30px var(--safe-right) calc(30px + env(safe-area-inset-bottom)) var(--safe-left);
+  max-height: none; margin: auto 0 0; text-align: center;
+}
+.feedback-tack p { margin: 0; font-size: var(--fs-lg); color: var(--ink); }
+.feedback-tack-markning {
+  display: flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; border-radius: 999px; background: var(--surface-sunk); color: var(--accent);
+}
+
+/* ---- fliken i adminpanelen ---- */
+.feedback-lista { display: flex; flex-direction: column; gap: 10px; }
+.feedback-rad {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 14px 16px; background: var(--surface);
+  border: 1px solid var(--border); border-radius: var(--r-md, 12px);
+}
+.feedback-rad-topp { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+/* Betyget som en bricka. Färgen bär omdömet: låga tal ska gå att hitta genom att bläddra. */
+.feedback-betyg {
+  flex-shrink: 0; padding: 2px 8px; border-radius: 999px;
+  font-size: var(--fs-sm); font-weight: 700; color: #fff; background: var(--muted);
+}
+.feedback-betyg.betyg-1, .feedback-betyg.betyg-2 { background: var(--accent); }
+.feedback-betyg.betyg-3 { background: var(--muted); }
+.feedback-betyg.betyg-4, .feedback-betyg.betyg-5 { background: hsl(150 38% 34%); }
+.feedback-mobel { font-weight: 600; color: var(--ink); }
+.feedback-id { font-size: var(--fs-sm); color: var(--muted); font-variant-numeric: tabular-nums; }
+.feedback-tid { margin-left: auto; font-size: var(--fs-sm); color: var(--muted); }
+/* Radbrytningarna behålls: den som skrev tre stycken menade tre stycken. */
+.feedback-text-svar { margin: 0; white-space: pre-wrap; line-height: 1.5; color: var(--ink-soft); }
+.feedback-tom { margin: 0; font-size: var(--fs-sm); color: var(--muted); font-style: italic; }
+.feedback-avsandare { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
