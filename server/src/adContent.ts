@@ -119,17 +119,25 @@ function infoPageUrl(loopaId: string): string | null {
 /**
  * Annonstexten som block.
  *
- * Annonsen säger tre saker rakt ut, i den ordningen: att den är skriven av Loopa, vad AI:n hittade,
- * och vilket skick den satte. Det är hela poängen med Loopa — en köpare ska se exakt vad
- * besiktningen såg, inte "bruksslitage, se bilder" — och det håller bara om annonsen också berättar
- * VEM som tittat och att det var en maskin. Ett skick satt av en AI som utger sig för att vara
- * säljarens egen bedömning vore samma lögn som en bortretuscherad repa.
+ * ORDNINGEN ÄR KÖPARENS, INTE VÅR. Texten öppnade förut med två stycken om Loopa — vem som skrivit
+ * annonsen, hur många vyer AI:n gått igenom, i hur många besiktningar — och först i tredje stycket
+ * stod det vad möbeln var. Den som skummar en annonslista läser en rad och bläddrar vidare, och den
+ * raden handlade om oss. Nu står avsändaren på en rad, möbeln på nästa, och allt som är en
+ * MÄTNING (mått, skick, skador) samlat därefter.
  *
- * Därefter allt en möbelannons behöver för att inte behöva en fråga i meddelandefunktionen: mått,
- * övriga specifikationer, skicket i klartext, varje skada, och — på Tradera — leveranssättet.
+ * AVSÄNDAREN STÅR KVAR FÖRST, kortad till en mening. Att skicket är satt av en maskin och inte av
+ * säljaren är inte en teknisk detalj utan hela skillnaden mot "bruksslitage, se bilder": ett skick
+ * satt av en AI som utger sig för att vara säljarens egen bedömning vore samma lögn som en
+ * bortretuscherad repa. Vad AI:n faktiskt gjorde — hur många håll, hur många gånger, vad den
+ * hittade — flyttade däremot NER till skickstycket, där påståendet det kvalificerar står. Uppgiften
+ * är densamma; den står bara där den betyder något.
  *
- * Sist Loopa-ID:t. Annonsen bakom det är publik, och det är där påståendena ovan går att kontrollera
- * mot bild, källor och en skada i taget.
+ * SAMMA SAK SÄGS EN GÅNG. Skadeantalet stod på tre ställen (ingressen, en rad som pekade nedåt, och
+ * listans rubrik) och skicket på två, med två olika ord för samma betyg. En annons som upprepar sig
+ * läser som en annons som fyller ut, och läsaren börjar skumma just det som ska läsas noga.
+ *
+ * Sist Loopa-ID:t och EN länk — den till sidan där påståendena går att kontrollera mot bild, källor
+ * och en skada i taget.
  */
 /**
  * Meningar som lovar något om hämtning eller frakt. Se anropet i composeAd för varför de ska bort.
@@ -159,39 +167,25 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   const damages = result.damages.filter(damageStands);
   const grade = result.grade;
 
-  // Avsändaren först, före allt annat. Den som skummar en annons läser den första raden.
-  const found =
-    damages.length > 0
-      ? `hittat ${damages.length} ${damages.length === 1 ? "synlig skada" : "synliga skador"}`
-      : "inte hittat någon synlig skada";
-  const opening =
-    `Loopas AI har gått igenom ${result.images.length} ${result.images.length === 1 ? "vy" : "vyer"} av möbeln` +
-    `${result.reviewed ? " i två besiktningar" : ""}, ${found} och `;
-  const tail = damages.length > 0 ? " Skadorna står utskrivna längre ner, en och en." : "";
-
-  // Avsändaren OCH säljaren i samma rad. Att annonsen är skriven av Loopa säger vem som står bakom
-  // orden; att möbeln säljs av Loopa säger vem köparen gör affär med — och det andra är det som
-  // avgör vad de kan förvänta sig av frakt, betalning och ansvar.
+  /**
+   * Avsändaren på EN rad, och båda sakerna den måste bära.
+   *
+   * Att annonsen är skriven av Loopa säger vem som står bakom orden; att möbeln SÄLJS av Loopa säger
+   * vem köparen gör affär med, vilket är det som avgör vad de kan vänta sig av frakt, betalning och
+   * ansvar. Att granskningen är gjord av en AI står med här och inte bara nere vid skicket, för att
+   * raden annars läser som att en människa tittat — och den som skummar läser bara den här raden.
+   *
+   * Tre meningar blev en. Vad AI:n hittade står i skickstycket, där siffran hör hemma.
+   */
   blocks.push(
     paragraph([
       {
         text: options.loopaSells
-          ? "Den här möbeln säljs av Loopa, och annonsen är skriven av Loopa."
-          : "Den här annonsen är skapad av Loopa.",
+          ? "Säljs av Loopa. Vi har filmat möbeln, granskat den med AI och skrivit annonsen."
+          : "Annonsen är skriven av Loopa. Vi har filmat möbeln och granskat den med AI.",
         strong: true,
       },
     ]),
-  );
-  blocks.push(
-    paragraph(
-      grade
-        ? [
-            { text: `${opening}satt skicket ` },
-            { text: grade.label, strong: true },
-            { text: ` (${grade.canonicalCondition}).${tail}` },
-          ]
-        : [{ text: `${opening}sammanställt uppgifterna nedan.${tail}` }],
-    ),
   );
 
   /**
@@ -249,12 +243,17 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
     blocks.push(attributeList(rest));
   }
 
+  /**
+   * Skicket — ETT ord, inte två.
+   *
+   * Raden löd "Skick: Gott begagnat skick — Mycket bra skick": två etiketter för samma betyg, med ett
+   * tankstreck emellan som läser som att de säger olika saker. `canonicalCondition` är enligt sin egen
+   * typ de publika skickorden (fyra möjliga, se types.ts) och är alltså det ord som är skrivet för en
+   * köpare; `grade.label` är vår egen formulering av samma sak och behövs inte bredvid den.
+   */
   blocks.push(
     paragraph([
-      {
-        text: `Skick: ${grade ? `${grade.label} — ${grade.canonicalCondition}` : "bedömt utifrån bilderna"}`,
-        strong: true,
-      },
+      { text: `Skick: ${grade ? grade.canonicalCondition : "bedömt utifrån bilderna"}`, strong: true },
     ]),
   );
   if (grade?.rationale) blocks.push(paragraph([{ text: grade.rationale }]));
@@ -264,17 +263,34 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   // I en annons som säger att en AI hittat de här skadorna är en sådan mening inte bara överflödig,
   // den är osann. Skicket har EN röst i annonsen, och det är besiktningens.
 
+  /**
+   * Vad granskningen faktiskt bestod i, precis före det den kom fram till.
+   *
+   * Stod tidigare i ingressen, långt från skadelistan, i orden "gått igenom 2 vyer av möbeln i två
+   * besiktningar". "Vy" och "besiktning" är VÅRA ord för en filmad vinkel och en omkörning av
+   * granskningen; en köpare läser "2 vyer" som att vi sett två bilder. "Från 2 håll" och "två
+   * gånger" säger samma sak med ord som inte behöver förklaras.
+   *
+   * Antalet skador står HÄR och bara här. Det stod förut också i ingressen och i en rad som sa att
+   * skadorna kom längre ner — en hänvisning nedåt i en text man ändå läser uppifrån och ner.
+   */
+  const granskning =
+    `Loopas AI har granskat möbeln från ${result.images.length === 1 ? "ett" : result.images.length} ` +
+    `${result.images.length === 1 ? "håll" : "håll"}${result.reviewed ? ", två gånger," : ""} och `;
   if (damages.length > 0) {
     blocks.push(
       paragraph([
-        { text: `AI:n hittade ${damages.length} ${damages.length === 1 ? "skada" : "skador"}:`, strong: true },
+        {
+          text: `${granskning}hittade ${damages.length} ${damages.length === 1 ? "skada" : "skador"}:`,
+          strong: true,
+        },
       ]),
     );
     // Numrerad: samma ordning och samma nummer som nålarna på annonsen, så en skada går att slå
     // upp där utan att först räknas fram.
     blocks.push({ kind: "list", ordered: true, items: damages.map(describeDamage) });
   } else {
-    blocks.push(paragraph([{ text: "AI:n hittade inga synliga skador.", strong: true }]));
+    blocks.push(paragraph([{ text: `${granskning}hittade inga synliga skador.`, strong: true }]));
   }
 
   /**
@@ -320,33 +336,35 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
         smell,
       ],
     });
+    // Kortad, men samma två saker: vem som svarat, och varför det inte kunde kontrolleras.
     blocks.push(
       paragraph([
-        {
-          text:
-            "De två uppgifterna kommer från säljaren och inte från besiktningen — varken pälsdjur " +
-            "eller lukt går att se på bild.",
-        },
+        { text: "Uppgifterna kommer från säljaren och inte från besiktningen — varken pälsdjur eller lukt syns på bild." },
       ]),
     );
   }
 
   if (options.delivery) {
-    // Leveransen är det köparen annars skriver ett meddelande om, och svaret är inte "hämtas hos
-    // säljaren" längre — Loopa kör hem möbeln. Tre saker måste stå: att det BARA är hemleverans, att
-    // ingenting tillkommer i kassan, och vem som gör vad efter köpet. Beloppet skrivs ut trots att
-    // köparen inte betalar det separat; en hemleverans som bara sägs "ingå" läses som att den inte
-    // är värd något.
-    blocks.push(paragraph([{ text: "Leverans", strong: true }]));
-    blocks.push(
-      paragraph([{ text: "Endast hemleverans — frakten ingår i priset.", strong: true }]),
-    );
+    /**
+     * Leveransen — det köparen annars skriver ett meddelande om.
+     *
+     * Fyra uppgifter måste stå, och alla fyra står kvar: att leveransen ingår i priset, vad som
+     * händer efter köpet, vad den kostar, och att avhämtning inte är ett alternativ. Beloppet
+     * skrivs ut trots att köparen inte betalar det separat — en hemleverans som bara sägs "ingå"
+     * läses som att den inte är värd något.
+     *
+     * EN RUBRIK FÄRRE, EN MENING FÄRRE. "Leverans" följt av "Endast hemleverans — frakten ingår i
+     * priset" var en rubrik ovanpå en rubrik, och "Loopa löser hemleveransen åt dig efter köpet:"
+     * var en inledning till en mening som sedan sa exakt vad vi löser. Den feta raden är rubriken
+     * nu, och den säger det viktigaste i fyra ord. "Endast" behövs inte för att stänga avhämtningen
+     * — sista meningen gör det rakt ut.
+     */
+    blocks.push(paragraph([{ text: "Hemleverans ingår i priset.", strong: true }]));
     blocks.push(
       paragraph([
         {
           text:
-            "Loopa löser hemleveransen åt dig efter köpet: en budfirma kör möbeln hem till din dörr, och " +
-            "du väljer leveranstid via SMS. " +
+            "En budfirma kör möbeln hem till din dörr efter köpet, och du väljer leveranstid via SMS. " +
             `Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad i priset — ingenting ` +
             "tillkommer i kassan. Avhämtning erbjuds inte.",
         },
@@ -354,39 +372,49 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
     );
   }
 
-  const url = publicCardUrl(loopaId);
-  blocks.push(paragraph([{ text: `Loopa-ID: ${loopaId}`, strong: true }]));
-  blocks.push(
-    paragraph([
-      {
-        text:
-          "Varje annons hos Loopa är publik. Sök på Loopa-ID:t hos Loopa så ser du hela besiktningen: " +
-          "skicket, varje skada, måtten och källorna bakom uppgifterna." +
-          (url ? ` ${url}` : ""),
-      },
-    ]),
-  );
-
   /**
-   * Den köpfria sidan, som EGEN rad och sist.
+   * Loopa-ID:t och EN väg till besiktningen.
    *
-   * EN LÄNK MAN KAN KLICKA PÅ, inte ett ID man ska skriva av. Stycket ovanför ber läsaren slå upp
-   * ett ID, vilket är ett arbetsmoment — och de flesta gör det inte. Raden här är samma
-   * besiktning en klick bort, och den säger rakt ut att sidan inte är ett andra ställe att köpa
-   * på: annars läser en Loopa-länk i en Tradera-annons som ett försök att ta affären därifrån,
-   * vilket både köparen och Tradera skulle ha rätt att irritera sig på.
+   * Här stod två stycken med var sin länk: ett som bad läsaren söka upp ID:t på /c/, och ett som
+   * pekade på den köpfria sidan. Båda leder till samma uppgifter, och två länkar i rad som säger
+   * nästan samma sak läser som utfyllnad — värre, de tvingar läsaren att välja mellan dem utan att
+   * ha något att välja på.
    *
-   * Faller adressen bort (ingen LOOPA_PUBLIC_URL) står stycket inte alls — en mening om en sida
-   * utan sidan är sämre än tystnad.
+   * KANALEN AVGÖR VILKEN SOM STÅR. Har annonsen en köpfri sida att peka på (Tradera) är den den
+   * bättre destinationen: möbeln först, ingen sökruta att fylla i. Saknas den (Blocket) står
+   * uppslagsvägen kvar precis som förut. ID:t skrivs ut i båda fallen — det är det köparen har kvar
+   * om länken inte går fram, och det står i annonsen även när ingen adress är känd.
+   *
+   * REDAN PUBLICERADE ANNONSER BÄR /c/ INBAKAT. Att nya annonser slutar skriva ut den adressen
+   * ändrar ingenting för dem: /c/ svarar där den står, för all framtid, och undantaget som ser till
+   * det ligger kvar i butik/seo.ts.
    */
+  blocks.push(paragraph([{ text: `Loopa-ID: ${loopaId}`, strong: true }]));
   const info = options.infoPage ? infoPageUrl(loopaId) : null;
+  const kort = publicCardUrl(loopaId);
   if (info) {
+    /*
+     * Sidan säger rakt ut att den inte är ett andra ställe att köpa på. Utan den meningen läser en
+     * Loopa-länk mitt i en Tradera-annons som ett försök att ta affären därifrån, vilket både
+     * köparen och Tradera skulle ha rätt att irritera sig på.
+     */
     blocks.push(
       paragraph([
         {
           text:
-            `Se möbeln med alla bilder, måtten och varje skada utpekad: ${info} ` +
-            "Sidan är bara information — köpet gör du här i annonsen.",
+            `Se hela besiktningen — alla bilder, måtten och varje skada utpekad: ${info} ` +
+            "Sidan är bara information, köpet gör du här i annonsen.",
+        },
+      ]),
+    );
+  } else {
+    blocks.push(
+      paragraph([
+        {
+          text:
+            "Varje annons hos Loopa är publik. Sök på Loopa-ID:t hos Loopa så ser du hela besiktningen: " +
+            "skicket, varje skada, måtten och källorna bakom uppgifterna." +
+            (kort ? ` ${kort}` : ""),
         },
       ]),
     );
@@ -493,11 +521,20 @@ function attributeList(attributes: ListingAttribute[]): AdBlock {
   return { kind: "list", ordered: false, items: attributes.map((a) => `${a.label}: ${a.value}`) };
 }
 
+/**
+ * En skada som en rad i listan.
+ *
+ * "Repa på bordsskiva (vänstra hörnet) — måttlig. En repa på cirka 4 cm." — tankstrecket mitt i
+ * delade raden i två halvor som båda började om, och allvarsgraden stod som ett eget påstående
+ * mellan platsen och beskrivningen. Platsen hör ihop med delen och allvarsgraden hör ihop med
+ * skadan, så de sitter nu på var sin sida: delen och var på den, sedan hur illa det är, sedan
+ * besiktningens egna ord. Samma fyra uppgifter, en klausul mindre att ta sig igenom.
+ */
 function describeDamage(damage: Damage): string {
   const head = [TYPE_LABELS[damage.type], damage.part].filter(Boolean).join(" på ");
-  const where = damage.semanticLocation ? ` (${damage.semanticLocation})` : "";
+  const where = damage.semanticLocation ? `, ${damage.semanticLocation}` : "";
   const severity = SEVERITY_LABELS[damage.severity];
-  return `${head}${where} — ${severity}. ${damage.description}`.trim();
+  return `${head}${where} (${severity}). ${damage.description}`.trim();
 }
 
 function escapeHtml(text: string): string {

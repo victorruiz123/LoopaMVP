@@ -123,14 +123,33 @@ test("annonsen säger vem som säljer möbeln, vem som skrivit texten, och att d
   const html = buildDescription(job());
   // Säljaren står i första raden. En köpare som tror att de handlar av en privatperson gissar fel
   // om både frakt och ansvar — och den gissningen görs innan de läst en enda rad om möbeln.
-  assert.match(html, /Den här möbeln säljs av Loopa, och annonsen är skriven av Loopa/);
-  assert.match(html, /Loopas AI har gått igenom 2 vyer av möbeln/);
+  assert.match(html, /Säljs av Loopa\. Vi har filmat möbeln, granskat den med AI och skrivit annonsen/);
+  // Vad granskningen bestod i står kvar, men nere vid skicket — se skickstyckets test.
+  assert.match(html, /Loopas AI har granskat möbeln från 2 håll och hittade/);
 });
 
-test("skicket står med både betygets etikett och Traderas skickord", () => {
+/**
+ * "2 vyer i två besiktningar" var våra ord för en filmad vinkel och en omkörning av granskningen.
+ * En köpare läser "2 vyer" som att vi sett två bilder. Omkörningen står bara när den faktiskt
+ * gjorts — `reviewed` — och ett påstående om två granskningar på ett jobb som bara granskats en
+ * gång vore ett löfte om noggrannhet vi inte hållit.
+ */
+test("den andra besiktningen nämns bara när den gjorts", () => {
+  assert.doesNotMatch(buildDescription(job()), /två gånger/);
+  const granskad = job();
+  granskad.result!.reviewed = true;
+  assert.match(buildDescription(granskad), /granskat möbeln från 2 håll, två gånger, och hittade/);
+});
+
+/**
+ * Ett skickord, inte två. Raden bar både `grade.label` och `canonicalCondition` — "Gott begagnat
+ * skick — Mycket bra skick" — vilket läser som två olika bedömningar av samma möbel. Kvar står det
+ * ord som enligt sin egen typ är skrivet för en köpare (types.ts: fyra publika skickord).
+ */
+test("skicket står med ETT skickord, och motiveringen under", () => {
   const html = buildDescription(job());
-  assert.match(html, /satt skicket <strong>Gott begagnat skick<\/strong> \(Mycket bra skick\)/);
-  assert.match(html, /Skick: Gott begagnat skick — Mycket bra skick/);
+  assert.match(html, /Skick: Mycket bra skick/);
+  assert.doesNotMatch(html, /Gott begagnat skick/, "betygets interna etikett ska inte stå bredvid det publika ordet");
   assert.match(html, /Ett par ytliga repor/, "motiveringen ska följa med, inte bara betyget");
 });
 
@@ -146,9 +165,9 @@ test("varje skada står utskriven, numrerad som på annonsen", () => {
   const html = buildDescription(
     job({ damages: [dmg({ id: "a" }), dmg({ id: "b", type: "stain", part: "benet", description: "En fläck." })] }),
   );
-  assert.match(html, /AI:n hittade 2 skador/);
+  assert.match(html, /hittade 2 skador/);
   assert.match(html, /<ol>/, "numrerad lista — samma nummer som nålarna på kortet");
-  assert.match(html, /Repa på bordsskiva \(vänstra hörnet\) — måttlig\. En repa på cirka 4 cm\./);
+  assert.match(html, /Repa på bordsskiva, vänstra hörnet \(måttlig\)\. En repa på cirka 4 cm\./);
   assert.match(html, /Fläck på benet/);
 });
 
@@ -156,15 +175,15 @@ test("en skada säljaren avvisat följer inte med till annonsen", () => {
   const html = buildDescription(
     job({ damages: [dmg({ id: "a" }), dmg({ id: "b", sellerAction: "rejected", description: "Avvisad av säljaren." })] }),
   );
-  assert.match(html, /hittat 1 synlig skada/);
-  assert.match(html, /AI:n hittade 1 skada:/);
+  assert.match(html, /hittade 1 skada:/);
+  // Antalet står på ETT ställe numera. Stod det kvar i en ingress också kunde de två räkna olika.
+  assert.equal((html.match(/1 skada/g) ?? []).length, 1, "skadeantalet sägs en gång, inte två");
   assert.doesNotMatch(html, /Avvisad av säljaren/);
 });
 
 test("noll skador sägs som noll skador, inte genom att listan uteblir", () => {
   const html = buildDescription(job({ damages: [] }));
-  assert.match(html, /inte hittat någon synlig skada/);
-  assert.match(html, /AI:n hittade inga synliga skador/);
+  assert.match(html, /Loopas AI har granskat möbeln från 2 håll och hittade inga synliga skador/);
 });
 
 /**
@@ -263,15 +282,15 @@ test("saknade mått sägs rakt ut i stället för att rubriken tyst uteblir", ()
  */
 test("Blocket-annonsen bär samma leveranslöfte som Tradera-annonsen", () => {
   const text = buildBlocketDescription(job());
-  assert.match(text, /Endast hemleverans — frakten ingår i priset\./);
-  assert.match(text, /Loopa löser hemleveransen åt dig efter köpet/);
+  assert.match(text, /Hemleverans ingår i priset\./);
+  assert.match(text, /budfirma kör möbeln hem till din dörr efter köpet/);
   assert.match(text, new RegExp(`Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad`));
   assert.match(text, /Avhämtning erbjuds inte/);
 });
 
 test("Blocket-annonsen säger att Loopa är säljaren, precis som Tradera-annonsen", () => {
-  assert.match(buildBlocketDescription(job()), /Den här möbeln säljs av Loopa/);
-  assert.match(buildDescription(job()), /Den här möbeln säljs av Loopa/);
+  assert.match(buildBlocketDescription(job()), /Säljs av Loopa/);
+  assert.match(buildDescription(job()), /Säljs av Loopa/);
 });
 
 /**
@@ -314,12 +333,13 @@ test("skillnaden mot Tradera-texten är renderingen och länken till infosidan",
 
 test("leveransen säger både att den ingår och vad som händer efter köpet", () => {
   const html = buildDescription(job());
-  assert.match(html, /Endast hemleverans — frakten ingår i priset\./);
-  assert.match(html, /Loopa löser hemleveransen åt dig efter köpet/);
+  assert.match(html, /Hemleverans ingår i priset\./);
   assert.match(html, new RegExp(`Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad`));
   assert.match(html, /ingenting tillkommer i kassan/);
-  assert.match(html, /budfirma kör möbeln hem till din dörr/);
+  assert.match(html, /budfirma kör möbeln hem till din dörr efter köpet/);
   assert.match(html, /leveranstid via SMS/);
+  // Avhämtningen stängs av sista meningen och behöver inget "Endast" i rubriken ovanför.
+  assert.doesNotMatch(html, /Endast hemleverans/);
   assert.match(html, /Avhämtning erbjuds inte/);
   assert.doesNotMatch(html, /Hämtas hos säljaren/);
 });
@@ -346,11 +366,37 @@ test("måtten hänvisar till oss och inte till en säljare som inte finns", () =
   assert.doesNotMatch(html, /Fråga säljaren/);
 });
 
-test("Loopa-ID:t står i annonsen, med vad det går att göra med det", () => {
+/**
+ * ID:t står i BÅDA kanalerna. Det är det köparen har kvar om länken inte går fram — och det enda
+ * som står där även när servern inte vet sin egen adress.
+ */
+test("Loopa-ID:t står i annonsen på båda kanalerna", () => {
+  assert.match(buildDescription(job()), new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
+  assert.match(buildBlocketDescription(job()), new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
+});
+
+/**
+ * EN länk per annons, och kanalen avgör vilken.
+ *
+ * Annonsen bar två stycken med var sin länk till samma uppgifter — uppslagsvägen via /c/ och den
+ * köpfria sidan. Två länkar i rad som säger nästan samma sak tvingar läsaren att välja mellan dem
+ * utan att ha något att välja på. Har annonsen en köpfri sida att peka på är den den bättre
+ * destinationen; saknas den står uppslagsvägen kvar.
+ */
+test("annonsen bär en väg till besiktningen, inte två", () => {
+  const before = process.env.LOOPA_PUBLIC_URL;
+  process.env.LOOPA_PUBLIC_URL = "https://app.loopa.nu/";
   const html = buildDescription(job());
-  assert.match(html, new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
-  assert.match(html, /Varje annons hos Loopa är publik/);
-  assert.match(html, /Sök på Loopa-ID:t/);
+  assert.equal((html.match(/https:\/\//g) ?? []).length, 1, "Tradera-annonsen ska bära exakt en länk");
+  assert.match(html, /\/butik\/info\//);
+  assert.doesNotMatch(html, /Sök på Loopa-ID:t/, "uppslagsvägen behövs inte bredvid en direktlänk");
+
+  const text = buildBlocketDescription(job());
+  assert.equal((text.match(/https:\/\//g) ?? []).length, 1, "Blocket-annonsen ska bära exakt en länk");
+  assert.match(text, /Varje annons hos Loopa är publik/);
+  assert.match(text, /Sök på Loopa-ID:t/);
+  if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
+  else process.env.LOOPA_PUBLIC_URL = before;
 });
 
 /**
@@ -368,7 +414,7 @@ test("länken till den köpfria sidan står i Tradera-annonsen och bara där", (
   assert.match(html, new RegExp(`https://app.loopa.nu/butik/info/${loopaIdFor(JOB_ID)}`));
   // Sidan får inte läsas som ett andra ställe att köpa på — då är länken i någon annans annons ett
   // försök att ta affären därifrån.
-  assert.match(html, /Sidan är bara information — köpet gör du här i annonsen/);
+  assert.match(html, /Sidan är bara information, köpet gör du här i annonsen/);
   assert.doesNotMatch(buildBlocketDescription(job()), /\/butik\/info\//);
   if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
   else process.env.LOOPA_PUBLIC_URL = before;
@@ -384,12 +430,19 @@ test("infolänken uteblir helt när servern inte vet sin adress", () => {
   else process.env.LOOPA_PUBLIC_URL = before;
 });
 
+/**
+ * Prövas på BLOCKET-texten, som är den kanal där /c/ numera står. Tradera-annonsen pekar på den
+ * köpfria sidan i stället — redan publicerade Tradera-annonser bär /c/ inbakat och nås oförändrat,
+ * se undantaget i butik/seo.ts.
+ */
 test("adressen till kortet skrivs ut bara när servern vet vilken den är", () => {
   const before = process.env.LOOPA_PUBLIC_URL;
   delete process.env.LOOPA_PUBLIC_URL;
-  assert.doesNotMatch(buildDescription(job()), /https?:\/\/[^ ]*\/c\//);
+  assert.doesNotMatch(buildBlocketDescription(job()), /https?:\/\/[^ ]*\/c\//);
+  // Uppslagsvägen står kvar som mening — det är bara adressen som fattas.
+  assert.match(buildBlocketDescription(job()), /Sök på Loopa-ID:t/);
   process.env.LOOPA_PUBLIC_URL = "https://app.loopa.nu/";
-  assert.match(buildDescription(job()), new RegExp(`https://app.loopa.nu/c/${loopaIdFor(JOB_ID)}`));
+  assert.match(buildBlocketDescription(job()), new RegExp(`https://app.loopa.nu/c/${loopaIdFor(JOB_ID)}`));
   if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
   else process.env.LOOPA_PUBLIC_URL = before;
 });
