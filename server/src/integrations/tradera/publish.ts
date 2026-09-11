@@ -321,7 +321,7 @@ async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
  * leveransstycket, som bara stämmer när annonsen ligger på Loopas eget konto.
  */
 export function buildDescription(job: ConditionJob): string {
-  return renderAdHtml(composeAd(job, { delivery: true }));
+  return renderAdHtml(composeAd(job, { delivery: true, loopaSells: true }));
 }
 
 export { traderaConfigured };

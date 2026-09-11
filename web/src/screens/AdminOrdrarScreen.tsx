@@ -284,6 +284,7 @@ function statusText(status: AdminOrderRad["status"]): string {
     booking: "Bokar frakt",
     scheduled: "Frakt bokad",
     delivered: "Levererad",
+    cancel_requested: "Ångrat av köparen",
     return_requested: "Retur begärd",
     returned: "Returnerad",
     cancelled: "Avbruten",

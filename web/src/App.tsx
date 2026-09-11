@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import HomeScreen from "./screens/HomeScreen";
 import CaptureScreen from "./screens/CaptureScreen";
 import AnalysisScreen from "./screens/AnalysisScreen";
 import ModelSelectScreen from "./screens/ModelSelectScreen";
 import SpecsScreen from "./screens/SpecsScreen";
+import DisclosuresScreen from "./screens/DisclosuresScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
 import ListingScreen from "./screens/ListingScreen";
@@ -26,11 +27,13 @@ import CookieConsent from "./components/CookieConsent";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchLoader from "./components/ModelSearchLoader";
 import ListingBuildLoader from "./components/ListingBuildLoader";
-import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, type CapturedShot, ensureMediaSession } from "./api";
+import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, saveDisclosures, type CapturedShot, ensureMediaSession } from "./api";
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
 import type { AdminFlik } from "./screens/AdminScreen";
+import * as flode from "./lib/flode";
+import { getViewMode } from "./lib/viewMode";
 
 type Screen =
   | { name: "home" }
@@ -214,6 +217,7 @@ function useMediaSession(userId: string | undefined): boolean {
 }
 
 function FlowApp() {
+  const t = useT();
   const { user } = useAuth();
   const isAdmin = useMediaSession(user?.id);
   const [screen, setScreen] = useState<Screen>({ name: "home" });
@@ -274,6 +278,29 @@ function FlowApp() {
     if (openAdmin && isAdmin) setScreen({ name: "admin" });
   }, [openAdmin, isAdmin]);
 
+  /**
+   * Flödesmätningen: vilket steg säljaren står i, hur länge, och var de försvinner.
+   *
+   * LIGGER HÄR OCH INTE I VARJE SKÄRM. Steget ÄR `screen.name` — den här switchen är flödet — och en
+   * mätning utspridd över tio komponenter hade tappat exakt de steg någon glömde haka på. En effekt
+   * på skärmnamnet fångar varje byte, inklusive de som sker automatiskt (uppladdning → identifiering)
+   * och de som är avhopp bakåt.
+   *
+   * Jobbet knyts på så fort det finns: allt före uppladdningen saknar id, och det är serverns
+   * hopkoppling på flödessessionen som ger de stegen sin möbel. Se web/src/lib/flode.ts.
+   */
+  useEffect(() => {
+    flode.enhet(getViewMode());
+    return flode.startaAvhoppsvakt();
+  }, []);
+  useEffect(() => {
+    flode.stegIn(screen.name);
+    const jobId = "jobId" in screen ? screen.jobId : null;
+    if (jobId) flode.knytTillJobb(jobId);
+    // Kortet ÄR intyget: skärmen visas först när besiktningen står och säljaren bekräftat den.
+    if (screen.name === "listing") flode.intygat();
+  }, [screen]);
+
   const hadAccount = useRef(false);
   useEffect(() => {
     if (user) {
@@ -330,7 +357,9 @@ function FlowApp() {
     case "signup":
       return (
         <AuthScreen
-          intent="flow"
+          // Utan bilder står säljaren FÖRE filmningen — de tryckte just på sitt märke. Med bilder är
+          // det den gamla grinden mitt i flödet, och de två får inte säga samma sak.
+          intent={screen.shots ? "flow" : "sale"}
           // Den som tappat sin session har redan ett konto — då är "logga in" fliken de behöver.
           initialTab={screen.resume ? "signin" : undefined}
           // Rakt in i uppladdningen. Sessionen finns när det här anropas, så jobbet får sin token —
@@ -384,11 +413,15 @@ function FlowApp() {
       );
     case "specs":
       return (
-        <SpecsGate
-          jobId={screen.jobId}
-          onNext={() => setScreen({ ...screen, name: "price" })}
-          onBack={() => setScreen({ ...screen, name: "identify" })}
-        />
+        // Frågorna om pälsdjur och lukt ligger framför väntan på annonsen, inte i en egen skärm i
+        // flödet: bygget pågår bakom dem. Se DisclosuresGate.
+        <DisclosuresGate jobId={screen.jobId}>
+          <SpecsGate
+            jobId={screen.jobId}
+            onNext={() => setScreen({ ...screen, name: "price" })}
+            onBack={() => setScreen({ ...screen, name: "identify" })}
+          />
+        </DisclosuresGate>
       );
     case "price":
       return (
@@ -429,7 +462,7 @@ function FlowApp() {
       );
     case "listing": {
       const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
-      // Adminvägen öppnar samma skärm för någon annans möbel. "Till dina annonser" hade tagit
+      // Adminvägen öppnar samma skärm för någon annans möbel. "Till mina annonser" hade tagit
       // adminen till sin EGEN profil därifrån — så den vägen finns bara för säljarens eget kort.
       const ownCard = screen.back?.name !== "adminUser";
       return (
@@ -437,8 +470,18 @@ function FlowApp() {
           result={screen.result}
           loopaId={screen.loopaId}
           onBack={() => setScreen(back)}
+          // Vägen tillbaka heter det den leder till. Ur profilen ligger inte skicket bakom kortet —
+          // listan över egna annonser gör det, och det är dit knappen går.
+          backLabel={back.name === "profile" ? t("Tillbaka till mina annonser") : undefined}
+          // Borttagningen finns bara för säljarens eget kort, av samma skäl som "Till mina annonser".
+          // Efteråt finns ingen annons att stå kvar på: ur profilen tillbaka till listan, annars hem.
+          onDeleted={ownCard ? () => setScreen(back.name === "profile" ? { name: "profile" } : { name: "home" }) : undefined}
           onHome={goHome}
           onMyListings={ownCard ? () => setScreen({ name: "profile" }) : undefined}
+          // Nästa möbel börjar där den första gjorde: på startsidan, där märket anges och filmningen
+          // tar vid. Samma spärr som "Till mina annonser" — adminen som tittar på någon annans kort
+          // ska inte erbjudas att sälja en möbel till härifrån.
+          onSellAnother={ownCard ? goHome : undefined}
         />
       );
     }
@@ -452,7 +495,10 @@ function FlowApp() {
           // tillbaka till skicket finns kvar inifrån det.
           onOpenJob={async (row) => {
             const job = await getJob(row.id);
-            if (job.result) setScreen({ name: "listing", jobId: row.id, result: job.result, loopaId: job.loopaId });
+            // `back` pekar tillbaka på profilen, inte på skickvyn: annonsen öppnades ur listan över
+            // egna annonser, och det är dit man ska kunna gå tillbaka. Det är också den propen som
+            // ger kortet sin borttagningsknapp och sin tillbakatext — se `case "listing"`.
+            if (job.result) setScreen({ name: "listing", jobId: row.id, result: job.result, loopaId: job.loopaId, back: { name: "profile" } });
             else setScreen({ name: "result", jobId: row.id });
           }}
         />
@@ -714,6 +760,72 @@ function IdentifyGate({
       />
     </>
   );
+}
+
+/**
+ * Väntan efter modellvalet, använd till något: frågorna om pälsdjur, lukt och — för stolar — antal.
+ *
+ * Annonsen byggs i bakgrunden hela tiden — pollningen i SpecsGate under sköter den — så frågorna
+ * kostar ingen extra sekund. De ligger FÖRE väntan och inte efter: en säljare som svarat medan bygget
+ * pågick har i bästa fall aldrig sett en laddskärm alls.
+ *
+ * `sellerDisclosures` på jobbet är minnet. En omladdning mitt i väntan, eller en väg tillbaka via
+ * "Byt modell", ska inte ställa samma frågor igen.
+ *
+ * `chairLike` avgör om den tredje frågan ställs. Den läses ur samma hämtning som svaren: servern
+ * satte den vid modellvalet, alltså innan den här skärmen ens ritades.
+ *
+ * ETT MISSLYCKAT SPARANDE STOPPAR INGEN. Svaren gör annonsen bättre; de är inte villkoret för att få
+ * en. Faller anropet visas felet och nästa tryck går vidare ändå — resten av flödet är kvar, och
+ * annonsen står utan stycket "Från säljaren" i stället för att säljaren står utan annons.
+ */
+function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNode }) {
+  const t = useT();
+  const [answered, setAnswered] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /** Ett andra tryck efter ett fall betyder "strunt i det, gå vidare". */
+  const [failed, setFailed] = useState(false);
+  const [job, setJob] = useState<ConditionJob | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  // En enda hämtning, bara för att se om frågorna redan är besvarade. Pollningen som håller reda på
+  // annonsen bor i SpecsGate — den här grinden behöver inte veta hur bygget går.
+  useEffect(() => {
+    let avbruten = false;
+    getJob(jobId)
+      .then((j) => !avbruten && setJob(j))
+      // Går hämtningen inte fram ställs frågorna. Att hoppa över dem för ett nätverksfel vore att
+      // tappa dem tyst; att ställa dem en andra gång kostar bara två tryck.
+      .catch(() => {})
+      .finally(() => !avbruten && setLoaded(true));
+    return () => {
+      avbruten = true;
+    };
+  }, [jobId]);
+
+  async function done(svar: { pets: boolean; smell: boolean; smellNote: string | null; chairCount: number | null }) {
+    if (failed) return setAnswered(true);
+    setSaving(true);
+    setError(null);
+    try {
+      await saveDisclosures(jobId, svar);
+      setAnswered(true);
+    } catch (err) {
+      setFailed(true);
+      setError(
+        `${err instanceof Error ? err.message : t("Vi kunde inte spara svaren just nu.")} ${t("Tryck igen för att gå vidare utan dem.")}`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  // Tills jobbet lästs vet vi inte om frågorna redan är ställda, och en skärm som blinkar förbi är
+  // värre än en kort väntan. Bygget pågår ändå bakom.
+  if (!loaded) return <BuildingListing />;
+  if (answered || job?.sellerDisclosures) return <>{children}</>;
+  return <DisclosuresScreen onDone={done} saving={saving} error={error} chairLike={!!job?.chairLike} />;
 }
 
 /** Väntar in annonsen efter modellvalet. */

@@ -5,7 +5,7 @@
 //   1. SÄLJAREN får sitt fulla pris. Ingen provision, inget avdrag.
 //   2. LEVERANSEN prissätts av butikens zoner och ingen annanstans. Två fraktpriser för samma
 //      sträcka i samma app är två priser användaren kan se samtidigt.
-//   3. VARNINGEN informerar men blockerar aldrig. En 500-kronorsstol med 895 kr i avgifter kan
+//   3. VARNINGEN informerar men blockerar aldrig. En 500-kronorsstol med 800 kr i avgifter kan
 //      fortfarande vara ett vettigt köp — men det är köparens beslut, med talen framme.
 
 import { test } from "node:test";
@@ -25,11 +25,24 @@ test("leveransen kommer från butikens zoner, inte en egen taxa", () => {
   }
 });
 
-test("innerstad, närförort och storstockholm kostar olika", () => {
+/**
+ * Zonerna kostar numera LIKA — och det är hela poängen.
+ *
+ * Priset var 495/695/895 efter avstånd, men annonserna lovar ett enda tal ("Hemleveransen kostar
+ * 600 kr och är redan inräknad i priset") och kan inte veta postnumret när de skrivs. Testet vaktar
+ * att ingen zon glider isär igen: en köpare i Haninge ska betala det annonsen sa.
+ */
+test("frakten är samma i innerstad, närförort och storstockholm", () => {
   const inner = feesFor(4000, "11234").deliveryFeeSek;
   const nar = feesFor(4000, "16440").deliveryFeeSek;
   const stor = feesFor(4000, "18131").deliveryFeeSek;
-  assert.ok(inner < nar && nar < stor, `${inner} < ${nar} < ${stor}`);
+  assert.ok(inner === nar && nar === stor, `${inner} = ${nar} = ${stor}`);
+});
+
+// Leveranstiden är däremot fortfarande zonens: budfirman behöver längre framförhållning längre ut,
+// och det är en operativ sanning som inte försvann av att priset blev ett.
+test("leveranstiden skiljer sig fortfarande mellan zonerna", () => {
+  assert.ok(deliveryQuote("11234").zone!.leadDays < deliveryQuote("18131").zone!.leadDays);
 });
 
 test("serviceavgiften är platt — arbetet är detsamma oavsett möbelns pris", () => {
@@ -45,7 +58,7 @@ test("utanför området finns ingen leveransavgift att ta ut", () => {
 });
 
 test("varningen tänds när avgifterna närmar sig möbelns pris", () => {
-  const billig = feesFor(800, "18131"); // 200 + 895 = 1095 på en 800-kronorsmöbel
+  const billig = feesFor(800, "18131"); // 200 + 600 = 800 på en 800-kronorsmöbel
   assert.ok(billig.viabilityNote, "ska upplysa");
   assert.match(billig.viabilityNote!, /800 kr/, "talen står i meningen");
 });

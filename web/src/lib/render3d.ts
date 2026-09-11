@@ -190,6 +190,43 @@ function roundedQuad(pts: [number, number][], r: number): string {
   return `${d}Z`;
 }
 
+/**
+ * Punkternas konvexa hölje, moturs. Åtta hörn, så en enkel svepning räcker.
+ *
+ * Höljet av en lådas åtta projicerade hörn ÄR lådans siluett — en konvex kropp har ingen kontur
+ * innanför sitt hölje. Det är vad `silhuett` nedan fyller.
+ */
+function convexHull(pts: [number, number][]): [number, number][] {
+  const p = [...pts].sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  const kryss = (o: [number, number], a: [number, number], b: [number, number]) =>
+    (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+  const bygg = (lista: [number, number][]) => {
+    const ut: [number, number][] = [];
+    for (const punkt of lista) {
+      while (ut.length >= 2 && kryss(ut[ut.length - 2], ut[ut.length - 1], punkt) <= 0) ut.pop();
+      ut.push(punkt);
+    }
+    ut.pop();
+    return ut;
+  };
+  return [...bygg(p), ...bygg([...p].reverse())];
+}
+
+/** Samma rundning som `roundedQuad`, men för en polygon med hur många hörn som helst. */
+function roundedPoly(pts: [number, number][], r: number): string {
+  const n = pts.length;
+  if (n < 3) return "";
+  if (r < 0.7) return `M${pts.map(fmt).join("L")}Z`;
+  let d = "";
+  for (let i = 0; i < n; i++) {
+    const prev = pts[(i + n - 1) % n];
+    const cur = pts[i];
+    const next = pts[(i + 1) % n];
+    d += `${i === 0 ? "M" : "L"}${fmt(along(cur, prev, r))}Q${fmt(cur)} ${fmt(along(cur, next, r))}`;
+  }
+  return `${d}Z`;
+}
+
 /** Alla lådors ytor, baksidesgallrade och sorterade bakifrån och fram. */
 export function buildFaces(boxes: Box[], view: View, palette: Palette): Face[] {
   // Möbelns överkant, som referens för kontaktskuggningen nedan.
@@ -204,6 +241,28 @@ export function buildFaces(boxes: Box[], view: View, palette: Palette): Face[] {
       return { x: box.center.x + local.x, y: box.center.y + local.y, z: box.center.z + local.z };
     });
     const rotated = corners.map((c) => rotate(c, view.yaw, view.pitch));
+    const platt = rotated.map((r) => {
+      const sk = view.distance / (view.distance - r.z);
+      return [view.cx + r.x * sk * view.scale, view.cy - r.y * sk * view.scale] as [number, number];
+    });
+
+    /**
+     * SILUETTEN, fylld FÖRE lådans egna ytor.
+     *
+     * Varje yta rundas för sig (se roundedQuad), och två ytor som möts i en kant rundar båda undan
+     * från den — så i varje hörn av varje låda stod en kil av bakgrunden kvar. På en soffa blev det
+     * ett dussin ljusa hack längs kanterna, och de såg ut som glipor i möbeln, vilket är precis vad
+     * de var.
+     *
+     * En konvex låda har ingen kontur innanför sitt hölje, så höljet av de åtta projicerade hörnen
+     * är exakt lådans yttre form. Fylld i ett mellanting mellan de synliga ytornas toner täpper den
+     * igen varje hack utan att synas: ytorna målas ovanpå och bär fortfarande all skuggning.
+     *
+     * Djupet ligger strax bakom lådans BAKERSTA yta, så fyllningen aldrig kan lägga sig framför
+     * något som står framför lådan — den täcker bara det lådan själv redan skymmer.
+     */
+    const synliga: { lit: number; depth: number }[] = [];
+
     for (const face of FACES) {
       const normal = tiltX(face.normal, tilt);
       const n = rotate(normal, view.yaw, view.pitch);
@@ -227,6 +286,20 @@ export function buildFaces(boxes: Box[], view: View, palette: Palette): Face[] {
         light: tone(base, lit * (1 + sheen)),
         dark: tone(base, lit * (1 - sheen)),
         depth,
+      });
+      synliga.push({ lit, depth });
+    }
+
+    if (synliga.length > 0) {
+      const bakerst = Math.min(...synliga.map((f) => f.depth));
+      const medel = synliga.reduce((sum, f) => sum + f.lit, 0) / synliga.length;
+      const hull = convexHull(platt);
+      const ton = tone(base, medel);
+      out.push({
+        path: roundedPoly(hull, ((box.radius ?? 0) * view.scale * view.distance) / (view.distance - bakerst)),
+        light: ton,
+        dark: ton,
+        depth: bakerst - 0.001,
       });
     }
   }

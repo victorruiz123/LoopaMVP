@@ -10,11 +10,20 @@ import LegalLink from "../components/LegalLink";
  *
  * Ett konto som redan finns i Vips fungerar här utan registrering — det är samma Supabase-projekt.
  *
- * Skärmen har två lägen, och skillnaden är var i besöket den dyker upp. `account` är den som öppnas
+ * Skärmen har tre lägen, och skillnaden är var i besöket den dyker upp. `account` är den som öppnas
  * ur topplisten av någon som vill åt sin profil. `flow` är grinden mitt i säljflödet: varvet är
  * filmat, bilderna ligger och väntar, och det enda som saknas är ett konto att hänga annonsen på.
- * Där är registrering det troliga ärendet, så den fliken ligger uppe från början — den som redan har
- * ett konto byter med ett tryck, medan den som inte har det annars hade mötts av fel formulär.
+ * `sale` är grinden FÖRE flödet: säljaren har tryckt på sitt märke och ingenting är filmat än.
+ *
+ * `kop` är grinden i KASSAN, och den enda som inte handlar om att sälja: köparen har valt en möbel,
+ * skrivit sitt postnummer och tryckt "Logga in och betala". Texten måste säga vad kontot är till för
+ * i just det ärendet — ordern, leveranstiden, kvittot — och framför allt att möbeln ligger kvar.
+ *
+ * De två föregående är samma grind på två olika ställen, och texten måste säga vilket. "Bilderna är klara"
+ * är sant efter filmningen och en ren gåta före den — den som just tryckt på IKEA har inga bilder och
+ * undrar vems de är. I båda lägena är registrering det troliga ärendet, så den fliken ligger uppe från
+ * början — den som redan har ett konto byter med ett tryck, medan den som inte har det annars hade
+ * mötts av fel formulär.
  */
 export default function AuthScreen({
   intent = "account",
@@ -23,7 +32,7 @@ export default function AuthScreen({
   onDone,
   onBack,
 }: {
-  intent?: "account" | "flow";
+  intent?: "account" | "flow" | "sale" | "kop";
   /**
    * Skärmen ligger INUTI en annan sida — butikens spalt, ett ark ovanpå köpsidan.
    *
@@ -41,7 +50,12 @@ export default function AuthScreen({
   onBack?: () => void;
 }) {
   const { signIn, signUp } = useAuth();
-  const flow = intent === "flow";
+  /** Grinden i eller före flödet — båda öppnar på registreringsfliken. */
+  const flow = intent === "flow" || intent === "sale";
+  /** Grinden FÖRE filmningen. Samma grind, men ingenting är gjort än, och det ska texten säga. */
+  const sale = intent === "sale";
+  /** Grinden i kassan. Köparens ärende, inte säljarens — se resonemanget överst. */
+  const kop = intent === "kop";
   const [tab, setTab] = useState<"signin" | "signup">(initialTab ?? (flow ? "signup" : "signin"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -51,7 +65,8 @@ export default function AuthScreen({
 
   const t = useT();
   const isSignup = tab === "signup";
-  usePageTitle(isSignup ? "Skapa konto" : "Logga in");
+  // Inbäddad rör vi inte fliktiteln: sidan bakom arket äger den. Se usePageTitle.
+  usePageTitle(inbaddad ? undefined : isSignup ? "Skapa konto" : "Logga in");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -96,7 +111,21 @@ export default function AuthScreen({
 
         <div className="auth-hero">
           <h1 className="auth-title">
-            {flow ? (
+            {kop ? (
+              isSignup ? (
+                <>
+                  {t("Skapa konto och")} <span className="auth-wordmark-inline">{t("betala")}</span>
+                </>
+              ) : (
+                <>
+                  {t("Logga in och")} <span className="auth-wordmark-inline">{t("betala")}</span>
+                </>
+              )
+            ) : sale ? (
+              <>
+                {t("Sälj din")} <span className="auth-wordmark-inline">{t("möbel")}</span>
+              </>
+            ) : flow ? (
               <>
                 {t("Bilderna är")} <span className="auth-wordmark-inline">{t("klara")}</span>
               </>
@@ -110,11 +139,19 @@ export default function AuthScreen({
               </>
             )}
           </h1>
-          {/* I flödet säger leden vad som händer NÄST, inte vad appen gör: säljaren har redan filmat
-              varvet och står med bilderna i handen. Det de behöver veta är att steget är det sista
-              före resultatet och att varvet inte ska göras om. */}
+          {/* Leden säger vad som händer NÄST, inte vad appen gör. Efter filmningen är det beskedet att
+              steget är det sista före resultatet och att varvet inte ska göras om. Före den är det
+              motsatta beskedet som behövs: ingenting är gjort än, och det som väntar är kameran. */}
           <p className="auth-lede">
-            {flow
+            {kop
+              ? isSignup
+                ? t("Kontot är där ordern, leveranstiden och kvittot hamnar. Möbeln ligger kvar medan du skapar det.")
+                : t("Logga in, så fortsätter vi till betalningen. Möbeln ligger kvar i kassan.")
+              : sale
+              ? isSignup
+                ? t("Skapa ett konto, så filmar du ett varv runt möbeln — sedan gör vi annonsen och säljer den.")
+                : t("Logga in, så fortsätter vi till filmningen av din möbel.")
+              : flow
               ? isSignup
                 ? t("Skapa ett konto, så sätter vi igång på en gång. Du behöver inte filma om.")
                 : t("Logga in, så fortsätter vi där du var. Bilderna ligger kvar.")

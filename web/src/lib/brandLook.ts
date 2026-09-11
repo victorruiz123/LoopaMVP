@@ -16,8 +16,13 @@ import type { CSSProperties } from "react";
  *
  * MIO, SITS, SWEDESE OCH EM HOME tillkom när butiken började visa märken som stora brickor på
  * förstasidan: de fyra är de vi faktiskt har lager av, och en rad där bara IKEA hade en färg läste
- * som fyra tomma rutor. Savo och Sweef står kvar utan färg, för om dem säger ingenting i projektet
- * något, och regeln ovan gäller dem precis som förut.
+ * som fyra tomma rutor. SOFACOMPANY OCH SOFFADIREKT kom med skyltningen i brandSeed. Savo och
+ * Sweef står kvar utan färg, för om dem säger ingenting i projektet något, och regeln ovan gäller
+ * dem precis som förut.
+ *
+ * FÄRGERNA ÄR AVLÄSTA UR MÄRKETS EGET GRÄNSSNITT — husets CSS-tokens, dess logotypfil, dess
+ * `theme-color` — aldrig ur minnet och aldrig ur den vanligaste hexkoden på sidan. Den vanligaste
+ * är ofta en kampanjetikett; se `mio` nedan, som bar fel färg i månader just av det skälet.
  *
  * DEN HÄR FILEN ÄR NU ENDA KÄLLAN. brandTheme.ts bar tidigare en egen, parallell tabell för
  * säljflödets brickor, och de två sa olika saker om samma märke — Vitra svart i butiken och rött i
@@ -69,6 +74,18 @@ export interface BrandLook {
    * inte känner igen, och igenkänningen är hela skälet den här filen finns.
    */
   wordmark?: string;
+  /**
+   * Undantaget från typens sättning, för de märken vars ordbild inte går att uttrycka som en typ.
+   *
+   * Typerna är tonfall och gäller en HEL familj av märken — "geometrisk sans, spärrad, versal" är
+   * sant om Artek och Massproductions. Ett enskilt hus skriver ändå ibland sitt namn på ett sätt som
+   * ingen typ kan bära: SoffaDirekt har två versaler mitt i ordet, och varje typ i den här filen
+   * tvingar fram en skiftning som äter upp den andra.
+   *
+   * Fältet är därför en KORT undantagslista och inte en andra formgivning: en spärr, en skiftning.
+   * Skiljer sig ett märke mer än så från sin typ är det fel typ det har fått.
+   */
+  stil?: CSSProperties;
 }
 
 const PAPER = "#ffffff";
@@ -79,7 +96,6 @@ const LOOKS: Record<string, BrandLook> = {
   ikea: { bg: "#0058a3", fg: "#ffda1a", type: "heavy" },
   jysk: { bg: "#00509e", fg: PAPER, type: "heavy" },
   chilli: { bg: "#d81f26", fg: PAPER, type: "heavy" },
-  mio: { bg: "#b23a3a", fg: PAPER, type: "heavy" },
 
   // Designhusen — svart på papper, vid spärr. Deras identitet ÄR frånvaron av färg.
   hay: { bg: PAPER, fg: INK, type: "heavy", ring: true },
@@ -101,6 +117,54 @@ const LOOKS: Record<string, BrandLook> = {
   "west elm": { bg: INK, fg: PAPER, type: "wide" },
   bolia: { bg: PAPER, fg: INK, type: "wide", ring: true },
   sits: { bg: PAPER, fg: "#3f3b35", type: "wide", ring: true },
+  /**
+   * SVART OCH GEMENT, inte rött och versalt.
+   *
+   * Brickan bar länge ett påhittat tegelrött (#b23a3a) i tung versal. Mios egen logotyp är ett
+   * gement "mio" i vitt ur en helsvart platta — `fill="#000"` med vita bokstavshål, och sidans
+   * `theme-color` är `#000`. Det röda som syns på mio.se är `#B9432C`, färgen på deras
+   * NYHET-etikett, som upprepas hundratals gånger i produktdatan och därför läser som en husfärg
+   * för den som räknar hexkoder i stället för att titta på märket.
+   *
+   * Deras rubriksnitt är en egen antikva, "Bulldog Mio", men den sätter rubriker — inte namnet.
+   * Ordbilden man känner igen är den gemena logotypen, och det är den brickan återger.
+   */
+  /**
+   * Mio skriver sitt namn med versal M och tät spärr — inte som de gemena, vida ordbilderna typen
+   * "lower" finns för (artek, muuto, string). Ordbilden är kort och kompakt, och 0,22 em spärr drog
+   * isär tre bokstäver till något som läste som en förkortning.
+   */
+  mio: { bg: "#000000", fg: PAPER, type: "lower", wordmark: "Mio", stil: { textTransform: "none", letterSpacing: "0.04em" } },
+  /**
+   * Sand och bläck. Sofacompany bygger hela sitt gränssnitt på #f4f0ec med #0d1821 som text — de
+   * två färgerna står för 104 av hexkoderna i deras CSS-bunt, före allt annat. Namnet sätter de
+   * versalt ("... | SOFACOMPANY") i Open Sans, en humanist som ligger närmare "wide" än "heavy":
+   * ljus och spärrad, inte hopdragen.
+   */
+  sofacompany: {
+    bg: "#f4f0ec", fg: "#0d1821", type: "wide", ring: true,
+    // "Sofacompany" är elva tecken, och typens 0,16 em spärr sköt ut ordet över brickans kant så
+    // att det bröts mitt itu. Ett märkesnamn på två rader är ingen ordbild. Spärren stryps därför
+    // just här — hellre tätare än delat.
+    stil: { letterSpacing: "0.01em" },
+  },
+  /**
+   * SoffaDirekt sätter allt i Poppins — en geometrisk sans i Futuras släkt — och deras logotyp är
+   * svart på varmvitt (`logo-black-v1.svg`). Paret är deras egna tokens: `--base-background2`
+   * #faf8f6 under `--cta-background1` #1c1c1c.
+   *
+   * SKIFTNINGEN ÄR DERAS: "SoffaDirekt", med versal S och D och resten gement. Här stod tidigare
+   * "SOFFADIREKT" med motiveringen att rätt snitt vägde tyngre än rätt skiftning — men versalen åt
+   * upp det enda som är särskiljande i ordbilden, nämligen de två versalerna mitt i den. Med `stil`
+   * behöver valet inte längre göras: snittet kommer från typen, skiftningen från huset.
+   */
+  soffadirekt: {
+    // Ljus khaki i stället för deras varmvita: två nästan vita brickor bredvid varandra (de och
+    // Sofacompany) läste som en lucka i rutnätet. Texten är deras egen `--cta-background1`.
+    bg: "#d9d4c3", fg: "#1c1c1c", type: "geometric", ring: true,
+    wordmark: "SoffaDirekt",
+    stil: { textTransform: "none", letterSpacing: "0.01em" },
+  },
   "string furniture": { bg: "#141414", fg: PAPER, type: "lower", wordmark: "string" },
   "herman miller": { bg: INK, fg: PAPER, type: "wide" },
   stressless: { bg: "#2b2b2b", fg: PAPER, type: "wide" },
@@ -198,6 +262,18 @@ const FAMILJER: Record<BrandType, string | undefined> = {
  */
 export function harEgenIdentitet(name: string): boolean {
   return LOOKS[name.trim().toLowerCase()] !== undefined;
+}
+
+/**
+ * Hur MÄRKET sätter sitt namn: typens tonfall plus husets eget undantag.
+ *
+ * Den här ska anropas överallt där ett märkesnamn skrivs ut. `brandTypeStyle` finns kvar för de
+ * ställen som bara har en typ i handen, men ett namn satt genom den missar `stil` — och då står
+ * SoffaDirekt som SOFFADIREKT igen.
+ */
+export function brandNameStyle(name: string): CSSProperties {
+  const look = brandLook(name);
+  return { ...brandTypeStyle(look.type), ...look.stil };
 }
 
 export function brandTypeStyle(type: BrandType): CSSProperties {

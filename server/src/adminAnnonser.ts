@@ -20,7 +20,7 @@
  * ett tal som räknas på två ställen börjar avvika samma dag det ena stället ändras.
  */
 
-import { getJob, listJobs, ownerIdOf, persist } from "./jobStore.js";
+import { getJob, listJobs, listRemovedJobs, ownerIdOf, persist } from "./jobStore.js";
 import { loopaIdFor } from "./loopaId.js";
 import { jobToProduct } from "./butik/normalize.js";
 import { shopReadiness } from "./butik/state.js";
@@ -46,7 +46,7 @@ import { traderaConfigured, missingTraderaEnv } from "./integrations/tradera/tra
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
-export type AnnonsLage = "misslyckad" | "pagaende" | "utan-annons" | "utkast" | "vantar" | "live" | "reserverad" | "sald" | "levererad" | "returnerad";
+export type AnnonsLage = "misslyckad" | "pagaende" | "utan-annons" | "utkast" | "vantar" | "live" | "reserverad" | "sald" | "levererad" | "returnerad" | "borttagen";
 
 export interface AdminAnnonsRad {
   /** Loopa-ID:t. Adressen möbeln har utåt, och nyckeln allt annat slås upp på. */
@@ -139,6 +139,14 @@ function listingOf(job: ConditionJob) {
  * osynliga: föll, kör fortfarande, eller blev aldrig en annons.
  */
 export function lageAv(job: ConditionJob, record: ButikRecord | undefined): AnnonsLage {
+  /**
+   * Borttagen går FÖRE allt annat, även före butikens tillstånd.
+   *
+   * Posten i butikslagret står kvar som utkast efter en borttagning — huvudboken stryker inga rader
+   * — och "utkast" är precis det fel läget att visa: det säger att möbeln är på väg in, när den är
+   * på väg ut. Att raden syns alls är hela poängen med att jobbet behålls; se jobStore.markJobRemoved.
+   */
+  if (job.removedAt) return "borttagen";
   if (record) {
     if (record.state === "live") return "live";
     if (record.state === "reserved") return "reserverad";
@@ -245,12 +253,22 @@ function radAv(
  * en sämre affär än en läsning som tar en halv sekund.
  */
 export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summering: Summering }> {
-  const [jobs, records, overstyrningar, statistik] = await Promise.all([
+  /**
+   * De borttagna annonserna står MED i listan, och det är därför de behålls på disk.
+   *
+   * `listJobs` utesluter dem — det är grinden som gör en borttagning verklig i produkten (se
+   * jobStore.ts). Panelen är det enda stället som ska se dem, och den frågar uttryckligen. Raden ser
+   * ut som vilken annan som helst, med läget "borttagen": vi ska kunna svara på vad som hände med en
+   * möbel som låg uppe i en vecka, inte bara på vad som ligger uppe nu.
+   */
+  const [aktiva, borttagna, records, overstyrningar, statistik] = await Promise.all([
     listJobs(),
+    listRemovedJobs(),
     butikStore().all(),
     overrides.alla(),
     allStatistik(),
   ]);
+  const jobs = [...aktiva, ...borttagna].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const byId = new Map(records.map((r) => [r.id, r]));
 
   /**
@@ -310,10 +328,21 @@ function summera(rader: AdminAnnonsRad[]): Summering {
   };
 }
 
-/** Jobbet bakom ett Loopa-ID. Slås upp genom att räkna om id:t — samma väg som publicCard tar. */
+/**
+ * Jobbet bakom ett Loopa-ID. Slås upp genom att räkna om id:t — samma väg som publicCard tar.
+ *
+ * OCH SEDAN BLAND DE BORTTAGNA. `jobByLoopaId` går via `listJobs`, som med flit inte ser dem: det är
+ * grinden som gör en borttagning verklig utåt. Men panelen VISAR raden, och en rad som går att klicka
+ * på måste gå att öppna — annars är "borttagen" ett läge man ser och inte kan undersöka.
+ */
 async function jobbFor(loopaId: string): Promise<ConditionJob | undefined> {
   const { jobByLoopaId } = await import("./publicCard.js");
-  return jobByLoopaId(loopaId);
+  const aktivt = await jobByLoopaId(loopaId);
+  if (aktivt) return aktivt;
+  const { normalizeLoopaId } = await import("./loopaId.js");
+  const wanted = normalizeLoopaId(loopaId);
+  if (!wanted) return undefined;
+  return (await listRemovedJobs()).find((job) => loopaIdFor(job.id) === wanted);
 }
 
 export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj | null> {

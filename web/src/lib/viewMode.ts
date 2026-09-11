@@ -23,23 +23,18 @@ const SWITCHABLE_QUERY = "(min-width: 860px)";
 const STORAGE_KEY = "loopa.view-mode";
 
 /**
- * MOBILVY SOM STANDARD I UTVECKLINGSLÄGET — tillfälligt.
+ * Läget ur fönstret, i utveckling som i drift.
  *
- * Startsidan byggs om, och mobilvyn är den som formges först; datorvyn anpassas efter den. Utan det
- * här öppnar `npm run web:dev` på en laptop i datorvy, och den layout man håller på att bygga är
- * inte den man ser.
+ * Här stod tidigare `if (import.meta.env.DEV) return "mobile"` — en tillfällig rad medan startsidans
+ * mobilvy formgavs, så att `npm run web:dev` inte öppnade i det läge man inte höll på att bygga.
+ * Den är borta nu när datorvyn finns: ett utvecklingsläge som beter sig annorlunda än driften är en
+ * skillnad man slutar minnas att den finns, och nästa gång något ser fel ut i drift letar man på fel
+ * ställe.
  *
- * `import.meta.env.DEV` är sant BARA under `vite dev`. Ett produktionsbygge går genom `detect()`
- * precis som förut, så den här raden kan inte följa med ut.
- *
- * ÖVERSTYRNINGEN VINNER ÄNDÅ. Kör `loopaSetViewMode("desktop")` i konsolen för att se datorvyn på
- * samma skärm, och `loopaSetViewMode(null)` för att lämna tillbaka valet till automatiken.
- *
- * TA BORT NÄR DATORVYN ÄR GJORD. Ett utvecklingsläge som beter sig annorlunda än driften är en
- * skillnad man glömmer att den finns, och det är därför den står utskriven här.
+ * Vill man ändå se det andra läget på samma skärm finns `loopaSetViewMode("desktop")` i konsolen,
+ * och `loopaSetViewMode(null)` lämnar tillbaka valet till automatiken.
  */
 function detect(): ViewMode {
-  if (import.meta.env.DEV) return "mobile";
   return window.matchMedia(DESKTOP_QUERY).matches ? "desktop" : "mobile";
 }
 

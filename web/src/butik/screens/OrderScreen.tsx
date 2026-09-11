@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchDelivery, fetchOrder, requestReturn, requestSlots, type DeliverySlot, type Order } from "../api";
+import { angraKopet, fetchOrder, requestSlots, type DeliverySlot, type Order } from "../api";
 import type { Product } from "../types";
 import { Link, SellCta, track } from "../components/Bits";
 
@@ -36,9 +36,8 @@ export default function OrderScreen({ id }: { id: string }) {
         if (!live) return;
         setOrder(r.order);
         setProduct(r.product);
-        if ((r.order.status === "paid" || r.order.status === "booking") && r.order.postalCode) {
-          fetchDelivery(r.order.postalCode).then((q) => live && setSlots(q.slots)).catch(() => undefined);
-        }
+        // Tiderna följer med ordern — de räknas ur KÖPETS datum, inte ur dagens. Se fetchOrder.
+        setSlots(r.slots ?? []);
         // Webhooken kan vara sekunder efter köparen. Pollar en kort stund i stället för att påstå
         // att betalningen inte kom fram.
         if (r.order.status === "pending" && tries < 10) {
@@ -78,6 +77,21 @@ export default function OrderScreen({ id }: { id: string }) {
     { key: ["delivered", "return_requested", "returned"], label: "Levererad" },
   ];
 
+  /** Köpet är betalt och tiderna ovalda: DET är sidans ärende, och rubriken ska säga så. */
+  const vantarPaTider = order.status === "paid" && slots.length > 0;
+
+  /**
+   * Går köpet fortfarande att ångra?
+   *
+   * Samma regel som servern håller (se `gårAttAngra` i butik/routes.ts) och samma gräns: fram till
+   * dagen innan leveransen. Skrivs här också därför att en knapp som finns men svarar 409 är ett
+   * sämre besked än en knapp som aldrig visas — servern är spärren, det här är beskedet.
+   */
+  const idagISO = new Date().toLocaleDateString("sv-SE");
+  const angerbart =
+    (order.status === "paid" || order.status === "booking" || order.status === "scheduled") &&
+    (!order.deliveryDate || idagISO < order.deliveryDate);
+
   const isVald = (s: DeliverySlot) => valda.some((v) => v.date === s.date && v.window === s.window);
 
   const toggle = (slot: DeliverySlot) => {
@@ -107,9 +121,28 @@ export default function OrderScreen({ id }: { id: string }) {
     <>
       <header className="butik-hero" style={{ paddingBottom: 14 }}>
         <span className="butik-geo">Order {order.reference}</span>
+        {/*
+          RUBRIKEN SÄGER VAD SOM SKA GÖRAS, inte vad som hänt.
+
+          "Tack för ditt köp!" var sant och slutgiltigt på samma gång: sidan såg ut som ett kvitto,
+          och tidvalet — det enda köparen måste göra för att möbeln ska komma fram — låg som ett
+          stycke bland andra långt ner. Tacket står kvar som en rad ovanför, där det hör hemma.
+        */}
+        {vantarPaTider && <p className="butik-order-tack">Tack för ditt köp!</p>}
         <h1 style={{ fontSize: "clamp(24px, 5.5vw, 34px)" }}>
-          {order.status === "pending" ? "Vi behandlar din betalning" : order.status === "cancelled" ? "Köpet gick inte igenom" : "Tack för ditt köp!"}
+          {order.status === "pending"
+            ? "Vi behandlar din betalning"
+            : order.status === "cancelled"
+              ? "Köpet gick inte igenom"
+              : vantarPaTider
+                ? "Välj leveranstid!"
+                : "Tack för ditt köp!"}
         </h1>
+        {vantarPaTider && (
+          <p style={{ marginTop: 6 }}>
+            Möbeln är din. Det enda som återstår är att säga när vi får komma — välj nedan, så bokar vi frakten.
+          </p>
+        )}
         {order.status === "pending" && <p>Det tar oftast några sekunder. Sidan uppdaterar sig själv.</p>}
         {order.status === "cancelled" && (
           <p>
@@ -132,27 +165,13 @@ export default function OrderScreen({ id }: { id: string }) {
             })}
           </ol>
 
-          <section className="butik-explainer" style={{ padding: 18 }}>
-            <h2 style={{ fontSize: 18 }}>{product?.title ?? "Din möbel"}</h2>
-            <dl style={{ margin: 0, fontSize: "var(--fs-md)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                <dt>Möbeln</dt><dd style={{ margin: 0 }}>{order.priceSek.toLocaleString("sv-SE")} kr</dd>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
-                <dt>Hemleverans</dt><dd style={{ margin: 0 }}>{order.deliveryFeeSek ? `${order.deliveryFeeSek} kr` : "—"}</dd>
-              </div>
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0", borderTop: "1px solid var(--border)", marginTop: 6, fontWeight: 700 }}>
-                <dt>Betalt</dt><dd style={{ margin: 0 }}>{(order.priceSek + order.deliveryFeeSek).toLocaleString("sv-SE")} kr</dd>
-              </div>
-            </dl>
-          </section>
-
           {order.status === "paid" && slots.length > 0 && (
             <section className="butik-explainer" style={{ padding: 18 }}>
               <h2 style={{ fontSize: 18 }}>När passar det att vi kommer?</h2>
               <p style={{ marginBottom: 14 }}>
-                Välj upp till tre tider. Vi bokar budfirman och återkommer med den tid som gäller — den första du
-                väljer försöker vi med först. Vi bär in möbeln till dörren.
+                Förmiddag 08–12 eller eftermiddag 12–18, de fem närmaste arbetsdagarna. Välj upp till tre tider — vi
+                bokar budfirman och återkommer med den som gäller, och försöker med din första hand först. Vi bär in
+                möbeln till dörren.
               </p>
               <div className="butik-field-row">
                 {slots.map((s) => (
@@ -181,6 +200,21 @@ export default function OrderScreen({ id }: { id: string }) {
               </button>
             </section>
           )}
+
+          <section className="butik-explainer" style={{ padding: 18 }}>
+            <h2 style={{ fontSize: 18 }}>{product?.title ?? "Din möbel"}</h2>
+            <dl style={{ margin: 0, fontSize: "var(--fs-md)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                <dt>Möbeln</dt><dd style={{ margin: 0 }}>{order.priceSek.toLocaleString("sv-SE")} kr</dd>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "4px 0" }}>
+                <dt>Hemleverans</dt><dd style={{ margin: 0 }}>{order.deliveryFeeSek ? `${order.deliveryFeeSek} kr` : "—"}</dd>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between", padding: "8px 0 0", borderTop: "1px solid var(--border)", marginTop: 6, fontWeight: 700 }}>
+                <dt>Betalt</dt><dd style={{ margin: 0 }}>{(order.priceSek + order.deliveryFeeSek).toLocaleString("sv-SE")} kr</dd>
+              </div>
+            </dl>
+          </section>
 
           {order.status === "booking" && (
             <section className="butik-explainer" style={{ padding: 18 }}>
@@ -227,39 +261,80 @@ export default function OrderScreen({ id }: { id: string }) {
             </section>
           )}
 
+          {/*
+            ÅNGRA ÄR ATT STOPPA EN LEVERANS, INTE ATT HÄMTA TILLBAKA EN MÖBEL.
+
+            Rutan lovade tidigare "Ångrar du dig hämtar vi möbeln" i varje läge — även efter att den
+            burits in. Det är ett åtagande till: en budfirma till, en bärning till, och en möbel som
+            ska tillbaka till lagret. Ångerrätten gäller därför medan möbeln fortfarande står hos
+            oss. Är frakten bokad går det fram till dagen innan, för då är bilen bokad och en
+            avbeställning på morgonen stoppar ingen som redan lastat.
+
+            Efter leverans står här ingen knapp utan en väg till en människa. Det som händer sedan är
+            en förhandling om en möbel någon har hemma, och den kan ingen knapp avgöra.
+          */}
           <section className="butik-explainer" style={{ padding: 18 }}>
             <h2 style={{ fontSize: 18 }}>Ångra köpet</h2>
-            {order.status === "return_requested" ? (
-              <p style={{ margin: 0 }}>Vi har tagit emot din returbegäran och hör av oss för att boka upphämtning.</p>
-            ) : (
+            {order.status === "cancel_requested" ? (
+              <p style={{ margin: 0 }}>
+                Vi har tagit emot din ångerbegäran, stoppar leveransen och betalar tillbaka hela beloppet — möbeln och
+                frakten. Pengarna är hos dig inom några bankdagar.
+              </p>
+            ) : angerbart ? (
               <>
-                {/* Ingen tidsgräns utlovad. Returen finns som funktion — villkoren för den sätts av
-                    ops och ska inte uppfinnas i ett gränssnitt. */}
-                <p style={{ marginBottom: 12 }}>Ångrar du dig hämtar vi möbeln. Hör av dig så bokar vi upphämtning.</p>
+                <p style={{ marginBottom: 12 }}>
+                  {order.deliveryDate ? (
+                    <>
+                      Leveransen är bokad till <strong>{slotLabel(order.deliveryDate)}</strong>. Du kan ångra köpet fram
+                      till och med dagen innan — då stoppar vi frakten och betalar tillbaka hela beloppet.
+                    </>
+                  ) : (
+                    <>
+                      Möbeln står hos oss tills den körs ut, och fram till dagen innan leveransen kan du ångra dig. Vi
+                      betalar då tillbaka hela beloppet, både möbeln och frakten.
+                    </>
+                  )}
+                </p>
                 <button
                   type="button"
                   className="btn btn-outline btn-small"
                   disabled={busy}
                   onClick={async () => {
                     setBusy(true);
-                    try { setOrder((await requestReturn(order.id)).order); }
-                    catch (e) { setError(e instanceof Error ? e.message : "Kunde inte begära retur."); }
+                    try { setOrder((await angraKopet(order.id)).order); }
+                    catch (e) { setError(e instanceof Error ? e.message : "Kunde inte ångra köpet."); }
                     finally { setBusy(false); }
                   }}
                 >
-                  Begär retur
+                  Ångra köpet
                 </button>
               </>
+            ) : (
+              <p style={{ margin: 0 }}>
+                {order.status === "delivered" || order.status === "return_requested" || order.status === "returned"
+                  ? "Möbeln är levererad, så köpet går inte att ångra här. Hör av dig till oss med ordernumret så tittar vi på det tillsammans."
+                  : "Leveransen är i morgon eller närmare och går inte att stoppa härifrån. Hör av dig till oss med ordernumret."}
+              </p>
             )}
           </section>
+
         </>
       )}
 
-      {/* Efterköpet är säljslingans bästa ögonblick: möbeln som ersattes står ofta kvar i hallen. */}
+      {/*
+        Efterköpet är säljslingans bästa ögonblick: möbeln som ersattes står ofta kvar i hallen.
+
+        RUBRIKEN NÄMNER INGEN MÖBELTYP, och det är ett rättat fel. Här stod "Sålde du just din gamla
+        soffa?" — som var fel två gånger på samma rad: köparen hade nyss KÖPT, inte sålt, och möbeln
+        var en stol. Typen finns inte att gissa från här heller: den härleds på servern
+        (butik/catalog.ts `resolveTypeSlug`) och följer inte med varan ut, och en klientkopia av den
+        katalogen vore en dubblett som glider isär för en rubriks skull. En fråga som är sann om
+        varje möbel är bättre än en som är träffande om en av dem.
+      */}
       <SellCta
         categorySlug={product?.categorySlug}
-        heading="Sålde du just din gamla soffa?"
-        body="Nästa gång kan du sälja den här. Filma ett varv med mobilen så besiktigar, prissätter och lägger vi ut den åt dig."
+        heading="Blev en möbel över?"
+        body="Den du ersatte kan du sälja här. Filma ett varv med mobilen så besiktigar, prissätter och lägger vi ut den åt dig."
       />
     </>
   );

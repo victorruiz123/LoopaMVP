@@ -12,6 +12,11 @@ import { useT } from "../../lib/i18n";
  * Håller sig till det appen faktiskt gör. Prisstegen nedan är inte en formulering utan en beskrivning
  * av server/src/priceLadder.ts — annonsens pris sänks verkligen, av sig självt, och en säljare som
  * inte fått veta det skulle med rätta bli förvånad.
+ *
+ * DE 600 KRONORNA ÄR INTE ETT PÅFUNNET TAL. Det är FRAKT_SEK i server/src/butik/delivery.ts, samma
+ * hemleveransavgift som köparen betalar och som står i annonstexten. Ändras den avgiften ändras
+ * returkostnaden här i samma veva — två olika 600-kronorstal i samma produkt vore ett vi inte kan
+ * försvara den dagen någon jämför dem.
  */
 export default function TermsText() {
   const t = useT();
@@ -63,7 +68,12 @@ export default function TermsText() {
       <p>
         <strong>{t("Annonsen är ditt ansvar.")}</strong>{" "}
         {t(
-          "Det är du som säljer möbeln, och det är du som ansvarar för att det som står i annonsen stämmer. Läs igenom den innan du lägger ut den.",
+          "Det är du som säljer möbeln, och det är du som ansvarar för allt som står i annonsen — skickbetyget, skadelistan, måtten, modellen och bilderna. Texten och bedömningen du får av oss är ett förslag som en modell skrivit ur dina bilder, och ett förslag är inte ett påstående förrän du gjort det till ditt.",
+        )}
+      </p>
+      <p>
+        {t(
+          "Du är därför skyldig att läsa igenom varje förslag som tagits fram automatiskt och rätta det som inte stämmer innan du lägger ut annonsen. Saknas en skada i listan lägger du till den; står det en skada som inte finns tar du bort den; stämmer inte modellen eller måtten ändrar du dem. Att publicera annonsen är ditt intyg om att den stämmer med möbeln du säljer — att förslaget kom från oss är inte en ursäkt efteråt.",
         )}
       </p>
 
@@ -88,6 +98,38 @@ export default function TermsText() {
         )}
       </p>
 
+      <h2>{t("Köpet är mellan dig och köparen")}</h2>
+      <p>
+        {t(
+          "Juridiskt sker köpet mellan två privatpersoner: du som säljare och den som köper möbeln. Loopa förmedlar affären — vi bygger annonsen, tar emot betalningen och ordnar leveransen — men vi är inte säljare och köper inte möbeln av dig. Det är köplagen som gäller mellan er, inte konsumentköplagen, eftersom ingen av er handlar i egenskap av företag.",
+        )}
+      </p>
+      <p>
+        <strong>{t("Det finns ingen ångerrätt.")}</strong>{" "}
+        {t(
+          "Ångerrätten i distansavtalslagen gäller köp från en näringsidkare, och ett köp mellan två privatpersoner är inte det. En köpare kan alltså inte lämna tillbaka en möbel för att den inte passade, inte gick in genom dörren eller inte såg ut som hemma hos någon annan. Köpet är slutgiltigt när det är genomfört.",
+        )}
+      </p>
+
+      <h2>{t("Om annonsen inte stämde")}</h2>
+      <p>
+        {t(
+          "Visar det sig att möbeln inte är den annonsen beskrev — en skada som inte fanns med, ett skick som inte höll, en annan modell eller andra mått — har köparen rätt att skicka tillbaka den och få betalt tillbaka. Det är den enda vägen tillbaka som finns, och den öppnas av att annonsen var fel, inte av att köparen ändrat sig.",
+        )}
+      </p>
+      <p>
+        {t("Returen kostar en fraktsträcka, och den står du för:")}{" "}
+        <strong>{t("600 kr dras från din utbetalning")}</strong>{" "}
+        {t(
+          "när en möbel kommer tillbaka av det skälet. Har utbetalningen redan gått iväg fakturerar vi beloppet. Det är samma 600 kr som en hemleverans kostar i Stockholms län — returen är en resa till, inte två.",
+        )}
+      </p>
+      <p>
+        {t(
+          "Det här är också hela skälet till att förslagen ska redigeras och inte bara godkännas. En skada du lät stå kvar oredigerad i annonstexten är en retur du betalar för.",
+        )}
+      </p>
+
       <h2>{t("Det publika kortet")}</h2>
       <p>
         {t(
@@ -109,7 +151,7 @@ export default function TermsText() {
       <h2>{t("Ansvar")}</h2>
       <p>
         {t(
-          "Tjänsten tillhandahålls i befintligt skick. Vi ansvarar inte för indirekt skada, utebliven vinst eller för att en möbel såldes för mindre än du hoppats. Ingenting i de här villkoren begränsar det ansvar som inte får begränsas enligt tvingande lag — är du konsument gäller dina rättigheter enligt konsumentlagstiftningen oavsett vad som står här.",
+          "Tjänsten tillhandahålls i befintligt skick. Vi ansvarar inte för indirekt skada, utebliven vinst eller för att en möbel såldes för mindre än du hoppats. Ingenting i de här villkoren begränsar det ansvar som inte får begränsas enligt tvingande lag — är du konsument gäller dina rättigheter mot oss enligt konsumentlagstiftningen oavsett vad som står här. Det gäller din relation till Loopa som tjänst; själva köpet av möbeln sker mellan dig och köparen och styrs av köplagen, som beskrivet ovan.",
         )}
       </p>
 

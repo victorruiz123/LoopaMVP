@@ -30,7 +30,7 @@ export const LEGAL_TITLES: Record<LegalDoc, string> = {
  * En policy utan datum går inte att veta om den beskriver dagens tjänst. Ändras något av det den
  * beskriver — en ny mottagare, en ny sorts uppgift — ska den här flyttas fram i samma ändring.
  */
-export const LEGAL_UPDATED_ISO = "2026-08-29";
+export const LEGAL_UPDATED_ISO = "2026-09-11";
 
 /** Datumet på läsarens språk: "29 augusti 2026", "29 August 2026", "29 août 2026". */
 export function legalUpdated(lang: string): string {

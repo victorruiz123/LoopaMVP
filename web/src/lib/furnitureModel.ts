@@ -356,6 +356,15 @@ const RIGHT: Vec3 = { x: 1, y: 0, z: 0 };
  * bänk. Utan dem är ryggen en enda hög låda, och det var den bilden som fick kortet att se ut som en
  * skiss. De lutar lite bakåt, som de gör i verkligheten.
  */
+/**
+ * Hur mycket ryggens och sitsens segment går in i varandra, i centimeter.
+ *
+ * Måste vara större än kantradien (R.body), annars syns skarven: varje segment rundar sina hörn, och
+ * två segment som bara nuddar varandra rundar båda undan från fogen — resultatet blir en vågig kant
+ * i stället för en rak. Med ett rejält överlapp ligger varje rundat hörn inne i grannens raka del.
+ */
+const SEGMENT_OVERLAPP = 9;
+
 function buildSofa(w: number, d: number, h: number, shape: ShapeHints): Built {
   const legH = clamp(h * 0.15, 8, 17);
   const arms = shape.arms && w > 55;
@@ -372,14 +381,59 @@ function buildSofa(w: number, d: number, h: number, shape: ShapeHints): Built {
   const seats = clamp(shape.seats ?? Math.round(w / 85), 1, 4);
   const backZ = -(d / 2 - backD / 2);
 
-  const boxes: Box[] = [
-    ...legs(w, d, legH, 6.5, 10),
-    // Stommen under dynorna.
-    box({ x: 0, y: (legH + frameTop) / 2, z: backD / 2 }, { x: innerW, y: frameTop - legH, z: seatD }, "body", R.body),
-    // Ryggens stomme går MELLAN armstöden, inte bakom dem. Full bredd gav en tunn vinge som stack
-    // ut utanför varje armstöd i vyn — geometriskt riktigt, men det såg ut som en lös skiva.
-    box({ x: 0, y: (legH + h) / 2, z: backZ }, { x: innerW + armW, y: h - legH, z: backD }, "body", R.body),
-  ];
+  const boxes: Box[] = [...legs(w, d, legH, 6.5, 10)];
+
+  /**
+   * SAMMA SEGMENTERING UNDER SITSEN som i ryggen nedan, och av exakt samma skäl.
+   *
+   * Stommen under dynorna var en enda låda över hela bredden, med sin framsida centrerad på x=0.
+   * Mätt på en 212 cm soffa vriden 36°: stommens framsida får sorteringsdjup 36,6 medan de två
+   * vänstra sitsdynornas framsidor får 3,8 och 35,8 — alltså målades stommen ÖVER dem. Kvar syntes
+   * bara dynornas ovansidor, som tre plattor utan tjocklek, medan den högra dynan (67,8) såg riktig
+   * ut. Det var inte dynor som satt fel, det var en stomme som lade sig framför dem.
+   */
+  const segW = innerW / seats;
+  for (let i = 0; i < seats; i++) {
+    boxes.push(
+      box(
+        { x: -innerW / 2 + segW * (i + 0.5), y: (legH + frameTop) / 2, z: backD / 2 },
+        { x: segW + (seats > 1 ? SEGMENT_OVERLAPP : 0), y: frameTop - legH, z: seatD },
+        "body",
+        R.body,
+      ),
+    );
+  }
+
+  /**
+   * RYGGENS STOMME BYGGS I SEGMENT, ETT PER SITTPLATS. Det är ingen finess — det är vad som gör att
+   * de vänstra ryggdynorna syns.
+   *
+   * Ytorna sorteras på sitt MITTDJUP (se buildFaces i render3d) och målas bakifrån och fram. Ryggens
+   * framsida var en enda yta över hela bredden, med sin mittpunkt på x=0. Vrids soffan snett hamnar
+   * den ytans mitt närmare betraktaren än de dynor som sitter längst bort i vridningen — så den
+   * målades SIST och lade sig över dem. Resultatet var en soffa med tre sitsdynor men bara två
+   * ryggdynor: den vänstra fanns i modellen hela tiden, den blev övermålad.
+   *
+   * Ett segment per plats ger varje bit av ryggen ett mittdjup i närheten av den dyna som sitter
+   * framför den, och då hamnar de i rätt ordning. Segmenten överlappar varandra ett par centimeter
+   * så att rundningen på en kant alltid ligger inne i grannen — annars syns skarvarna som hack i
+   * ryggens överkant.
+   *
+   * Ryggen går MELLAN armstöden, inte bakom dem. Full bredd gav en tunn vinge som stack ut utanför
+   * varje armstöd i vyn — geometriskt riktigt, men det såg ut som en lös skiva.
+   */
+  const backW = innerW + armW;
+  const backSegW = backW / seats;
+  for (let i = 0; i < seats; i++) {
+    boxes.push(
+      box(
+        { x: -backW / 2 + backSegW * (i + 0.5), y: (legH + h) / 2, z: backZ },
+        { x: backSegW + (seats > 1 ? SEGMENT_OVERLAPP : 0), y: h - legH, z: backD },
+        "body",
+        R.body,
+      ),
+    );
+  }
   if (arms) {
     for (const sx of [-1, 1]) {
       boxes.push(

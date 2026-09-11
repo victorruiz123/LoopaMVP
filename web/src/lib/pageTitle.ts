@@ -18,9 +18,17 @@ const SUFFIX = "Loopa";
  * talar tre språk. Språket står i beroendelistan: byter man språk med fliken öppen ska namnet i
  * flikraden byta med resten av skärmen.
  */
-export function usePageTitle(title: string | null) {
+/**
+ * `null` sätter appens standardtitel. `undefined` rör inte titeln alls.
+ *
+ * Skillnaden finns för skärmar som ritas INUTI en annan sida — inloggningen i kassans ark, till
+ * exempel. Den är en egen skärm överallt annars och sätter därför sin titel, men i arket hade den
+ * bytt namn på produktsidan bakom sig och lämnat kvar "Logga in" i flikraden när arket stängdes.
+ */
+export function usePageTitle(title: string | null | undefined) {
   const { lang } = useLang();
   useEffect(() => {
+    if (title === undefined) return;
     document.title = title ? `${t(title)} – ${SUFFIX}` : `${SUFFIX} – ${t("Sälj din möbel")}`;
   }, [title, lang]);
 }

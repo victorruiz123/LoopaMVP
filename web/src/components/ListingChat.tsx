@@ -3,6 +3,7 @@ import { askListing } from "../api";
 import type { AnswerSource } from "../types";
 import { SendIcon, SparkIcon } from "./icons";
 import { useT } from "../lib/i18n";
+import { chipTryckt, guideFraga } from "../lib/flode";
 import { hasConsent, useConsent } from "../lib/consent";
 
 /**
@@ -121,6 +122,7 @@ export default function ListingChat({
     setInput("");
     setPending(true);
     try {
+      guideFraga("annons", trimmed);
       const { answer, source } = await askListing(loopaId, trimmed, history);
       setMessages((prev) => [...prev, { role: "assistant", content: answer, source }]);
     } catch (err) {
@@ -182,6 +184,7 @@ export default function ListingChat({
               className="card-chat-suggestion"
               disabled={pending}
               onClick={() => {
+                chipTryckt("annons", s);
                 void ask(s);
                 inputRef.current?.focus();
               }}

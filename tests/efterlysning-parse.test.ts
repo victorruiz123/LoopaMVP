@@ -132,9 +132,11 @@ test("ett mått är inget pris, ens med ett gränsord framför", () => {
 
 // ─── följdfrågorna ──────────────────────────────────────────────────────────
 
-test("bara fält som ändrar matchningen frågas om", () => {
+test("en tydlig beskrivning får inga frågor alls", () => {
+  // Tre fält räcker. Den som skrivit "soffa, max 5 000, högst 210 bred" har svarat på det vi behöver
+  // veta, och tre frågor till läser som att vi inte lyssnade.
   const q = followUps(spec({ filter: { categorySlug: "soffor", maxPriceSek: 5000, maxWidthMm: 2100 } }));
-  assert.deepEqual(q, [], "allt hårt är satt — ingen fråga kvar");
+  assert.deepEqual(q, [], "allt hårt är satt och beskrivningen är riklig");
 });
 
 test("saknad kategori frågas alltid, den avgör vilka källor vi frågar", () => {
@@ -143,18 +145,54 @@ test("saknad kategori frågas alltid, den avgör vilka källor vi frågar", () =
 
 test("mått frågas bara om skrymmande möbler", () => {
   const lampa = followUps(spec({ filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
-  assert.deepEqual(lampa, [], "en lampa passar överallt");
+  assert.ok(!lampa.some((q) => q.field === "matt"), "en lampa passar överallt");
   const soffa = followUps(spec({ filter: { categorySlug: "soffor", maxPriceSek: 5000 } }));
-  assert.deepEqual(soffa.map((q) => q.field), ["matt"]);
+  assert.equal(soffa[0].field, "matt", "hårda luckor står först");
 });
 
 test("aldrig fler än tre frågor", () => {
   assert.ok(followUps(spec()).length <= 3);
+  assert.ok(followUps(spec({ filter: { categorySlug: "belysning" } })).length <= 3);
 });
 
-test("färg och stil frågas aldrig om — de gör en träff bättre, inte möjlig", () => {
+// ─── mjuka frågor: bara när beskrivningen är tunn ───────────────────────────
+//
+// Regeln ändrades när "Letar du möbel?" kom till. Förut frågades aldrig om märke, skick, färg eller
+// stil: de gör en träff bättre, inte möjlig. Det stämmer fortfarande — men det argumentet gällde en
+// SÖKNING som ska ge träffar nu. En efterlysning läses av en människa som matchar för hand, och för
+// den handen är "grön, mid-century" skillnaden mellan att känna igen möbeln och att gissa.
+//
+// Priset betalas av den som redan berättat mycket, och det är därför tröskeln finns.
+
+test("en tunn beskrivning får mjuka frågor", () => {
   const q = followUps(spec({ filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
-  assert.equal(q.length, 0);
+  assert.deepEqual(q.map((f) => f.field), ["marke", "skick", "farg"]);
+});
+
+test("hårda luckor tränger undan de mjuka", () => {
+  // Utan kategori är efterlysningen oanvändbar; utan färgpreferens är den bara bredare. De hårda
+  // fälten står därför först, och en mjuk fråga får bara de platser som blir över av tre.
+  const q = followUps(spec()).map((f) => f.field);
+  assert.deepEqual(q.slice(0, 2), ["kategori", "maxpris"]);
+  assert.ok(!q.includes("farg"), "färgen fick inte plats framför de hårda");
+});
+
+test("tre hårda luckor lämnar ingen plats åt en mjuk fråga", () => {
+  // Kategorin sätts av svaret på fråga ett, så måttfrågan kan följa i samma omgång först när
+  // kategorin redan är känd. Här är alla tre hårda öppna på en gång.
+  const q = followUps(spec({ filter: { categorySlug: "soffor" } }));
+  assert.deepEqual(q.map((f) => f.field), ["maxpris", "matt", "marke"]);
+});
+
+test("en fråga ställs aldrig om ett fält som redan är ifyllt", () => {
+  const q = followUps(spec({ filter: { categorySlug: "belysning", maxPriceSek: 500, colors: ["grön"] } }));
+  assert.ok(!q.some((f) => f.field === "farg"));
+});
+
+test("skickfrågan har de tre svaren och inget annat", () => {
+  const q = followUps(spec({ filter: { categorySlug: "belysning", maxPriceSek: 500 } }));
+  const skick = q.find((f) => f.field === "skick");
+  assert.deepEqual(skick?.options, ["Som nytt", "Gott skick", "Spelar ingen roll"]);
 });
 
 // ─── sammanfattningen ───────────────────────────────────────────────────────

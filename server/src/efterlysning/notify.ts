@@ -221,11 +221,21 @@ export async function notifyMatches(e: Efterlysning, hits: Candidate[]): Promise
   return notice;
 }
 
-export async function sendLetter(letter: Letter): Promise<void> {
+/**
+ * Sant när brevet kom iväg, falskt när det föll.
+ *
+ * SVARET FINNS FÖR ARBETSORDRARNA. Ett fallet brev får fortfarande aldrig fälla körningen som skapade
+ * det — en bevakning som inte gick fram är en missad artighet. Men "BOKA FRAKT" är inte en artighet:
+ * det är enda signalen till människan som ska boka budfirman, och faller den tyst står köparen och
+ * väntar på en leverans ingen påbörjat. Den som skickar ett sådant brev behöver kunna skriva ner att
+ * det inte gick. Anropare som inte bryr sig ignorerar värdet, precis som förut.
+ */
+export async function sendLetter(letter: Letter): Promise<boolean> {
   try {
     await sender().send(letter);
+    return true;
   } catch (err) {
-    // Ett fallet brev får aldrig fälla den körning som skapade det. Notisen ligger redan i inkorgen.
     console.warn(`[utskick] brevet "${letter.subject}" gick inte iväg:`, err instanceof Error ? err.message : err);
+    return false;
   }
 }

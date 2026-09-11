@@ -96,17 +96,17 @@
 }
 .butik-bar-logga-in:hover { border-color: var(--ink); }
 
+/* Ren text i märkets orange, ingen platta. Höjden är kvar på --tap trots att ramen är borta:
+   träffytan ska vara lika stor som knappens var, annars blir ordet svårt att träffa med tummen. */
 .butik-bar-sell {
-  flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 16px;
-  border-radius: var(--r); background: var(--accent); color: #fff;
+  flex: none; height: var(--tap); display: inline-flex; align-items: center; padding: 0 4px;
+  color: var(--accent);
   font-size: var(--fs-md); font-weight: 700; text-decoration: none; white-space: nowrap;
 }
 .butik-bar-sell:active { opacity: 0.82; }
 @media (max-width: 720px) {
-  .butik-bar-sell-long { display: none; }
   .butik-search-oppen { position: absolute; left: 12px; right: 12px; max-width: none; z-index: 2; }
 }
-@media (min-width: 721px) { .butik-bar-sell-short { display: none; } }
 
 .butik-main { max-width: var(--butik-spalt); margin: 0 auto; padding: 0 var(--safe-left) 64px; }
 
@@ -287,6 +287,11 @@
 @media (min-width: 560px) { .butik-empty-actions { flex-direction: row; justify-content: center; } }
 
 /* ---- förtroenderad ---- */
+/* Tacket över "Välj leveranstid!" — en kvittering, inte en rubrik. Rubriken är nästa steg. */
+.butik-order-tack {
+  margin: 0 0 2px; font-size: var(--fs-md); font-weight: 600; color: var(--green-dark);
+}
+
 .butik-trust { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0; }
 .butik-trust-item {
   display: inline-flex; align-items: center; gap: 7px;
@@ -468,6 +473,71 @@
   .butik-slot-about     { order: 4; }
   .butik-slot-specs     { order: 5; }
   .butik-slot-chat      { order: 6; }
+
+  /*
+    POSTNUMMERFÄLTET SKA SYNAS UTAN ATT MAN SCROLLAR.
+
+    Det är fältet som gör priset färdigt: utan det står "150 kr" utan frakt och utan totalsumma, och
+    knappen är död. Det låg under en kvadratisk produktbild, en rubrikrad, priset, två
+    förtroenderader och två textstycken — alltså en hel skärm ner på en telefon, och den som inte
+    scrollade såg en köpruta som inte gick att använda.
+
+    Tre grepp, i den ordning de kostar minst:
+
+    1. BILDEN FÅR EN HÖJD I STÄLLET FÖR ETT FORMAT. 1:1 betyder 390 px på en 390 px bred telefon —
+       en halv skärm åt en bild man ändå kan trycka på för att se större. `contain` är kvar, så hela
+       möbeln syns; det är luften runt den som krymper.
+    2. FÄLTET FLYTTAS UPP FÖRBI förtroenderaderna. "Loopa-granskad" och "Hemleverans i Stockholm" är
+       skäl att köpa, och de läses efter priset — inte före det man måste fylla i.
+    3. LEDTEXTEN FLYTTAR NER under fältet. Den förklarar vad ifyllandet ger — fraktpris och
+       totalsumma — och den frågan ställs med fältet framför sig, inte före det. (Rubriken "Köp och
+       hemleverans" var redan dold inuti köprutan; se regeln längre ner.)
+  */
+  .butik-pdp .butik-slot-cover .listing-cover,
+  .butik-pdp .butik-slot-cover .listing-stage-cutout .listing-cover {
+    aspect-ratio: auto; height: 32vh; min-height: 170px; padding: 10px;
+  }
+
+  /* Grundtalet först, av samma skäl som inne i panelen nedan: ett barn utan `order` ligger på 0 och
+     hade hamnat före rubriken. Rutan används av BÅDE Loopas kassa och Tradera-panelen, och den
+     senare bär rader som inget av tumreglerna här känner vid namn. */
+  .butik-buybox { display: flex; flex-direction: column; }
+  .butik-buybox > * { order: 3; }
+  .butik-buybox-titel { order: 1; }
+  .butik-buybox-price { order: 2; }
+  .butik-buybox .butik-explainer { order: 3; margin-top: 4px; }
+  .butik-buybox .butik-trust { order: 4; }
+  .butik-buybox .butik-buybox-note { order: 5; }
+
+  /*
+    FÖRTROENDERADEN KRYMPER TILL EN RAD TEXT.
+
+    "Loopa-granskad" faller bort helt: hela sidan är besiktningen — betyget, varje skada med
+    närbild, källorna — och en bricka som säger samma sak ovanför den är en sammanfattning av det
+    man redan tittar på. Kvar står leveransen, som är ett LÖFTE och inte en beskrivning, och den
+    behöver ingen ram: en bricka mitt i kassan läser som en knapp man ska trycka på.
+  */
+  .butik-buybox .butik-trust-granskad { display: none; }
+  .butik-buybox .butik-trust { margin: 6px 0 0; }
+  .butik-buybox .butik-trust-item {
+    padding: 0; background: none; box-shadow: none;
+    font-size: var(--fs-sm); font-weight: 500; color: var(--muted);
+  }
+
+  /*
+    ALLA BARN FÅR ETT ORDNINGSTAL, inte bara de två som flyttas.
+
+    Ett flexbarn utan `order` ligger på 0 och hamnar alltså FÖRE allt som fått ett positivt tal.
+    Utan grundregeln nedan sköt felmeddelandet, sammanställningen och knappen sig före fältet i det
+    ögonblick något av dem dök upp — och de tre är just det som visas när något går fel.
+    Grundtalet 3 håller dem i sin DOM-ordning inbördes.
+  */
+  .butik-buybox .butik-explainer { display: flex; flex-direction: column; }
+  .butik-buybox .butik-explainer > * { order: 3; }
+  .butik-buybox .butik-explainer > .butik-field-row { order: 1; }
+  /* Ledtexten under fältet: den förklarar vad som händer när man fyllt i, och den frågan ställs
+     med fältet framför sig. Marginalen som höll isär rubrik och fält blir fel i den ordningen. */
+  .butik-buybox .butik-explainer > .butik-kop-lede { order: 2; margin: 8px 0 0; }
 }
 
 /* Köpsektionen följer med när man scrollar förbi bilden — den är sidans syfte. Bara på stora

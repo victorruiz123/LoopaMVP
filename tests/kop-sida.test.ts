@@ -2,7 +2,7 @@
 //
 // Sidan lovar två saker i klartext, och båda går att bryta i kod utan att någon märker det:
 //
-//   "+200 kr serviceavgift + frakt från 495 kr. Inga överraskningar."
+//   "+200 kr serviceavgift + 600 kr frakt. Inga överraskningar."
 //        Talen måste komma från koden som RÄKNAR dem. En siffra skriven en gång till i en
 //        komponent är en siffra som en dag säger något annat än kassan gör.
 //
@@ -29,14 +29,22 @@ const { seoFor } = await import("../server/src/butik/seo.js");
 // ─── priset ─────────────────────────────────────────────────────────────────
 
 test("zonavgifterna kommer ur zonerna, inte ur en lista bredvid", () => {
-  // ZONE_FEES finns för att köpsidan ska kunna säga "från 495 kr" utan att skriva talet själv.
+  // ZONE_FEES finns för att köpsidan ska kunna skriva ut fraktpriset utan att skriva talet själv.
   for (const pn of ["11234", "16440", "18131"]) {
     assert.ok(ZONE_FEES.includes(deliveryQuote(pn).zone!.feeSek), `${pn} ska finnas i ZONE_FEES`);
   }
 });
 
-test("'frakt från' är den lägsta zonen, inte ett påhittat golv", () => {
-  assert.equal(Math.min(...ZONE_FEES), 495);
+/**
+ * Fraktpriset är ETT tal i hela produkten.
+ *
+ * Tradera-annonserna skriver ut det i löptext ("Hemleveransen kostar 600 kr") och räknar in det i
+ * annonspriset. Skiljer sig kassans tal från det säger annonsen fel — och det upptäcks av en köpare,
+ * inte av oss.
+ */
+test("kassans frakt är samma tal som annonserna lovar, i varje zon", async () => {
+  const { SHIPPING_INCLUDED_SEK } = await import("../server/src/integrations/tradera/shipping.js");
+  assert.deepEqual([...new Set(ZONE_FEES)], [SHIPPING_INCLUDED_SEK]);
   assert.ok(ZONE_FEES.every((a, i) => i === 0 || ZONE_FEES[i - 1] <= a), "sorterad");
 });
 
@@ -91,6 +99,17 @@ test("butiken och efterfrågeväggen har kvar sina huvuden", async () => {
 });
 
 test("säljverktygets startsida får INTE köpsidans huvud", async () => {
-  // Grinden i seoFor. Utan den hade "/" presenterat sig som en köpsida för varje sökmotor.
-  assert.equal(await seoFor("/", ""), null);
+  /*
+   * Grinden i seoFor. Utan den hade "/" presenterat sig som en köpsida — eller som butiken — för
+   * varje sökmotor.
+   *
+   * Roten SAKNADE tidigare huvud helt, och det här testet låste fast just det. Den har ett eget
+   * sedan märkessökningen "loopa" började landa här (se butik-seo.test.ts): påståendet är alltså
+   * inte längre "inget huvud" utan "sitt eget huvud". Grinden testas precis lika hårt av det.
+   */
+  const head = await seoFor("/", "");
+  assert.ok(head, "roten är sajtens startsida och måste bära ett huvud");
+  assert.match(head.canonical, /\/$/, "roten kanoniseras som roten, inte som /kop eller /butik");
+  assert.ok(!head.title.includes("Butik"), "startsidan är inte butikens landningssida");
+  assert.ok(!/Köp begagnat/.test(head.description), "och den bär inte köpsidans löfte");
 });

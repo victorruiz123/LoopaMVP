@@ -107,8 +107,49 @@ test("en möbel som inte finns markeras noindex i stället för att svara 200 me
 });
 
 test("adresser utanför butiken rör inte skalet", async () => {
-  assert.equal(await seoFor("/", ""), null);
   assert.equal(await seoFor("/butik/nagot-okant/x", ""), null);
+  // Säljflödets egna skärmar ska ingen hitta via en sökmotor — bara roten själv har ett huvud.
+  assert.equal(await seoFor("/salj/steg-2", ""), null);
+});
+
+/**
+ * Startsidan är den sida en sökning på "loopa" landar på, och den gick länge ut som ett tomt skal.
+ * Testerna nedan låser fast det som gör den till en sida: en kanonisk adress, en kropp som nämner
+ * företaget vid namn ihop med vad det gör, och entitetsmarkeringen som skiljer Loopa från verbet.
+ */
+test("startsidan bär sitt eget huvud, inte butikens", async () => {
+  const head = await seoFor("/", "");
+  assert.ok(head, "roten måste ha ett sidhuvud sedan den flyttade hit");
+  assert.match(head.title, /^Loopa/, "märkesnamnet först — frågan som ska träffa är namnet");
+  assert.ok(!head.title.includes("Butik"), "roten är sajten, inte avdelningen");
+  assert.match(head.canonical, /\/$/);
+  assert.ok(!head.noindex);
+  assert.equal(head.ogType, "website", "startsidan är ingen produkt");
+});
+
+test("startsidan bär Organization och WebSite — och ingen annan sida gör det", async () => {
+  const rot = await seoFor("/", "");
+  const grafer = JSON.parse(rot!.jsonLd!) as Array<Record<string, unknown>>;
+  const typer = grafer.map((g) => g["@type"]);
+  assert.ok(typer.includes("Organization"));
+  assert.ok(typer.includes("WebSite"), "sökfältsmarkeringen läses bara på startsidan");
+
+  const org = grafer.find((g) => g["@type"] === "Organization")!;
+  assert.equal(org.name, "Loopa");
+  assert.match(String(org.url), /\/$/, "Organization pekar på roten, inte på /butik");
+  assert.ok(!("sameAs" in org), "tomt sameAs utelämnas hellre än skickas tomt");
+
+  const butik = await seoFor("/butik", "");
+  assert.ok(!String(butik!.jsonLd).includes('"WebSite"'), "sajtgrafen ska stå på EN sida");
+});
+
+test("startsidans kropp skiljer företaget Loopa från verbet loopa", async () => {
+  const head = await seoFor("/", "");
+  const body = head!.body ?? "";
+  assert.match(body, /<h1>Loopa<\/h1>/);
+  assert.match(body, /begagnade möbler/i);
+  assert.match(body, /Stockholm/, "orten är det som gör namnet till en entitet och inte ett ord");
+  assert.match(body, /href="\/butik"/, "vägen in i butiken får inte kräva JavaScript");
 });
 
 
@@ -234,11 +275,15 @@ test("samma sida på RÄTT värdnamn omdirigeras inte — annars blir det en oä
 test("hela appen flyttar — allt utom maskinvägarna och sanningskorten", () => {
   MED_KANONISK("https://loopa.nu", () => {
     /*
-     * ROTEN VÄNTAR PÅ LANSERING. loopa.nu/ visar marknadssajtens företagssida än, så en
-     * kanonisering av roten gav kedjan app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company:
+     * ROTEN FLYTTADE 2026-09-11 och är inte längre ett undantag. Den var det ända fram till dess,
+     * bakom flaggan LOOPA_ROT_FLYTTAD: loopa.nu/ visade marknadssajtens företagssida, och en
+     * kanonisering av roten gav kedjan app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company —
      * säljflödet gick inte att nå från någon adress alls. Det hände i drift.
+     *
+     * Skyddet mot att det händer igen sitter numera i UTRULLNINGSORDNINGEN och inte i en flagga:
+     * omdirigeringsregeln tas bort före servern rullas. Se deploy/cloudflare/wrangler.toml.
      */
-    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), null);
+    assert.equal(flyttadAdress("app.loopa.nu", "/", ""), "https://loopa.nu/");
     assert.equal(flyttadAdress("app.loopa.nu", "/efterlyses/stolar", ""), "https://loopa.nu/efterlyses/stolar");
     assert.equal(flyttadAdress("app.loopa.nu", "/sitemap.xml", ""), "https://loopa.nu/sitemap.xml");
     assert.equal(flyttadAdress("app.loopa.nu", "/kop/analysera", ""), "https://loopa.nu/kop/analysera");
@@ -299,17 +344,25 @@ test("loopback och IP-adresser kanoniseras aldrig", () => {
   });
 });
 
-test("roten flyttar när flaggan sätts vid lansering", () => {
+/**
+ * Roten har flyttat, och ingen flagga styr det längre.
+ *
+ * Testet står kvar med omvänt påstående i stället för att raderas: det var det här beteendet som en
+ * gång sköt ned säljflödet i drift, och en rad som säger vad som gäller nu är billigare än att
+ * någon om ett halvår undrar varför roten behandlas som allt annat.
+ */
+test("roten kanoniseras som varje annan sida, oavsett miljövariabler", () => {
   const fore = process.env.LOOPA_ROT_FLYTTAD;
-  process.env.LOOPA_ROT_FLYTTAD = "1";
+  // Den gamla flaggan ska inte längre kunna hålla kvar roten på app.loopa.nu.
+  delete process.env.LOOPA_ROT_FLYTTAD;
   try {
     MED_KANONISK("https://loopa.nu", () => {
       assert.equal(flyttadAdress("app.loopa.nu", "/", ""), "https://loopa.nu/");
-      // Undantagen gäller fortfarande — flaggan rör bara roten.
+      assert.equal(flyttadAdress("app.loopa.nu", "/", "?utm=x"), "https://loopa.nu/?utm=x");
+      // Undantagen gäller fortfarande — flytten rör inte maskinvägarna.
       assert.equal(flyttadAdress("app.loopa.nu", "/c/LP-1", ""), null);
     });
   } finally {
-    if (fore === undefined) delete process.env.LOOPA_ROT_FLYTTAD;
-    else process.env.LOOPA_ROT_FLYTTAD = fore;
+    if (fore !== undefined) process.env.LOOPA_ROT_FLYTTAD = fore;
   }
 });

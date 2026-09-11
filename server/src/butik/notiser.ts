@@ -154,11 +154,23 @@ export async function notifyPurchase(order: Order, record: ButikRecord | null, t
 // Frakten
 // ---------------------------------------------------------------------------
 
-/** Köparen har lämnat sina tider. Nu är det vi som är sena, inte de. */
-export async function notifySlotsRequested(order: Order, title: string): Promise<void> {
+/**
+ * Köparen har lämnat sina tider. Nu är det vi som är sena, inte de.
+ *
+ * SVARAR OM ARBETSORDERN KOM IVÄG, och det är den enda av notiserna här som gör det. "BOKA FRAKT" är
+ * inte en artighet till en kund — det är enda signalen till människan som ska ringa budfirman. Faller
+ * brevet står köparen och väntar på en leverans ingen påbörjat, och det enda spåret vore en rad i en
+ * serverlogg. Anroparen skriver i stället en intern rad på ordern, där den syns i panelen bredvid
+ * själva ordern. Se `requestSlots` i checkout.ts.
+ *
+ * Falskt betyder också "det fanns ingen att skicka till": en tom `opsAddresses()` är samma sak som
+ * ett fallet brev för den som väntar på leveransen.
+ */
+export async function notifySlotsRequested(order: Order, title: string): Promise<boolean> {
   const tider = order.requestedSlots.map((s) => `  • ${slotText(s)}`).join("\n");
+  let framme = false;
   for (const to of opsAddresses()) {
-    await sendLetter({
+    const ok = await sendLetter({
       to,
       subject: `BOKA FRAKT: ${title} (${order.reference})`,
       kind: "ops-frakt",
@@ -176,6 +188,7 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
         link("/?admin=1") ? `Bekräfta i panelen: ${link("/?admin=1")}` : null,
       ),
     });
+    framme = framme || ok;
   }
   if (order.email) {
     await sendLetter({
@@ -194,6 +207,7 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
       ),
     });
   }
+  return framme;
 }
 
 /** Frakten är bokad. EN tid gäller, och det är den enda som nämns. */

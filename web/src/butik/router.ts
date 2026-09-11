@@ -22,6 +22,15 @@ export type ButikRoute =
   | { name: "product"; id: string }
   | { name: "search"; q: string }
   | { name: "order"; id: string }
+  /**
+   * Säljarens egen annons: /butik/annons/<jobId>.
+   *
+   * Skild från `product`, som är KÖPARENS sida om möbeln. Den här öppnas ur profilen, av den som äger
+   * annonsen, och är det säljaren menar med "min annons" — kortet som ligger ute, med vägen att ta
+   * bort den. Att skicka säljaren till produktsidan i stället var att svara på en annan fråga än den
+   * de ställde när de tryckte på sin egen rad.
+   */
+  | { name: "annons"; id: string }
   /** Profilen. SAMMA skärm som säljverktygets — se screens/ProfileScreen.tsx. */
   | { name: "profile" };
 
@@ -54,6 +63,7 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   if (head === "objekt" && tail) return { name: "product", id: decodeURIComponent(tail) };
   if (head === "order" && tail) return { name: "order", id: decodeURIComponent(tail) };
   if (head === "sok") return { name: "search", q: params.get("q") ?? "" };
+  if (head === "annons" && tail) return { name: "annons", id: decodeURIComponent(tail) };
   if (head === "profil") return { name: "profile" };
   // Okänd väg under /butik: hela lagret. En död länk till en borttagen kategori ska landa i
   // butiken, inte i ingenting.
@@ -68,6 +78,7 @@ export function butikHref(route: ButikRoute): string {
     case "product": return `${BUTIK_ROOT}/objekt/${encodeURIComponent(route.id)}`;
     case "order": return `${BUTIK_ROOT}/order/${encodeURIComponent(route.id)}`;
     case "search": return `${BUTIK_ROOT}/sok?q=${encodeURIComponent(route.q)}`;
+    case "annons": return `${BUTIK_ROOT}/annons/${encodeURIComponent(route.id)}`;
     case "profile": return `${BUTIK_ROOT}/profil`;
   }
 }

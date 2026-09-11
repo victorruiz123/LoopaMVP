@@ -6,8 +6,7 @@ import ListingView from "../components/ListingView";
 import SellWithLoopa from "../components/SellWithLoopa";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
-import { imageUrl, saveListingDetails } from "../api";
-import DemandHook from "../kop/components/DemandHook";
+import { deleteJob, imageUrl, saveListingDetails } from "../api";
 
 /**
  * Säljarens vy av sin annons.
@@ -29,13 +28,25 @@ export default function ListingScreen({
   result: initialResult,
   loopaId,
   onBack,
+  backLabel,
   onHome,
   onMyListings,
+  onSellAnother,
+  onDeleted,
 }: {
   result: ConditionResult;
   /** Kortets publika ID. Saknas bara om jobbsvaret hämtades innan servern började skicka med det. */
   loopaId?: string;
   onBack: () => void;
+  /**
+   * Vad vägen tillbaka heter.
+   *
+   * Den står i flödet direkt efter skickbedömningen, och DÄR är "Tillbaka till skicket" sant. Öppnas
+   * samma kort ur profilen är det en lögn: skicket ligger inte bakom, mina annonser gör det — och en
+   * knapp som säger fel om vart den leder är sämre än ingen knapp. Texten kommer därför utifrån, av
+   * den som vet var man kom ifrån.
+   */
+  backLabel?: string;
   onHome: () => void;
   /**
    * Till profilen, där möbeln står under "Till salu" så fort den lagts ut.
@@ -44,6 +55,16 @@ export default function ListingScreen({
    * fel. Saknas den ritas ingen sådan väg.
    */
   onMyListings?: () => void;
+  /** Ett nytt varv, med nästa möbel. Valfri av samma skäl som `onMyListings`. */
+  onSellAnother?: () => void;
+  /**
+   * Annonsen är borta — vart man går då.
+   *
+   * Att den är VALFRI är själva behörighetsprövningen på skärmen: saknas den ritas ingen
+   * borttagningsknapp alls. Adminpanelen öppnar samma skärm för andras kort och skickar inte in
+   * den; servern prövar ägarskapet igen på sin sida (DELETE /api/jobs/:id).
+   */
+  onDeleted?: () => void;
 }) {
   const t = useT();
 
@@ -60,6 +81,34 @@ export default function ListingScreen({
   const [result, setResult] = useState(initialResult);
   useEffect(() => setResult(initialResult), [initialResult]);
 
+  /**
+   * Borttagningen, i två tryck.
+   *
+   * Ett steg hade varit fel: annonsen är resultatet av en filmning, en skickbedömning och en
+   * prissättning, och den går inte att göra ogjord. Frågan ställs därför på skärmen i stället för i
+   * en `confirm()` — den senare ser ut som webbläsarens fråga, inte som vår, och texten om vad som
+   * faktiskt försvinner får inte plats i den.
+   *
+   * Felet visas där knappen står. Servern är den som avgör om annonsen får tas bort (möbeln kan
+   * ligga ute till salu eller redan vara köpt), och dess besked är formulerat för säljaren.
+   */
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  async function remove() {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteJob(result.jobId);
+      onDeleted?.();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : String(err));
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
+
   const listing = result.listing;
   usePageTitle("Annons");
   const card = listing?.result ?? null;
@@ -69,7 +118,7 @@ export default function ListingScreen({
   return (
     <div className="screen screen-light card-screen">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> {t("Tillbaka till skicket")}
+        <ArrowLeftIcon /> {backLabel ?? t("Tillbaka till skicket")}
       </button>
 
       {!listing || listing.status === "unavailable" ? (
@@ -88,12 +137,6 @@ export default function ListingScreen({
         </section>
       ) : (
         <>
-          {/* Anonymiserad efterfrågan. Döljer sig själv vid noll — se DemandHook. */}
-          <DemandHook
-            kategori={card.identity.category ?? null}
-            marke={card.identity.brand ?? null}
-            pris={card.pricing.suggestedPriceSek ?? null}
-          />
           <ListingView
             card={card}
             identity={result.identity}
@@ -102,12 +145,25 @@ export default function ListingScreen({
             damages={saljarensSkador(result)}
             imageCount={result.images.length}
             reviewed={result.reviewed}
-            productImage={result.productImage}
+            /**
+             * KATALOGBILDEN SKICKAS INTE IN HÄR, och det är avsiktligt.
+             *
+             * ListingView tar katalogbilden före en orörd bildruta (se `candidates` där), vilket är
+             * rätt ordning för en KÖPARE: en studiobild av en ny möbel ser ut som något man handlar.
+             * Säljaren granskar något annat — sin egen möbel, som den blev fotograferad. Att visa
+             * en främmande produktbild överst på den sidan är att visa fel möbel till fel person.
+             *
+             * Uttryckligen null och inte en flagga: det finns ingen katalogbild att välja bort i
+             * den här vyn, det finns bara säljarens omslag.
+             */
+            productImage={null}
             cover={sellerCover(result)}
             loopaId={loopaId}
             /* Fällda sektioner, så att "Sälj med Loopa" ryms på första skärmen. Se `collapsible`
                i ListingView för varför det gäller den här vyn och inte det publika kortet. */
             collapsible
+            /* Säljaren har inga frågor att ställa om sin egen möbel — se `hideChat` i ListingView. */
+            hideChat
             onSaveListing={async (patch) => setResult(await saveListingDetails(result.jobId, patch))}
           />
           {/* Sist på kortet, efter allt som ska granskas: vägen ut. Det är det enda på den här
@@ -122,8 +178,41 @@ export default function ListingScreen({
             jobId={result.jobId}
             coverUrl={sellerCover(result)?.url ?? null}
             onMyListings={onMyListings}
+            onSellAnother={onSellAnother}
           />
         </>
+      )}
+
+      {/*
+        Ta bort annonsen. SIST PÅ SIDAN och som text, inte som knapp: det är den handling man letar
+        efter när man bestämt sig, inte en som ska konkurrera med att sälja möbeln.
+
+        Ritas bara när någon tagit emot den — adminpanelen öppnar samma skärm för andras kort, och
+        där finns ingenting att ta bort (se `onDeleted` i App.tsx).
+      */}
+      {onDeleted && (
+        <section className="card-delete">
+          {deleteError && <p className="sell-error">{deleteError}</p>}
+          {confirmDelete ? (
+            <>
+              <p className="muted small">
+                {t("Annonsen, bilderna och skickrapporten tas bort. Det går inte att ångra.")}
+              </p>
+              <div className="card-delete-row">
+                <button className="btn btn-danger" onClick={() => void remove()} disabled={deleting}>
+                  {deleting ? t("Tar bort…") : t("Ja, ta bort annonsen")}
+                </button>
+                <button className="btn btn-text" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                  {t("Avbryt")}
+                </button>
+              </div>
+            </>
+          ) : (
+            <button className="btn btn-text card-delete-link" onClick={() => setConfirmDelete(true)}>
+              {t("Ta bort annonsen")}
+            </button>
+          )}
+        </section>
       )}
 
       {/* Bara för kort som inte går att sälja: annonsen föll, eller den byggs fortfarande. Den

@@ -4,7 +4,6 @@ import { ensureMediaSession } from "../../api";
 import AuthScreen from "../../screens/AuthScreen";
 import ProfileScreen from "../../screens/ProfileScreen";
 import { harStegBakat, navigate } from "../router";
-import { publicCardPath } from "../../lib/loopaId";
 
 /**
  * Vägen ut ur profilen: TILLBAKA DIT MAN KOM IFRÅN.
@@ -36,8 +35,7 @@ function tillbaka() {
  * samma syfte hade genast börjat glida isär — en ny statistikruta i den ena, en ny lista i den andra.
  *
  * Det ENDA som skiljer är vad knapparna runt omkring gör, och det är precis vad skärmens props är
- * till för: ett annonskort öppnas på sin publika adress, eftersom butiken inte har säljverktygets
- * kortvy.
+ * till för: ett annonskort öppnas på butikens egen adress för säljarens annons, /butik/annons/<jobId>.
  *
  * "Tillbaka" är den andra skillnaden, och den har ingen destination alls — se `tillbaka` ovan.
  * Knappen pekade tidigare på `{ name: "search", q: "" }`, alltså hela lagret, oavsett var man kom
@@ -100,12 +98,15 @@ export default function ButikProfile() {
        */
       onOpenAdmin={() => { window.location.href = "/?admin=1"; }}
       onBack={tillbaka}
-      /* Säljverktygets kortvy finns inte här. Det publika kortet gör det, och det är samma möbel —
-         möbeln som ligger i butiken nås dessutom på sin butiksadress, som är den köparen ser. */
-      onOpenJob={(job) => {
-        if (job.shop) navigate({ name: "product", id: job.loopaId });
-        else window.location.href = publicCardPath(job.loopaId);
-      }}
+      /**
+       * Egen adress för säljarens annons: /butik/annons/<jobId>.
+       *
+       * Klicket gick förut till KÖPARENS vy — produktsidan för möbler i butiken, det publika kortet
+       * för resten. Båda visar möbeln, ingen av dem visar annonsen som säljarens: det går inte att se
+       * hur den går och inte att ta bort den, vilket är de två sakerna man öppnar sin egen rad för.
+       * Se butik/screens/MinAnnons.tsx.
+       */
+      onOpenJob={(job) => navigate({ name: "annons", id: job.id })}
     />
   );
 }

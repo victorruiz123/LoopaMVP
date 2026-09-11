@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowLeftIcon, CameraIcon, CloseIcon, FolderIcon, PhotosIcon, PlusIcon, SofaIcon, VideoIcon } from "../components/icons";
+import { ArrowLeftIcon, CameraIcon, CloseIcon, PhotosIcon, PlusIcon, SofaIcon, VideoIcon } from "../components/icons";
 import type { CapturedShot } from "../api";
 import type { FurnitureIdentity } from "../types";
 import { extractBestFrames, EXTRACTION_TARGET_MS } from "../lib/videoFrames";
@@ -147,9 +147,8 @@ export default function CaptureScreen({
    * Mobilvyn öppnar i filmningen.
    *
    * Varvet är det underlag appen är byggd för: bildrutorna väljs ur rörelsen, täckningen blir hela
-   * möbeln, och säljaren behöver inte hålla sex vinklar i huvudet. Fotoguiden finns kvar som utväg
-   * för den som inte kommer runt möbeln — dörren dit står i filmguidens överlägg, se WalkaroundGuide
-   * — men den är en utväg och inte vägen in.
+   * möbeln, och säljaren behöver inte hålla sex vinklar i huvudet. Fotoguiden finns kvar, men bara
+   * från datorns valskärm: i mobilvyn är varvet hela vägen, och överlägget erbjuder ingen avstickare.
    */
   const mode: Mode = videoOnly && pickedMode === "choose" ? "video" : pickedMode;
   usePageTitle(
@@ -224,11 +223,40 @@ export default function CaptureScreen({
       await useMainLens(streamRef.current);
       setStreamEpoch((n) => n + 1);
     } catch (err) {
-      setCameraError(err instanceof Error ? err.message : t("Kunde inte starta kameran."));
+      // Samma skäl som i fästningen nedan: webbläsarens DOMException-text är engelsk och beskriver
+      // ett API, inte ett läge en säljare kan göra något åt. Namnet på felet säger däremot precis
+      // vilket läge det är.
+      console.warn("[capture] getUserMedia misslyckades", err);
+      const name = err instanceof DOMException ? err.name : "";
+      setCameraError(
+        name === "NotAllowedError"
+          ? t("Kameran är blockerad för den här sidan. Tillåt kameran i webbläsarens inställningar och försök igen.")
+          : name === "NotFoundError"
+            ? t("Ingen kamera hittades på enheten.")
+            : name === "NotReadableError" || name === "AbortError"
+              ? t("Kameran används av något annat just nu. Stäng andra appar som har kameran igång och försök igen.")
+              : t("Kunde inte starta kameran."),
+      );
     }
   }
 
-  // Attach the stream once the <video> for this mode is actually in the DOM.
+  /**
+   * Attach the stream once the <video> for this mode is actually in the DOM.
+   *
+   * ETT AVBRUTET play() ÄR INGET KAMERAFEL. Elementen har `autoPlay`, och strömmen fästs här — alltså
+   * efter att elementet ritats — så webbläsaren har redan börjat starta uppspelningen när det
+   * uttryckliga `play()` nedan kommer. Krockar de avbryter den det ena med
+   * `AbortError: The operation was aborted.`, och varje läge har dessutom sitt EGET <video>: går
+   * säljaren från filmningen till omslagsbilden rivs det gamla elementet medan dess play() är på väg,
+   * vilket ger samma avbrott. Bilden rullar i båda fallen.
+   *
+   * Det gick tidigare rakt ut i rutan, ordagrant och på engelska, mitt i filmningen av en möbel som
+   * syntes fint i sökaren. Det som säger något om kameran är om bilden STÅR STILL efteråt — därför
+   * kollas `el.paused` när avbrottet kommer, i stället för att avbrottet i sig räknas som fel.
+   *
+   * `play()` är ändå kvar: utan det står bilden still på de vägar där autoplay inte får löpa (iOS
+   * efter ett lägesbyte utan nytt tryck).
+   */
   useEffect(() => {
     if (!CAMERA_MODES.includes(mode)) return;
     const el = videoRef.current;
@@ -236,7 +264,20 @@ export default function CaptureScreen({
     if (!el || !stream || el.srcObject === stream) return;
     el.srcObject = stream;
     el.play().catch((err) => {
-      setCameraError(err instanceof Error ? err.message : t("Kameran kunde inte spelas upp."));
+      const aborted = err instanceof DOMException && err.name === "AbortError";
+      // Avbrottet levereras innan elementet hunnit börja rulla; frågan är om det är igång strax efter.
+      if (aborted) {
+        window.setTimeout(() => {
+          if (videoRef.current === el && el.srcObject === stream && el.paused) {
+            setCameraError(t("Kameran kunde inte spelas upp."));
+          }
+        }, 400);
+        return;
+      }
+      // Webbläsarens egen text är engelsk och säger ingenting till en säljare — den hör hemma i
+      // konsolen, inte över sökaren.
+      console.warn("[capture] play() misslyckades", err);
+      setCameraError(t("Kameran kunde inte spelas upp."));
     });
   }, [mode, streamEpoch]);
 
@@ -352,6 +393,32 @@ export default function CaptureScreen({
    * väljs av koden, och det finns inget att godkänna.
    */
   const [omslagsforslag, setOmslagsforslag] = useState<string | null>(null);
+
+  /**
+   * DATORINMATNINGEN: en film och en omslagsbild, ingenting annat.
+   *
+   * Valskärmen bakom `mode === "choose"` visas bara på en dator (mobilvyn går rakt in i kameran), och
+   * den räknade upp fem vägar: filma, fotoguide, ta bilder, ladda upp film, ladda upp bilder. Fem
+   * jämnstora kort är inget val utan en meny, och tre av dem förutsätter dessutom en kamera man kan
+   * bära runt möbeln — vilket en stationär skärm inte är.
+   *
+   * På en dator har säljaren redan filmen i telefonen. De två sakerna som faktiskt behövs är därför
+   * de enda som står här: VARVET, som får vara ofullständigt (soffan står mot en vägg), och
+   * OMSLAGSBILDEN, som blir annonsens ansikte. Vägen framåt öppnar när båda ligger på plats.
+   *
+   * Bildruteuttaget startar i samma ögonblick som filmen släpps och löper medan omslagsbilden väljs —
+   * samma grepp som telefonen använder under omslagssteget (se `bildrutorRef`). Väntan hamnar i en
+   * ruta säljaren ändå ska fylla i stället för i en spinner efteråt.
+   */
+  const [videoNamn, setVideoNamn] = useState<string | null>(null);
+  const [videoLaser, setVideoLaser] = useState(false);
+  const [videoRuta, setVideoRuta] = useState<string | null>(null);
+  const [videoFel, setVideoFel] = useState<string | null>(null);
+  const [datorOmslag, setDatorOmslag] = useState<string | null>(null);
+  /** Löftet om bildrutorna. Bärs i en ref: det är inte tillstånd som ritas, det är arbete som pågår. */
+  const datorRutorRef = useRef<Promise<Awaited<ReturnType<typeof extractBestFrames>>> | null>(null);
+  /** Vilket fack som har en fil ovanför sig just nu — bara för att rita ringen runt rätt ruta. */
+  const [dragOver, setDragOver] = useState<"video" | "omslag" | null>(null);
   /**
    * Guiden före omslagsbilden, precis som filmguiden ligger före inspelningen.
    *
@@ -488,48 +555,6 @@ export default function CaptureScreen({
     else setActiveStation(PHOTO_STATIONS[0].id);
   }
 
-  /**
-   * Same path as a camera recording: a File IS a Blob, so it goes straight into the existing
-   * client-side frame selection. Nothing about the pipeline knows the difference.
-   */
-  async function handleVideoFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    e.target.value = ""; // så samma fil kan väljas igen efter ett misslyckat försök
-    if (!file) return;
-    setProcessingError(null);
-    /**
-     * FILMEN LADDAS ALDRIG UPP — bara bildrutorna.
-     *
-     * Uttolkningen sker här i webbläsaren, så en film på hundra megabyte kostar ingen överföring.
-     * Därför finns heller ingen storleksgräns: det som begränsar är vad webbläsaren orkar avkoda,
-     * och det säger den själv genom att inte ge oss några bildrutor.
-     */
-    setMode("processing");
-    try {
-      const frames = await extractBestFrames(file);
-      frames.forEach((f) => addShot(f.dataUrl, "video", f.viewLabel));
-      // Straight into the analysis. The frames were picked by the selector, not by the seller, so
-      // there is nothing for them to approve — and being asked to sign off on someone else's choice
-      // is friction without a decision behind it. Bildrutorna följer med vidare, så ett försök som
-      // faller på uppladdningen kan tas om utan att något filmas nytt.
-      startAnalysis(frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })));
-    } catch (err) {
-      /**
-       * En INSPELAD film kommer från vår egen kamera och går alltid att läsa. En VALD fil kan vara
-       * vad som helst — en HEVC-film från en iPhone, en skärminspelning, en fil som råkade heta
-       * .mov. Felet är detsamma, men råden är olika, så uppladdningen säger vad man kan göra i
-       * stället för att bara konstatera att det inte gick.
-       */
-      const bas = err instanceof Error ? err.message : t("Kunde inte bearbeta videon.");
-      setProcessingError(
-        /bildruta/i.test(bas)
-          ? t("Webbläsaren kunde inte läsa filmen. Prova en MP4, eller filma direkt i appen.")
-          : bas,
-      );
-      setMode("choose");
-    }
-  }
-
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ""; // så samma filer kan väljas igen efter ett misslyckat försök
@@ -605,7 +630,7 @@ export default function CaptureScreen({
         setProcessingError(
           blob.size < MIN_CLIP_BYTES
             ? t("Inspelningen blev tom — kameran verkar ha stängts av. Försök igen.")
-            : t("Filmen blev för kort för att läsa bildrutor ur. Gå ett helt varv och låt den spela klart."),
+            : t("Filmen blev för kort för att läsa bildrutor ur. Låt den spela några sekunder till."),
         );
         setMode("video");
         return;
@@ -673,6 +698,85 @@ export default function CaptureScreen({
     return () => clearInterval(timer);
   }, [recording]);
 
+  // ---- datorinmatningen: filmen och omslagsbilden -------------------------
+
+  /**
+   * Filmen är vald. Bildrutorna börjar läsas ut direkt, medan säljaren letar upp sin omslagsbild.
+   *
+   * Filen laddas aldrig upp — uttaget sker i webbläsaren, och det är bildrutorna som skickas. Därför
+   * finns ingen storleksgräns här heller; det som begränsar är vad webbläsaren orkar avkoda, och det
+   * säger den genom att inte ge oss några rutor.
+   */
+  async function taEmotVideo(file: File) {
+    setProcessingError(null);
+    setVideoFel(null);
+    setVideoRuta(null);
+    setVideoNamn(file.name);
+    setVideoLaser(true);
+    const uttag = extractBestFrames(file);
+    datorRutorRef.current = uttag;
+    try {
+      const frames = await uttag;
+      // Första rutan som miniatyr: beviset att filmen gick att läsa, och att det är RÄTT film.
+      setVideoRuta(frames[0]?.dataUrl ?? null);
+    } catch (err) {
+      datorRutorRef.current = null;
+      const bas = err instanceof Error ? err.message : t("Kunde inte bearbeta videon.");
+      setVideoFel(
+        /bildruta/i.test(bas)
+          ? t("Webbläsaren kunde inte läsa filmen. Prova en MP4.")
+          : bas,
+      );
+    } finally {
+      setVideoLaser(false);
+    }
+  }
+
+  /** Omslagsbilden. Skalas ned på samma sätt som varje annan vald bild. */
+  async function taEmotOmslag(file: File) {
+    setProcessingError(null);
+    try {
+      setDatorOmslag(await fileToResizedDataUrl(file));
+    } catch {
+      setProcessingError(t("Bilden gick inte att läsa. Prova en JPEG eller PNG."));
+    }
+  }
+
+  /** Filen ur ett släpp eller en filväljare, till rätt fack. Fel sorts fil säger vad som fattas. */
+  function taEmotFil(fack: "video" | "omslag", file: File | undefined) {
+    if (!file) return;
+    const arVideo = file.type.startsWith("video/");
+    const arBild = file.type.startsWith("image/");
+    if (fack === "video" && !arVideo) return setProcessingError(t("Det där är ingen filmfil. Släpp filmen i den vänstra rutan."));
+    if (fack === "omslag" && !arBild) return setProcessingError(t("Det där är ingen bildfil. Släpp bilden i den högra rutan."));
+    void (fack === "video" ? taEmotVideo(file) : taEmotOmslag(file));
+  }
+
+  /**
+   * Båda facken fyllda — vidare.
+   *
+   * Bildrutorna väntas in här och ingen annanstans. Är uttaget klart (det vanliga: det startade när
+   * filmen släpptes) syns ingen bearbetningsruta alls; hann säljaren välja omslagsbild snabbare än
+   * avkodningen får de se den i någon sekund. Omslagsbilden ligger SIST i listan — inspektionen får
+   * listan utan den, och den listan är ett prefix av den här bara så länge ordningen hålls.
+   */
+  async function fortsattFranDatorn() {
+    const uttag = datorRutorRef.current;
+    if (!uttag || !datorOmslag) return;
+    if (videoLaser) setMode("processing");
+    let frames: Awaited<ReturnType<typeof extractBestFrames>>;
+    try {
+      frames = await uttag;
+    } catch {
+      setMode("choose");
+      return;
+    }
+    startAnalysis([
+      ...frames.map((f) => ({ dataUrl: f.dataUrl, viewLabel: f.viewLabel, source: "video" as const })),
+      { dataUrl: datorOmslag, viewLabel: OMSLAGSSTATION.label, source: "manual" as const, role: "cover" as const },
+    ]);
+  }
+
   /**
    * `payloadOverride` exists because the video paths start the analysis in the same tick as they add
    * their shots: `shots` has not re-rendered yet, so reading it here would send an empty list.
@@ -687,81 +791,142 @@ export default function CaptureScreen({
     onCaptured(payload);
   }
 
-  // ---- choose ----
+  // ---- choose: datorns inmatning ----
+  /**
+   * Skärmen finns BARA på en dator: mobilvyn går rakt in i kameran (se `mode` ovan), och telefonen
+   * har sitt eget flöde med varv och omslagssteg. Här är det två filer som ska in.
+   */
   if (mode === "choose") {
+    // Villkoret läses ur tillståndet och inte ur löftet: en ref ritar ingenting när den ändras.
+    const klar = !!videoNamn && !videoLaser && !videoFel && !!datorOmslag;
     return (
-      <div className="screen screen-light">
+      <div className="screen screen-light dator-intag">
         <button className="btn btn-text btn-back" onClick={onBack}>
           <ArrowLeftIcon /> {t("Tillbaka")}
         </button>
-        <h2 className="choose-title">{t("Hur vill du visa möbeln?")}</h2>
+        <h2 className="choose-title">{t("Visa möbeln")}</h2>
         <p className="capture-identity">{[identity.brand, identity.model].filter(Boolean).join(" ")}</p>
-        <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("video")}>
-          <span className="choose-icon">
-            <VideoIcon />
-          </span>
-          <div>
-            <strong>{t("Spela in en snabb video")}</strong>
-            <p className="muted">
-              {cameraAvailable
-                ? t("Gå runt möbeln — vi väljer de bästa vyerna automatiskt.")
-                : t("Kräver HTTPS — inte tillgängligt här.")}
-            </p>
-          </div>
-        </button>
-        {/* Guiden kräver ingen kamera och gråas därför aldrig ut: varje vinkel går att fylla med en
-            bild ur mappen, vilket är hela vägen framåt när getUserMedia är blockerad. */}
-        <button className="choose-card" onClick={() => void enterGuided()}>
-          <span className="choose-icon">
-            <SofaIcon />
-          </span>
-          <div>
-            <strong>{t("Följ fotoguiden")}</strong>
-            <p className="muted">
-              {t(
-                "Sex vinklar, en i taget — guiden visar var du ska stå. Går lika bra att fylla med bilder du redan har.",
+        <p className="dator-ingress">
+          {t("Två saker behövs: en film runt möbeln och en bild som blir annonsens ansikte. Släpp filerna i rutorna eller klicka för att välja.")}
+        </p>
+
+        <div className="dator-fack">
+          {/* 1. FILMEN. Får vara ofullständig — se WalkaroundGuide för samma besked på telefonen. */}
+          <button
+            className={`dator-ruta ${videoNamn && !videoFel ? "dator-ruta-fylld" : ""} ${dragOver === "video" ? "dator-ruta-over" : ""}`}
+            onClick={() => videoFileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver("video");
+            }}
+            onDragLeave={() => setDragOver(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(null);
+              taEmotFil("video", e.dataTransfer.files[0]);
+            }}
+          >
+            <span className="dator-ruta-nr">1</span>
+            <span className="dator-ruta-yta">
+              {videoRuta ? (
+                <img src={videoRuta} alt="" className="dator-ruta-bild" />
+              ) : videoLaser ? (
+                <span className="spinner spinner-small" />
+              ) : (
+                <span className="dator-ruta-ikon">
+                  <VideoIcon />
+                </span>
               )}
-            </p>
-          </div>
-        </button>
-        <button className={`choose-card ${cameraAvailable ? "" : "choose-card-unavailable"}`} onClick={() => enterMode("photo")}>
-          <span className="choose-icon">
-            <CameraIcon />
-          </span>
-          <div>
-            <strong>{t("Ta bilder manuellt")}</strong>
-            <p className="muted">
-              {cameraAvailable
-                ? t("Ta foton själv, gärna med närbilder på skador och slitage.")
-                : t("Kräver HTTPS — inte tillgängligt här.")}
-            </p>
-          </div>
-        </button>
-        <button className="choose-card" onClick={() => videoFileInputRef.current?.click()}>
-          <span className="choose-icon">
-            <FolderIcon />
-          </span>
-          <div>
-            <strong>{t("Ladda upp en videofil")}</strong>
-            <p className="muted">{t("Välj en färdig film — vi extraherar bildrutorna åt dig.")}</p>
-          </div>
-        </button>
-        <button className="choose-card" onClick={() => fileInputRef.current?.click()}>
-          <span className="choose-icon">
-            <PhotosIcon />
-          </span>
-          <div>
-            <strong>{t("Ladda upp bilder")}</strong>
-            <p className="muted">
-              {t(
-                "Har du redan foton? Välj upp till {max} — ingen film behövs. Ta gärna med närbilder på eventuella skador.",
-                { max: MAX_IMAGES },
+            </span>
+            <div className="dator-ruta-text">
+              <strong>{t("Video runt möbeln")}</strong>
+              <p className="muted">{t("Behöver inte gå hela vägen runt — filma de sidor du kommer åt.")}</p>
+              {/* Statusraden är facket självt: filnamn när den ligger inne, felet när den inte gick att
+                  läsa. Ett fel som står någon annanstans läses som ett fel på hela sidan. */}
+              {videoFel ? (
+                <p className="dator-ruta-fel">{videoFel}</p>
+              ) : videoLaser ? (
+                <p className="dator-ruta-status">{t("Läser bildrutor…")}</p>
+              ) : videoNamn ? (
+                <p className="dator-ruta-status">{videoNamn} · {t("klar")}</p>
+              ) : null}
+            </div>
+          </button>
+
+          {/* 2. OMSLAGSBILDEN. Samma bild som telefonen ber om efter varvet. */}
+          <button
+            className={`dator-ruta ${datorOmslag ? "dator-ruta-fylld" : ""} ${dragOver === "omslag" ? "dator-ruta-over" : ""}`}
+            onClick={() => fileInputRef.current?.click()}
+            onDragOver={(e) => {
+              e.preventDefault();
+              setDragOver("omslag");
+            }}
+            onDragLeave={() => setDragOver(null)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(null);
+              taEmotFil("omslag", e.dataTransfer.files[0]);
+            }}
+          >
+            <span className="dator-ruta-nr">2</span>
+            <span className="dator-ruta-yta">
+              {datorOmslag ? (
+                <img src={datorOmslag} alt="" className="dator-ruta-bild" />
+              ) : (
+                <span className="dator-ruta-ikon">
+                  <CameraIcon />
+                </span>
               )}
-            </p>
-          </div>
+            </span>
+            <div className="dator-ruta-text">
+              <strong>{t("En omslagsbild")}</strong>
+              <p className="muted">{t("Hela möbeln snett framifrån, i möbelns egen höjd. Den blir annonsens första bild.")}</p>
+              {datorOmslag && <p className="dator-ruta-status">{t("Vald — klicka för att byta")}</p>}
+            </div>
+          </button>
+        </div>
+
+        {/* Knappen säger vad som fattas i stället för att bara vara grå. */}
+        <button className="btn btn-primary dator-fortsatt" disabled={!klar} onClick={() => void fortsattFranDatorn()}>
+          {klar
+            ? t("Fortsätt")
+            : !videoNamn && !datorOmslag
+              ? t("Lägg till filmen och omslagsbilden")
+              : !videoNamn || videoFel
+                ? t("Lägg till filmen")
+                : videoLaser
+                  ? t("Läser filmen…")
+                  : t("Lägg till omslagsbilden")}
         </button>
-        <input ref={fileInputRef} type="file" accept="image/*" multiple style={{ display: "none" }} onChange={handleFileUpload} />
-        <input ref={videoFileInputRef} type="file" accept="video/*" style={{ display: "none" }} onChange={handleVideoFileUpload} />
+
+        {/* En väg ut för den som inte har någon film: fotoguiden tar sex vinklar ur mappen. Länk och
+            inte ett kort — det är utvägen, inte vägen in. */}
+        <button className="btn btn-text dator-utvag" onClick={() => void enterGuided()}>
+          {t("Ingen film? Fyll sex vinklar med bilder du redan har")}
+        </button>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            taEmotFil("omslag", file);
+          }}
+        />
+        <input
+          ref={videoFileInputRef}
+          type="file"
+          accept="video/*"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            e.target.value = "";
+            taEmotFil("video", file);
+          }}
+        />
         {cameraError && <p className="error-text">{cameraError}</p>}
         {processingError && <p className="error-text">{processingError}</p>}
       </div>
@@ -936,17 +1101,22 @@ export default function CaptureScreen({
   // ---- video recording ----
   if (mode === "video") {
     const stepIndex = Math.min(GUIDANCE_STEPS.length - 1, Math.floor((recordMs / MAX_RECORD_MS) * GUIDANCE_STEPS.length));
+    /**
+     * Nog filmat för att duga — och därmed läge att säga att man får sluta.
+     *
+     * Samma gräns som varvets egen (`MIN_LAP_MS`), och det är ingen slump: under den är klippet inte
+     * ett underlag, och en uppmaning att avsluta hade lett rakt in i "filmen blev för kort". Över den
+     * är det ett underlag, hur mycket av möbeln det än råkar visa — en soffa mot en vägg har inget
+     * helt varv att ge, och den som står halvvägs ska veta att halvvägs räcker.
+     */
+    const kanAvsluta = recordMs >= MIN_LAP_MS;
     return (
       <div className="screen screen-camera">
         <video ref={videoRef} className="camera-feed" muted playsInline autoPlay />
         {/* Ingen beskärningsram här: filmen tar hela bildrutan, och en ram som antyder något annat
             hade fått säljaren att rama in möbeln i fel yta. */}
         {!recording && (
-          <WalkaroundGuide
-            subject={[identity.brand, identity.model].filter(Boolean).join(" ")}
-            onSwitch={() => void enterGuided()}
-            onUploadVideo={() => videoFileInputRef.current?.click()}
-          />
+          <WalkaroundGuide subject={[identity.brand, identity.model].filter(Boolean).join(" ")} />
         )}
         {!recording && (
           <button className="btn btn-ghost capture-mode-back" onClick={leaveCamera}>
@@ -968,28 +1138,15 @@ export default function CaptureScreen({
               ? t("Gå långsammare — annars blir bilderna suddiga")
               : hasRotation === false
                 ? t("{steg} — tryck för att avsluta när du gått runt", { steg: t(GUIDANCE_STEPS[stepIndex]) })
-                : Math.abs(rotationDeg) < 20
-                  ? t("Börja gå — långsamt medsols, ett varv på ungefär 40 sekunder")
-                  : t(GUIDANCE_STEPS[stepIndex])}
+                : kanAvsluta
+                  ? t("{steg} — kommer du inte runt? Tryck för att avsluta", { steg: t(GUIDANCE_STEPS[stepIndex]) })
+                  : Math.abs(rotationDeg) < 20
+                    ? t("Börja gå — långsamt medsols, ett varv på ungefär 40 sekunder")
+                    : t(GUIDANCE_STEPS[stepIndex])}
           </div>
         )}
         {cameraError && <p className="error-text camera-error-overlay">{cameraError}</p>}
         {processingError && <p className="error-text video-error">{processingError}</p>}
-        {/*
-          Filväljaren finns även HÄR och inte bara på valskärmen.
-          
-          Skälet är att valskärmen inte visas i mobilvyn — och mobilvyn är tvingad i utvecklingsläget
-          (se lib/viewMode.ts), så den saknades i praktiken även på en dator. `accept="video/*"` utan
-          `capture` öppnar filerna och inte kameran, vilket är hela poängen: det är den färdiga filmen
-          vi är ute efter, inte en ny inspelning.
-        */}
-        <input
-          ref={videoFileInputRef}
-          type="file"
-          accept="video/*"
-          style={{ display: "none" }}
-          onChange={handleVideoFileUpload}
-        />
         <div className="video-controls">
           {!recording ? (
             <button className="record-btn record-btn-hint" onClick={startRecording} aria-label={t("Starta inspelning")} />

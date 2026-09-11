@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CardDamage, ListingAttribute, ListingViewData } from "../types";
 import { formatSek } from "../lib/price";
 import { severityLabel, typeLabel } from "../lib/labels";
-import { brandLook, brandTypeStyle } from "../lib/brandLook";
+import { brandLook, brandNameStyle } from "../lib/brandLook";
 import { archetypeFor, buildModel, parseDimensions, zoneForPart } from "../lib/furnitureModel";
 import GradeBadge from "./GradeBadge";
 import { ChevronRight } from "./icons";
@@ -47,6 +47,7 @@ export default function ListingView({
   bilder,
   loopaId,
   hideHeader = false,
+  hideChat = false,
   hideSources = false,
   collapsible = false,
   onSaveListing,
@@ -87,6 +88,14 @@ export default function ListingView({
    * ingress ovanför sig och måste bära sin rubrik själva.
    */
   hideHeader?: boolean;
+  /**
+   * Döljer frågechatten.
+   *
+   * Finns för SÄLJARENS vy av sin egen annons. Chatten svarar en köpare på frågor om möbeln ur
+   * besiktningen bakom kortet — säljaren äger möbeln och har inga frågor att ställa om den. Den
+   * står kvar överallt där någon annan än säljaren läser kortet.
+   */
+  hideChat?: boolean;
   /**
    * Utelämnar källänkarna vid specifikationerna och under omslaget.
    *
@@ -427,7 +436,7 @@ export default function ListingView({
         {!hideHeader && !only && (
         <header className="listing-head">
           {brand && (
-            <div className="listing-brand" style={brandTypeStyle(brandLook(brand).type)}>
+            <div className="listing-brand" style={brandNameStyle(brand)}>
               {brand}
             </div>
           )}
@@ -718,7 +727,7 @@ export default function ListingView({
 
         {/* Sist, efter allt som går att läsa. Frågor uppstår när man läst skicket och beskrivningen —
             en chatt placerad före dem hade bjudit in till att fråga om det som stod två rader ned. */}
-        {show("chat") && loopaId && (
+        {show("chat") && !hideChat && loopaId && (
           <ListingChat
             loopaId={loopaId}
             name={name}

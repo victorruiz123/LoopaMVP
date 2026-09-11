@@ -398,3 +398,126 @@ inget matbord: typsidan får inte fyllas med bord vi inte vet är matbord.
 **Antalen är delade på brickan**, "12 granskade · 3 via Tradera", av samma skäl som på
 märkesbrickan (beslut 16). Räkningen bor i inventory.ts med tester som låser att brickan och
 rutnätet räknar på samma regel.
+
+---
+
+## 18. "Letar du möbel?" — en fotnot som frågar, och en människa som svarar
+
+**Vad som byggdes:** en rad längst ned på startsidan och på produktsidorna. Klick öppnar en vy där
+man beskriver vad man letar efter i fri text, får högst tre följdfrågor, lämnar en e-postadress och
+inget mer. Ingen träfflista, inget konto, inget löfte om när.
+
+### Den visar aldrig något utbud
+
+Vyn kunde ha svarat med ett direktsvep — `/api/efterlysning/svep` finns och fungerar. Den gör det
+inte. Att svara med en **tom hylla** på "jag letar efter X" är det värsta svar just den personen kan
+få, och att svara med en **full hylla** gör dem till en besökare i rutnätet i stället för någon vi
+har adressen till. Vi tar emot beskrivningen och hör av oss. Det är hela funktionen.
+
+### Chatten kom tillbaka, men inte som chatt
+
+Beslut 11 tog bort `EfterlysningChat` från /kop och lät parsern ligga kvar orörd. Den parsern är vad
+den här funktionen står på: ett `/tolka`-anrop, och sedan **frågor bestämda i kod**. Det som inte
+kom tillbaka är den öppna dialogen — vyn kan ställa åtta frågor och inga andra, den ställer högst
+tre, och var och en går att hoppa över med en knapp som syns lika tydligt som svaret.
+
+### Mjuka frågor, men bara till den som inte redan berättat
+
+`followUps` frågade förut aldrig om märke, skick, färg eller stil: de gör en träff *bättre*, inte
+*möjlig*. Argumentet höll för en SÖKNING som ska ge träffar nu — men en efterlysning läses av en
+människa som matchar för hand, och för den handen är "grön, mid-century" skillnaden mellan att känna
+igen möbeln och att gissa.
+
+Fälten delas därför i två, och ordningen mellan dem är hela regeln:
+
+- **Hårda** (kategori, pris, mått) avgör om en möbel kan matcha alls. En lucka frågas det alltid om.
+- **Mjuka** (märke, skick, färg, stil, övrigt) frågas bara när beskrivningen är tunn — under tre
+  ifyllda fält. Den som skrivit "soffa, max 5 000, högst 210 bred" har svarat på det vi behöver
+  veta, och tre frågor till läser som att vi inte lyssnade.
+
+Två hårda luckor tränger undan de mjuka: taket på tre gäller summan.
+
+### Originaltexten sparas bredvid fälten, inte i stället för dem
+
+Tolkningen kastar med flit allt den inte kan pröva mot katalogen. Ett märke vi inte har i lager
+överlever den inte — och att någon letar en Muuto vi *inte* har är hela poängen med att skriva upp
+sig. Efterlysningen bär därför tre nya fält: `originalText` (meningen ordagrant), `asked`
+(frågeloggen, **med de överhoppade kvar** — en fråga alla hoppar över ska bort ur intaget, och bara
+de besvarade hade dolt just den signalen) och `origin` (adressen personen kom från). Alla tre är
+valfria i typen: rader skapade före fältet fanns saknar dem, och en migrering hade fyllt dem med en
+påhittad mening.
+
+Följdsvaren vävs in på **servern**, i samma slinga som skriver loggen. Alternativet — ett
+`/tolka`-anrop per svar — hade gett tre extra rundturer mitt i ett intag som ska kännas som en fråga
+i taget, och lagt tolkningen av "max 210 bred" på två ställen. Nu *kan* loggen och filtret inte gå
+isär.
+
+### Matchningen sker för hand, och det är ett beslut
+
+Sveparen matchar redan automatiskt mot ett `ProductFilter`, och gör det bra för det som *är* ett
+filter. Adminfliken finns för resten: originaltexten bredvid en hylla ur butikens vanliga `browse`,
+och en knapp som skickar ett brev med möbel, bild, pris, skick och en länk rakt till produktsidan.
+Kandidatfiltret körs **mjukt** — kategori och pristak, men utan mått, färg och material — för de
+fälten fäller kandidater en människa mycket väl kan tycka duger, och en tom lista säger ingenting om
+varför den är tom.
+
+Dubbletten stoppas på servern och inte i knappen. Knappen är grå för en redan skickad möbel, men en
+grå knapp är en artighet; regeln måste sitta där skrivningen sker.
+
+### Följd: "Lägg en bevakning" är borta ur produktsidan
+
+Notisen på en såld möbel sa "Lägg en bevakning så hör vi av oss". Ordet *bevakning* hör till
+registret som redan är avvecklat (beslut i `efterlysning/types.ts`), och funktionen som ersätter det
+säger *berätta*. På en såld möbel **ersätter** raden dessutom köpblocket i stället för att stå under
+det: "Möbeln är såld och går inte längre att köpa" var sant och en återvändsgränd.
+
+---
+
+## 19. Annonsen i profilen är säljarens vy, och den går att ta bort
+
+**Upptäckt:** Ett klick på en rad i profilen ledde till *köparens* sida — produktsidan för möbler som
+låg i butiken, det publika kortet för resten. Båda visar möbeln; ingen av dem visar annonsen som
+säljarens. Frågorna man öppnar sin egen rad för — hur går det, och hur tar jag bort den — hade inget
+svar någonstans i produkten.
+
+**Beslut:** Profilen öppnar säljarens kortvy på båda ingångarna. Säljverktyget som en skärm i flödet,
+butiken på en egen adress: `/butik/annons/<jobId>`. Det är samma `ListingScreen` på båda ställena, av
+samma skäl som profilen själv är en enda skärm — två varianter av samma vy börjar glida isär den vecka
+någon lägger till en rad i den ena.
+
+**Vägen tillbaka heter det den leder till.** Kortet skrev "Tillbaka till skicket", vilket är sant i
+flödet direkt efter besiktningen och en lögn ur profilen: skicket ligger inte bakom, listan över egna
+annonser gör det. Texten kommer därför utifrån, av den som vet var man kom ifrån.
+
+### Borttagningen: tre saker, i en ordning som är regeln
+
+1. **Tradera först.** Ligger annonsen ute hos dem tas den ner (`endTraderaItem`) innan något annat
+   händer. Går det inte avbryts hela borttagningen med ett 502 och ett besked om att försöka igen: en
+   annons som ligger uppe på Tradera men saknar kort hos oss visar "hittades inte" för någon som är på
+   väg att lägga ett bud. Det är motsatt val till kassans `delistFromTradera`, som loggar och går
+   vidare — där är köpet redan giltigt, här är ingenting oåterkalleligt ännu.
+2. **Ur butiken**, om möbeln är publicerad. Posten står kvar i huvudboken som utkast; rader stryks
+   inte ur en huvudbok.
+3. **Jobbet märks som borttaget** — `removedAt`, `removedBy`.
+
+**Grinden som inte går att förhandla om:** är möbeln reserverad, såld, levererad eller returnerad har
+den en köpare, och den affären upphör inte för att säljaren ångrar sin annons. Svaret är 409 med ett
+besked skrivet för säljaren. Regeln ligger på servern och inte i en grå knapp: klienten ska inte hålla
+en andra kopia av listan över när det får ske.
+
+### Varför en märkning och inte `rm -rf`
+
+Två krav drar i olika riktningar: annonsen ska försvinna ur allt som visar möbler, och adminpanelen
+ska kunna svara på vad som hände med en möbel som låg uppe i en vecka och togs ner. En raderad mapp
+klarar det första och gör det andra omöjligt — en borttagen möbel och en möbel som aldrig funnits ser
+likadana ut när båda är borta från disk.
+
+Märkningen sitter därför på jobbet och **grinden ligger i `listJobs`**, det enda stället som räknar upp
+lagret: butikens index, det publika kortet, profilen, datasetet, prisstegen och e-postbevakaren går
+alla genom den. Ett filter hos var och en av de sex hade varit sex tillfällen att glömma. Panelen
+frågar i stället uttryckligen, med `listRemovedJobs`, och raden får läget **"borttagen"** — som går
+före butikens tillstånd, eftersom posten står kvar som `utkast` efteråt och "utkast" säger raka
+motsatsen: att möbeln är på väg in.
+
+**Följd:** `JOBS_DIR` går att peka om med `LOOPA_JOBS_DIR`, av samma skäl som `BUTIK_DATA_DIR` finns —
+grinden ska gå att testa utan att skapa och ta bort jobb bland de skarpa besiktningarna.

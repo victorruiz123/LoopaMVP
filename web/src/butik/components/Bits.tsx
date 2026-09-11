@@ -35,8 +35,10 @@ export function SearchIcon() {
 export function TrustRow() {
   return (
     <div className="butik-trust">
-      <span className="butik-trust-item"><CheckIcon /> Loopa-granskad</span>
-      <span className="butik-trust-item"><CheckIcon /> Hemleverans i Stockholm</span>
+      {/* Egna klasser, för att telefonen behandlar de två raderna olika: "Loopa-granskad" faller
+          bort där och leveransraden tappar sin ram. Se .butik-trust i butik.css. */}
+      <span className="butik-trust-item butik-trust-granskad"><CheckIcon /> Loopa-granskad</span>
+      <span className="butik-trust-item butik-trust-leverans"><CheckIcon /> Hemleverans i Stockholm</span>
     </div>
   );
 }

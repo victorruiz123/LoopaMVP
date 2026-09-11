@@ -120,6 +120,10 @@ export interface PriceEstimate {
   unavailableReason: string | null;
   requestedAt: string;
   latencyMs: number;
+  /** Antal stolar talet gäller, när säljaren sagt att de säljs tillsammans. Osatt = en möbel. */
+  stolAntal?: number | null;
+  /** Priset för en enda stol, innan bunten räknades. Visas bredvid buntpriset så talet går att läsa. */
+  styckPris?: number | null;
 }
 
 /** En egenskap generatorn hittat och kunnat belägga — mått, material, färg, årsmodell. */
@@ -501,6 +505,30 @@ export interface ConditionJob {
   priceLadder?: PriceLadder | null;
   /** Supabase-användaren som skapade jobbet. Det är den profilen annonsen sparas i. */
   ownerId?: string | null;
+  /**
+   * Säljarens svar på de två frågorna bilderna inte kan besvara: pälsdjur och lukt.
+   *
+   * Läses för att veta om de redan är ställda. En omladdning mitt i väntan ska inte fråga om samma
+   * sak en gång till.
+   */
+  sellerDisclosures?: SellerDisclosures | null;
+  /**
+   * Möbeln är en stol, så frågan om antal ska ställas med.
+   *
+   * Sätts på servern vid modellvalet, alltså innan väntan där frågorna ställs börjar. Osatt = ingen
+   * stol, eller ett jobb från före frågan fanns — ingetdera får läsas som en stol.
+   */
+  chairLike?: boolean;
+}
+
+/** Svaren, som de ligger på jobbet. Se DisclosuresScreen och annonstexten på servern. */
+export interface SellerDisclosures {
+  pets: boolean;
+  smell: boolean;
+  smellNote?: string | null;
+  /** Antal stolar som säljs tillsammans. Bara för stolar; det är talet priset räknas på. */
+  chairCount?: number | null;
+  answeredAt: string;
 }
 
 /**
@@ -576,7 +604,7 @@ export interface AnnonsStatistik {
  * historik, alltså samma mening köparen läser.
  */
 export interface JobOrder {
-  status: "paid" | "booking" | "scheduled" | "delivered" | "return_requested" | "returned";
+  status: "paid" | "booking" | "scheduled" | "delivered" | "cancel_requested" | "return_requested" | "returned";
   reference: string;
   deliveryDate: string | null;
   deliveryWindow: string | null;
@@ -663,7 +691,9 @@ export type AnnonsLage =
   | "reserverad"
   | "sald"
   | "levererad"
-  | "returnerad";
+  | "returnerad"
+  /** Säljaren har tagit bort annonsen. Möbeln finns inte utåt längre — raden är historik. */
+  | "borttagen";
 
 export interface AdminAnnonsRad {
   id: string;
@@ -992,7 +1022,7 @@ export interface AdminOrderRad {
   reference: string;
   productId: string;
   titel: string;
-  status: "pending" | "paid" | "booking" | "scheduled" | "delivered" | "return_requested" | "returned" | "cancelled";
+  status: "pending" | "paid" | "booking" | "scheduled" | "delivered" | "cancel_requested" | "return_requested" | "returned" | "cancelled";
   attGora: string | null;
   priceSek: number;
   deliveryFeeSek: number;
@@ -1025,6 +1055,41 @@ export interface AdminOrdrar {
   };
 }
 
+/**
+ * En efterlysning som adminpanelen läser den. Se server/src/efterlysning/admin.ts.
+ *
+ * `originalText` står först i vyn och inte `summary`: sammanfattningen är vad TOLKNINGEN förstod,
+ * meningen är vad personen faktiskt bad om, och matchningen sker för hand mot den senare.
+ */
+export interface AdminEfterlysning {
+  id: string;
+  state: "active" | "paused" | "fulfilled" | "expired";
+  originalText: string | null;
+  summary: string;
+  epost: string | null;
+  konto: boolean;
+  varifran: string | null;
+  fragor: { field: string; question: string; answer: string | null }[];
+  filter: Record<string, unknown>;
+  styleTags: string[];
+  note: string | null;
+  skapad: string;
+  tipsade: string[];
+}
+
+/** En möbel panelen föreslår för en efterlysning. Ett förslag — knappen sitter hos människan. */
+export interface EfterlysningKandidat {
+  id: string;
+  titel: string;
+  marke: string | null;
+  pris: number | null;
+  bild: string | null;
+  skick: string | null;
+  kalla: string;
+  lank: string;
+  tipsad: boolean;
+}
+
 /** Vad panelen kan göra med en order. Se server/src/adminOrdrar.ts. */
 export interface OrderAtgard {
   gor: "boka" | "levererad" | "anteckna";
@@ -1032,4 +1097,194 @@ export interface OrderAtgard {
   tid?: string;
   text?: string;
   publik?: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Datafliken — server/src/data/dataset.ts
+// ---------------------------------------------------------------------------
+
+/**
+ * Ett fält som ett par: vad AI:n sa, och vad människan gjorde av det.
+ *
+ * `manniskanSa` null betyder ORÖRT, inte "höll med". Skillnaden bärs hela vägen från servern och får
+ * inte plattas till i klienten — se server/src/data/dataset.ts.
+ */
+export interface DataFalt {
+  falt: string;
+  aiSa: string | null;
+  manniskanSa: string | null;
+  konfidens: string | null;
+  kalla: string | null;
+}
+
+export interface DataRattelse {
+  at: string;
+  jobId: string;
+  omrade: "identitet" | "skick" | "betyg" | "pris" | "annons";
+  falt: string;
+  fyndId: string | null;
+  aiSa: string | null;
+  manniskanSa: string | null;
+  kalla: "saljare" | "admin" | "granskning";
+  notis: string | null;
+}
+
+export interface DataFynd {
+  id: string;
+  typ: string;
+  del: string;
+  position: string;
+  allvarlighet: string;
+  paverkan: string;
+  beskrivning: string;
+  bilder: Array<{ imageId: string; viewLabel: string | null; cropPath: string | null }>;
+  konfidens: number;
+  granskning: string;
+  granskningSkal: string;
+  saljarenSa: "stämmer" | "stämmer inte" | "rättade" | null;
+  saljarenLaTill: boolean;
+  rattelser: DataRattelse[];
+}
+
+export interface DataObjekt {
+  id: string;
+  jobId: string;
+  loopaId: string;
+  createdAt: string;
+  ownerId: string | null;
+  ownerEmail: string | null;
+  titel: string;
+  lage: string;
+  bildUrl: string | null;
+  identitet: {
+    falt: DataFalt[];
+    konfidens: string | null;
+    konfidensNotis: string | null;
+    nyprisSek: number | null;
+    nyprisKalla: string | null;
+    kandidatRundor: number;
+    aiForstaForslag: string | null;
+    saljarensVal: string | null;
+    identitetRattad: boolean;
+  };
+  skick: {
+    fynd: DataFynd[];
+    antalFynd: number;
+    bekraftade: number;
+    avvisade: number;
+    saljarensEgna: number;
+    obesvarade: number;
+    betyg: string | null;
+    betygEtikett: string | null;
+    modellensBetyg: string | null;
+    betygRattat: boolean;
+    fragor: DataFalt[];
+    antalBilder: number;
+    taeckta: string[];
+    saknade: string[];
+    taeckning: string | null;
+    taeckningNotis: string | null;
+    ejSynligaDelar: string[];
+  };
+  flode: {
+    sess: string | null;
+    tidTillIntygatMs: number | null;
+    perStegMs: Record<string, number>;
+    besokta: string[];
+    sistaSteg: string | null;
+    intygat: boolean;
+    fragor: Array<{ at: string; steg: string | null; chatt: string | null; kategori: string | null }>;
+    chip: Array<{ at: string; steg: string | null; text: string | null }>;
+    berattaPa: boolean;
+    enhet: string | null;
+    plattform: string | null;
+    vy: string | null;
+  };
+  pris: {
+    forslagSek: number | null;
+    lagSek: number | null;
+    hogSek: number | null;
+    konfidens: string | null;
+    motorNotis: string | null;
+    saljarensStartSek: number | null;
+    golvSek: number | null;
+    veckoSankningPct: number | null;
+    sankningar: Array<{ at: string; fran: number; till: number }>;
+    nuSek: number | null;
+    slutSek: number | null;
+    andelAvNypris: number | null;
+    andelAvForslag: number | null;
+    prisRattat: boolean;
+  };
+  distribution: {
+    kanaler: Array<{
+      kanal: string;
+      publiceradAt: string | null;
+      visningar: number | null;
+      forfragningar: number;
+      klick: number;
+      notis: string | null;
+    }>;
+    sidvisningar: number;
+    unikaVisningar: number;
+    listvisningar: number;
+    kassor: number;
+    kop: number;
+    utgaendeTradera: number;
+    perHandelse: Record<string, number>;
+    bevakningar: number;
+  };
+  transaktion: {
+    dagarTillForstaForfragan: number | null;
+    dagarTillSald: number | null;
+    kanal: string | null;
+    betalsatt: string | null;
+    meddelanden: Array<{ at: string; kanal: string; kategori: string; utdrag: string }>;
+    antalMeddelanden: number;
+    perKategori: Record<string, number>;
+    follIgenom: boolean;
+    orsak: string | null;
+  };
+  leverans: {
+    hamtningsdatum: string | null;
+    leveransdatum: string | null;
+    zon: string | null;
+    leveranskostnadSek: number | null;
+    kontroll: DataFalt[];
+    kopetGodkantAt: string | null;
+    tvist: boolean | null;
+  };
+  rattelser: DataRattelse[];
+  luckor: string[];
+}
+
+export interface DataTrattSteg {
+  steg: string;
+  naddeHit: number;
+  stannade: number;
+  medianMs: number | null;
+}
+
+export interface DataSvar {
+  objekt: DataObjekt[];
+  summering: {
+    antal: number;
+    medRattelse: number;
+    rattelser: number;
+    fynd: number;
+    bekraftadeFynd: number;
+    avvisadeFynd: number;
+    egnaFynd: number;
+    traffsakerhet: number | null;
+    betygRattade: number;
+    identitetRattade: number;
+    prisRattade: number;
+    medianTidTillIntygatMs: number | null;
+    salda: number;
+    medianDagarTillSald: number | null;
+  };
+  tratt: DataTrattSteg[];
+  avhoppUtanJobb: number;
+  /** Fält som inte samlas in än, med skälet. Visas som de är — aldrig som nollor. */
+  luckor: Array<{ falt: string; skal: string }>;
 }

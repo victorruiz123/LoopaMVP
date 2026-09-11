@@ -32,6 +32,7 @@ export default function SellWithLoopa({
   jobId,
   coverUrl,
   onMyListings,
+  onSellAnother,
 }: {
   jobId: string;
   /**
@@ -44,6 +45,14 @@ export default function SellWithLoopa({
   coverUrl?: string | null;
   /** Vidare till profilen. Ritas bara i kvittot: dit går man när den här möbeln är avklarad. */
   onMyListings?: () => void;
+  /**
+   * Tillbaka till början, med en ny möbel.
+   *
+   * Kvittot är den enda skärmen i flödet som inte har något nästa steg — möbeln är överlämnad, och
+   * utan en väg vidare är enda utvägen bakåtknappen till en annons man just blivit klar med. Den
+   * som sålt en möbel har nästan alltid en till, och frågan ställs bäst precis här.
+   */
+  onSellAnother?: () => void;
 }) {
   const t = useT();
   const [state, setState] = useState<TraderaState | null>(null);
@@ -113,43 +122,40 @@ export default function SellWithLoopa({
         <a className="btn btn-primary sell-link" href={publication.url} target="_blank" rel="noreferrer">
           {t("Se annonsen")}
         </a>
-        {/* Kvittot gäller EN möbel. Frågan som kommer efter det — vad har jag ute nu? — besvaras i
-            profilen, där den här annonsen just lagt sig överst under "Till salu". */}
-        {onMyListings && (
-          <button className="btn btn-text sell-mine" onClick={onMyListings}>
-            {t("Till dina annonser")}
-          </button>
-        )}
+        {/* Kvittot gäller EN möbel. Frågorna som kommer efter det — vad har jag ute nu, och kan jag
+            göra det här igen — besvaras i profilen och i ett nytt varv. */}
+        <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} />
       </section>
     );
   }
 
   if (publication?.status === "pending") {
+    /**
+     * KVITTOT ÄR HELA SIDAN, inte ett block i botten av annonsen.
+     *
+     * Det låg förut sist på kortet, med möbelns bilder, skickrapporten, specifikationerna och
+     * prisstegen kvar ovanför. Allt det är underlag för ett beslut som redan är fattat: säljaren har
+     * sagt ja, möbeln är överlämnad, och det finns ingenting kvar på den sidan att göra. Att lämna
+     * annonsen stående bakom kvittot gör överlämningen till en notis om en sida man fortfarande står
+     * på — och ger gott om anledning att börja granska sin egen annons igen.
+     *
+     * Här står tre saker: att vi tagit över, var möbeln finns nu, och vägen till nästa. Förklaringen
+     * om granskningstiden och raden om prisstegen stod här förut och är borta med flit — båda fanns
+     * ordagrant i bekräftelsen säljaren just läste och tryckte ja på.
+     */
     return (
-      <section className="card-block sell-block sell-done">
-        <h3>{t("Annonsen granskas av Loopa")}</h3>
-        <p className="muted small">
-          {t(
-            "Vi tittar igenom annonsen innan den läggs ut, oftast samma dag. Sedan hör vi av oss så fort möbeln är såld — du behöver inte göra något mer.",
-          )}
-        </p>
-        {/* Inte LadderStatus: den säger "ligger på", och inget ligger ute än. En rad om prisplanen,
-            inte ett stycke — den fullständiga uppdelningen stod i bekräftelsen säljaren just läst. */}
-        {ladderDrops(state.ladder) > 0 && plan && (
-          <p className="muted small">
-            {t("Priset börjar på {start} och sänks {andel} % i veckan ner till {golv}.", {
-              start: formatSek(state.ladder!.startPrice + plan.shippingSek),
-              andel: Math.round(state.ladder!.weeklyDropPct * 100),
-              golv: formatSek(state.ladder!.floorPrice + plan.shippingSek),
-            })}
-          </p>
-        )}
-        {onMyListings && (
-          <button className="btn btn-text sell-mine" onClick={onMyListings}>
-            {t("Till dina annonser")}
-          </button>
-        )}
-      </section>
+      <div className="sell-kvitto" role="status" aria-labelledby="sell-kvitto-rubrik">
+        <div className="sell-kvitto-inner">
+          <div className="sell-kvitto-markning" aria-hidden="true">
+            <CheckIcon size={28} />
+          </div>
+          {/* RUBRIKEN SÄGER VAD SOM HÄNT, INTE VAD VI GÖR JUST NU. Här stod "Annonsen granskas av
+              Loopa", vilket är sant och är fel sak att möta ett ja med: säljaren har lämnat över en
+              försäljning och fick ett handläggningsbesked tillbaka. */}
+          <h1 id="sell-kvitto-rubrik">{t("Vi tar över försäljningen")}</h1>
+          <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} framtradande />
+        </div>
+      </div>
     );
   }
 
@@ -222,6 +228,49 @@ export default function SellWithLoopa({
         />
       )}
     </>
+  );
+}
+
+/**
+ * Kvittots fot: vägen till de egna annonserna, och vägen till nästa möbel.
+ *
+ * Ligger i en egen funktion för att de två kvittona — annonsen i kö och annonsen uppe — är samma
+ * ögonblick sett med några timmars mellanrum. Att bara det ena hade en väg vidare var inte ett val
+ * utan en glömska.
+ */
+function KvittoVagar({
+  onMyListings,
+  onSellAnother,
+  /**
+   * Ska "Till mina annonser" vara den fyllda knappen?
+   *
+   * Ja i kvittot för annonsen i kö: där finns ingen annan handling alls, och en dämpad textlänk som
+   * enda väg ut lämnar säljaren stående. Nej när annonsen är uppe — då är "Se annonsen" skärmens
+   * huvudsak, och två fyllda knappar under varandra gör vägen vidare till ett val mellan likar.
+   */
+  framtradande = false,
+}: {
+  onMyListings?: () => void;
+  onSellAnother?: () => void;
+  framtradande?: boolean;
+}) {
+  const t = useT();
+  if (!onMyListings && !onSellAnother) return null;
+  return (
+    <div className="sell-vagar">
+      {/* Annonserna först: frågan direkt efter ett ja är "var ligger den nu?", och svaret är
+          profilen, där möbeln just lagt sig överst. */}
+      {onMyListings && (
+        <button className={`btn ${framtradande ? "btn-primary" : "btn-text"} sell-mine`} onClick={onMyListings}>
+          {t("Till mina annonser")}
+        </button>
+      )}
+      {onSellAnother && (
+        <button className="btn btn-text sell-again" onClick={onSellAnother}>
+          {t("Sälj en till möbel")}
+        </button>
+      )}
+    </div>
   );
 }
 

@@ -8,7 +8,8 @@ import type {
   Severity,
 } from "./types.js";
 import { damageStands } from "./pipeline/grade.js";
-import { kanVaraStol, styckprisForStol } from "./stolPris.js";
+import { kanVaraStol, prisForAntalStolar, styckprisForStol } from "./stolPris.js";
+import { getJob, getJobSync, persist } from "./jobStore.js";
 
 const PRICE_ENGINE_URL = (process.env.PRICE_ENGINE_URL ?? "http://127.0.0.1:8000").replace(/\/+$/, "");
 const PRICE_ENGINE_API_KEY = process.env.PRICE_ENGINE_API_KEY ?? null;
@@ -254,6 +255,13 @@ export async function estimatePrice(
   coverImageBase64: string | null,
   /** Avbryter anropet i förtid — används när ett spekulativt pris visar sig vara på fel lista. */
   signal?: AbortSignal,
+  /**
+   * Möbeltypen säljaren valde. Bara till stolskontrollen nedan, och skickad hit av samma skäl som
+   * `finalizeWithModel` läser den: modellsträngen bär inte alltid ordet. "Stefan" är en stol, men
+   * ingenting i "IKEA Stefan" säger det — och står säljaren utan den uppgiften faller kontrollen
+   * tillbaka på prismotorns `variant`, som kommer FÖRST i svaret vi just fått och inte alltid alls.
+   */
+  productType?: string | null,
 ): Promise<PriceEstimate | null> {
   if (!identity?.model?.trim()) return null;
   const startedAt = Date.now();
@@ -340,7 +348,7 @@ export async function estimatePrice(
    * för stolar: den kostar ett Gemini-anrop, och för soffor och bord finns ingenting att hämta.
    * Faller den kommer motorns eget tal tillbaka orört — se stolPris.ts.
    */
-  if (kanVaraStol({ brand, model }, estimate.variant)) {
+  if (kanVaraStol({ brand, model }, estimate.variant, productType ?? null)) {
     return await styckprisForStol({ brand, model }, estimate);
   }
   return estimate;
@@ -354,13 +362,20 @@ export async function estimatePrice(
  * Keeps the previous estimate when the engine is unreachable: a stale price with a note beats blanking
  * out a number the seller was already looking at.
  */
-export async function repriceResult(result: ConditionResult, coverImageBase64: string | null): Promise<void> {
+export async function repriceResult(
+  result: ConditionResult,
+  coverImageBase64: string | null,
+  /** Möbeltypen säljaren valde — se `estimatePrice`. Utan den tappar omräkningen styckpriset. */
+  productType?: string | null,
+): Promise<void> {
   if (!result.identity) return;
   const fresh = await estimatePrice(
     result.identity,
     result.damages,
     result.grade?.canonicalCondition ?? null,
     coverImageBase64,
+    undefined,
+    productType ?? null,
   );
   if (!fresh) return;
   if (fresh.status === "unavailable" && result.price && result.price.status === "ok") {
@@ -368,4 +383,42 @@ export async function repriceResult(result: ConditionResult, coverImageBase64: s
     return;
   }
   result.price = fresh;
+}
+
+/**
+ * Priset för det antal stolar säljaren sa att de säljer.
+ *
+ * VARFÖR EN EGEN SYNKNING och inte ett steg i prisvägen: de två uppgifterna landar i vilken ordning
+ * som helst. Priset räknas i bakgrunden efter modellvalet; antalet svarar säljaren i väntan under
+ * tiden. Ibland är priset först, ibland svaret. Funktionen anropas från BÅDA hållen och gör
+ * ingenting när den andra halvan saknas — den som kommer sist utlöser räkningen.
+ *
+ * `stolAntal` på priset är minnet, och gör anropet ofarligt att göra om: ett pris som redan gäller
+ * det antalet rörs inte. Har säljaren ÄNDRAT sitt svar räknas priset om från motorn först — att
+ * skala ett redan skalat tal hade multiplicerat två svar med varandra.
+ *
+ * Kastar aldrig, av samma skäl som resten av prisvägen: annonsen ska bli av även när ett tal blir
+ * mindre exakt än det kunde ha varit.
+ */
+export async function synkaStolpris(jobId: string): Promise<void> {
+  try {
+    const job = getJobSync(jobId) ?? (await getJob(jobId));
+    const antal = job?.sellerDisclosures?.chairCount ?? null;
+    if (!job?.chairLike || !antal || !job.result?.identity) return;
+
+    const price = job.result.price;
+    if (!price || price.status !== "ok") return;
+    if (price.stolAntal === antal) return;
+
+    // Ett ändrat svar: det tal som ligger gäller ett annat antal, och går inte att skala om utan att
+    // först hämta hem motorns ojusterade pris igen.
+    if (price.stolAntal != null) await repriceResult(job.result, null, job.selected?.productType ?? null);
+    const bas = job.result.price;
+    if (!bas || bas.status !== "ok" || bas.stolAntal != null) return;
+
+    job.result.price = await prisForAntalStolar(job.result.identity, bas, antal);
+    await persist(job);
+  } catch (err) {
+    console.warn(`[pris] antalet stolar kunde inte vägas in: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }

@@ -6,10 +6,10 @@
  * sanningskortet INNAN säljaren bjuds in. Skälet är att en köpare som upptäcker avgifter efter att
  * ha dragit in en säljare i en affär har blivit lurad, oavsett hur rimliga avgifterna är.
  *
- * EN ENDA FRAKTLOGIK I HELA PRODUKTEN. Leveransen prissätts av `deliveryQuote` i butiken —
- * zonbaserat, 495/695/895 — och inte av en egen platt taxa här. Två fraktpriser för samma sträcka i
- * samma app är två priser användaren kan se samtidigt, och den dagen någon jämför dem har vi ingen
- * bra förklaring.
+ * EN ENDA FRAKTLOGIK I HELA PRODUKTEN. Leveransen prissätts av `deliveryQuote` i butiken — 600 kr
+ * inom Stockholms län — och inte av en egen taxa här. Två fraktpriser för samma sträcka i samma app
+ * är två priser användaren kan se samtidigt, och den dagen någon jämför dem har vi ingen bra
+ * förklaring.
  *
  * SERVICEAVGIFTEN är vad granskningen, den skyddade betalningen och hanteringen kostar. Platt, för
  * att arbetet är detsamma oavsett möbelns pris: samma filmning att gå igenom, samma pengar att hålla,
@@ -24,7 +24,7 @@ export const SERVICE_FEE_SEK = Number(process.env.AFFAR_SERVICE_FEE_SEK ?? 200);
 /**
  * När avgifterna är stora nog att förtjäna en varning.
  *
- * INFORMERAR, BLOCKERAR INTE. En 500-kronorsstol med 695 kr frakt och 200 kr service är fortfarande
+ * INFORMERAR, BLOCKERAR INTE. En 500-kronorsstol med 600 kr frakt och 200 kr service är fortfarande
  * ett vettigt köp för den som inte har bil och inte vill åka till Haninge — men det är ett beslut
  * köparen ska fatta med talen framför sig, inte upptäcka i kassan. Att stoppa affären hade varit att
  * fatta beslutet åt dem.

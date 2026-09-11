@@ -4,7 +4,7 @@ import { fetchBrands } from "../api";
 import ProductGrid from "../components/ProductGrid";
 import Filters, { EMPTY_FILTER, type FilterState } from "../components/Filters";
 import { Link, SellCta } from "../components/Bits";
-import { brandInk, brandLook, brandTypeStyle } from "../../lib/brandLook";
+import { brandInk, brandLook, brandNameStyle } from "../../lib/brandLook";
 
 /**
  * En märkessida — förstklassig, inte ett filter med egen adress.
@@ -54,7 +54,7 @@ export default function BrandScreen({ slug }: { slug: string }) {
         {/* Märkets namn i märkets egen bokstavsform, "secondhand" i Loopas. Samma delning som på
             brickan: namnet är deras, ordet om begagnat är vårt. */}
         <h1 style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", gap: "0.3em" }}>
-          <span style={{ ...brandTypeStyle(brandLook(name).type), fontSize: "1em", color: brandInk(name) }}>{name}</span>
+          <span style={{ ...brandNameStyle(name), fontSize: "1em", color: brandInk(name) }}>{name}</span>
           <span style={{ fontWeight: 400, color: "var(--muted)", letterSpacing: 0, textTransform: "none" }}>
             secondhand
           </span>

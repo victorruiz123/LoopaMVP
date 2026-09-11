@@ -1,4 +1,4 @@
-import { brandLook, brandTypeStyle } from "../../lib/brandLook";
+import { brandLook, brandNameStyle } from "../../lib/brandLook";
 import type { BrandFacet } from "../types";
 import { Link } from "./Bits";
 
@@ -24,7 +24,7 @@ export default function BrandTiles({ brands }: { brands: BrandFacet[] }) {
     <nav className="butik-brands" aria-label="Märken">
       {brands.map((b) => {
         const look = brandLook(b.brand);
-        const type = brandTypeStyle(look.type);
+        const type = brandNameStyle(b.brand);
         return (
           <Link
             key={b.brand}
@@ -44,7 +44,9 @@ export default function BrandTiles({ brands }: { brands: BrandFacet[] }) {
                 style={{
                   ...type,
                   // Den vida spärren skjuter texten åt höger; halva spärren tillbaka centrerar den.
-                  textIndent: look.type === "wide" ? "0.16em" : undefined,
+                  // Samma undantag som på startsidan: ett märke med egen spärr ska inte få ett
+                  // indrag som kompenserar för typens.
+                  textIndent: look.type === "wide" && !look.stil?.letterSpacing ? "0.16em" : undefined,
                 }}
               >
                 {b.brand}

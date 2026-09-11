@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, TruckIcon, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChevronRight, MailIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
 import AdminAdsScreen from "./AdminAdsScreen";
 import AdminTraderaPostScreen from "./AdminTraderaPostScreen";
 import AdminOrdrarScreen from "./AdminOrdrarScreen";
+import AdminDataScreen from "./AdminDataScreen";
+import AdminEfterlysningarScreen from "./AdminEfterlysningarScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar";
+export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -120,6 +122,33 @@ export default function AdminScreen({
         >
           <TruckIcon size={16} /> {t("Ordrar")}
         </button>
+        {/*
+          Efterlysningarna står bredvid ordrarna och inte bredvid annonserna.
+          Båda är arbetslistor: något ligger och väntar på att en människa gör en sak. Annonserna och
+          användarna är register man slår upp i. Ordningen i flikraden är den ordning en arbetsdag
+          har, inte den ordning modulerna byggdes.
+        */}
+        <button
+          role="tab"
+          aria-selected={flik === "efterlysningar"}
+          className={`admin-flik-knapp${flik === "efterlysningar" ? " vald" : ""}`}
+          onClick={() => setFlik("efterlysningar")}
+        >
+          <SearchIcon size={16} /> {t("Efterlysningar")}
+        </button>
+        {/*
+          Datafliken sist bland flikarna och först i ordningen av skäl: den läses inte för att få
+          något gjort idag, utan för att se om modellen blir bättre. Den som öppnar panelen för att
+          jobba ska inte behöva passera den.
+        */}
+        <button
+          role="tab"
+          aria-selected={flik === "data"}
+          className={`admin-flik-knapp${flik === "data" ? " vald" : ""}`}
+          onClick={() => setFlik("data")}
+        >
+          <SparkIcon size={16} /> {t("Data")}
+        </button>
         <button
           role="tab"
           aria-selected={flik === "tradera"}
@@ -132,8 +161,12 @@ export default function AdminScreen({
 
       {flik === "annonser" ? (
         <AdminAdsScreen inbaddad onOpenAd={(rad) => onOpenAd?.(rad)} />
+      ) : flik === "data" ? (
+        <AdminDataScreen />
       ) : flik === "ordrar" ? (
         <AdminOrdrarScreen onOpenAd={onOpenAdId} />
+      ) : flik === "efterlysningar" ? (
+        <AdminEfterlysningarScreen />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : (

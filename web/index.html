@@ -21,8 +21,10 @@
     />
     <meta name="theme-color" content="#faf7f1" />
 
-    <!-- Ordmärket går inte att läsa i 16 px, så fliken bär loopen ur det i samma
-         tegelorange som appen. SVG:n skalar till varje storlek utan en egen fil per mått. -->
+    <!-- Fliken bär ordmärket självt: "loopa" i Poppins ExtraBold, tegelorange, genomskinlig
+         bakgrund. Bokstäverna ligger som kurvor i filen — se favicon.svg för varför det inte
+         kan vara <text>. Samma fil finns i marknadssajten (loopa-landing-page-main/public), för
+         loopa.nu/favicon.svg går dit och inte till appen; de två måste ändras ihop. -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <!-- Manifestet gör appen installerbar, och det är förutsättningen för share_target: en delning

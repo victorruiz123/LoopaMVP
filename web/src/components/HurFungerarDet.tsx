@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { askSalj } from "../api";
+import { chipTryckt, guideFraga } from "../lib/flode";
 import { ArrowUpIcon, CloseIcon } from "./icons";
 import { useT } from "../lib/i18n";
 
@@ -136,14 +138,31 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
     if (!open) return;
     const y = window.scrollY;
     const body = document.body;
-    const fore = { position: body.style.position, top: body.style.top, width: body.style.width };
+    const fore = {
+      position: body.style.position,
+      top: body.style.top,
+      width: body.style.width,
+      paddingRight: body.style.paddingRight,
+    };
+    /**
+     * RULLISTENS BREDD LÄGGS TILLBAKA SOM MARGINAL.
+     *
+     * En dator har en rullist som tar plats i layouten. Låset lyfter ut body ur flödet, rullisten
+     * försvinner — och sidan bakom hoppar ett dussin pixlar åt sidan i samma ögonblick som chatten
+     * öppnas, och tillbaka när den stängs. Ett hopp man ser tydligt eftersom sidan står kvar synlig
+     * bakom floret. Bredden mäts i stället upp och läggs tillbaka som padding, så innehållet står
+     * still. På en telefon är talet noll och raden gör ingenting.
+     */
+    const rullist = window.innerWidth - document.documentElement.clientWidth;
     body.style.position = "fixed";
     body.style.top = `-${y}px`;
     body.style.width = "100%";
+    if (rullist > 0) body.style.paddingRight = `${rullist}px`;
     return () => {
       body.style.position = fore.position;
       body.style.top = fore.top;
       body.style.width = fore.width;
+      body.style.paddingRight = fore.paddingRight;
       window.scrollTo(0, y);
     };
   }, [open]);
@@ -164,6 +183,9 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
     // Frågan syns direkt. Ett svar tar ett par sekunder, och en ruta som töms utan att visa vad man
     // skrev läser som att trycket inte gick fram.
     const historik = meddelanden.filter((m) => !m.failed).map((m) => ({ role: m.role, content: m.content }));
+    // Mätningen får veta VILKEN SORTS fråga det var och i vilket steg — aldrig vad som skrevs.
+    // Se web/src/lib/flode.ts.
+    guideFraga("start", q);
     setMeddelanden((m) => [...m, { role: "user", content: q }]);
     try {
       const svar = await askSalj(q, historik);
@@ -189,7 +211,20 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
 
   const tomt = meddelanden.length === 0;
 
-  return (
+  /**
+   * ARKET RITAS I <body>, INTE DÄR DET STÅR I TRÄDET.
+   *
+   * `position: fixed` mäts mot närmaste förfader som har en transform — inte mot fönstret. Datorvyn
+   * ger varje skärm en intoning (`screen-in`, med `animation-fill-mode: both`), och en animerad
+   * transform som ligger kvar räknas som just en sådan förfader. Följden var att floret och arket
+   * klipptes till startsidans egen spalt: sidan låg odämpad i en remsa längs vardera kanten, och
+   * "över hela sidan" var precis vad överlägget inte var.
+   *
+   * En portal är rätt lösning och inte en kringgång: ett modalt lager hör hemma i dokumentets rot,
+   * oberoende av vilken skärm som råkade öppna det. Tangentbord och skärmläsare följer fortfarande
+   * React-trädet, så fokusfällan och `aria-modal` ovan fungerar som förut.
+   */
+  return createPortal(
     <div className="hur-overlay" role="presentation" onClick={onClose}>
       <div
         className="hur-ark"
@@ -242,7 +277,14 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
         {tomt && (
           <div className="hur-forslag">
             {FORSLAG.map((f) => (
-              <button key={f} onClick={() => void skicka(t(f))} disabled={vantar}>
+              <button
+                key={f}
+                onClick={() => {
+                  chipTryckt("start", f);
+                  void skicka(t(f));
+                }}
+                disabled={vantar}
+              >
                 {t(f)}
               </button>
             ))}
@@ -291,6 +333,7 @@ export default function HurFungerarDet({ open, onClose }: { open: boolean; onClo
           </button>
         </form>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

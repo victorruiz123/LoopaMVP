@@ -45,9 +45,10 @@ export default function ProfileScreen({
   /**
    * Öppna ett annonskort.
    *
-   * Tar HELA raden, inte bara id:t. Säljverktyget öppnar sin egen kortvy på `id`; butiken har ingen
-   * sådan vy och går till det publika kortet, som slås upp på `loopaId`. Att skicka med bara det ena
-   * hade tvingat den andra ingången att slå upp resten en gång till.
+   * Tar HELA raden, inte bara id:t. Båda ingångarna öppnar numera säljarens egen kortvy — säljverktyget
+   * som en skärm i sitt flöde, butiken på adressen /butik/annons/<jobId> — men raden bär både `id` och
+   * `loopaId`, och att skicka med bara det ena hade tvingat den som behöver det andra att slå upp
+   * resten en gång till.
    */
   onOpenJob: (job: JobSummary) => void;
   /** Serverns besked ur inloggningen. Ingången ritas bara då — och prövas igen bakom varje adminväg. */
@@ -387,6 +388,9 @@ const ORDER_STEG: Record<NonNullable<JobSummary["order"]>["status"], string> = {
   booking: "Såld — vi bokar frakt",
   scheduled: "Såld — frakt bokad",
   delivered: "Levererad till köparen",
+  // Köparen hann ångra sig innan möbeln kördes ut. För säljaren betyder det att den går tillbaka
+  // till butiken — inte att något är fel på möbeln.
+  cancel_requested: "Köparen ångrade sig — möbeln läggs ut igen",
   return_requested: "Retur begärd",
   returned: "Returnerad",
 };

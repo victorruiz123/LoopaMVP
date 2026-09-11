@@ -100,7 +100,11 @@ export default function PriceScreen({
           </>
         ) : (
           <>
-            <div className="price-panel-head">{t("Uppskattat värde")}</div>
+            <div className="price-panel-head">
+              {price.stolAntal && price.stolAntal > 1
+                ? t("Uppskattat värde för {antal} stolar", { antal: price.stolAntal })
+                : t("Uppskattat värde")}
+            </div>
             <div className="price-main price-main-xl">{formatSek(price.default)}</div>
             <div className="price-range">
               <span className="price-range-end">
@@ -113,6 +117,13 @@ export default function PriceScreen({
                 <span className="muted small">{t("säljs långsamt")}</span>
               </span>
             </div>
+            {/* Styckpriset står under buntens tal, inte i stället för det. Utan det läser en säljare
+                med sex stolar talet som en enda stols pris — och tycker att det är sex gånger fel. */}
+            {price.stolAntal && price.stolAntal > 1 && price.styckPris !== null && price.styckPris !== undefined && (
+              <p className="muted small price-basis">
+                {t("Ungefär {pris} per stol.", { pris: formatSek(price.styckPris) })}
+              </p>
+            )}
             <p className="muted small price-basis">
               {price.matchCount === 1
                 ? t("Bygger på {antal} liknande annons", { antal: price.matchCount })

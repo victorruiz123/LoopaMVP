@@ -28,6 +28,9 @@ const LAGE_ETIKETT: Record<AnnonsLage, string> = {
   "utan-annons": "Ingen annons",
   pagaende: "Pågår",
   misslyckad: "Föll",
+  // Säljaren tog bort annonsen. Raden står kvar för att frågan "vad hände med den möbeln" ska ha ett
+  // svar — se lageAv i server/src/adminAnnonser.ts.
+  borttagen: "Borttagen",
 };
 
 type Sortering = "nyast" | "langst-uppe" | "mest-visad" | "sämst-ctr" | "dyrast";

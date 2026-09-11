@@ -108,8 +108,28 @@ export async function sitemapXml(): Promise<string> {
   const products = await allProducts();
   const synliga = products.filter((p) => BROWSABLE_STATES.includes(p.state));
 
+  /**
+   * STARTSIDAN FÖRST, och ensam om 1.0.
+   *
+   * Sitemapen började på /butik, som om butiken vore sajten. Sedan roten flyttade hit är `/` den
+   * sida en märkessökning ska landa på, och den stod inte med alls — Google fick alltså aldrig veta
+   * att den fanns annat än genom att någon råkade länka dit.
+   *
+   * Marknadssidorna står med av samma skäl: de beskriver företaget, och en sökning på "loopa" är en
+   * fråga om företaget. De bor på Pages och inte hos oss (se wrangler.toml), men en sitemap listar
+   * adresser på en domän — inte sidor en viss server råkar rendera.
+   *
+   * DE JURIDISKA SIDORNA STÅR MEDVETET INTE MED. /villkor, /integritetspolicy och /cookies får inget
+   * eget sidhuvud ur seo.ts än, så alla tre går ut med skalets titel. Tre adresser med identisk titel
+   * är tre sidor som konkurrerar om samma märkesfråga, och att be Google indexera dem vore att göra
+   * problemet större. De ska in — efter att de fått var sitt huvud.
+   */
   const poster: Post[] = [
-    { loc: `${base}/butik`, changefreq: "daily", priority: "1.0" },
+    { loc: `${base}/`, changefreq: "weekly", priority: "1.0" },
+    { loc: `${base}/butik`, changefreq: "daily", priority: "0.9" },
+    { loc: `${base}/company`, changefreq: "monthly", priority: "0.8" },
+    { loc: `${base}/brands`, changefreq: "monthly", priority: "0.6" },
+    { loc: `${base}/secondhand`, changefreq: "monthly", priority: "0.6" },
   ];
 
   /**

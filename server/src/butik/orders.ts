@@ -32,6 +32,15 @@ export type OrderStatus =
   | "booking"
   | "scheduled"
   | "delivered"
+  /**
+   * Köparen ångrade FÖRE leveransen. Möbeln står kvar hos oss; det som ska hända är att en bokad
+   * frakt stoppas och pengarna går tillbaka.
+   *
+   * SKILT FRÅN `return_requested`, som är en möbel vi redan burit in och ska hämta igen. De två
+   * kostar olika saker och löses av olika personer, och att skriva dem i samma fält hade betytt att
+   * ingen kunde se vilket av dem en rad handlade om. Gamla rader behåller sitt läge.
+   */
+  | "cancel_requested"
   | "return_requested"
   | "returned"
   | "cancelled";

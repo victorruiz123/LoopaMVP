@@ -112,6 +112,16 @@ export const FLOW: Record<string, Translation> = {
     en: "Your account is created. Log in to continue.",
     fr: "Votre compte est créé. Connectez-vous pour continuer.",
   },
+  "Sälj din": { en: "Sell your", fr: "Vendez votre" },
+  möbel: { en: "furniture", fr: "meuble" },
+  "Skapa ett konto, så filmar du ett varv runt möbeln — sedan gör vi annonsen och säljer den.": {
+    en: "Create an account, then film one lap around the furniture — we write the listing and sell it.",
+    fr: "Créez un compte, puis filmez un tour du meuble — nous rédigeons l'annonce et le vendons.",
+  },
+  "Logga in, så fortsätter vi till filmningen av din möbel.": {
+    en: "Log in and we'll go straight to filming your furniture.",
+    fr: "Connectez-vous et nous passons au tournage de votre meuble.",
+  },
   "Bilderna är": { en: "Your photos are", fr: "Vos photos sont" },
   klara: { en: "ready", fr: "prêtes" },
   "Välkommen till": { en: "Welcome to", fr: "Bienvenue chez" },
@@ -209,6 +219,54 @@ export const FLOW: Record<string, Translation> = {
   },
   "Fortsätt till priset ändå": { en: "Continue to the price anyway", fr: "Passer au prix quand même" },
   "Bygger annonsen…": { en: "Building the listing…", fr: "Création de l'annonce…" },
+
+  // ---- de två frågorna: pälsdjur och lukt ----
+  // Ställs medan annonsen byggs. Svaren står i annonsen som säljarens ord, inte som AI:ns — därför
+  // säger leden "dina ord" och inte "vi lägger till".
+  "Två frågor om möbeln": { en: "Two questions about the piece", fr: "Deux questions sur le meuble" },
+  "Två frågor": { en: "Two questions", fr: "Deux questions" },
+  "om möbeln": { en: "about the piece", fr: "sur le meuble" },
+  "Det här ser inte AI:n på bilderna, och det är det köparen frågar om. Svaren står i annonsen som dina ord.":
+    {
+      en: "The AI can't see this in the photos, and it's what buyers ask about. Your answers go into the listing as your own words.",
+      fr: "L'IA ne voit pas cela sur les photos, et c'est ce que les acheteurs demandent. Vos réponses figurent dans l'annonce, avec vos mots.",
+    },
+  // Den tredje frågan ställs bara för stolar, så rubriken finns i två upplagor. Franskan böjer inte
+  // "questions" annorlunda på tre, men räkneordet måste bytas i båda språken.
+  "Tre frågor om möbeln": { en: "Three questions about the piece", fr: "Trois questions sur le meuble" },
+  "Tre frågor": { en: "Three questions", fr: "Trois questions" },
+  "Hur många stolar säljer du?": { en: "How many chairs are you selling?", fr: "Combien de chaises vendez-vous ?" },
+  "Annat antal": { en: "Another number", fr: "Autre nombre" },
+  "Antal stolar": { en: "Number of chairs", fr: "Nombre de chaises" },
+  "Prisförslaget räknas på antalet — ett set säljs sällan för antalet gånger styckpriset.": {
+    en: "The suggested price is calculated on the number — a set rarely sells for the number times the single-chair price.",
+    fr: "Le prix suggéré est calculé sur le nombre — un lot se vend rarement au nombre multiplié par le prix unitaire.",
+  },
+  "Har du pälsdjur i hemmet?": { en: "Do you have furry pets at home?", fr: "Avez-vous des animaux à poils chez vous ?" },
+  "Luktar möbeln något?": { en: "Does the piece smell of anything?", fr: "Le meuble a-t-il une odeur ?" },
+  Ja: { en: "Yes", fr: "Oui" },
+  Nej: { en: "No", fr: "Non" },
+  "Beskriv lukten": { en: "Describe the smell", fr: "Décrivez l'odeur" },
+  "t.ex. svag röklukt i dynorna": {
+    en: "e.g. faint smoke smell in the cushions",
+    fr: "p. ex. légère odeur de fumée dans les coussins",
+  },
+  "Dina egna ord går rakt in i annonsen. En köpare skiljer på röklukt och källarlukt.": {
+    en: "Your own words go straight into the listing. A buyer tells smoke apart from cellar damp.",
+    fr: "Vos mots vont directement dans l'annonce. Un acheteur distingue la fumée de l'odeur de cave.",
+  },
+  "Annonsen byggs medan du svarar.": {
+    en: "The listing is being built while you answer.",
+    fr: "L'annonce se construit pendant que vous répondez.",
+  },
+  "Vi kunde inte spara svaren just nu.": {
+    en: "We couldn't save your answers right now.",
+    fr: "Nous n'avons pas pu enregistrer vos réponses pour le moment.",
+  },
+  "Tryck igen för att gå vidare utan dem.": {
+    en: "Tap again to continue without them.",
+    fr: "Appuyez à nouveau pour continuer sans elles.",
+  },
   "Hämtar mått, material och specifikationer": {
     en: "Fetching dimensions, materials and specifications",
     fr: "Récupération des dimensions, matériaux et caractéristiques",
@@ -274,11 +332,19 @@ export const FLOW: Record<string, Translation> = {
     en: "The recording stops by itself when you're back where you started",
     fr: "L'enregistrement s'arrête tout seul quand vous revenez au point de départ",
   },
-  "Tryck på den röda knappen för att börja": { en: "Press the red button to start", fr: "Appuyez sur le bouton rouge pour commencer" },
-  "Går inte att gå runt? Ta bilder i stället": {
-    en: "Can't walk around it? Take photos instead",
-    fr: "Impossible d'en faire le tour ? Prenez plutôt des photos",
+  "Står möbeln mot en vägg? Filma de sidor du kommer åt och tryck på stoppknappen när du är klar — vi bedömer det du filmat och skriver i annonsen vad som inte syns.": {
+    en: "Is the piece against a wall? Film the sides you can reach and press stop when you're done — we assess what you filmed and note in the listing what isn't visible.",
+    fr: "Le meuble est contre un mur ? Filmez les côtés accessibles et appuyez sur stop quand vous avez fini — nous évaluons ce que vous avez filmé et indiquons dans l'annonce ce qui n'est pas visible.",
   },
+  "{steg} — kommer du inte runt? Tryck för att avsluta": {
+    en: "{steg} — can't get all the way around? Tap to finish",
+    fr: "{steg} — vous ne pouvez pas faire le tour ? Appuyez pour terminer",
+  },
+  "Filmen blev för kort för att läsa bildrutor ur. Låt den spela några sekunder till.": {
+    en: "The clip was too short to pull frames from. Let it run a few seconds longer.",
+    fr: "La vidéo est trop courte pour en extraire des images. Laissez-la tourner quelques secondes de plus.",
+  },
+  "Tryck på den röda knappen för att börja": { en: "Press the red button to start", fr: "Appuyez sur le bouton rouge pour commencer" },
   "SPELAR IN {sek}s": { en: "RECORDING {sek}s", fr: "ENREGISTREMENT {sek}s" },
   "Gå medsols runt möbeln": { en: "Walk clockwise around the furniture", fr: "Tournez autour du meuble dans le sens horaire" },
   "Starta inspelning": { en: "Start recording", fr: "Démarrer l'enregistrement" },
@@ -352,10 +418,6 @@ export const FLOW: Record<string, Translation> = {
   "Inspelningen blev tom — kameran verkar ha stängts av. Försök igen.": {
     en: "The recording came out empty — the camera seems to have switched off. Try again.",
     fr: "L'enregistrement est vide — la caméra semble s'être éteinte. Réessayez.",
-  },
-  "Filmen blev för kort för att läsa bildrutor ur. Gå ett helt varv och låt den spela klart.": {
-    en: "The film was too short to read frames from. Walk a full lap and let it finish.",
-    fr: "La vidéo est trop courte pour en extraire des images. Faites un tour complet et laissez-la se terminer.",
   },
   "Framifrån": { en: "Front", fr: "De face" },
   "Vänster sida": { en: "Left side", fr: "Côté gauche" },
@@ -479,6 +541,11 @@ export const FLOW: Record<string, Translation> = {
     fr: "Nous n'avons trouvé aucune annonce assez similaire pour la comparaison.",
   },
   "Uppskattat värde": { en: "Estimated value", fr: "Valeur estimée" },
+  "Uppskattat värde för {antal} stolar": {
+    en: "Estimated value for {antal} chairs",
+    fr: "Valeur estimée pour {antal} chaises",
+  },
+  "Ungefär {pris} per stol.": { en: "About {pris} per chair.", fr: "Environ {pris} par chaise." },
   "säljs snabbt": { en: "sells quickly", fr: "vente rapide" },
   "säljs långsamt": { en: "sells slowly", fr: "vente lente" },
   "Bygger på {antal} liknande annons": { en: "Based on {antal} similar listing", fr: "Basé sur {antal} annonce similaire" },
@@ -529,6 +596,18 @@ export const FLOW: Record<string, Translation> = {
 
   // ---- analysen ----
   "Bilder förberedda": { en: "Photos prepared", fr: "Photos préparées" },
+  // ---- inloggningen i kassan (intent "kop") ----
+  "Skapa konto och": { en: "Create an account and", fr: "Créez un compte et" },
+  "Logga in och": { en: "Log in and", fr: "Connectez-vous et" },
+  betala: { en: "pay", fr: "payez" },
+  "Kontot är där ordern, leveranstiden och kvittot hamnar. Möbeln ligger kvar medan du skapar det.": {
+    en: "The account is where your order, delivery slot and receipt live. The piece stays yours while you create it.",
+    fr: "Le compte reçoit votre commande, votre créneau de livraison et votre reçu. Le meuble vous reste réservé pendant ce temps.",
+  },
+  "Logga in, så fortsätter vi till betalningen. Möbeln ligger kvar i kassan.": {
+    en: "Log in and we continue to payment. The piece stays in your basket.",
+    fr: "Connectez-vous et nous passons au paiement. Le meuble reste dans votre panier.",
+  },
   "Ingen kontakt med servern just nu — vi fortsätter försöka.": {
     en: "No contact with the server right now — we keep trying.",
     fr: "Pas de contact avec le serveur pour le moment — nous continuons d'essayer.",

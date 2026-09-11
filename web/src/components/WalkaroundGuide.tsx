@@ -10,27 +10,11 @@ import GuideScene from "./GuideScene";
  * Scenen och matematiken bakom den ligger i GuideScene, som fotoguiden ritar samma möbel ur.
  *
  * Härifrån och ut är det bara ord: vad varvet är, hur länge det tar och vad som händer när det är
- * klart. `onSwitch` är dörren till fotoguiden — samma varv, men stannat på fyra ställen — och den
- * står här, ovanpå kameran, för att det är HÄR säljaren står när hen inser att ett varv inte går att
- * gå: soffan står mot en vägg, eller händerna är fulla.
+ * klart. Överlägget erbjuder ingen annan väg: varvet är det enda underlaget den här vyn samlar in,
+ * och väggfallet — som var skälet att stå med en dörr härifrån — besvaras av noten nedan i stället.
+ * Fotoguiden nås från datorns valskärm.
  */
-export default function WalkaroundGuide({
-  subject,
-  onSwitch,
-  onUploadVideo,
-}: {
-  subject?: string;
-  onSwitch?: () => void;
-  /**
-   * Dörren till en färdig film ur telefonens eller datorns filer.
-   *
-   * STÅR HÄR AV SAMMA SKÄL SOM `onSwitch`: det här är platsen där säljaren inser att varvet inte går
-   * att gå just nu. Skillnaden mot fotoguiden är att den här vägen ger samma sorts underlag som ett
-   * riktigt varv — bildrutor valda ur rörelse — och därför ingen kvalitetsförlust alls, bara en film
-   * som spelats in vid ett annat tillfälle.
-   */
-  onUploadVideo?: () => void;
-}) {
+export default function WalkaroundGuide({ subject }: { subject?: string }) {
   const t = useT();
   return (
     <div className="capture-guide">
@@ -46,16 +30,20 @@ export default function WalkaroundGuide({
           <li>{t("Filmen stannar själv när du är tillbaka där du började")}</li>
         </ol>
         <p className="capture-guide-cta">{t("Tryck på den röda knappen för att börja")}</p>
-        {onUploadVideo && (
-          <button className="btn btn-text capture-guide-switch" onClick={onUploadVideo}>
-            {t("Har du redan en film? Ladda upp den")}
-          </button>
-        )}
-        {onSwitch && (
-          <button className="btn btn-text capture-guide-switch" onClick={onSwitch}>
-            {t("Går inte att gå runt? Ta bilder i stället")}
-          </button>
-        )}
+        {/*
+          VÄGGFALLET, sagt före filmningen och inte efteråt.
+
+          En soffa står oftast mot en vägg, och då finns det inget helt varv att gå. Stoppknappen har
+          alltid kunnat avsluta filmen när som helst, men ingenting sa det: guiden lovar ett helt varv
+          och att filmen stannar av sig själv, så den som kommer halvvägs tror att hen gjort fel och
+          går tillbaka till början.
+
+          Det som INTE filmas blir inte tyst borta: besiktningen skriver själv vilken sida den aldrig
+          fick se, och den raden står i annonsen. Det är därför uppmaningen kan vara så här lugn.
+        */}
+        <p className="capture-guide-note">
+          {t("Står möbeln mot en vägg? Filma de sidor du kommer åt och tryck på stoppknappen när du är klar — vi bedömer det du filmat och skriver i annonsen vad som inte syns.")}
+        </p>
       </div>
     </div>
   );

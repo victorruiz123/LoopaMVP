@@ -15,7 +15,7 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import * as store from "./store.js";
 import { parse, followUps, applyAnswer, summarize, type ParsedSpec } from "./parse.js";
 import { sweep } from "./sweep.js";
-import type { Efterlysning } from "./types.js";
+import type { AskedQuestion, Efterlysning } from "./types.js";
 import { EXPIRY_DAYS } from "./types.js";
 import { inbox, markRead } from "./notify.js";
 import { demandCountFor, demandDashboard, toCsv, wall } from "./wall.js";
@@ -147,6 +147,102 @@ export async function handleEfterlysningPublic(
       // faktiskt skapar efterlysningar ärligt.
       parseMethod: "form",
       area: null,
+    });
+    json(res, 201, { efterlysning: { id: row.id, summary: row.summary }, dagar: EXPIRY_DAYS });
+    return true;
+  }
+
+  /**
+   * POST /api/efterlysning/beskrivning — "Letar du möbel?", hela vägen in.
+   *
+   * SKILD FRÅN `/enkel`, OCH SKILLNADEN ÄR INTE FORMULÄRETS LÄNGD. `/enkel` tar tre fält från någon
+   * som är på väg någon annanstans och får inte kosta en sekund. Den här tar en mening någon
+   * FAKTISKT SATT SIG NER OCH SKREV, plus svaren på högst tre frågor — och sparar dessutom det
+   * `/enkel` inte har: köparens egna ord, vilka frågor vi ställde, och var på sajten de kom ifrån.
+   *
+   * SKILD FRÅN `POST /api/efterlysning`, OCH SKILLNADEN ÄR KONTOT. Den vägen ligger bakom en
+   * inloggning och ger inkorgen; den här tar en e-postadress och ingenting mer. Se DECISIONS.md #9:
+   * kravet var alltid en väg att nå personen, inte ett konto.
+   *
+   * SPECEN KOMMER FRÅN KLIENTEN, som fick den ur `/tolka`. Att tolka om meningen här hade kostat ett
+   * andra modellanrop för att kanske komma fram till något annat än det köparen just bekräftade.
+   * Originaltexten sparas ändå, så inget som kastades i tolkningen är borta.
+   */
+  if (segments[0] === "beskrivning" && req.method === "POST") {
+    const body = await readBody<{
+      text?: string;
+      spec?: ParsedSpec;
+      fragor?: { field?: string; question?: string; answer?: string | null }[];
+      epost?: string;
+      varifran?: string;
+    }>(req);
+
+    const epost = (body.epost ?? "").trim().toLowerCase();
+    if (!epost || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(epost)) {
+      return json(res, 400, { error: "Skriv en e-postadress vi kan nå dig på." }), true;
+    }
+    const text = (body.text ?? "").trim().slice(0, 2000);
+    // Specen ELLER texten räcker. Faller tolkningen har vi ändå meningen, och en efterlysning med
+    // bara köparens egna ord är fullt användbar för en människa som matchar för hand.
+    if (!body.spec?.filter && !text) {
+      return json(res, 400, { error: "Skriv vad du letar efter." }), true;
+    }
+    let spec: ParsedSpec = body.spec?.filter
+      ? body.spec
+      : { filter: {}, styleTags: [], deadline: null, urgency: "none", note: null, summary: "", aiUsed: false };
+
+    const asked: AskedQuestion[] = (body.fragor ?? [])
+      .filter((q) => q?.field && q?.question)
+      .slice(0, 3)
+      .map((q) => ({
+        field: String(q.field).slice(0, 40),
+        question: String(q.question).slice(0, 200),
+        // Tom sträng blir null: en fråga som visades och lämnades tom ÄR en överhoppad fråga, och
+        // två sätt att skriva "inget svar" hade gjort statistiken över överhoppade frågor osann.
+        answer: q.answer?.trim() ? String(q.answer).trim().slice(0, 500) : null,
+      }));
+
+    /**
+     * Svaren vävs in HÄR, inte hos klienten.
+     *
+     * Klienten skickar specen den fick ur `/tolka` plus frågeloggen, och servern lägger på svaren.
+     * Alternativet — ett `/tolka`-anrop per svar — hade gett tre extra rundturer mitt i ett intag
+     * som ska kännas som en fråga i taget, och lagt tolkningen av "max 210 bred" på två ställen.
+     * Att göra det här betyder också att loggen och specen inte KAN gå isär: samma slinga skriver
+     * båda.
+     */
+    for (const q of asked) {
+      if (!q.answer) continue;
+      spec = await applyAnswer(spec, q.field as never, q.answer);
+    }
+
+    /**
+     * Rubriken måste säga VAD det är för möbel. Annars står köparens egna ord där.
+     *
+     * `summarize` beskriver det vi filtrerar på, och gör det bra när tolkningen fick fatt i en
+     * kategori eller ett märke. Gjorde den inte det blir raden antingen "Allt i lagret" (tomt
+     * filter) eller något som "skick A" — en sann beskrivning av filtret och en obrukbar rubrik på
+     * någons efterlysning. Den som ska matcha för hand läser hellre "något att ha vid sängen, gärna
+     * i trä" än vår sammanfattning av det lilla vi förstod.
+     */
+    const identifierat = !!spec.filter.categorySlug || !!spec.filter.brands?.length;
+    const summary = identifierat ? summarize(spec) : text.slice(0, 120) || summarize(spec);
+
+    const row = await store.create({
+      userId: null,
+      email: epost.slice(0, 200),
+      filter: spec.filter,
+      styleTags: spec.styleTags ?? [],
+      deadline: spec.deadline ?? null,
+      urgency: spec.urgency ?? "none",
+      note: spec.note ?? null,
+      summary,
+      parseMethod: "chat",
+      area: null,
+      originalText: text || null,
+      asked,
+      // En adress, inte ett namn på en yta. Trunkeras: en query-sträng är inte var man var.
+      origin: (body.varifran ?? "").trim().slice(0, 200) || null,
     });
     json(res, 201, { efterlysning: { id: row.id, summary: row.summary }, dagar: EXPIRY_DAYS });
     return true;

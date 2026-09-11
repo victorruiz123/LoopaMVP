@@ -7,8 +7,8 @@
  */
 
 import type { IncomingMessage, ServerResponse } from "node:http";
-import { deliveryQuote } from "./delivery.js";
-import { abandonCheckout, checkoutConfigured, CheckoutError, fulfilPaidOrder, parseWebhook, requestSlots, startCheckout } from "./checkout.js";
+import { deliveryQuote, slotsFor, zoneFor } from "./delivery.js";
+import { abandonCheckout, checkoutConfigured, CheckoutError, fulfilPaidOrder, parseWebhook, reconcileOrder, requestSlots, startCheckout } from "./checkout.js";
 import { getOrder, orderByReference, ordersForUser, publikHistorik, updateOrder, type Order } from "./orders.js";
 import { createBevakning, deleteBevakning, listBevakningar } from "./bevakningar.js";
 import { aiSearchAvailable, interpretQuery, rateLimited } from "./aiSearch.js";
@@ -321,6 +321,9 @@ export async function handleButikWrite(
         postalCode: body.postnummer ?? "",
         userId: identity.userId,
         email: identity.email,
+        // Ursprunget köparen står på. Betyder något bara i utveckling, där UI:t kommer från vite på
+        // en annan port än API:t och en retur till serverns egen adress hamnar utanför sessionen.
+        origin: header(req, "origin"),
       });
       json(res, 200, { orderId: result.order.id, reference: result.order.reference, checkoutUrl: result.checkoutUrl });
     } catch (err) {
@@ -414,21 +417,52 @@ export async function handleButikWrite(
     return true;
   }
 
-  // POST /api/butik/order/:id/retur — returbegäran. Manuell hantering bakom kulisserna.
-  if (segments[0] === "order" && segments.length === 3 && segments[2] === "retur" && req.method === "POST") {
+  /**
+   * POST /api/butik/order/:id/angra — köparen ångrar köpet INNAN möbeln levererats.
+   *
+   * INTE EN RETUR. Vägen hette `/retur` och satte `return_requested`, vilket betydde att vi lovade
+   * hämta tillbaka en möbel vi redan burit in — ett åtagande som kostar en budfirma till och som
+   * ingen bakom kulisserna hade sagt ja till. Ångerrätten gäller därför FÖRE leveransen: så länge
+   * möbeln står hos oss avbeställs den, och är frakten bokad går det fram till dagen innan.
+   *
+   * DAGEN INNAN är gränsen därför att budfirman är bokad då. En avbeställning på morgonen samma dag
+   * stoppar ingen bil som redan är lastad, och ett löfte vi inte kan hålla ska inte gå att trycka på.
+   * Efter leverans finns ingen knapp alls — då är det ett ärende för en människa, och sidan säger det.
+   */
+  if (segments[0] === "order" && segments.length === 3 && segments[2] === "angra" && req.method === "POST") {
     if (!identity) return json(res, 401, { error: "Logga in." }), true;
     const order = await getOrder(segments[1]);
     if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
-    if (order.status !== "delivered" && order.status !== "scheduled" && order.status !== "paid") {
-      return json(res, 409, { error: "Ordern kan inte returneras i sitt nuvarande läge." }), true;
+    if (order.status !== "paid" && order.status !== "booking" && order.status !== "scheduled") {
+      return json(res, 409, { error: "Köpet går inte att ångra i sitt nuvarande läge." }), true;
     }
-    const updated = await updateOrder(order.id, { status: "return_requested" });
-    console.info(`[butik] Retur begärd för order ${order.reference} (${order.productId}) — boka upphämtning.`);
+    if (order.deliveryDate && !gårAttAngra(order.deliveryDate)) {
+      return json(res, 409, { error: "Leveransen är i morgon eller närmare — hör av dig till oss i stället." }), true;
+    }
+    const updated = await updateOrder(order.id, { status: "cancel_requested" });
+    console.info(`[butik] Köpet ångrat för order ${order.reference} (${order.productId}) — stoppa leverans och återbetala.`);
     json(res, 200, { order: updated });
     return true;
   }
 
   return false;
+}
+
+/**
+ * Går köpet fortfarande att ångra, med en bokad leveransdag?
+ *
+ * Gränsen är SLUTET av dagen före leveransen: bokas onsdag går det att ångra till och med tisdag
+ * kväll. Jämförelsen görs på datumsträngar (`YYYY-MM-DD`) och inte på tidsstämplar — ett köp som
+ * ångras 23:58 ska räknas som samma dag som ett som ångras 08:02, och en tidszonsjustering emellan
+ * hade gjort skillnad på dem.
+ *
+ * Exporterad för att gränsen ska gå att pröva utan att resa en HTTP-förfrågan: regeln är ett löfte
+ * till köparen ("fram till dagen innan"), och ett löfte som bara hålls av att koden är rätt är ett
+ * löfte tills någon ändrar i koden.
+ */
+export function gårAttAngra(deliveryDate: string, nu: Date = new Date()): boolean {
+  const idag = `${nu.getFullYear()}-${String(nu.getMonth() + 1).padStart(2, "0")}-${String(nu.getDate()).padStart(2, "0")}`;
+  return idag < deliveryDate;
 }
 
 /** Läsande ordervägar. Egen funktion för att de kräver inloggning men inte är skrivande. */
@@ -458,8 +492,18 @@ export async function handleButikOrderRead(
   if (segments[0] === "order" && segments.length === 1 && req.method === "GET") {
     if (!identity?.userId) return json(res, 401, { error: "Logga in." }), true;
     const mine = await ordersForUser(identity.userId);
+    /**
+     * Obesvarade ordrar stäms av mot Stripe innan listan skrivs — se checkout.ts `reconcileOrder`.
+     *
+     * "Mina köp" är vägen tillbaka för den som stängde fliken efter betalningen, och den fick inte
+     * vara det enda stället i produkten där ett betalt köp fortsätter se obetalt ut för att en
+     * webhook försvann. Bara `pending` frågar; en normal lista kostar därför ingenting.
+     */
     const rows = await Promise.all(
-      mine.map(async (order) => ({ order: forBuyer(order), product: await productById(order.productId) })),
+      mine.map(async (o) => {
+        const order = o.status === "pending" ? ((await reconcileOrder(o.id)) ?? o) : o;
+        return { order: forBuyer(order), product: await productById(order.productId) };
+      }),
     );
     json(res, 200, { orders: rows });
     return true;
@@ -467,10 +511,31 @@ export async function handleButikOrderRead(
 
   if (segments[0] === "order" && segments.length === 2 && req.method === "GET") {
     if (!identity) return json(res, 401, { error: "Logga in." }), true;
-    const order = (await getOrder(segments[1])) ?? (await orderByReference(segments[1]));
-    if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
+    const funnen = (await getOrder(segments[1])) ?? (await orderByReference(segments[1]));
+    if (!funnen || (funnen.userId && funnen.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
+    /**
+     * Står ordern kvar i `pending` frågar vi Stripe innan vi svarar.
+     *
+     * ÄGARSKAPET PRÖVAS FÖRE, på raden ovan: avstämningen kostar ett anrop mot Stripe, och den ska
+     * bara gå att utlösa av den som äger ordern.
+     *
+     * Det är det här anropet som gör tacksidan självläkande. Köparen kommer tillbaka från Stripe,
+     * sidan hämtar sin order, och kom aldrig webhooken fram hämtas svaret i stället för att inväntas
+     * — i utveckling varje gång, i drift den gången nätet delade sig.
+     */
+    const order = funnen.status === "pending" ? ((await reconcileOrder(funnen.id)) ?? funnen) : funnen;
     const product = await productById(order.productId);
-    json(res, 200, { order: forBuyer(order), product });
+    /**
+     * TIDERNA RÄKNAS UT HÄR, ur ORDERNS köpdatum — inte i klienten ur dagens.
+     *
+     * Skärmen hämtade dem tidigare via `/leverans?postnummer=`, som räknar från "nu". Regeln är
+     * "fem arbetsdagar från dagen efter köpet", och den går bara att följa där köpet står skrivet.
+     * Bara i `paid`: efter det har köparen redan lämnat sina tider, och en lista att kryssa i hade
+     * bara varit ett erbjudande vi inte tänkte infria.
+     */
+    const zon = order.postalCode ? zoneFor(order.postalCode) : null;
+    const slots = order.status === "paid" && zon ? slotsFor(zon, new Date(order.createdAt)) : [];
+    json(res, 200, { order: forBuyer(order), product, slots });
     return true;
   }
   return false;

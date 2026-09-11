@@ -45,6 +45,23 @@ export type EfterlysningState = "active" | "paused" | "fulfilled" | "expired";
  */
 export type StyleTag = string;
 
+/**
+ * En fråga vi ställde och vad som kom tillbaka.
+ *
+ * SPARAS FÖR ATT FRÅGORNA SKA GÅ ATT DÖMA. Vilka följdfrågor som ställs avgörs i kod (se
+ * `followUps`), och den koden är en gissning om vad som saknas. Utan en logg över vad vi frågade och
+ * vad folk svarade går det inte att se vilken fråga som alltid hoppas över och därför borde bort —
+ * bara att gissa vidare.
+ *
+ * `answer: null` = överhoppad. Skilt från tom sträng, som ingen skriver.
+ */
+export interface AskedQuestion {
+  field: string;
+  /** Ordagrant som den ställdes, inte fältets namn. Frågetexten ändras över tid. */
+  question: string;
+  answer: string | null;
+}
+
 export interface Efterlysning {
   id: string;
   /** Null för en efterlysning som ännu inte sparats. Sparande kräver konto — se routes.ts. */
@@ -75,6 +92,27 @@ export interface Efterlysning {
 
   /** Grovt område, för efterfrågeväggen. Aldrig mer exakt än så. */
   area: string | null;
+
+  /**
+   * Meningen köparen skrev, ordagrant och otolkad.
+   *
+   * SPARAS BREDVID de strukturerade fälten, inte i stället för dem. Tolkningen kastar med flit allt
+   * den inte kan pröva mot katalogen — ett märke vi inte har i lager, ett önskemål som inte är ett
+   * filter — och det som kastas är ofta just det en människa behöver läsa för att känna igen möbeln
+   * när den kommer in. Matchningen sker för hand tills vidare, och den handen läser den här raden.
+   *
+   * Valfritt i typen: rader skapade före fältet fanns saknar det, och en migrering hade fyllt dem
+   * med en påhittad mening.
+   */
+  originalText?: string | null;
+  /** Följdfrågorna som ställdes, i ordning. Se AskedQuestion. */
+  asked?: AskedQuestion[];
+  /**
+   * Var på sajten personen kom ifrån: "/", "/butik/objekt/LP-1234-5678".
+   *
+   * En adress och inte ett namn på en yta. Adressen går att öppna; "produktsida" går att tolka fel.
+   */
+  origin?: string | null;
 
   /** Produkt-ID:n vi redan hört av oss om, så samma möbel inte notifieras två gånger. */
   notifiedProductIds: string[];

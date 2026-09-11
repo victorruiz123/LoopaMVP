@@ -7,10 +7,13 @@ import { KNOWN_BRANDS } from "../lib/brands";
 import { LOOPA_FEE_CAP_SEK, LOOPA_PERCENT } from "../lib/fees";
 import { formatSek } from "../lib/price";
 import { POPULAR_BRANDS, VITRIN } from "../lib/brandSeed";
-import { brandLook, brandTypeStyle, harEgenIdentitet } from "../lib/brandLook";
+import { brandLook, brandNameStyle, harEgenIdentitet } from "../lib/brandLook";
 import HurFungerarDet from "../components/HurFungerarDet";
+import LetarDuMobel from "../components/LetarDuMobel";
+import MobelParad from "../components/MobelParad";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
+import { useViewMode } from "../lib/viewMode";
 
 function fold(s: string): string {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -24,11 +27,11 @@ const POPULAR_SET = new Set(POPULAR_BRANDS.map(fold));
  * Tre lager, och ordningen är visuell och inte alfabetisk — rutnätet är en hylla med varumärken,
  * inte ett register:
  *
- *   1. Skyltningen (VITRIN): åtta hus med åtta olika ordbilder, valda för att visa vad brickorna är.
+ *   1. Skyltningen (VITRIN): IKEA och Mio först, sedan soffhandeln, sedan hus med egen ordbild.
  *   2. Resten av märkena som har en egen husfärg och bokstavsform (brandLook.ts).
  *   3. Korpusen. Beigea neutraler, för om dem säger tabellen ingenting.
  *
- * Utan lager 1 och 2 öppnade listan med volymhandeln — fem snarlika röda och blå rutor — och man
+ * Utan lager 1 och 2 fortsatte listan med volymhandeln — snarlika röda och blå rutor — och man
  * missade att brickorna alls bär märkenas egen identitet.
  *
  * ORDNINGEN GÄLLER BARA DEN TOMMA RUTAN. Söker man något söks hela korpusen igenom, och hittas
@@ -74,6 +77,8 @@ export default function HomeScreen({
 }) {
   const t = useT();
   const { profile, user, loading } = useAuth();
+  /** Datorvyn flyttar "Letar du möbel?" från raden före sidfoten upp i topplisten. */
+  const dator = useViewMode() === "desktop";
   usePageTitle(null);
   const [query, setQuery] = useState("");
   const [hurOppen, setHurOppen] = useState(false);
@@ -114,26 +119,34 @@ export default function HomeScreen({
   return (
     <div className="screen screen-light home">
       {/*
-        Topplisten: ordmärket till vänster, profilen till höger. Ingenting däremellan.
+        Topplisten: ordmärket till vänster, profilen till höger.
 
-        Här stod en länk till butiken. Den är borta: raden är sidans enda vågräta yta, och den ska
-        bära avsändaren och vägen till kontot — inget tredje. Vägen till butiken finns kvar i foten
-        och i butikens egen topplist.
+        Här stod en länk till butiken. Den är borta: raden ska bära avsändaren och vägen till kontot,
+        inte en andra hylla. Vägen till butiken finns kvar i foten och i butikens egen topplist.
+
+        I DATORVYN står "Letar du möbel?" till vänster om profilbrickan. Telefonens topprad rymmer
+        ordmärket och brickan och ingenting mer, men på en datorskärm ligger hela mitten tom — och
+        där kostar knappen ingenting av säljflödet samtidigt som letandet slutar vara det sista man
+        ser före sidfoten. Den står till VÄNSTER om brickan av samma skäl som "Sälj" gör det i
+        butikens topplist: profilen är radens ände, och något utanför den läser som om DEN vore det.
       */}
       <div className="home-bar">
         <span className="home-wordmark">loopa</span>
-        {/* Ingen knapp alls medan sessionen läses: att gissa fel i en tiondels sekund byter ut
-            brickan framför ögonen på den som just siktat in sig på den. */}
-        {!loading && (
-          <button
-            className={`home-bar-profil ${user ? "home-bar-profil-inne" : ""}`}
-            onClick={onOpenProfile}
-            aria-label={user ? t("Din profil") : t("Logga in")}
-            title={user ? shortName(profile?.full_name ?? profile?.username, user.email) : t("Logga in")}
-          >
-            <Avatar profile={profile} email={user?.email} inloggad={!!user} size={21} />
-          </button>
-        )}
+        <div className="home-bar-hoger">
+          {dator && <LetarDuMobel varifran="/" variant="bar" />}
+          {/* Ingen knapp alls medan sessionen läses: att gissa fel i en tiondels sekund byter ut
+              brickan framför ögonen på den som just siktat in sig på den. */}
+          {!loading && (
+            <button
+              className={`home-bar-profil ${user ? "home-bar-profil-inne" : ""}`}
+              onClick={onOpenProfile}
+              aria-label={user ? t("Din profil") : t("Logga in")}
+              title={user ? shortName(profile?.full_name ?? profile?.username, user.email) : t("Logga in")}
+            >
+              <Avatar profile={profile} email={user?.email} inloggad={!!user} size={21} />
+            </button>
+          )}
+        </div>
       </div>
 
       {/*
@@ -158,6 +171,10 @@ export default function HomeScreen({
         <button className="home-hur-knapp" onClick={() => setHurOppen(true)}>
           {t("Hur fungerar det?")}
         </button>
+
+        {/* Möblerna fyller ytan under löftet på datorn och ritas inte alls på en telefon, där det
+            inte finns någon yta att fylla — se `.mobel-parad` i styles.css. */}
+        <MobelParad />
       </header>
 
       <section className="home-marken">
@@ -214,9 +231,14 @@ export default function HomeScreen({
                        ett märke man inte känner igen — vilket är hela skälet brickorna finns. */
                     className={`home-marke-namn ${ordbild.length > 13 ? "home-marke-namn-lang" : ""}`}
                     style={{
-                      ...brandTypeStyle(look.type),
+                      ...brandNameStyle(name),
                       // Spärren skjuter texten åt höger; halva spärren tillbaka centrerar ordet.
-                      textIndent: look.type === "wide" || look.type === "lower" ? "0.16em" : undefined,
+                      // Gäller inte märken som satt en egen spärr i `stil` — då kompenserar
+                      // indraget för en spärr som inte längre finns, och ordet hamnar snett.
+                      textIndent:
+                        (look.type === "wide" || look.type === "lower") && !look.stil?.letterSpacing
+                          ? "0.16em"
+                          : undefined,
                     }}
                   >
                     {ordbild}
@@ -270,9 +292,27 @@ export default function HomeScreen({
         </p>
       </section>
 
+      {/*
+        Sista raden före sidfoten — i mobilvyn, och medvetet sist där.
+        Sidan handlar om att SÄLJA. Den som ändå letar efter något ska mötas av en väg, men först
+        efter att säljflödet fått hela sidan: under avgiften, ovanför sidfoten, aldrig i heron.
+
+        I datorvyn står den i stället som knapp i topplisten (se ovan) och raden här utgår. Två
+        ingångar till samma vy på samma sida hade varit en upprepning, och den i toppen är den som
+        faktiskt syns — den nedersta raden på en datorskärm är den man skrollat förbi.
+      */}
+      {!dator && <LetarDuMobel varifran="/" />}
+
       <footer className="home-fot">
         <span className="home-wordmark">loopa</span>
-        <span className="home-fot-ort">{t("Loopa AI · Möbler i Stockholm")}</span>
+        {/* Adressen står här och inte bara i villkoren: den som undrar något som sidan inte svarar
+            på ska hitta ett sätt att fråga utan att leta. */}
+        <span className="home-fot-kontakt">
+          <span className="home-fot-ort">{t("Loopa AI · Möbler i Stockholm")}</span>
+          <a className="home-fot-mail" href="mailto:info@loopa.nu">
+            info@loopa.nu
+          </a>
+        </span>
       </footer>
 
       <HurFungerarDet open={hurOppen} onClose={() => setHurOppen(false)} />

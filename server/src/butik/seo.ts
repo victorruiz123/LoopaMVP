@@ -24,6 +24,36 @@ import { BROWSABLE_STATES, type Product } from "./types.js";
 const SITE = "Loopa Butik";
 const MOTTO = "Köp begagnat. Handla som nytt.";
 
+/**
+ * Sajtnamnet — det Google kan välja att skriva ovanför träffen.
+ *
+ * "Loopa Butik" är en AVDELNING, inte en sajt. Stod det i og:site_name på varje butikssida medan
+ * skalet sa "Loopa", och då härleder Google sajtnamnet ur den av de två den råkar lita på. Butiken
+ * heter fortfarande "Loopa Butik" i titlarna, där det är en upplysning om VILKEN sida man ser.
+ */
+const SAJTNAMN = "Loopa";
+
+/**
+ * Loopa som ENTITET, inte som sajt. Det här är vad märkesfrågan "loopa" hänger på.
+ *
+ * "Loopa" är ett vanligt svenskt verb, och loopa.se är någon annans. Google kan alltså inte avgöra
+ * ur ordet självt att frågan gäller ett företag — det måste stå någonstans att företaget finns, vad
+ * det gör och var. `sameAs` är fältet som gör det: varje adress är en oberoende profil som beskriver
+ * samma sak, och det är sambandet mellan dem som bygger entiteten.
+ *
+ * TOMMA FÄLT UTELÄMNAS HELT ur markeringen. En tom `sameAs`-lista är inte ett svagare påstående utan
+ * ett trasigt, och `legalName: ""` är en lögn om ett registrerat namn. Hellre ingen uppgift.
+ *
+ * ATT FYLLA I: LinkedIn-sidan, Instagram och allabolag-posten så snart de finns, plus organisations-
+ * numret. Innan dess står Organization här med bara namn, logotyp och ort — vilket är korrekt men
+ * inte övertygande, och det är hela skillnaden i en märkessökning.
+ */
+const FORETAG: { legalName: string | null; orgNummer: string | null; sameAs: string[] } = {
+  legalName: null,
+  orgNummer: null,
+  sameAs: [],
+};
+
 export function baseUrl(): string {
   return (process.env.LOOPA_PUBLIC_URL || "https://app.loopa.nu").replace(/\/+$/, "");
 }
@@ -45,6 +75,14 @@ export interface SeoHead {
   body?: string;
   /** Sant när sidan inte ska indexeras — en såld möbel eller en tom kategori. */
   noindex?: boolean;
+  /**
+   * og:type. "website" om inget anges.
+   *
+   * Härleddes tidigare ur om sidan hade strukturerad data — vilket gjorde varje KATEGORISIDA till en
+   * og:type "product", eftersom de bär en ItemList. Ett delningskort som påstår att en lista med
+   * fyrtio soffor är en produkt är fel på ett ställe där det syns. Bara produktsidan är en produkt.
+   */
+  ogType?: "website" | "product";
 }
 
 /**
@@ -317,35 +355,55 @@ function grafer(...delar: Array<Record<string, unknown> | null>): string {
 }
 
 /**
- * Vem butiken är. Ligger på landningssidan, en gång.
+ * Vem Loopa är. Ligger på STARTSIDAN, en gång.
  *
- * Organization knyter ihop sajten med företaget, och `WebSite` med `SearchAction` är det som kan ge
- * ett sökfält direkt i Googles träff. Båda är billiga och båda står på EN sida — upprepade på varje
- * produktsida blir de brus utan att bli sannare.
+ * Låg på /butik fram till att roten flyttade hit (2026-09-11), och det var fel plats redan då:
+ * Organization är ett påstående om vem som äger domänen, och den frågan ställs om roten. En
+ * märkessökning landar på `/`, och hittade där ett tomt skal utan en rad strukturerad data.
+ *
+ * `logo` är med för att Google visar den i kunskapspanelen och bredvid träffen. Filen är ordmärket
+ * självt (favicon.svg, samma som fliken bär) — en SVG duger, och den finns redan på båda sajterna.
  */
-function sajtJsonLd(): Record<string, unknown>[] {
+function organisationJsonLd(): Record<string, unknown> {
   const base = baseUrl();
-  return [
-    {
-      "@context": "https://schema.org",
-      "@type": "Organization",
-      name: "Loopa",
-      url: base,
-      areaServed: { "@type": "City", name: "Stockholm" },
+  return {
+    "@context": "https://schema.org",
+    "@type": "Organization",
+    name: SAJTNAMN,
+    url: `${base}/`,
+    logo: `${base}/favicon.svg`,
+    description:
+      "Loopa säljer begagnade möbler åt privatpersoner i Stockholm. Säljaren filmar ett varv runt möbeln; Loopa besiktigar den med AI, sätter priset, skriver annonsen och sköter affären.",
+    areaServed: { "@type": "City", name: "Stockholm" },
+    // Utelämnas när de saknas — se FORETAG. En tom lista är ett trasigt påstående, inte ett svagt.
+    ...(FORETAG.legalName ? { legalName: FORETAG.legalName } : {}),
+    ...(FORETAG.orgNummer ? { identifier: { "@type": "PropertyValue", propertyID: "SE-ORG", value: FORETAG.orgNummer } } : {}),
+    ...(FORETAG.sameAs.length > 0 ? { sameAs: FORETAG.sameAs } : {}),
+  };
+}
+
+/**
+ * Sajten som sajt, med sökfältet.
+ *
+ * `WebSite` med `SearchAction` är det som kan ge ett sökfält direkt i Googles träff, och Google
+ * läser den BARA på startsidan — vilket är exakt varför den låg fel när den låg på /butik. Namnet är
+ * "Loopa" och adressen är roten, av samma skäl: det är sajtens namn som efterfrågas, inte
+ * avdelningens. Sökmålet pekar fortfarande in i butiken, för det är där det finns något att söka i.
+ */
+function webbplatsJsonLd(): Record<string, unknown> {
+  const base = baseUrl();
+  return {
+    "@context": "https://schema.org",
+    "@type": "WebSite",
+    name: SAJTNAMN,
+    url: `${base}/`,
+    inLanguage: "sv-SE",
+    potentialAction: {
+      "@type": "SearchAction",
+      target: { "@type": "EntryPoint", urlTemplate: `${base}/butik/sok?q={search_term_string}` },
+      "query-input": "required name=search_term_string",
     },
-    {
-      "@context": "https://schema.org",
-      "@type": "WebSite",
-      name: SITE,
-      url: `${base}/butik`,
-      inLanguage: "sv-SE",
-      potentialAction: {
-        "@type": "SearchAction",
-        target: { "@type": "EntryPoint", urlTemplate: `${base}/butik/sok?q={search_term_string}` },
-        "query-input": "required name=search_term_string",
-      },
-    },
-  ];
+  };
 }
 
 /** Värden butiken ska bo på, härledd ur LOOPA_PUBLIC_URL. Null när adressen inte går att tolka. */
@@ -402,25 +460,6 @@ function arPublikVard(host: string): boolean {
 }
 
 /**
- * Har roten flyttat än?
- *
- * `loopa.nu/` visar marknadssajtens företagssida fram till lansering — en Cloudflare-regel som
- * ligger kvar med flit. Kanoniserades roten ändå fick en säljare den här kedjan:
- * app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company. Säljflödet gick inte att nå från någon adress
- * alls, och det var precis vad som hände i drift innan den här raden fanns.
- *
- * Roten är den ENDA sökvägen där de två sajterna gör anspråk på samma adress, och därför den enda
- * som behöver ett datum. Resten flyttade direkt.
- *
- * Vid lansering: sätt LOOPA_ROT_FLYTTAD=1 i server/.env, ta bort omdirigeringsregeln i Cloudflare,
- * starta om. Ordningen spelar roll — regeln körs före Workers, så tas den inte bort når förfrågan
- * aldrig appen.
- */
-function rotFlyttad(): boolean {
-  return process.env.LOOPA_ROT_FLYTTAD?.trim() === "1";
-}
-
-/**
  * Adressen en förfrågan ska omdirigeras till, eller null när den redan står rätt.
  *
  * DUBBELPUBLICERING ÄR DET SOM SKA UNDVIKAS. Ligger samma butikssida på två värdnamn räknar Google
@@ -430,13 +469,24 @@ function rotFlyttad(): boolean {
  * `host` ska vara den värd BESÖKAREN bad om, inte den servern råkar lyssna på. Går förfrågan genom
  * en router framför oss är det routern som vet det, och den skickar det i `x-forwarded-host`. Utan
  * den skulle servern se sitt eget namn, omdirigera dit den redan står, och göra en oändlig slinga.
+ *
+ * ROTEN HAR FLYTTAT (2026-09-11) och är inte längre ett undantag här.
+ *
+ * Den var det ända fram till dess, bakom flaggan LOOPA_ROT_FLYTTAD: `loopa.nu/` visade
+ * marknadssajtens företagssida via en omdirigeringsregel hos Cloudflare, och kanoniserade servern
+ * roten ändå fick säljaren kedjan app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company. Säljflödet gick
+ * då inte att nå från någon adress alls, och det hände i drift.
+ *
+ * Flaggan är borta med flytten i stället för att lämnas kvar satt: en strömbrytare som bara har ett
+ * riktigt läge kvar är en som en dag ställs i det andra av misstag. Ordningen vid utrullning är
+ * däremot fortfarande hela poängen, och den står i deploy/cloudflare/wrangler.toml —
+ * omdirigeringsregeln måste bort FÖRE den här servern rullas, annars är kedjan tillbaka.
  */
 export function flyttadAdress(host: string | null, pathname: string, search: string): string | null {
   const kanonisk = kanoniskVard();
   if (!kanonisk || !host) return null;
   if (!arPublikVard(host)) return null;
   if (host.toLowerCase() === kanonisk.toLowerCase()) return null;
-  if (pathname === "/" && !rotFlyttad()) return null;
   if (ALDRIG.some((p) => pathname === p.replace(/\/$/, "") || pathname.startsWith(p))) return null;
   return `${baseUrl()}${pathname}${search}`;
 }
@@ -450,6 +500,44 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
    * till butiken (se server.ts), och ett sidhuvud för en adress som svarar 301 vore ett löfte till
    * sökmotorn om en sida som inte finns. Butikens egna sidor och efterfrågeväggen har sina kvar.
    */
+
+  /**
+   * STARTSIDAN. Sidan märkessökningen "loopa" landar på.
+   *
+   * Fick länge inget huvud alls: grinden nedan släppte bara igenom /butik, och roten gick ut som det
+   * råa skalet — utan canonical, utan robots-tagg, utan strukturerad data och med en tom #root. Den
+   * sida som ska bära hela varumärket var alltså den enda utan innehåll att indexera, och det märktes
+   * inte eftersom titeln i index.html ser fullt rimlig ut i en flik.
+   *
+   * KROPPEN NÄMNER "Loopa" SOM NAMN, ihop med "begagnade möbler" och "Stockholm". Det är inte
+   * nyckelordsstoppning utan det som skiljer företaget från verbet: ordet loopa betyder något på
+   * svenska, och loopa.se är någon annans. Utan samförekomsten på sidan finns inget som säger vilken
+   * av betydelserna domänen handlar om.
+   *
+   * Länkarna härifrån är dessutom den enda vägen in i butiken som inte kräver JavaScript. Roten är
+   * navet nu, inte /butik.
+   */
+  if (pathname === "/") {
+    return {
+      title: `${SAJTNAMN} – sälj din begagnade möbel i Stockholm`,
+      description:
+        "Loopa säljer din begagnade möbel åt dig i Stockholm. Filma ett varv runt den — vi besiktigar med AI, sätter priset, skriver annonsen och hör av oss när den är såld.",
+      canonical: `${baseUrl()}/`,
+      ogType: "website",
+      jsonLd: grafer(organisationJsonLd(), webbplatsJsonLd()),
+      body:
+        `<h1>Loopa</h1>` +
+        `<p>Loopa säljer begagnade möbler i Stockholm. Du filmar ett varv runt möbeln; vi besiktigar ` +
+        `den med AI, sätter priset, skriver annonsen och hör av oss när den är såld.</p>` +
+        `<p>Varje möbel Loopa säljer är granskad innan den läggs ut: skick, skador och exakta mått ` +
+        `står i annonsen, så köparen vet vad hen får.</p>` +
+        `<ul>` +
+        `<li><a href="/butik">Köp begagnade möbler i butiken</a></li>` +
+        `<li><a href="/efterlyses">Se vad köpare i Stockholm söker just nu</a></li>` +
+        `<li><a href="/company">Om Loopa</a></li>` +
+        `</ul>`,
+    };
+  }
 
   /**
    * Efterlysningsväggen, renderad per kategori.
@@ -502,7 +590,12 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
       description:
         "Begagnade möbler i Stockholm, besiktigade av AI. Du ser varje skada och exakta mått innan du köper. Fast pris och hemleverans i Stockholm.",
       canonical,
-      jsonLd: grafer(...sajtJsonLd()),
+      /**
+       * Organization och WebSite låg HÄR tills roten flyttade hit. Båda hör till startsidan — Google
+       * läser sökfältsmarkeringen bara där, och Organization är ett påstående om domänen. Kvar blir
+       * brödsmulan, som numera har någonstans att peka uppåt: butiken är en avdelning på en sajt.
+       */
+      jsonLd: grafer(breadcrumbJsonLd([{ name: SAJTNAMN, path: "/" }, { name: "Butik", path: "/butik" }])),
       /**
        * Landningssidan är navet, och den ska LÄNKA som ett nav.
        *
@@ -723,6 +816,8 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
         `Besiktigad av Loopa med varje skada utpekad. Hemleverans i Stockholm.`.trim(),
       canonical,
       image: product.imageUrl,
+      // Den enda sidan som FAKTISKT är en produkt. Se ogType i SeoHead för varför det står uttryckligen.
+      ogType: "product",
       /**
        * Strukturerad data bara för det vi själva säljer och kan svara för.
        *
@@ -783,11 +878,11 @@ export function injectSeo(html: string, head: SeoHead): string {
     `<meta name="description" content="${esc(head.description)}" />`,
     `<link rel="canonical" href="${esc(head.canonical)}" />`,
     head.noindex ? `<meta name="robots" content="noindex,follow" />` : `<meta name="robots" content="index,follow" />`,
-    `<meta property="og:type" content="${head.jsonLd ? "product" : "website"}" />`,
+    `<meta property="og:type" content="${head.ogType ?? "website"}" />`,
     `<meta property="og:title" content="${esc(head.title)}" />`,
     `<meta property="og:description" content="${esc(head.description)}" />`,
     `<meta property="og:url" content="${esc(head.canonical)}" />`,
-    `<meta property="og:site_name" content="${SITE}" />`,
+    `<meta property="og:site_name" content="${SAJTNAMN}" />`,
     `<meta property="og:locale" content="sv_SE" />`,
     `<meta name="twitter:card" content="${head.image ? "summary_large_image" : "summary"}" />`,
     head.image ? `<meta property="og:image" content="${esc(head.image.startsWith("http") ? head.image : baseUrl() + head.image)}" />` : "",

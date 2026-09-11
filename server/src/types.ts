@@ -243,6 +243,17 @@ export interface PriceEstimate {
    * kontrollen faktiskt sänkte talet — se stolPris.ts för varför stolar behöver den.
    */
   styckDivisor?: number | null;
+  /**
+   * Hur många stolar talet gäller, när säljaren sagt det. Osatt = priset gäller en möbel.
+   *
+   * Skiljt från `styckDivisor` med flit: divisorn är en RÄTTELSE av datan — annonserna gällde en
+   * bunt och talet skulle gälla en stol. Det här är motsatt riktning och ett annat slags uppgift:
+   * säljaren säljer flera, och priset ska gälla dem alla. Att slå ihop dem hade gjort ett fel i
+   * korpusen omöjligt att skilja från ett val säljaren gjort.
+   */
+  stolAntal?: number | null;
+  /** Priset för EN stol, sparat innan bunten räknades. Utan det går buntens tal inte att läsa. */
+  styckPris?: number | null;
   damageLines: PriceDamageLine[];
   unavailableReason: string | null;
   requestedAt: string;
@@ -679,6 +690,17 @@ export interface ConditionJob {
   /** Annonsen på Tradera, när säljaren valt att publicera den dit. */
   tradera?: TraderaPublication | null;
   /**
+   * När säljaren tog bort annonsen. Satt = möbeln finns inte längre någonstans utåt.
+   *
+   * Jobbet står kvar med sina uppgifter, och det är avsiktligt: adminpanelen ska kunna svara på vad
+   * som hände med en möbel som låg uppe i en vecka och togs ner, och en raderad mapp gör den frågan
+   * obesvarbar. Grinden som gör borttagningen verklig ligger i `listJobs` (jobStore.ts) — inget som
+   * räknar upp lagret ser en borttagen annons.
+   */
+  removedAt?: string | null;
+  /** Vem som tog bort den. Säljaren gör det ur sin profil; adminvägen finns för vår egen städning. */
+  removedBy?: "seller" | "admin" | null;
+  /**
    * Säljarens prisspann och den veckovisa sänkningen genom det. Saknas fältet är priset fast: ett
    * jobb från före stegen ska inte börja sjunka av sig självt.
    */
@@ -710,6 +732,60 @@ export interface ConditionJob {
    * bilder säljaren valt, ofta just för att slitaget inte syns. Se PreliminaryFrame i klienten.
    */
   adDerived?: boolean;
+  /**
+   * Säljarens svar på de två frågor bilderna inte kan besvara: pälsdjur i hemmet, och lukt.
+   *
+   * VARFÖR DE FRÅGAS ALLS. Besiktningen ser bara det som syns. En katt syns inte på en soffa, och
+   * lukt syns aldrig — men båda är precis det en köpare skriver ett meddelande om, och det en
+   * allergiker måste veta innan de köper. En annons som tiger om dem säger inte "nej", den säger
+   * ingenting, och köparen får gissa.
+   *
+   * VARFÖR PÅ JOBBET och inte i annonsunderlaget: annonstexten byggs vid publiceringen (composeAd),
+   * långt efter att generatorn kört. Svaren ställs medan annonsen byggs och behöver därför inte
+   * hinna fram till generatorn — de läses där texten sätts samman.
+   *
+   * Osatt = jobbet är från före frågorna, eller säljaren hoppade över dem. Då står ingenting i
+   * annonsen: ett tomt fält får aldrig bli ett "nej" i text.
+   */
+  sellerDisclosures?: SellerDisclosures | null;
+  /**
+   * Möbeln är en stol, så frågan om ANTAL ska ställas.
+   *
+   * Avgörs vid modellvalet och sparas där (se finalizeWithModel), inte när frågorna ställs. Skälet
+   * är ordningen: frågorna kommer i väntan direkt efter valet, och prismotorns möbeltyp — det
+   * säkraste svaret på om det är en stol — finns först en bit in i den väntan. Kandidatens egen
+   * `productType` finns däremot redan, och den räcker.
+   *
+   * Osatt = frågan ställdes aldrig, antingen för att möbeln inte är en stol eller för att jobbet är
+   * från före frågan fanns. Ingen av dem får läsas som "en stol".
+   */
+  chairLike?: boolean;
+}
+
+/**
+ * De två svaren, som säljaren gav dem.
+ *
+ * `smellNote` finns bara när `smell` är sant, och är säljarens egna ord. Den skrivs ut RÅ i annonsen
+ * (escapad, inte omskriven): "luktar rök" och "luktar svagt av källare" är olika saker för en
+ * köpare, och en modell som sammanfattar dem till "viss lukt" tar bort just det som skiljer.
+ */
+export interface SellerDisclosures {
+  /** Pälsdjur i hemmet där möbeln stått. */
+  pets: boolean;
+  /** Om möbeln luktar något. */
+  smell: boolean;
+  /** Säljarens beskrivning av lukten. Bara när `smell` är sant. */
+  smellNote?: string | null;
+  /**
+   * Hur många stolar som säljs tillsammans. Frågas BARA när möbeln är en stol (`chairLike`), och
+   * är därför osatt för soffor, bord och för jobb från före frågan fanns.
+   *
+   * Till skillnad från de två andra svaren ändrar det här PRISET och inte bara annonstexten: en
+   * säljare med sex stolar säljer sex, och styckpriset är då lika fel som buntpriset var för den
+   * som säljer en. Se prisForAntalStolar i stolPris.ts.
+   */
+  chairCount?: number | null;
+  answeredAt: string;
 }
 
 // ---- debug trace (never sent to the normal seller UI; see GET /api/jobs/:id/debug) ----

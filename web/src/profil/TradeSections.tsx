@@ -29,6 +29,7 @@ const ORDER_LABEL: Record<Order["status"], string> = {
   booking: "Vi bokar frakt",
   scheduled: "Frakt bokad",
   delivered: "Levererad",
+  cancel_requested: "Ångrat — vi återbetalar",
   return_requested: "Retur begärd",
   returned: "Returnerad",
   cancelled: "Avbruten",
@@ -44,6 +45,7 @@ const ORDER_LABEL: Record<Order["status"], string> = {
 const ORDER_TODO: Partial<Record<Order["status"], string>> = {
   pending: "Slutför köpet",
   paid: "Välj tider för leveransen",
+  cancel_requested: "Vi stoppar leveransen",
   return_requested: "Retur pågår",
 };
 

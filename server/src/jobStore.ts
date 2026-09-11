@@ -4,7 +4,12 @@ import { randomUUID } from "node:crypto";
 import type { ConditionJob, DebugTrace, FurnitureIdentity, JobProgress } from "./types.js";
 
 export const DATA_DIR = path.resolve(import.meta.dirname, "..", "data");
-export const JOBS_DIR = path.join(DATA_DIR, "jobs");
+/**
+ * Var jobben ligger. Går att peka om med LOOPA_JOBS_DIR, av samma skäl som BUTIK_DATA_DIR finns:
+ * testerna ska kunna skapa och ta bort jobb utan att röra de skarpa besiktningarna. Förvalet är
+ * oförändrat — en osatt variabel ger exakt samma mapp som förut.
+ */
+export const JOBS_DIR = process.env.LOOPA_JOBS_DIR?.trim() || path.join(DATA_DIR, "jobs");
 
 const jobs = new Map<string, ConditionJob>();
 
@@ -117,7 +122,22 @@ export async function failOrphanedJobs(): Promise<number> {
   return n;
 }
 
+/**
+ * Lagret, nyast först — UTAN de borttagna.
+ *
+ * Grinden ligger här och inte hos läsarna, se `markJobRemoved`. Den som faktiskt vill se en
+ * borttagen annons har två vägar: `listRemovedJobs` för listan, `getJob` för en enskild.
+ */
 export async function listJobs(): Promise<ConditionJob[]> {
+  return (await allJobs()).filter((j) => !j.removedAt);
+}
+
+/** De borttagna annonserna. Bara adminpanelen frågar efter dem — se `markJobRemoved`. */
+export async function listRemovedJobs(): Promise<ConditionJob[]> {
+  return (await allJobs()).filter((j) => !!j.removedAt);
+}
+
+async function allJobs(): Promise<ConditionJob[]> {
   const result: ConditionJob[] = [];
   let entries: string[] = [];
   try {
@@ -243,6 +263,31 @@ export async function failJob(id: string, error: string): Promise<void> {
 export async function persist(job: ConditionJob): Promise<void> {
   await mkdir(jobDir(job.id), { recursive: true });
   await writeFile(path.join(jobDir(job.id), "job.json"), JSON.stringify(job, null, 2), "utf-8");
+}
+
+/**
+ * Tar bort annonsen — men behåller jobbet som en borttagen post.
+ *
+ * TVÅ SAKER SKA HÄNDA SAMTIDIGT och de drar i olika riktningar: annonsen ska försvinna ur allt som
+ * visar möbler — profilen, butiken, det publika kortet, prisstegen — och samtidigt ska adminpanelen
+ * kunna svara på vad som hände med den. En raderad mapp klarar det första och gör det andra
+ * omöjligt: en möbel som togs ner efter en vecka uppe och en möbel som aldrig funnits ser exakt
+ * likadana ut när båda är borta från disk.
+ *
+ * Märkningen sitter därför PÅ jobbet, och grinden ligger i `listJobs` — det enda stället som räknar
+ * upp lagret. Alla åtta läsare går genom den (butikens index, det publika kortet, profilen,
+ * datasetet, prisstegen, e-postbevakaren), så borttagningen gäller överallt utan att åtta ställen
+ * behöver komma ihåg att filtrera. Panelen frågar i stället uttryckligen efter dem, med
+ * `listRemovedJobs`.
+ */
+export async function markJobRemoved(id: string, by: "seller" | "admin"): Promise<ConditionJob | undefined> {
+  const job = await getJob(id);
+  if (!job) return undefined;
+  if (job.removedAt) return job;
+  job.removedAt = new Date().toISOString();
+  job.removedBy = by;
+  await persist(job);
+  return job;
 }
 
 /** Debug trace is written separately from job.json and never sent to the normal seller-facing UI. */

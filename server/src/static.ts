@@ -66,14 +66,16 @@ export async function serveStatic(pathname: string, res: ServerResponse, search 
   /**
    * Sidor som ska gå att hitta får sitt huvud ifyllt innan de skickas.
    *
-   * TVÅ ADRESSRYMDER: butiken (möbler till salu) och efterlysningsväggen (möbler folk söker). Den
-   * andra kom till med köpsidan och är minst lika viktig för sökmotorer — "sökes string hylla
+   * TRE INGÅNGAR: roten, butiken (möbler till salu) och efterlysningsväggen (möbler folk söker). Den
+   * mellersta kom till med köpsidan och är minst lika viktig för sökmotorer — "sökes string hylla
    * stockholm" är en fråga folk ställer, och varje kategori är en sida som svarar.
    *
-   * Säljflödets skärmar ska ingen hitta via en sökmotor, och en riktig fil serveras som den är.
+   * ROTEN ÄR EXAKT "/" och inte hela säljflödet. Sedan roten flyttade hit är den sidan en sökning på
+   * "loopa" landar på, och den måste bära sitt huvud — men /salj/steg-2 ska fortfarande ingen hitta
+   * via en sökmotor, och en riktig fil serveras som den är.
    * Faller uppslaget skickas skalet orört — en trasig titel får aldrig bli en trasig sida.
    */
-  if (!direct && (pathname.startsWith("/butik") || pathname.startsWith("/efterlyses"))) {
+  if (!direct && (pathname === "/" || pathname.startsWith("/butik") || pathname.startsWith("/efterlyses"))) {
     try {
       const head = await seoFor(pathname, search);
       if (head) {

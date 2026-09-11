@@ -130,8 +130,6 @@ body:has(.butik-skiss) .consent-inner {
   transition: border-color var(--t-fast) ease, color var(--t-fast) ease;
 }
 .butik-skiss .butik-bar-sell:hover { border-color: var(--ink); color: var(--ink); background: transparent; }
-.butik-skiss .butik-bar-sell-short { display: none; }
-.butik-skiss .butik-bar-sell-long { display: inline; }
 /*
  * Profilen är en grå cirkel i skissen — i båda lägena. Inloggad visar initialen
  * som vanligt; utloggad är samma cirkel, fortfarande en knapp med etikett för

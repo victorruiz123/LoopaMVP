@@ -3,7 +3,8 @@ import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../c
 import { fargForAnnons, fargerI } from "./farg.js";
 import { mergeSpecs } from "../specHarvest.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
-import { estimatePrice, pricingSignature, takeSpeculativePrice } from "../pricing.js";
+import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
+import { kanVaraStol } from "../stolPris.js";
 import type { CapturedImage, ListingAttribute, ModelCandidate, ProductImage } from "../types.js";
 
 /** Hur länge prissättningen väntar på att skickbedömningen ska bli klar. */
@@ -581,6 +582,15 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   job.identity = { brand, model };
   job.selected = resolution.kind === "seller_selected" ? resolution.selected : null;
   job.identityStatus = "resolved";
+  /**
+   * Är det en stol? Avgörs HÄR, för det är här svaret först finns och redan behövs.
+   *
+   * Frågan om ANTAL stolar ställs i väntan som börjar i nästa andetag (se DisclosuresGate i
+   * klienten), alltså långt innan prismotorn hunnit säga vilken möbeltyp den filtrerade på. Den
+   * valda kandidatens `productType` finns däremot nu, och för ett handskrivet modellnamn får
+   * strängen tala — samma två källor som prisvägen läser, i den ordning de blir tillgängliga.
+   */
+  job.chairLike = kanVaraStol({ brand, model }, null, job.selected?.productType ?? null);
   // Bar kandidaten säljaren valde redan sin produktbild är omslaget klart här, utan en enda hämtning
   // till — det är samma bild de nyss pekade på. Annars hämtas ett omslag längre ned.
   job.productImage = job.selected?.imageUrl
@@ -800,6 +810,11 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
         ready.result.damages,
         ready.result.grade?.canonicalCondition ?? null,
         null,
+        undefined,
+        // Samma möbeltyp som `chairLike` ovan avgjordes på. Utan den kunde prisvägen svara nej på
+        // stolsfrågan efter att den här funktionen redan svarat ja — och då frågas säljaren om
+        // antalet stolar utan att styckpriset någonsin räknats fram.
+        job.selected?.productType ?? null,
       ));
     const target = getJobSync(jobId) ?? (await getJob(jobId));
     if (target?.result) {
@@ -807,6 +822,9 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
       target.result.identity = { brand, model };
       await persist(target);
     }
+    // Säljaren kan redan ha svarat hur många stolar det är — svaret ges i väntan medan det här
+    // löper. Gäller det priset räknas bunten in nu; annars gör svaret det när det kommer in.
+    await synkaStolpris(jobId);
     console.info(`[identify] ${jobId.slice(0, 8)} price=${price?.status ?? "none"} spekulerat=${speculated ? "ja" : "nej"} ms=${Date.now() - startedAt}`);
     return price;
   })();

@@ -6,7 +6,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { parseDimensions } from "../web/src/lib/furnitureModel.js";
+import { buildModel, parseDimensions } from "../web/src/lib/furnitureModel.js";
 import type { ListingAttribute } from "../web/src/types.js";
 
 const attrs = (...pairs: [string, string][]): ListingAttribute[] =>
@@ -84,4 +84,42 @@ test("en stol rörs inte — längden där är kartongen", () => {
 
 test("utan ett enda belagt mått ritas ingen modell", () => {
   assert.equal(parseDimensions(attrs(["Material", "Massiv furu"]), "chair"), null);
+});
+
+// ─── soffans rygg: en bit per sittplats ──────────────────────────────────────
+//
+// Ytorna målas bakifrån och fram, sorterade på sitt mittdjup. En ryggstomme i ETT stycke har sin
+// framsida centrerad på x=0, och när soffan står snett hamnar den mitten närmare betraktaren än de
+// ryggdynor som sitter längst bort i vridningen — så ryggen målades över dem. Soffan hade tre
+// sitsdynor och två ryggdynor, och den tredje fanns i modellen hela tiden.
+//
+// Testet låser fast botemedlet: ryggen byggs i lika många bitar som soffan har platser, så varje
+// bit har ett mittdjup i närheten av dynan framför sig. Det går inte att se i en ögonblicksbild av
+// modellen att sorteringen blir rätt — men utan segmenten är den garanterat fel.
+test("ryggstommen byggs i en bit per sittplats", () => {
+  const trepits = buildModel(
+    "sofa",
+    { width: 206, depth: 88, height: 76, assumed: [] },
+    [],
+    { title: "3-sits soffa" },
+  );
+  // Ryggen ligger bakom mitten; sitsstommen och dynorna ligger framför den.
+  const bak = trepits.boxes.filter((b) => b.material === "body" && b.center.z < -10);
+  assert.equal(bak.length, 3, "tre platser ska ge tre ryggsegment");
+  // Stommen UNDER dynorna har samma fel och samma botemedel: en enda låda över hela bredden fick
+  // sin framsida målad över de två vänstra sitsdynornas framsidor, så de såg ut som plattor utan
+  // tjocklek. Armstöden räknas bort — de är också `body`, men ligger ute vid kanterna.
+  const under = trepits.boxes.filter(
+    (b) => b.material === "body" && b.center.z > 0 && Math.abs(b.center.x) < 206 / 2 - 30,
+  );
+  assert.equal(under.length, 3, "tre platser ska ge tre stomsegment under sitsen");
+  const ryggdynor = trepits.boxes.filter((b) => b.material === "cushion" && b.center.z < 0);
+  assert.equal(ryggdynor.length, 3, "och lika många ryggdynor");
+  // Segmenten överlappar varandra, annars syns skarvarna som hack i ryggens överkant.
+  const bredd = bak.map((b) => b.size.x).reduce((a, b) => a + b, 0);
+  assert.ok(bredd > 206 * 0.8, "segmenten ska tillsammans täcka ryggen med råge");
+
+  // En ensitsig fåtölj byggs av samma funktion och ska inte få några skarvar alls.
+  const ensits = buildModel("chair", { width: 72, depth: 76, height: 88, assumed: [] }, [], { title: "fåtölj" });
+  assert.equal(ensits.boxes.filter((b) => b.material === "body" && b.center.z < -10).length, 1);
 });

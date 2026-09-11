@@ -121,6 +121,7 @@ export type OrderStatus =
   | "booking"
   | "scheduled"
   | "delivered"
+  | "cancel_requested"
   | "return_requested"
   | "returned"
   | "cancelled";
@@ -195,7 +196,14 @@ export function startCheckout(productId: string, postal: string): Promise<{ orde
   return authJson("/api/butik/kassa", { method: "POST", body: JSON.stringify({ produkt: productId, postnummer: postal }) });
 }
 
-export function fetchOrder(id: string): Promise<{ order: Order; product: Product | null }> {
+/**
+ * Ordern, möbeln — och tiderna att välja bland.
+ *
+ * Tiderna kommer HÄRIFRÅN och inte från `/leverans`: regeln är fem arbetsdagar från dagen efter
+ * KÖPET, och köpets datum står på ordern. Listan är tom i alla lägen utom `paid`, alltså när det
+ * faktiskt är köparens tur att välja.
+ */
+export function fetchOrder(id: string): Promise<{ order: Order; product: Product | null; slots: DeliverySlot[] }> {
   return authJson(`/api/butik/order/${encodeURIComponent(id)}`);
 }
 
@@ -217,8 +225,11 @@ export function requestSlots(orderId: string, tider: OrderSlot[]): Promise<{ ord
   });
 }
 
-export function requestReturn(orderId: string): Promise<{ order: Order }> {
-  return authJson(`/api/butik/order/${encodeURIComponent(orderId)}/retur`, { method: "POST" });
+/**
+ * Ångra köpet före leverans. INTE en retur — se `/angra` i butik/routes.ts för skillnaden.
+ */
+export function angraKopet(orderId: string): Promise<{ order: Order }> {
+  return authJson(`/api/butik/order/${encodeURIComponent(orderId)}/angra`, { method: "POST" });
 }
 
 export interface Interpretation {

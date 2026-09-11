@@ -81,6 +81,8 @@ function attGoraFor(order: Order): string | null {
       return "Boka frakt — köparen har lämnat tider.";
     case "scheduled":
       return "Kör ut och markera levererad.";
+    case "cancel_requested":
+      return "Köparen har ångrat sig — stoppa frakten och återbetala. Möbeln står kvar hos oss.";
     case "return_requested":
       return "Retur begärd — boka upphämtning och återbetala.";
     case "cancelled":
@@ -155,7 +157,8 @@ export async function listaOrdrar(): Promise<{ rader: AdminOrderRad[]; summering
     bokade: rader.filter((r) => r.status === "scheduled").length,
     levererade: rader.filter((r) => r.status === "delivered").length,
     omsattning: rader
-      .filter((r) => r.status !== "cancelled" && r.status !== "returned")
+      // Ett ångrat köp är inte omsättning: pengarna går tillbaka, precis som vid en retur.
+      .filter((r) => r.status !== "cancelled" && r.status !== "returned" && r.status !== "cancel_requested")
       .reduce((sum, r) => sum + r.priceSek + r.deliveryFeeSek, 0),
   };
   return { rader, summering };

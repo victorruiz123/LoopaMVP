@@ -1,0 +1,332 @@
+/*
+ * "Letar du möbel?" — raden och vyn bakom den.
+ *
+ * EGEN FIL, EGET PREFIX. Raden står på två ställen med två olika stilmallar runt sig: startsidan
+ * (styles.css) och produktsidan (butik.css). En regel skriven i endera hade gällt på ena sidan och
+ * inte på den andra, och en gemensam klass som `.rad` hade förr eller senare kolliderat med något —
+ * se DECISIONS.md #12 om de två filer som båda ägde `.hero`. Allt här heter `letar-*`.
+ *
+ * FÄRGERNA ÄR SIDANS EGNA. Inga egna hex-värden: `--ink`, `--muted`, `--border` och `--accent` bor i
+ * styles.css och laddas globalt, så raden ärver typografin och paletten från den sida den står på.
+ * Det är hela poängen med att den ska läsas som en fotnot och inte som en andra tjänst.
+ *
+ * INGEN EGEN BAKGRUNDSYTA på raden. Ingen ram, ingen platta, ingen illustration — bara en tunn linje
+ * ovanför och mindre text än allt annat. Varje gång den fått en yta har den slutat vara en fotnot.
+ */
+
+.letar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 10px 16px;
+  padding: 22px 20px;
+  margin: 0 auto;
+  max-width: 720px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+
+.letar-text {
+  margin: 0;
+  font-size: var(--fs-md);
+  line-height: 1.5;
+  color: var(--muted);
+}
+
+.letar-knapp {
+  flex: 0 0 auto;
+  padding: 8px 16px;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.letar-knapp:hover { border-color: var(--accent); color: var(--accent); }
+.letar-knapp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/*
+ * Läget där raden ERSÄTTER köpblocket på en såld möbel.
+ *
+ * Mer luft och ingen linje ovanför: här är den inte en fotnot under något annat utan sidans enda
+ * kvarvarande handling, och en linje hade sett ut som en avgränsare mot ett block som inte finns.
+ * Fortfarande ingen egen bakgrundsyta — den skulle göra en såld möbel till en reklamplats.
+ */
+.letar-istallet {
+  flex-direction: column;
+  gap: 12px;
+  padding: 26px 20px;
+  border-top: none;
+}
+
+/* ==========================================================================
+   Vyn — samma chatt som "Hur fungerar det?"
+   ==========================================================================
+   FORMEN ÄR ARKETS, OCH DET ÄR HELA POÄNGEN. Sajten har två ställen där man skriver till oss, och
+   de såg tills nyligen ut som två produkter: den ena ett mörkt ark med repliker, den andra en ljus
+   dialogruta med ett formulär i. Här är samma ark — mörk yta, andande prick i toppen, loopas
+   repliker som löpande text utan bubbla, det man själv skrivit i en bubbla till höger, chips under
+   och en rundad skrivrad med orange skickaknapp.
+
+   FÄRGERNA ÄR INTE SKRIVNA HÄR. `--chatt-*` sätts på `.hur-ark, .letar-ark` i styles.css, som en
+   gemensam palett. Två uppsättningar hex-värden hade glidit isär vid första justeringen.
+
+   VARFÖR INTE SAMMA KLASSER RAKT AV. Layoutmåtten står dubbelt, med flit: `.hur-*` beskriver ett ark
+   som svarar på frågor, det här ett som ställer dem, och de kommer att behöva skilja sig åt i det
+   lilla (fotnoten under raden finns bara här). Det som INTE får skilja sig är färgen, och den är
+   därför det enda som delas. */
+
+.letar-overlay {
+  position: fixed; inset: 0; z-index: 90;
+  display: flex; align-items: flex-end; justify-content: center;
+  /* Tyngre flor: en ljus sida bakom en mörk chatt behöver dämpas för att chatten ska läsa som
+     förgrund och inte som ett hål i sidan. */
+  background: hsl(var(--scrim) / 0.58);
+  animation: letar-in var(--t) var(--ease-ui);
+}
+
+.letar-ark {
+  display: flex; flex-direction: column;
+  width: 100%; max-width: 640px;
+  /* 63 % av den yta som syns. */
+  height: 63dvh;
+  background: var(--chatt-yta); color: var(--chatt-text);
+  border-radius: 22px 22px 0 0;
+  box-shadow: 0 -20px 60px -24px rgb(0 0 0 / 0.7);
+  animation: letar-upp var(--t-slow) var(--ease-spring);
+}
+
+/* Remsan bakom Safaris adressfält målas om så länge arket står uppe — ett `position: fixed`-element
+   kan inte nå dit. Hela resonemanget står vid `body:has(.hur-overlay)` i styles.css. */
+html:not([data-view="desktop"]) body:has(.letar-overlay) { background: #1e1d1b; }
+
+@keyframes letar-in { from { opacity: 0; } }
+@keyframes letar-upp { from { transform: translateY(26px); } }
+
+.letar-topp {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 16px 16px 14px; border-bottom: 1px solid var(--chatt-linje); flex-shrink: 0;
+}
+.letar-topp h2 {
+  display: flex; align-items: center; gap: 10px;
+  margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.015em;
+  color: var(--chatt-text);
+}
+/* Den orange pricken andas. Arkets enda ofrivilliga rörelse — den säger att det sitter någon i
+   andra änden, inte ett formulär. */
+.letar-prick {
+  width: 8px; height: 8px; flex-shrink: 0; border-radius: 999px; background: var(--chatt-orange);
+  box-shadow: 0 0 10px 0 var(--chatt-orange-fylld);
+  animation: letar-andas 2.8s var(--ease-ui) infinite;
+}
+@keyframes letar-andas {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.72); }
+}
+.letar-stang {
+  display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0; padding: 0;
+  border: none; border-radius: 999px; background: transparent; color: var(--chatt-text-svag);
+  cursor: pointer; transition: background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.letar-stang:hover { background: var(--chatt-upphojd); color: var(--chatt-text); }
+.letar-stang:focus-visible { outline: 2px solid var(--chatt-orange); outline-offset: 2px; }
+
+/* ---- samtalet ----
+   Våra repliker står som löpande text UTAN bubbla; bara det man själv skrivit får en. En bubbla
+   säger "replik i ett samtal", och en fråga man ska svara på är något man läser. */
+.letar-flode {
+  flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain;
+  padding: 20px 18px 8px; display: flex; flex-direction: column; gap: 22px;
+}
+.letar-svar {
+  margin: 0; white-space: pre-wrap;
+  font-size: var(--fs-lg); line-height: 1.65; letter-spacing: -0.011em; color: var(--chatt-text);
+}
+.letar-svar-fel { color: var(--chatt-fel); }
+
+.letar-du {
+  margin: 0; align-self: flex-end; max-width: 76%;
+  padding: 11px 16px; border-radius: 20px; background: var(--chatt-upphojd);
+  font-size: var(--fs-lg); line-height: 1.5; letter-spacing: -0.011em; color: var(--chatt-text);
+  white-space: pre-wrap; overflow-wrap: anywhere;
+}
+/* Ett överhoppande är inte ett svar. Det ska stå kvar i samtalet — annars ser det ut som att frågan
+   aldrig ställdes — men dämpat, och utan att se ut som något man sagt. */
+.letar-du-svag {
+  background: transparent; border: 1px solid var(--chatt-linje);
+  color: var(--chatt-text-svag); font-size: var(--fs-md);
+}
+
+.letar-vantar {
+  margin: 0; display: flex; align-items: center; gap: 9px;
+  font-size: var(--fs-md); color: var(--chatt-text-svag);
+}
+.letar-puls {
+  width: 9px; height: 9px; flex-shrink: 0; border-radius: 999px; background: var(--chatt-orange);
+  box-shadow: 0 0 12px 0 var(--chatt-orange-fylld);
+  animation: letar-puls 1.4s var(--ease-ui) infinite;
+}
+@keyframes letar-puls {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.25; transform: scale(0.7); }
+}
+
+/* ---- chipsen: exemplen, svarsalternativen och överhoppningen ---- */
+.letar-forslag {
+  display: flex; flex-wrap: wrap; gap: 8px; padding: 14px 18px 0; flex-shrink: 0;
+}
+.letar-forslag button {
+  padding: 9px 14px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--chatt-linje); background: transparent; color: var(--chatt-text-svag);
+  font-family: inherit; font-size: var(--fs-md); font-weight: 500; letter-spacing: -0.01em;
+  transition: border-color var(--t) var(--ease-ui), color var(--t) var(--ease-ui),
+    background var(--t) var(--ease-ui);
+}
+/* Orange först vid beröring. En rad chips som redan lyser orange skriker; en som tänds när man är
+   på väg att trycka svarar. */
+.letar-forslag button:hover {
+  border-color: var(--chatt-orange); color: var(--chatt-orange); background: rgb(255 122 77 / 0.07);
+}
+.letar-forslag button:focus-visible { outline: 2px solid var(--chatt-orange); outline-offset: 2px; }
+.letar-forslag button:disabled { opacity: 0.45; cursor: default; }
+/* Överhoppningen står bland svaren men utan ram: den är inte ett alternativ i samma mening som de
+   andra, och en ram till hade gjort den till ett. Den ska ändå synas — se kommentaren i .tsx. */
+.letar-hoppa {
+  border-color: transparent !important; text-decoration: underline;
+}
+.letar-hoppa:hover { background: transparent !important; }
+/* Slutet: bara "Stäng", och den får stå med luft under sig eftersom ingen skrivrad följer. */
+.letar-forslag-slut { padding-bottom: 4px; }
+
+/* ---- skrivraden ----
+   Fältet och knappen ligger i EN rundad ram. Ramen är det man siktar på och det som visar fokus;
+   knappen är en detalj inuti den. */
+.letar-skriv {
+  display: flex; align-items: flex-end; gap: 8px; flex-shrink: 0;
+  margin: 14px 16px 0;
+  padding: 7px 7px 7px 16px; border-radius: 26px;
+  border: 1px solid var(--chatt-linje); background: var(--chatt-upphojd);
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+.letar-skriv:focus-within {
+  border-color: rgb(255 122 77 / 0.55);
+  box-shadow: 0 0 0 3px rgb(228 87 46 / 0.16);
+}
+.letar-skriv textarea,
+.letar-skriv input {
+  flex: 1; min-width: 0; border: none; background: none; resize: none;
+  /* Höjden styrs av innehållet (se onInput). Taket gör att en lång beskrivning rullar i stället för
+     att äta upp samtalet ovanför. */
+  max-height: 132px; padding: 9px 0; margin: 0;
+  /* 16 px på fältet: allt under det gör att iOS zoomar in vid fokus, och sidan står kvar inzoomad. */
+  font-family: inherit; font-size: var(--fs-field); line-height: 1.45; color: var(--chatt-text);
+  letter-spacing: -0.011em;
+}
+.letar-skriv textarea::placeholder,
+.letar-skriv input::placeholder { color: var(--chatt-text-svag); }
+.letar-skriv textarea:focus,
+.letar-skriv input:focus { outline: none; }
+/* Skickaknappen är den enda fyllda orangea ytan i chatten. Den mättade varumärkesfärgen, inte
+   detaljfärgen: här står vitt ovanpå, och då är det botten som ska bära kontrasten. */
+.letar-skriv button {
+  display: grid; place-items: center; width: 36px; height: 36px; flex-shrink: 0;
+  border: none; border-radius: 999px; background: var(--chatt-orange-fylld); color: #fff;
+  cursor: pointer;
+  transition: opacity var(--t) var(--ease-ui), transform var(--t-fast) var(--ease-ui),
+    box-shadow var(--t) var(--ease-ui);
+}
+.letar-skriv button:not(:disabled) { box-shadow: 0 2px 14px -4px var(--chatt-orange-fylld); }
+.letar-skriv button:disabled {
+  background: var(--chatt-linje); color: var(--chatt-text-svag); cursor: default;
+}
+.letar-skriv button:not(:disabled):active { transform: scale(0.94); }
+.letar-skriv button:focus-visible { outline: 2px solid var(--chatt-orange); outline-offset: 2px; }
+
+/* Vad adressen används till. Den enda raden arket har som "Hur fungerar det?" inte har — där ställer
+   man frågor, här lämnar man ifrån sig något, och det ska stå under raden man skriver i och inte i
+   ett villkor någon annanstans. */
+.letar-fot {
+  flex-shrink: 0;
+  margin: 10px 20px calc(16px + env(safe-area-inset-bottom));
+  font-size: var(--fs-sm); line-height: 1.45; color: var(--chatt-text-svag);
+}
+
+/* ---- datorvyn ----
+   Arket blir en ruta mitt på skärmen i stället för ett blad från underkanten: ett ark som glider upp
+   från golvet är telefonens gest, och på en 27-tums skärm hade det blivit en remsa längst ned. */
+[data-view="desktop"] .letar-overlay {
+  align-items: center;
+  padding: clamp(24px, 4vh, 56px);
+  /* Sidan bakom syns genom floret och ska göra det: chatten är ett svar på något man klickade på,
+     inte en egen plats man reser till. Lättare flor än telefonens, plus en oskärpa som skiljer
+     förgrund från bakgrund utan att svärta ned den. */
+  background: hsl(var(--scrim) / 0.42);
+  backdrop-filter: blur(3px);
+}
+[data-view="desktop"] .letar-ark {
+  max-width: 680px; border-radius: var(--r-xl);
+  height: auto; min-height: min(58vh, 520px); max-height: min(80vh, 760px);
+  /* Skuggan faller NEDÅT här. Telefonens ligger uppåt för att arket kommer från underkanten; en ruta
+     mitt på skärmen som skuggar uppåt ser upp-och-nedvänd ut. */
+  box-shadow: 0 32px 80px -28px rgb(20 17 13 / 0.55), 0 4px 12px -6px rgb(20 17 13 / 0.3);
+  animation: letar-fram var(--t-slow) var(--ease-spring);
+}
+@keyframes letar-fram {
+  from { transform: scale(0.97); opacity: 0; }
+}
+[data-view="desktop"] .letar-topp { padding: 18px 26px 16px; }
+[data-view="desktop"] .letar-flode { padding: 26px 26px 10px; gap: 24px; }
+[data-view="desktop"] .letar-forslag { padding: 16px 26px 0; }
+[data-view="desktop"] .letar-skriv { margin: 16px 24px 0; }
+[data-view="desktop"] .letar-fot { margin: 10px 26px 20px; }
+/* Läsraden hålls kort. En replik som löper 680 px brett tappar man raden i; 58 tecken är samma mått
+   som brödtexten på sidan bakom. */
+[data-view="desktop"] .letar-svar { max-width: 58ch; }
+[data-view="desktop"] .letar-du { max-width: 68%; }
+[data-view="desktop"] .letar-skriv button:not(:disabled):hover { transform: translateY(-1px); }
+
+/* Rörelserna är få och små. Den som bett om mindre rörelse får dem stillastående; ingenting av det
+   som SÄGS sitter i en animation. */
+@media (prefers-reduced-motion: reduce) {
+  .letar-overlay, .letar-ark, .letar-puls, .letar-prick { animation: none; }
+}
+
+@media (max-width: 560px) {
+  .letar { flex-direction: column; gap: 12px; }
+}
+
+/* --------------------------------------------------------------------------
+   Knappen i topplisten (bara datorvyn, se LetarDuMobel.tsx `variant="bar"`)
+   -------------------------------------------------------------------------- */
+
+/*
+ * SAMMA FOTNOT, ANNAN PLATS. Avskalad pill utan fyllning, orange först vid hover — precis som
+ * `.letar-knapp` i raden. En fylld platta bredvid profilbrickan hade tävlat med den om blicken och
+ * gjort letandet till sidans andra tjänst i stället för dess andra väg.
+ *
+ * Lägre än brickans 48 px med flit: den ska stå BREDVID kontot, inte lika tungt som det.
+ */
+.letar-bar-knapp {
+  flex: 0 0 auto;
+  height: 40px;
+  padding: 0 18px;
+  font: inherit;
+  font-size: var(--fs-md);
+  font-weight: 600;
+  white-space: nowrap;
+  color: var(--ink);
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+}
+
+.letar-bar-knapp:hover { border-color: var(--accent); color: var(--accent); }
+.letar-bar-knapp:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

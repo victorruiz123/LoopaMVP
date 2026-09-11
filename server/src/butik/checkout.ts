@@ -21,7 +21,6 @@ import { notifyDelivered, notifyDeliveryBooked, notifyPurchase, notifySlotsReque
 import {
   createOrder,
   getOrder,
-  orderByStripeSession,
   recordOrderEvent,
   updateOrder,
   type Order,
@@ -55,8 +54,39 @@ function stripe(): Stripe {
   return client;
 }
 
-function publicUrl(): string {
-  return (process.env.LOOPA_PUBLIC_URL || "http://localhost:8799").replace(/\/+$/, "");
+/**
+ * Adressen köparen skickas TILLBAKA till efter Stripe.
+ *
+ * `LOOPA_PUBLIC_URL` är svaret i drift, och det enda svar som duger där: adressen står i brev och i
+ * annonstext, och den ska vara densamma oavsett vem som råkade anropa oss.
+ *
+ * UTVECKLING ÄR UNDANTAGET, och det var här kvittot gick förlorat. UI:t kommer från vite på en egen
+ * port medan API:t lyssnar på 8799 — så en retur till serverns egen adress landade på ett annat
+ * ursprung än det köparen handlade på. Sidan öppnades, men Supabase-sessionen bor per ursprung, så
+ * ordern kunde inte hämtas och köparen fick en sida utan sitt köp. Därför tas ursprunget från
+ * förfrågan när ingen publik adress är satt.
+ *
+ * BARA LOOPBACK. En Origin-header kommer från webbläsaren och kan stå på vad som helst; att låta
+ * den peka ut vart en betalande köpare skickas vore en öppen vidarebefordran med ett kvitto på.
+ * Loopback kan bara en klient på samma maskin skicka, och i drift är variabeln satt ändå.
+ */
+function publicUrl(origin?: string | null): string {
+  const satt = process.env.LOOPA_PUBLIC_URL?.trim();
+  if (satt) return satt.replace(/\/+$/, "");
+  return loopbackOrigin(origin) ?? "http://localhost:8799";
+}
+
+/** Origin-huvudet när det pekar på den här maskinen, annars null. */
+function loopbackOrigin(origin: string | null | undefined): string | null {
+  if (!origin) return null;
+  try {
+    const u = new URL(origin);
+    const namn = u.hostname.replace(/^\[|\]$/g, "").toLowerCase();
+    const lokal = namn === "localhost" || namn.endsWith(".localhost") || namn === "::1" || namn.startsWith("127.");
+    return lokal ? `${u.protocol}//${u.host}` : null;
+  } catch {
+    return null;
+  }
 }
 
 export class CheckoutError extends Error {
@@ -81,6 +111,8 @@ export async function startCheckout(input: {
   postalCode: string;
   userId: string | null;
   email: string | null;
+  /** Ursprunget köparen står på. Används bara när LOOPA_PUBLIC_URL saknas — se publicUrl(). */
+  origin?: string | null;
 }): Promise<{ order: Order; checkoutUrl: string }> {
   if (!checkoutConfigured()) throw new CheckoutError("Kassan är inte konfigurerad.", 503);
 
@@ -149,8 +181,8 @@ export async function startCheckout(input: {
       // från allt klienten skickar.
       client_reference_id: order.id,
       metadata: { orderId: order.id, productId: product.id, loopaId: product.id },
-      success_url: `${publicUrl()}/butik/order/${order.id}?betald=1`,
-      cancel_url: `${publicUrl()}/butik/objekt/${encodeURIComponent(product.id)}?avbruten=1`,
+      success_url: `${publicUrl(input.origin)}/butik/order/${order.id}?betald=1`,
+      cancel_url: `${publicUrl(input.origin)}/butik/objekt/${encodeURIComponent(product.id)}?avbruten=1`,
       // Stripes egen tidsgräns läggs strax innanför vår reservation, så fönstret aldrig står öppet
       // längre än möbeln faktiskt är hållen. Minsta tillåtna hos Stripe är 30 minuter.
       expires_at: Math.floor(Date.now() / 1000) + 30 * 60,
@@ -193,7 +225,33 @@ export function parseWebhook(rawBody: Buffer, signature: string): Stripe.Event {
  * kan lägga ett bud som vi inte kan infria. Att den kan misslyckas hanteras — köpet står kvar och
  * felet loggas — men den försöker omedelbart.
  */
-export async function fulfilPaidOrder(orderId: string): Promise<Order | null> {
+export function fulfilPaidOrder(orderId: string): Promise<Order | null> {
+  /**
+   * EN ORDER FULLFÖLJS AV EN ANROPARE I TAGET. Kollen på `pending` längre ner är idempotens mot
+   * anrop som kommer EFTER varandra — Stripe skickar om sin webhook vid minsta osäkerhet — men den
+   * skyddar inte mot två som kommer SAMTIDIGT. Båda läser då `pending` innan någon hunnit skriva,
+   * båda går vidare, och bara en kan vinna `claimForSale`. Förloraren drar slutsatsen att möbeln
+   * sålts i en annan kanal och skriver larmet om att pengar måste betalas tillbaka — för ett köp
+   * som i själva verket just gick igenom.
+   *
+   * Det hände på riktigt: ordersidan och "mina köp" stämde av samma order i samma ögonblick, och
+   * köparen fick "Återbetalning krävs" i sin historik 126 ms innan "Betalningen är genomförd".
+   * Vilken av raderna som blev den sista var en kapplöpning.
+   *
+   * Den andra anroparen får därför VÄNTA IN den första och dela dess svar. En Map i processen
+   * räcker: ordrar fullföljs bara här, och servern är en process.
+   */
+  const pagaende = FULLFOLJS.get(orderId);
+  if (pagaende) return pagaende;
+  const arbete = fullfoljOrder(orderId).finally(() => FULLFOLJS.delete(orderId));
+  FULLFOLJS.set(orderId, arbete);
+  return arbete;
+}
+
+/** Fullföljanden som pågår just nu, en per order. Se `fulfilPaidOrder`. */
+const FULLFOLJS = new Map<string, Promise<Order | null>>();
+
+async function fullfoljOrder(orderId: string): Promise<Order | null> {
   const order = await getOrder(orderId);
   if (!order) return null;
   // Idempotent: Stripe skickar om webhooken vid minsta osäkerhet, och ett andra anrop får inte
@@ -241,6 +299,58 @@ export async function fulfilPaidOrder(orderId: string): Promise<Order | null> {
    */
   if (updated) void notifyPurchase(updated, sold, await titleFor(updated.productId));
   return updated;
+}
+
+/**
+ * Avstämningen: fråga Stripe vad som faktiskt hände med en order som står kvar i `pending`.
+ *
+ * WEBHOOKEN ÄR FORTFARANDE SANNINGEN — det här är samma sanning, hämtad i stället för mottagen.
+ * Svaret kommer från Stripe över TLS på vår egen hemliga nyckel, vilket är exakt lika starkt bevis
+ * som en signerad webhook. Det klienten påstår väger noll här: `?betald=1` i adressfältet startar
+ * bara frågan, det besvarar den inte.
+ *
+ * VARFÖR DEN BEHÖVS. En webhook som inte kommer fram lämnar ett betalt köp i `pending` för alltid.
+ * Köparen ser "Vi behandlar din betalning" i timmar, möbeln står kvar som reserverad, och ingen på
+ * vår sida får veta något — själva larmet gick ju genom den kanal som brast. I utveckling är det
+ * normalläget (utan `stripe listen` finns ingen väg in till en localhost-server), och i drift är
+ * det en fråga om tid: nätet delar sig, servern rullas mitt i ett köp, en hemlighet roteras fel.
+ *
+ * Kostar ett API-anrop per hämtning av en order i `pending`. Ordersidan pollar en kort stund efter
+ * återkomsten från Stripe och slutar sedan; det är en handfull anrop per köp.
+ */
+export async function reconcileOrder(orderId: string): Promise<Order | null> {
+  const order = await getOrder(orderId);
+  if (!order) return null;
+  // Bara det obesvarade läget frågas om. Allt annat är redan avgjort, av webhooken eller av en tidigare avstämning.
+  if (order.status !== "pending") return order;
+  if (!order.stripeSessionId || !checkoutConfigured()) return order;
+
+  let session: Stripe.Checkout.Session;
+  try {
+    session = await stripe().checkout.sessions.retrieve(order.stripeSessionId);
+  } catch (err) {
+    // Stripe svarade inte. Ordern står kvar som den var och köparen får läsa att betalningen
+    // behandlas — vilket är sant. Att gissa här vore att gissa om pengar.
+    console.warn(`[butik] avstämning av ${order.reference} misslyckades: ${err instanceof Error ? err.message : err}`);
+    return order;
+  }
+
+  if (session.payment_status === "paid") {
+    console.info(`[butik] ${order.reference} var betald hos Stripe men obehandlad här — webhooken uteblev. Fullföljer.`);
+    return await fulfilPaidOrder(order.id);
+  }
+  /**
+   * Utgången session: betalfönstret stängdes utan betalning. Möbeln tillbaka i butiken.
+   *
+   * Samma sak som webhookens `checkout.session.expired` gör, och skälet att göra den här också är
+   * detsamma som ovan: uteblev den ena uteblev troligen den andra, och då står möbeln reserverad
+   * för ett köp som aldrig blir av tills städningen hinner ikapp.
+   */
+  if (session.status === "expired") {
+    await abandonCheckout(order.id);
+    return await getOrder(order.id);
+  }
+  return order;
 }
 
 /**
@@ -311,7 +421,33 @@ export async function requestSlots(orderId: string, slots: OrderSlot[]): Promise
     },
     { requestedSlots: rensade },
   );
-  if (uppdaterad) void notifySlotsRequested(uppdaterad, await titleFor(uppdaterad.productId));
+  /**
+   * Arbetsordern går ut — och om den INTE gör det står det på ordern.
+   *
+   * "BOKA FRAKT" är enda signalen till människan som ska ringa budfirman. Föll brevet — fel
+   * EMAIL_PROVIDER, en avvisad app-lösenordsinloggning, ingen adminadress satt — hände det tidigare
+   * bara i en serverlogg, och köparen stod och väntade på en leverans ingen påbörjat. Nu skrivs en
+   * intern rad på ordern i stället, där panelen redan visar historiken bredvid själva ordern.
+   *
+   * Fortfarande utan `await` på köparens väg: ett SMTP-fel får inte göra tidsvalet till ett felsvar
+   * när tiderna redan är sparade.
+   */
+  if (uppdaterad) {
+    const titel = await titleFor(uppdaterad.productId);
+    void notifySlotsRequested(uppdaterad, titel)
+      .then(async (framme) => {
+        if (framme) return;
+        await recordOrderEvent(uppdaterad.id, {
+          status: null,
+          note: "Arbetsordern kunde inte mejlas ut. Boka frakten för hand — tiderna står i den här ordern.",
+          actor: "system",
+          publik: false,
+        });
+      })
+      .catch(() => {
+        // Anteckningen är en hjälp, inte ett krav. Faller även den finns loggen kvar.
+      });
+  }
   return uppdaterad;
 }
 

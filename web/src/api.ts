@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, AdminEfterlysning, EfterlysningKandidat } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -161,6 +161,25 @@ export async function findMoreModels(jobId: string): Promise<void> {
   await json(res);
 }
 
+/**
+ * Säljarens svar om pälsdjur, lukt — och för stolar hur många som säljs.
+ *
+ * Ställs medan annonsen byggs och sparas på jobbet, inte i webbläsaren: det är annonstexten som ska
+ * bära dem, och den sätts samman på servern vid publiceringen — långt efter att den här fliken är
+ * stängd.
+ */
+export async function saveDisclosures(
+  jobId: string,
+  svar: { pets: boolean; smell: boolean; smellNote?: string | null; chairCount?: number | null },
+): Promise<void> {
+  const res = await authFetch(`/api/jobs/${jobId}/disclosures`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(svar),
+  });
+  await json(res);
+}
+
 /** Kör om pipelinen på de bildrutor jobbet redan har — ingen ny filmning, ingen ny uppladdning. */
 export async function retryJob(jobId: string): Promise<{ jobId: string; imageCount: number }> {
   const res = await authFetch(`/api/jobs/${jobId}/retry`, { method: "POST" });
@@ -270,6 +289,19 @@ export async function getJob(id: string): Promise<ConditionJob> {
   return json(res);
 }
 
+/**
+ * Tar bort annonsen — möbeln, bildrutorna och kortet.
+ *
+ * Servern avgör om det får ske: en möbel som ligger ute till salu eller som någon köpt går inte att
+ * ta bort, och beskedet om varför kommer därifrån (se handleDeleteJob i server/src/server.ts).
+ * Klienten ska inte gissa den regeln i en inaktiverad knapp — då hade två ställen behövt hålla
+ * samma lista aktuell.
+ */
+export async function deleteJob(id: string): Promise<void> {
+  const res = await authFetch(`/api/jobs/${id}`, { method: "DELETE" });
+  await json(res);
+}
+
 export async function listJobs(): Promise<JobSummary[]> {
   const res = await authFetch("/api/jobs");
   return json(res);
@@ -350,6 +382,31 @@ export async function andraOrder(id: string, atgard: OrderAtgard): Promise<Admin
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(atgard),
+    }),
+  );
+}
+
+/** Efterlysningarna, nyast först. Utkasten från direktsvepet är redan bortsållade på servern. */
+export async function listaEfterlysningar(): Promise<{ poster: AdminEfterlysning[] }> {
+  return json(await authFetch("/api/admin/efterlysningar"));
+}
+
+/** Vad vi har som ligger i närheten. Ett förslag att titta på, inte en matchning. */
+export async function efterlysningKandidater(id: string): Promise<{ poster: EfterlysningKandidat[] }> {
+  return json(await authFetch(`/api/admin/efterlysningar/${encodeURIComponent(id)}/kandidater`));
+}
+
+/** Skickar tipset. POST och inte PATCH: det som händer är att ett brev lämnar huset. */
+export async function skickaEfterlysningTips(
+  id: string,
+  produkt: string,
+  halsning?: string,
+): Promise<{ skickat: boolean; till: string }> {
+  return json(
+    await authFetch(`/api/admin/efterlysningar/${encodeURIComponent(id)}/tips`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ produkt, halsning }),
     }),
   );
 }
@@ -474,4 +531,36 @@ export async function addDamage(
     body: JSON.stringify(damage),
   });
   return json(res);
+}
+
+/**
+ * Datasetet: en rad per möbel med allt vi vet om den, och med AI:ns ord skilda från människans.
+ *
+ * Egen väg och inte en utökning av `listAnnonser`: de två svarar på olika frågor, och den här bär
+ * varje fynd med sitt före och efter. Se server/src/data/dataset.ts.
+ */
+export async function listData(): Promise<DataSvar> {
+  return json(await authFetch("/api/admin/data"));
+}
+
+export async function getDataObjekt(id: string): Promise<DataObjekt> {
+  return json(await authFetch(`/api/admin/data/${encodeURIComponent(id)}`));
+}
+
+/**
+ * Frågar chatten om datan. `id` fokuserar svaret på en enskild möbel; utan den svarar den på
+ * helheten.
+ */
+export async function fragaData(
+  fraga: string,
+  id: string | null,
+  historik: Array<{ role: "user" | "assistant"; content: string }>,
+): Promise<{ answer: string; belagt: boolean }> {
+  return json(
+    await authFetch("/api/admin/data/fraga", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fraga, id, historik }),
+    }),
+  );
 }

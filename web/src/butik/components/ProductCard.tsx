@@ -1,7 +1,7 @@
 import { useState } from "react";
 import type { ConditionGrade, Product } from "../types";
 import { butikHref } from "../router";
-import { brandInk, brandLook, brandTypeStyle } from "../../lib/brandLook";
+import { brandInk, brandLook, brandNameStyle } from "../../lib/brandLook";
 
 /**
  * Ett kort i rutnätet — och den enda plats där de två källorna möts som jämlikar.
@@ -185,7 +185,7 @@ export default function ProductCard({ product }: { product: Product }) {
         {product.brand && (
           <span
             className="butik-card-brand"
-            style={{ ...brandTypeStyle(brandLook(product.brand).type), color: brandInk(product.brand) }}
+            style={{ ...brandNameStyle(product.brand), color: brandInk(product.brand) }}
           >
             {product.brand}
           </span>

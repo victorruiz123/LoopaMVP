@@ -19,6 +19,29 @@ process.on("exit", () => rmSync(process.env.BUTIK_DATA_DIR!, { recursive: true, 
 
 const { createOrder, getOrder, updateOrder, publikHistorik, recordOrderEvent } = await import("../server/src/butik/orders.js");
 const { requestSlots, confirmDelivery, markOrderDelivered, CheckoutError } = await import("../server/src/butik/checkout.js");
+const { gårAttAngra } = await import("../server/src/butik/routes.js");
+
+/**
+ * ÅNGERGRÄNSEN: till och med dagen innan leveransen.
+ *
+ * Den finns för att en bokad budbil inte går att avboka på morgonen samma dag, och för att "ångra"
+ * här betyder stoppa en leverans — inte hämta tillbaka en möbel som redan burits in. Regeln är
+ * skriven i två lager, ett i knappen och ett i servern, och det är serverns som gäller.
+ */
+test("köpet går att ångra fram till dagen innan leveransen", () => {
+  const nu = new Date("2026-09-15T09:00:00");
+  assert.equal(gårAttAngra("2026-09-17", nu), true, "två dagar kvar");
+  assert.equal(gårAttAngra("2026-09-16", nu), true, "dagen innan — sista chansen");
+  assert.equal(gårAttAngra("2026-09-15", nu), false, "leveransdagen är för sent");
+  assert.equal(gårAttAngra("2026-09-14", nu), false, "redan levererad");
+});
+
+test("gränsen går på DYGN, inte på klockslag", () => {
+  // 23:58 dagen innan är fortfarande dagen innan. En jämförelse på tidsstämplar hade gjort
+  // skillnad på morgon och kväll, och den skillnaden lovar vi inte.
+  assert.equal(gårAttAngra("2026-09-16", new Date("2026-09-15T23:58:00")), true);
+  assert.equal(gårAttAngra("2026-09-16", new Date("2026-09-16T00:02:00")), false);
+});
 
 async function betaldOrder() {
   const order = await createOrder({

@@ -1,15 +1,17 @@
 /**
  * Annonsen, oberoende av var den publiceras.
  *
- * Texten, priset och bildordningen bodde tidigare inne i Tradera-publiceringen, för att Tradera var
- * enda vägen ut. Nu finns två: knappen som lägger upp annonsen på Loopas Tradera-konto, och Blocket,
- * där säljaren för över den för hand. Båda ska säga SAMMA sak om möbeln — samma skador, samma mått,
- * samma skickord — och det håller bara om de bygger på en text och inte på två som liknar varandra
- * i dag.
+ * Texten, priset och bildordningen bodde tidigare inne i Tradera-publiceringen. De ligger här i
+ * stället för att annonsen är en sak och kanalen en annan: vad som står om möbeln — samma skador,
+ * samma mått, samma skickord — ska avgöras på ETT ställe, oavsett var den sedan hamnar.
  *
- * Därför byggs annonsen här som BLOCK, inte som färdig HTML: Tradera renderar HTML, Blockets
- * beskrivningsfält är ren text, och skillnaden mellan dem är ett renderingssteg och ingenting annat.
- * Vad som står, och i vilken ordning, avgörs på ett ställe.
+ * Här fanns en andra väg ut: en färdig text att föra över för hand till Blocket. Den är borttagen,
+ * och med den `renderAdPlain` som renderade blocken till den rena text Blockets beskrivningsfält
+ * tog emot. Kvarvarande kanal är Tradera-publiceringen.
+ *
+ * Annonsen byggs ändå som BLOCK och inte som färdig HTML. Renderingen är ett eget steg
+ * (`renderAdHtml`), så nästa kanal med ett annat textformat kostar en renderare och inte en andra
+ * annonstext som börjar glida isär från den här.
  */
 
 import path from "node:path";
@@ -45,6 +47,15 @@ export interface AdOptions {
    * hålla själv utan att ha lovat det. Hellre inget stycke än ett stycke de måste redigera bort.
    */
   delivery: boolean;
+  /**
+   * Om Loopa ska stå som SÄLJARE och inte bara som avsändare för texten.
+   *
+   * Samma skiljelinje som `delivery`, och av samma skäl: på Tradera ligger annonsen på Loopas konto,
+   * pengarna går till Loopa och det är Loopa som bokar budfirman. Då ska det stå i första raden —
+   * en köpare som tror att de handlar av en privatperson gissar fel om både frakt och ansvar. Där
+   * Loopa bara skrivit texten åt en säljare (Blocket-vägen) vore samma mening osann.
+   */
+  loopaSells: boolean;
 }
 
 // Allvarsgraden står mitt i en mening i annonstexten och är gemen därför; skadetyperna inleder sin
@@ -68,7 +79,7 @@ const DIMENSION_HINT = /(m[åa]tt|bredd|djup|h[öo]jd|l[äa]ngd|diameter|dimensi
  * Läses VID ANROP och inte vid modulladdning: server.ts kallar loadEnvFile i sin modulkropp, och ESM
  * kör alla importerade moduler före den — en konstant här hade aldrig sett server/.env.
  */
-export function publicCardUrl(loopaId: string): string | null {
+function publicCardUrl(loopaId: string): string | null {
   const base = process.env.LOOPA_PUBLIC_URL?.trim().replace(/\/+$/, "");
   return base ? `${base}/c/${loopaId}` : null;
 }
@@ -88,6 +99,23 @@ export function publicCardUrl(loopaId: string): string | null {
  * Sist Loopa-ID:t. Annonsen bakom det är publik, och det är där påståendena ovan går att kontrollera
  * mot bild, källor och en skada i taget.
  */
+/**
+ * Meningar som lovar något om hämtning eller frakt. Se anropet i composeAd för varför de ska bort.
+ *
+ * `skick` fastnar INTE i den här: mönstret kräver "skicka", "skickas" eller "skickar", alltså verbet
+ * — annars hade "Gott begagnat skick" läst som ett fraktlöfte och beskrivningen tömts på det enda
+ * ordet den handlar om.
+ */
+const LEVERANSLOFTE = /(hämt|avhämt|upphämt|frakt|leverans|levereras|leverera|skicka[rs]?(?![a-zà-ÿ])|postas|budbil)/i;
+
+function utanLeveransloften(text: string): string {
+  // Meningsgräns: punkt, utrops- eller frågetecken följt av blanksteg. Avslutningen "Hämtas enligt
+  // överenskommelse." saknar ofta mellanslag efter sig, därför tas även radslut som gräns.
+  const meningar = text.split(/(?<=[.!?])\s+/);
+  const kvar = meningar.filter((m) => !LEVERANSLOFTE.test(m));
+  return kvar.join(" ").trim();
+}
+
 export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   const result = job.result!;
   const card = result.listing!.result!;
@@ -109,7 +137,19 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
     `${result.reviewed ? " i två besiktningar" : ""}, ${found} och `;
   const tail = damages.length > 0 ? " Skadorna står utskrivna längre ner, en och en." : "";
 
-  blocks.push(paragraph([{ text: "Den här annonsen är skapad av Loopa.", strong: true }]));
+  // Avsändaren OCH säljaren i samma rad. Att annonsen är skriven av Loopa säger vem som står bakom
+  // orden; att möbeln säljs av Loopa säger vem köparen gör affär med — och det andra är det som
+  // avgör vad de kan förvänta sig av frakt, betalning och ansvar.
+  blocks.push(
+    paragraph([
+      {
+        text: options.loopaSells
+          ? "Den här möbeln säljs av Loopa, och annonsen är skriven av Loopa."
+          : "Den här annonsen är skapad av Loopa.",
+        strong: true,
+      },
+    ]),
+  );
   blocks.push(
     paragraph(
       grade
@@ -122,7 +162,22 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
     ),
   );
 
-  blocks.push(paragraph([{ text: card.listing.description }]));
+  /**
+   * Möbelbeskrivningen — men utan generatorns egna leveranslöften.
+   *
+   * SAMMA REGEL SOM SKICKET NEDAN: uppgiften har EN röst i annonsen. Beskrivningen skrivs av en
+   * modell som sett bilderna men inte affären, och den avslutar gärna med "Hämtas enligt
+   * överenskommelse" eller "kan skickas mot fraktkostnad" — meningar som var sanna när en
+   * privatperson sålde själv, och som nu står rakt emot leveransstycket längre ner: Loopa kör hem
+   * möbeln, avhämtning erbjuds inte, frakten är redan betald. En annons som säger båda sakerna
+   * lämnar köparen att gissa vilken som gäller, och den gissningen blir ett meddelande att svara på.
+   *
+   * MENINGEN FALLER HELT, även om den bär något om möbeln på köpet. Det som går förlorat står ändå
+   * i måtten, specifikationerna och skadelistan; det som blir kvar annars är ett löfte vi inte kan
+   * hålla. Blir ingenting kvar utelämnas stycket — resten av annonsen beskriver möbeln ändå.
+   */
+  const beskrivning = options.delivery ? utanLeveransloften(card.listing.description) : card.listing.description;
+  if (beskrivning) blocks.push(paragraph([{ text: beskrivning }]));
 
   // Måtten för sig. De avgör om möbeln passar där den ska stå, och ska inte behöva letas fram ur en
   // lista där de ligger mellan träslag och årsmodell.
@@ -139,14 +194,22 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
           {
             text:
               "Måtten är uppskattade utifrån typiska mått för möbeltypen och inte belagda mot någon källa." +
-              " Fråga säljaren om de exakta måtten.",
+              // "Fråga säljaren" är fel tilltal i en annons där Loopa ÄR säljaren — köparen skulle
+              // leta efter en tredje part som inte finns. Samma rad, riktad till rätt motpart.
+              (options.loopaSells ? " Fråga oss om de exakta måtten." : " Fråga säljaren om de exakta måtten."),
           },
         ]),
       );
     }
   } else {
     blocks.push(
-      paragraph([{ text: "Måtten kunde inte beläggas mot någon källa. Fråga säljaren om de behöver bekräftas." }]),
+      paragraph([
+        {
+          text:
+            "Måtten kunde inte beläggas mot någon källa." +
+            (options.loopaSells ? " Fråga oss om du behöver dem bekräftade." : " Fråga säljaren om de behöver bekräftas."),
+        },
+      ]),
     );
   }
   if (rest.length > 0) {
@@ -182,20 +245,78 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
     blocks.push(paragraph([{ text: "AI:n hittade inga synliga skador.", strong: true }]));
   }
 
-  if (options.delivery) {
-    // Leveransen är det köparen annars skriver ett meddelande om, och svaret är inte "hämtas hos
-    // säljaren" längre — Loopa kör hem möbeln. Två saker måste stå: att inget tillkommer i kassan,
-    // och vad som händer efter köpet. Beloppet skrivs ut trots att köparen inte betalar det separat;
-    // en hemleverans som bara sägs "ingå" läses som att den inte är värd något.
-    blocks.push(paragraph([{ text: "Leverans", strong: true }]));
-    blocks.push(paragraph([{ text: "Leverans endast — frakt ingår. Boka tid efter köp.", strong: true }]));
+  /**
+   * Pälsdjur och lukt — de två uppgifterna ingen bild kan bära.
+   *
+   * EGEN RUBRIK, OCH EGEN AVSÄNDARE. Resten av annonsen är besiktningens ord, och det är hela dess
+   * värde: en köpare ska veta att skadorna kommer ur en granskning och inte ur en säljares
+   * självbild. De här två raderna kommer från motsatt håll — säljaren har svarat på en fråga — och
+   * att blanda in dem i AI:ns stycken hade tillskrivit maskinen ett påstående den inte kan göra.
+   * En katt syns inte på en soffa, och lukt syns aldrig.
+   *
+   * BÅDA SVAREN SKRIVS UT, även nejen. Ett utelämnat nej är inte ett nej utan en tystnad, och det är
+   * just tystnaden en allergiker skriver ett meddelande om. Har säljaren aldrig svarat står stycket
+   * inte alls: ett tomt fält får inte bli ett nej i text.
+   */
+  const disclosures = job.sellerDisclosures;
+  if (disclosures) {
+    blocks.push(paragraph([{ text: "Från säljaren", strong: true }]));
+    const smell = disclosures.smell
+      ? disclosures.smellNote
+        ? // Säljarens egna ord, oomskrivna: "luktar rök" och "luktar svagt av källare" är olika
+          // saker för en köpare, och skillnaden är precis det en sammanfattning tar bort.
+          `Möbeln luktar något. Säljaren beskriver lukten: ${disclosures.smellNote}`
+        : "Möbeln luktar något. Säljaren har inte beskrivit lukten närmare."
+      : "Säljaren känner ingen lukt från möbeln.";
+    /**
+     * Antalet stolar står FÖRST i listan, och står bara när säljaren räknat upp mer än en.
+     *
+     * Det är inte en upplysning av samma slag som de andra två — pälsdjur och lukt beskriver möbeln,
+     * det här säger vad köparen får för pengarna. Men det hör hemma just här ändå: priset ovanför
+     * gäller hela bunten (se prisForAntalStolar), och en annons som visar ett buntpris under ett
+     * foto av en stol läser som ett styckpris. Raden är det som gör talet begripligt.
+     */
+    const antal = disclosures.chairCount ?? null;
+    blocks.push({
+      kind: "list",
+      ordered: false,
+      items: [
+        ...(antal && antal > 1 ? [`Säljs som ett set om ${antal} stolar — priset gäller alla.`] : []),
+        disclosures.pets
+          ? "Det finns pälsdjur i hemmet där möbeln har stått."
+          : "Det finns inga pälsdjur i hemmet där möbeln har stått.",
+        smell,
+      ],
+    });
     blocks.push(
       paragraph([
         {
           text:
+            "De två uppgifterna kommer från säljaren och inte från besiktningen — varken pälsdjur " +
+            "eller lukt går att se på bild.",
+        },
+      ]),
+    );
+  }
+
+  if (options.delivery) {
+    // Leveransen är det köparen annars skriver ett meddelande om, och svaret är inte "hämtas hos
+    // säljaren" längre — Loopa kör hem möbeln. Tre saker måste stå: att det BARA är hemleverans, att
+    // ingenting tillkommer i kassan, och vem som gör vad efter köpet. Beloppet skrivs ut trots att
+    // köparen inte betalar det separat; en hemleverans som bara sägs "ingå" läses som att den inte
+    // är värd något.
+    blocks.push(paragraph([{ text: "Leverans", strong: true }]));
+    blocks.push(
+      paragraph([{ text: "Endast hemleverans — frakten ingår i priset.", strong: true }]),
+    );
+    blocks.push(
+      paragraph([
+        {
+          text:
+            "Loopa löser hemleveransen åt dig efter köpet: en budfirma kör möbeln hem till din dörr, och " +
+            "du väljer leveranstid via SMS. " +
             `Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad i priset — ingenting ` +
-            "tillkommer i kassan. Efter köpet bokas leveransen: en budfirma kör möbeln hem till din dörr, " +
-            "och du väljer leveranstid via SMS. Avhämtning erbjuds inte.",
+            "tillkommer i kassan. Avhämtning erbjuds inte.",
         },
       ]),
     );
@@ -240,28 +361,6 @@ export function renderAdHtml(blocks: AdBlock[]): string {
       return `<p>${inner}</p>`;
     })
     .join("\n");
-}
-
-/**
- * Annonsen som ren text — det Blockets beskrivningsfält tar emot.
- *
- * Ingen markdown, inga stjärnor kring rubrikerna: det säljaren klistrar in ska se ut som färdig
- * annonstext direkt, och `**Mått**` i ett fält som inte renderar markdown är en asterisk för mycket.
- * Punktlistan får en bullet och skadelistan sina nummer, för att de ÄR listor även utan HTML.
- *
- * En lista hålls ihop med stycket ovanför med ett enkelt radbrott. Rubriken och dess punkter är en
- * sak, och en tom rad mellan dem hade brutit isär det som hör ihop.
- */
-export function renderAdPlain(blocks: AdBlock[]): string {
-  let out = "";
-  for (const [i, block] of blocks.entries()) {
-    if (i > 0) out += block.kind === "list" && blocks[i - 1].kind === "paragraph" ? "\n" : "\n\n";
-    out +=
-      block.kind === "list"
-        ? block.items.map((item, n) => (block.ordered ? `${n + 1}. ${item}` : `• ${item}`)).join("\n")
-        : block.runs.map((run) => run.text).join("");
-  }
-  return out;
 }
 
 /**

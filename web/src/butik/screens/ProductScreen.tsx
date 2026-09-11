@@ -6,9 +6,10 @@ import { fetchPublicCard } from "../../api";
 import ListingView from "../../components/ListingView";
 import { Link, SellCta, TrustRow, track } from "../components/Bits";
 import { dimensionLabel, timeLeft } from "../components/ProductCard";
-import { brandInk, brandLook, brandTypeStyle } from "../../lib/brandLook";
+import { brandInk, brandLook, brandNameStyle } from "../../lib/brandLook";
 import FitsThrough from "../components/FitsThrough";
 import BuyPanel from "../components/BuyPanel";
+import LetarDuMobel from "../../components/LetarDuMobel";
 import { useViewItem } from "../components/ProductGrid";
 
 /**
@@ -92,7 +93,7 @@ export default function ProductScreen({ id }: { id: string }) {
         {product.brand && (
           <span
             className="butik-card-brand"
-            style={{ ...brandTypeStyle(brandLook(product.brand).type), color: brandInk(product.brand) }}
+            style={{ ...brandNameStyle(product.brand), color: brandInk(product.brand) }}
           >
             {product.brand}
           </span>
@@ -103,7 +104,7 @@ export default function ProductScreen({ id }: { id: string }) {
       {sold && (
         <div className="butik-notice" role="status">
           <span aria-hidden="true">●</span>
-          <span>Den här möbeln är såld. Lägg en bevakning så hör vi av oss när något liknande kommer in.</span>
+          <span>Den här möbeln är såld. Berätta vad du letar efter, så hör vi av oss när något liknande kommer in.</span>
         </div>
       )}
 
@@ -156,6 +157,14 @@ export default function ProductScreen({ id }: { id: string }) {
       </div>
 
       {loopa && <FitsThrough product={product} />}
+
+      {/*
+        Står under köpblocket — utom när raden redan TAGIT köpblockets plats.
+        Det händer bara i ett fall: en såld möbel som är vår egen (se BuyBox). En såld
+        Tradera-annons har ingen sådan ruta, och utan undantaget för `loopa` hade just den sidan —
+        en död länk till någon annans avslutade annons — blivit den enda utan väg vidare.
+      */}
+      {!(sold && loopa) && <LetarDuMobel varifran={`/butik/objekt/${product.id}`} />}
 
       <SellCta categorySlug={product.categorySlug} brand={product.brand} />
     </>
@@ -210,7 +219,13 @@ function BuyBox({ product, sold, reserved }: { product: Product; sold: boolean; 
 
       {!sold && !reserved && <BuyPanel product={product} />}
 
-      {sold && <p className="butik-buybox-note">Möbeln är såld och går inte längre att köpa.</p>}
+      {/*
+        SÅLD: raden ERSÄTTER köpet i stället för att stå under det.
+        "Möbeln är såld och går inte längre att köpa" var sant och en återvändsgränd — sidans enda
+        kvarvarande handling var att backa. Nu är den kvarvarande handlingen att berätta vad man
+        letade efter, vilket är precis vad någon som landat på en såld möbel har på gång.
+      */}
+      {sold && <LetarDuMobel varifran={`/butik/objekt/${product.id}`} istallet />}
     </section>
   );
 }

@@ -9,7 +9,7 @@ try {
 } catch {
   // no .env file yet — GEMINI_API_KEY must be set some other way, checked below.
 }
-import { createJob, failOrphanedJobs, getJob, getJobSync, jobDir, listJobs, ownerIdOf, persist, getDebugTrace, watchJobDeadline } from "./jobStore.js";
+import { createJob, failOrphanedJobs, getJob, getJobSync, jobDir, listJobs, ownerIdOf, persist, markJobRemoved, getDebugTrace, watchJobDeadline } from "./jobStore.js";
 import { createConditionJob, readIdentity, type CreateJobBody } from "./jobCreate.js";
 import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
@@ -17,7 +17,8 @@ import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
 import { adminEmails, listAccounts } from "./admin.js";
 import { identityFromRequest, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
-import { estimatePrice, repriceResult } from "./pricing.js";
+import { estimatePrice, repriceResult, synkaStolpris } from "./pricing.js";
+import { MAX_ANTAL_STOLAR } from "./stolPris.js";
 import { finalizeWithModel, findMoreCandidates, runIdentify } from "./pipeline/identify.js";
 import type { Resolution } from "./listing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
@@ -27,7 +28,6 @@ import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
-import { blocketAdFor } from "./integrations/blocket.js";
 import { getTraderaLage, missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
@@ -76,7 +76,7 @@ function setCors(req: IncomingMessage, res: ServerResponse) {
   if (!origin || !ALLOWED_ORIGINS.includes(origin)) return;
   res.setHeader("Access-Control-Allow-Origin", origin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,DELETE,OPTIONS");
   res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, x-api-key");
 }
 
@@ -105,11 +105,48 @@ async function readJsonBody<T>(req: IncomingMessage, maxBytes: number = MAX_BODY
   return JSON.parse(raw) as T;
 }
 
-async function regradeAndReprice(job: ConditionJob): Promise<void> {
+/**
+ * Räknar om betyg och pris efter en rättelse — och LOGGAR vad omräkningen gjorde.
+ *
+ * Loggningen ligger här och inte hos varje anropsställe, för att det är här betyget faktiskt ändras.
+ * Ett betyg som gick från C till B för att säljaren avvisade en skada är den enda plats där den
+ * rättelsens KONSEKVENS finns; jobbet på disk bär bara det nya betyget, och efteråt går det inte att
+ * se att det någonsin var ett annat. Se data/rattelser.ts för varför det är hela poängen.
+ *
+ * `kalla` säger vem omräkningen kom ur. Den skickas in i stället för att gissas: en säljare som
+ * avvisar en skada och en granskning som underkänner den betyder olika saker för träningsdatan.
+ */
+async function regradeAndReprice(job: ConditionJob, kalla: "saljare" | "granskning" = "saljare"): Promise<void> {
   if (!job.result) return;
+  const foreBetyg = job.result.grade?.grade ?? null;
+  const forePris = job.result.price?.default ?? null;
+
   job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
-  await repriceResult(job.result, await coverImageBase64(job));
+  await repriceResult(job.result, await coverImageBase64(job), job.selected?.productType ?? null);
   await persist(job);
+  // Det nya priset kommer ojusterat ur motorn, alltså för EN möbel. Är det stolar säljaren räknat
+  // upp måste bunten vägas in igen, annars sjunker priset till en sjättedel av en rättelse som
+  // bara gällde en repa.
+  await synkaStolpris(job.id);
+
+  const efterBetyg = job.result.grade?.grade ?? null;
+  const efterPris = job.result.price?.default ?? null;
+  const { notera } = await import("./data/rattelser.js");
+  if (foreBetyg !== efterBetyg) {
+    void notera({ jobId: job.id, omrade: "betyg", falt: "betyg", fyndId: null, aiSa: foreBetyg, manniskanSa: efterBetyg, kalla, notis: "omräknat efter en rättelse" });
+  }
+  if (forePris !== efterPris) {
+    void notera({
+      jobId: job.id,
+      omrade: "pris",
+      falt: "motorns förslag",
+      fyndId: null,
+      aiSa: forePris === null ? null : String(Math.round(forePris)),
+      manniskanSa: efterPris === null ? null : String(Math.round(efterPris)),
+      kalla,
+      notis: "prismotorn räknade om efter en rättelse",
+    });
+  }
 }
 
 async function coverImageBase64(job: ConditionJob): Promise<string | null> {
@@ -212,6 +249,96 @@ async function handleGetJob(id: string, res: ServerResponse) {
 }
 
 /**
+ * Säljaren tar bort sin annons.
+ *
+ * TRE SAKER, I DEN HÄR ORDNINGEN, och ordningen är regeln: möbeln ska aldrig finnas kvar till salu
+ * någonstans efter att den försvunnit hos oss.
+ *
+ *   1. TRADERA. Ligger annonsen ute hos dem tas den ner först — de äger sidan köparen står på, och
+ *      ett bud på en möbel vi redan glömt är det dyraste utfallet av alla. Går det inte avbryts hela
+ *      borttagningen: en annons som ligger uppe på Tradera men saknar kort hos oss visar en köpare
+ *      "hittades inte" på en möbel de är på väg att köpa. Säljaren får då ett besked att försöka
+ *      igen, och panelen kan ta ner den för hand.
+ *   2. BUTIKEN. Är möbeln publicerad i vår egen butik tas den ur rutnätet. Posten står kvar i
+ *      huvudboken som utkast — loggen över en möbels liv är en huvudbok, och rader stryks inte ur en.
+ *   3. JOBBET märks som borttaget. Se `markJobRemoved` i jobStore.ts: annonsen försvinner ur allt
+ *      som visar möbler, och blir kvar som en rad i adminpanelen med läget "borttagen".
+ *
+ * GRINDEN som inte går att förhandla om: en möbel som är reserverad, såld, levererad eller
+ * returnerad har en KÖPARE. Den affären upphör inte för att säljaren ångrar sin annons, och ordern
+ * pekar på möbeln. `live` och `draft` går bort fritt — där finns ingen köpare inblandad än.
+ *
+ * Ägarskapet prövas inte här utan i grinden ovanför (segments[1] === "jobs"), som släpper igenom
+ * allt annat än GET bara för ägaren. Det är samma regel som skrivningarna av skador och mått.
+ */
+async function handleDeleteJob(id: string, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  // Redan borttagen. 200 och inte ett fel: säljaren bad om ett tillstånd, och i det tillståndet är
+  // vi redan — ett dubbeltryck på en långsam uppkoppling ska inte se ut som ett haveri.
+  if (job.removedAt) return sendJson(res, 200, { deleted: true, removedAt: job.removedAt });
+
+  const loopaId = loopaIdFor(job.id);
+
+  /**
+   * Butikens läge, läst en gång.
+   *
+   * Faller uppslagningen fortsätter vi: utan butikslager är jobbet bara en sparad annons, precis
+   * som profilen redan visar det (se handleListJobs). Att vägra ta bort en annons för att
+   * butiksryggen inte svarade vore att låsa in säljaren i vår driftstörning.
+   */
+  let state: string | null = null;
+  let butik: typeof import("./butik/store.js") | null = null;
+  try {
+    butik = await import("./butik/store.js");
+    state = (await butik.store().get(loopaId))?.state ?? null;
+  } catch {
+    state = null;
+  }
+  if (state && state !== "draft" && state !== "live") {
+    return sendJson(res, 409, {
+      error: "Möbeln är köpt av någon. Annonsen kan inte tas bort medan affären pågår.",
+    });
+  }
+
+  // 1. Tradera, om annonsen nått dit. `pending` har aldrig lämnat oss — den ligger i panelens kö och
+  //    har inget itemId att ta ner.
+  const itemId = job.tradera?.itemId ?? null;
+  if (itemId && (job.tradera?.status === "published" || job.tradera?.status === "publishing")) {
+    try {
+      const { endTraderaItem } = await import("./integrations/tradera/tradera.js");
+      await endTraderaItem(itemId);
+      console.log(`[tradera] ${loopaId}: annons ${itemId} togs ner — säljaren tog bort annonsen.`);
+    } catch (err) {
+      const detalj = err instanceof Error ? err.message : String(err);
+      console.error(`[tradera] ${loopaId}: kunde inte ta ner annons ${itemId}:`, detalj);
+      return sendJson(res, 502, {
+        error: "Annonsen kunde inte tas ner från Tradera just nu. Försök igen om en stund.",
+      });
+    }
+  }
+
+  // 2. Ur butiken, medan jobbet finns kvar att ta ur.
+  if (state === "live" && butik) {
+    await butik.unpublish(loopaId, { kind: "seller", userId: job.ownerId ?? null }).catch(() => null);
+  }
+
+  // 3. Märkningen som gör annonsen borta överallt utom i panelen.
+  await markJobRemoved(id, "seller");
+
+  // Rutnätet cachar lagret i 30 sekunder. Utan det här ligger möbeln kvar till salu i butiken en
+  // halv minut efter att säljaren tagit bort den.
+  try {
+    const { invalidate } = await import("./butik/inventory.js");
+    invalidate();
+  } catch {
+    // Inget lager att tömma cachen på.
+  }
+
+  sendJson(res, 200, { deleted: true });
+}
+
+/**
  * Runs the pipeline again on the frames the job already has.
  *
  * The failures this exists for are upstream and transient — a Gemini 503 or 504 — and the walkaround
@@ -251,6 +378,33 @@ async function handleSelectModel(id: string, req: IncomingMessage, res: ServerRe
   else if (body.manualModel?.trim()) resolution = { kind: "manual", manualModel: body.manualModel.trim() };
   else return sendJson(res, 400, { error: "candidate eller manualModel krävs" });
 
+  /**
+   * Vad identifieringen föreslog först, och vad säljaren valde.
+   *
+   * Loggas BARA när de skiljer sig: att välja modellens förstahandsförslag är ingen rättelse, det är
+   * ett medhåll — och medhållet syns ändå i att ingen rad skrevs. Ett handskrivet modellnamn är den
+   * hårdaste etiketten av alla: ingen av de fyra kandidaterna dög.
+   */
+  const forstaForslaget = job.candidates?.[0];
+  const aiSa = forstaForslaget ? [forstaForslaget.brand, forstaForslaget.model, forstaForslaget.variant].filter(Boolean).join(" ") : null;
+  const valet =
+    resolution.kind === "manual"
+      ? resolution.manualModel
+      : [resolution.selected.brand, resolution.selected.model, resolution.selected.variant].filter(Boolean).join(" ");
+  if (aiSa !== valet) {
+    const { notera: noteraModell } = await import("./data/rattelser.js");
+    void noteraModell({
+      jobId: id,
+      omrade: "identitet",
+      falt: "modell",
+      fyndId: null,
+      aiSa,
+      manniskanSa: valet,
+      kalla: "saljare",
+      notis: resolution.kind === "manual" ? "säljaren skrev in modellen själv" : `valde bland ${job.candidates?.length ?? 0} förslag, runda ${(job.candidateRound ?? 0) + 1}`,
+    });
+  }
+
   void finalizeWithModel(id, resolution);
   sendJson(res, 202, { ok: true });
 }
@@ -272,6 +426,74 @@ async function handleGetDebug(id: string, res: ServerResponse) {
   const trace = await getDebugTrace(id);
   if (!trace) return sendJson(res, 404, { error: "No debug trace for this job (not finished, or job not found)" });
   sendJson(res, 200, trace);
+}
+
+/**
+ * Säljarens svar: pälsdjur i hemmet, lukt — och för stolar hur många som säljs.
+ *
+ * Frågas MEDAN annonsen byggs, i väntan efter modellvalet — se DisclosuresGate i klienten. Svaren
+ * behöver därför inte hinna fram till annonsgeneratorn: annonstexten sätts samman vid publiceringen
+ * och läser dem där (composeAd).
+ *
+ * Efteråt är de låsta av samma skäl som prisspannet: ligger annonsen uppe på Tradera står svaren
+ * redan i texten, och ett nytt svar här hade beskrivit en annons som inte finns.
+ */
+async function handleSetDisclosures(id: string, req: IncomingMessage, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  if (job.tradera?.status === "published") {
+    return sendJson(res, 409, {
+      error: "Annonsen ligger redan uppe på Tradera, så svaren går inte att ändra här.",
+      disclosures: job.sellerDisclosures ?? null,
+    });
+  }
+
+  const body = await readJsonBody<{ pets?: unknown; smell?: unknown; smellNote?: unknown; chairCount?: unknown }>(req);
+  if (typeof body.pets !== "boolean" || typeof body.smell !== "boolean") {
+    return sendJson(res, 400, { error: "pets och smell måste vara ja eller nej." });
+  }
+
+  /**
+   * Antalet stolar tas emot BARA för en möbel vi kallat stol.
+   *
+   * Fältet flyttar pengar — det gångar prisförslaget — och är därför det enda av de tre som avvisas
+   * i stället för att tolkas välvilligt. En soffa med `chairCount: 6` är antingen ett fel i
+   * klienten eller någon som prövar sig fram, och båda ska mötas av samma nej.
+   */
+  let chairCount: number | null = null;
+  if (body.chairCount !== undefined && body.chairCount !== null) {
+    if (!job.chairLike) {
+      return sendJson(res, 400, { error: "Antal stolar frågas bara för stolar." });
+    }
+    const antal = Number(body.chairCount);
+    if (!Number.isInteger(antal) || antal < 1 || antal > MAX_ANTAL_STOLAR) {
+      return sendJson(res, 400, { error: `Antalet stolar måste vara mellan 1 och ${MAX_ANTAL_STOLAR}.` });
+    }
+    chairCount = antal;
+  }
+
+  // Lukttexten följer med BARA när svaret är ja. En beskrivning under ett nej är motsägelsefull, och
+  // den enda vägen dit är att säljaren skrivit något och sedan ändrat svaret.
+  const note = typeof body.smellNote === "string" ? body.smellNote.trim().slice(0, 300) : "";
+  job.sellerDisclosures = {
+    pets: body.pets,
+    smell: body.smell,
+    smellNote: body.smell && note ? note : null,
+    chairCount,
+    answeredAt: new Date().toISOString(),
+  };
+  await persist(job);
+  sendJson(res, 200, { disclosures: job.sellerDisclosures });
+
+  /**
+   * Priset vägs in EFTER svaret gått iväg.
+   *
+   * Buntpriset är ett Gemini-anrop, och säljaren står på en skärm som ska släppa vidare. Talet
+   * behövs först på prisskärmen, tre skärmar bort, och skrivs in i jobbet där pollningen ändå
+   * hämtar det. Att hålla kvitteringen tills modellen svarat hade lagt hela den väntan på en knapp
+   * som bara betyder "sparat".
+   */
+  if (chairCount !== null) void synkaStolpris(job.id);
 }
 
 /**
@@ -302,6 +524,26 @@ async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: Serv
     weeklyDropPct: body.weeklyDropPct,
   });
   if ("error" in ladder) return sendJson(res, 400, { error: ladder.error });
+
+  /**
+   * Vad motorn föreslog, och vad säljaren la sig på.
+   *
+   * Loggas som en rättelse i prisområdet även när den är ett medhåll: prisstegen har ett golv och en
+   * veckotakt som motorn aldrig föreslagit, så det finns alltid ett val att bokföra. Det är den här
+   * raden som svarar på om säljare systematiskt lägger sig över eller under förslaget.
+   */
+  const forslag = job.result?.price?.status === "ok" && job.result.price.default !== null ? Math.round(job.result.price.default) : null;
+  const { notera: noteraPris } = await import("./data/rattelser.js");
+  void noteraPris({
+    jobId,
+    omrade: "pris",
+    falt: "startpris",
+    fyndId: null,
+    aiSa: forslag === null ? null : String(forslag),
+    manniskanSa: String(Math.round(ladder.startPrice)),
+    kalla: "saljare",
+    notis: `golv ${Math.round(ladder.floorPrice)} kr, ${Math.round(ladder.weeklyDropPct * 100)} % i veckan`,
+  });
 
   job.priceLadder = ladder;
   await persist(job);
@@ -405,22 +647,6 @@ async function notifyAdminsOfPending(loopaId: string, title: string, price: numb
   } catch (err) {
     console.warn(`[tradera] kunde inte avisera admin om ${loopaId}:`, err instanceof Error ? err.message : err);
   }
-}
-
-// ---- Blocket: annonsen färdig att föra över för hand ----------------------
-
-/**
- * Annonsens fält, redo att klistras in i Blockets formulär.
- *
- * Läsande och utan sidoeffekter — till skillnad från Tradera-vägen publiceras ingenting här, för
- * Blocket har inget API att publicera till. Omslagsvalet räknas fram först, av samma skäl som vid
- * publiceringen: jobb från före omslagsvalet skulle annars lämna sin svarta första bildruta överst.
- */
-async function handleGetBlocket(jobId: string, res: ServerResponse) {
-  const job = await getJob(jobId);
-  if (!job) return sendJson(res, 404, { error: "Job not found" });
-  await resolveCoverImageId(job);
-  sendJson(res, 200, await blocketAdFor(job));
 }
 
 // ---- Publik annons: /api/cards/:loopaId, utan inloggning --------------
@@ -806,6 +1032,33 @@ async function handleAnalys(req: IncomingMessage, res: ServerResponse) {
   return res.end();
 }
 
+// ---- flödesmätningen: /api/data/flode ---------------------------------------
+
+/**
+ * Säljflödets händelser. Svarar 204 oavsett utfall, precis som /api/analys.
+ *
+ * UTANFÖR GRINDEN, och det är hela poängen: märkesvalet och filmningen sker innan säljaren har ett
+ * konto, och de två stegen är just de där flest försvinner. En mätning som börjar först vid
+ * inloggningen hade missat det den finns för att mäta.
+ *
+ * Vitlistan i data/flode.ts är säkerheten — händelsenamn, steg och egenskaper prövas alla där, och
+ * ingenting som en klient hittar på tar sig in i filen.
+ */
+async function handleFlodesHandelse(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const body = await readJsonBody<{ sess?: string; jobId?: string | null; event?: string; props?: Record<string, unknown> }>(req, 8 * 1024);
+    const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+    if (typeof body.sess === "string" && typeof body.event === "string" && !ROBOT.test(ua)) {
+      const { spara: sparaFlode } = await import("./data/flode.js");
+      await sparaFlode(body.sess, typeof body.jobId === "string" ? body.jobId : null, body.event, body.props ?? {});
+    }
+  } catch {
+    // En trasig kropp är inte värd ett felmeddelande. Se anropsstället.
+  }
+  res.writeHead(204);
+  return res.end();
+}
+
 // ---- adminpanelen: /api/admin/*, bara för adresserna i admin.ts -------------
 
 /**
@@ -987,13 +1240,28 @@ async function handleDamageAction(jobId: string, damageId: string, req: Incoming
   const damage = job.result.damages.find((d) => d.id === damageId);
   if (!damage) return sendJson(res, 404, { error: "Damage not found" });
 
+  /**
+   * Fyndet som modellen rapporterade det, FÖRE säljarens hand.
+   *
+   * Måste tas här: `Object.assign` nedan skriver över fälten på plats, och efteråt finns modellens
+   * påstående ingenstans. Det är den enda anledningen till att raden finns — se data/rattelser.ts.
+   */
+  const { notera, noteraFalt } = await import("./data/rattelser.js");
+  const fore = { type: damage.type, part: damage.part, semanticLocation: damage.semanticLocation, severity: damage.severity, impact: damage.impact, description: damage.description };
+
   if (body.action === "reject") {
     damage.sellerAction = "rejected";
+    void notera({ jobId, omrade: "skick", falt: "fyndet finns", fyndId: damageId, aiSa: `${damage.type} på ${damage.part}`, manniskanSa: "finns inte", kalla: "saljare", notis: damage.description });
   } else if (body.action === "confirm") {
     damage.sellerAction = "confirmed";
+    // Ett bekräftat fynd är lika mycket en etikett som ett avvisat: det är modellens träffar.
+    void notera({ jobId, omrade: "skick", falt: "bekräftat", fyndId: damageId, aiSa: `${damage.type} på ${damage.part}`, manniskanSa: "stämmer", kalla: "saljare", notis: null });
   } else if (body.action === "edit") {
     damage.sellerAction = "corrected";
-    if (body.patch) Object.assign(damage, body.patch);
+    if (body.patch) {
+      Object.assign(damage, body.patch);
+      void noteraFalt({ jobId, omrade: "skick", fyndId: damageId, kalla: "saljare", notis: null }, fore, { ...body.patch });
+    }
   }
 
   await regradeAndReprice(job);
@@ -1045,7 +1313,27 @@ async function handleDispute(jobId: string, damageId: string, req: IncomingMessa
   }
   damage.verificationReason = outcome.reason;
 
-  await regradeAndReprice(job);
+  /**
+   * Domslutet loggas som en egen sorts rättelse.
+   *
+   * `granskning` och inte `saljare`: säljaren BAD om en omprövning, men det var en modell som
+   * avgjorde den med en ny bild framför sig. Att bokföra det som säljarens ord hade gjort
+   * träningsdatan osann på just den punkt där den är som intressantast — fallen där det första
+   * omdömet ifrågasattes.
+   */
+  const { notera: noteraDispyt } = await import("./data/rattelser.js");
+  void noteraDispyt({
+    jobId,
+    omrade: "skick",
+    falt: "omprövat med närbild",
+    fyndId: damageId,
+    aiSa: `${damage.type} på ${damage.part}`,
+    manniskanSa: outcome.verdict === "REMOVE" ? "finns inte" : "stämmer",
+    kalla: "granskning",
+    notis: outcome.reason,
+  });
+
+  await regradeAndReprice(job, "granskning");
   sendJson(res, 200, { verdict: outcome.verdict, reason: outcome.reason, result: job.result });
 }
 
@@ -1098,6 +1386,20 @@ async function handleAddFromPhoto(jobId: string, req: IncomingMessage, res: Serv
   damage.sellerAdded = true;
   job.result.damages.push(damage);
 
+  // Ett tillägg har inget "före": modellen sa ingenting om det här. `aiSa` är null med flit — det
+  // är skillnaden mellan ett fynd modellen fick fel på och ett den missade helt.
+  const { notera: noteraTillagg } = await import("./data/rattelser.js");
+  void noteraTillagg({
+    jobId,
+    omrade: "skick",
+    falt: "fynd säljaren fotograferade",
+    fyndId: damage.id,
+    aiSa: null,
+    manniskanSa: `${damage.type} på ${damage.part}`,
+    kalla: "saljare",
+    notis: outcome.reason,
+  });
+
   await regradeAndReprice(job);
   sendJson(res, 200, { added: true, reason: outcome.reason, damage, result: job.result });
 }
@@ -1138,6 +1440,20 @@ async function handleAddDamage(jobId: string, req: IncomingMessage, res: ServerR
   };
 
   job.result.damages.push(damage);
+
+  // Samma sak som fotot ovan: modellen missade det här helt, och `aiSa` null säger just det.
+  const { notera: noteraManuellt } = await import("./data/rattelser.js");
+  void noteraManuellt({
+    jobId,
+    omrade: "skick",
+    falt: "fynd säljaren la till",
+    fyndId: damage.id,
+    aiSa: null,
+    manniskanSa: `${damage.type} på ${damage.part}`,
+    kalla: "saljare",
+    notis: damage.description,
+  });
+
   await regradeAndReprice(job);
   sendJson(res, 200, job.result);
 }
@@ -1181,6 +1497,8 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
   const body = await readJsonBody<ListingEditBody>(req);
   const listing = job.result.listing.result;
 
+  const { notera: noteraAnnons } = await import("./data/rattelser.js");
+
   if (Array.isArray(body.attributes)) {
     const tidigare = new Map(listing.attributes.map((a) => [a.key, a]));
     listing.attributes = body.attributes
@@ -1193,16 +1511,40 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
         const fore = tidigare.get(key);
         // Orörd rad behåller allt den hade — källan är fortfarande sann om värdet inte ändrats.
         if (fore && fore.label === label && fore.value === value) return fore;
+        /**
+         * Måttet som generatorn hade det, innan säljaren skrev över det.
+         *
+         * `sellerEdited` på raden säger ATT någon rättat den, men inte FRÅN vad — det värdet finns
+         * bara här, i ögonblicket innan det ersätts. En rättelse utan sitt före är ingen etikett.
+         */
+        void noteraAnnons({
+          jobId,
+          omrade: "identitet",
+          falt: label,
+          fyndId: null,
+          aiSa: fore?.value ?? null,
+          manniskanSa: value,
+          kalla: "saljare",
+          notis: fore?.estimated ? "värdet var uppskattat" : (fore?.sourceUrl ?? null),
+        });
         return { key, label, value, sourceUrl: null, estimated: false, sellerEdited: true };
       })
       .filter((a): a is NonNullable<typeof a> => a !== null);
   }
 
   if (typeof body.description === "string") {
-    listing.listing.description = kort(body.description, MAX_TEXT_LEN);
+    const nytt = kort(body.description, MAX_TEXT_LEN);
+    if (nytt !== listing.listing.description) {
+      void noteraAnnons({ jobId, omrade: "annons", falt: "beskrivning", fyndId: null, aiSa: listing.listing.description, manniskanSa: nytt, kalla: "saljare", notis: null });
+      listing.listing.description = nytt;
+    }
   }
   if (typeof body.conditionText === "string") {
-    listing.listing.conditionText = kort(body.conditionText, MAX_TEXT_LEN);
+    const nytt = kort(body.conditionText, MAX_TEXT_LEN);
+    if (nytt !== listing.listing.conditionText) {
+      void noteraAnnons({ jobId, omrade: "annons", falt: "skicktext", fyndId: null, aiSa: listing.listing.conditionText, manniskanSa: nytt, kalla: "saljare", notis: null });
+      listing.listing.conditionText = nytt;
+    }
   }
 
   await persist(job);
@@ -1288,6 +1630,13 @@ const server = http.createServer(async (req, res) => {
        */
       if (segments[1] === "analys" && segments.length === 2 && req.method === "POST") {
         return await handleAnalys(req, res);
+      }
+      /**
+       * Säljflödets mätning, utanför grinden av samma skäl som mätningen ovan. Se
+       * handleFlodesHandelse och data/flode.ts.
+       */
+      if (segments[1] === "data" && segments[2] === "flode" && segments.length === 3 && req.method === "POST") {
+        return await handleFlodesHandelse(req, res);
       }
       /**
        * Startsidans chatt, utanför grinden. Se handleSaljChat för varför den får ligga där.
@@ -1484,6 +1833,39 @@ const server = http.createServer(async (req, res) => {
           }
         }
         /**
+         * Efterlysningarna: vad folk letar efter, och knappen som hör av sig.
+         *
+         * EGEN FLIK och inte en kolumn i annonslistan. Annonserna svarar på "vad har vi", den här på
+         * "vad vill någon ha" — och de två frågorna ställs aldrig samtidigt. Matchningen sker för
+         * hand tills vidare; se efterlysning/admin.ts för varför det är ett beslut och inte en lucka.
+         */
+        if (segments[2] === "efterlysningar" && segments.length === 3 && req.method === "GET") {
+          const { listaEfterlysningar } = await import("./efterlysning/admin.js");
+          return sendJson(res, 200, await listaEfterlysningar());
+        }
+        if (segments[2] === "efterlysningar" && segments.length === 5 && segments[4] === "kandidater" && req.method === "GET") {
+          const { kandidater } = await import("./efterlysning/admin.js");
+          const svar = await kandidater(segments[3]);
+          if (!svar) return sendJson(res, 404, { error: "Efterlysningen finns inte." });
+          return sendJson(res, 200, svar);
+        }
+        /**
+         * Brevet. POST och inte PATCH: det som händer är inte att en rad ändras utan att ett brev
+         * lämnar huset, och det går inte att ta tillbaka.
+         */
+        if (segments[2] === "efterlysningar" && segments.length === 5 && segments[4] === "tips" && req.method === "POST") {
+          const { skickaTips, TipsFel } = await import("./efterlysning/admin.js");
+          try {
+            const kropp = await readJsonBody<{ produkt?: string; halsning?: string }>(req, 32 * 1024);
+            if (!kropp.produkt) return sendJson(res, 400, { error: "Välj en möbel att skicka." });
+            return sendJson(res, 200, await skickaTips(segments[3], kropp.produkt, kropp.halsning));
+          } catch (err) {
+            if (err instanceof TipsFel) return sendJson(res, 400, { error: err.message });
+            throw err;
+          }
+        }
+
+        /**
          * Tradera-posten: det Gmail-bevakaren sett — sålda varor, frågor, bud — och vad den gjorde.
          *
          * `hamta` kör en läsning NU i stället för att vänta på halvtimmestimern; svaret är samma
@@ -1505,6 +1887,59 @@ const server = http.createServer(async (req, res) => {
           if (!post) return sendJson(res, 404, { error: "Posten finns inte." });
           return sendJson(res, 200, post);
         }
+        /**
+         * Datafliken: en rad per möbel med allt vi vet om den, och med AI:ns ord skilda från
+         * människans rättelser.
+         *
+         * EGEN VY OCH INTE FLER KOLUMNER i annonslistan. De två svarar på olika frågor — annonsen på
+         * "vad hände med möbeln", den här på "hade modellen rätt" — och den som läser den ena ställer
+         * aldrig den andra samtidigt. Se data/dataset.ts för de sju källorna som slås ihop.
+         *
+         * CSV:n är en rad per möbel, för kalkylbladet. Den som ska träna läser JSON:en, där varje
+         * fynd bär sitt före och efter.
+         */
+        if (segments[2] === "data" && segments.length === 3 && req.method === "GET") {
+          const { bygg, tillCsv } = await import("./data/dataset.js");
+          const svar = await bygg();
+          if (url.searchParams.get("format") === "csv") {
+            res.writeHead(200, {
+              "Content-Type": "text/csv; charset=utf-8",
+              "Content-Disposition": 'attachment; filename="loopa-data.csv"',
+            });
+            return res.end(tillCsv(svar.objekt));
+          }
+          return sendJson(res, 200, svar);
+        }
+        /**
+         * Chatten över datan. POST och inte GET: frågan och samtalet ligger i kroppen, och en fråga
+         * är inte något som ska hamna i en serverlogg som en adress.
+         */
+        if (segments[2] === "data" && segments[3] === "fraga" && segments.length === 4 && req.method === "POST") {
+          const { bygg, objektFor } = await import("./data/dataset.js");
+          const { svaraPaDatafraga, MAX_QUESTION_CHARS: MAX_DATA_FRAGA } = await import("./data/chat.js");
+          const body = await readJsonBody<{ fraga?: unknown; id?: unknown; historik?: unknown }>(req, CHAT_BODY_BYTES);
+          const fraga = typeof body.fraga === "string" ? body.fraga.trim() : "";
+          if (!fraga) return sendJson(res, 400, { error: "Skriv en fråga." });
+          if (fraga.length > MAX_DATA_FRAGA) {
+            return sendJson(res, 400, { error: `Frågan får vara högst ${MAX_DATA_FRAGA} tecken.` });
+          }
+          try {
+            const svar = await bygg();
+            const fokus = typeof body.id === "string" && body.id ? await objektFor(body.id) : null;
+            const ut = await svaraPaDatafraga(fraga, svar, fokus, readChatHistory(body.historik));
+            return sendJson(res, 200, { answer: ut.answer, belagt: ut.belagt });
+          } catch (err) {
+            console.error("[data-chat]", err);
+            return sendJson(res, 503, { error: "Chatten kunde inte nås just nu. Försök igen om en stund." });
+          }
+        }
+        if (segments[2] === "data" && segments.length === 4 && req.method === "GET") {
+          const { objektFor } = await import("./data/dataset.js");
+          const objekt = await objektFor(segments[3]);
+          if (!objekt) return sendJson(res, 404, { error: "Objektet finns inte." });
+          return sendJson(res, 200, objekt);
+        }
+
         /**
          * Efterfrågepanelen: öppen efterfrågan per kategori, märke och prisband.
          *
@@ -1613,6 +2048,8 @@ const server = http.createServer(async (req, res) => {
       if (segments.length === 2 && req.method === "POST") return await handleCreateJob(req, res, identity);
       if (segments.length === 2 && req.method === "GET") return await handleListJobs(res, identity);
       if (segments.length === 3 && req.method === "GET") return await handleGetJob(segments[2], res);
+      // Säljarens borttagning. Ägargrinden ovanför har redan avvisat allt som inte är ägarens eget.
+      if (segments.length === 3 && req.method === "DELETE") return await handleDeleteJob(segments[2], res);
       if (segments.length === 4 && segments[3] === "debug" && req.method === "GET") {
         return await handleGetDebug(segments[2], res);
       }
@@ -1628,12 +2065,12 @@ const server = http.createServer(async (req, res) => {
       if (segments.length === 4 && segments[3] === "price-plan" && req.method === "POST") {
         return await handleSetPricePlan(segments[2], req, res);
       }
+      if (segments.length === 4 && segments[3] === "disclosures" && req.method === "POST") {
+        return await handleSetDisclosures(segments[2], req, res);
+      }
       if (segments.length === 4 && segments[3] === "tradera") {
         if (req.method === "POST") return await handlePublishTradera(segments[2], res);
         if (req.method === "GET") return await handleGetTradera(segments[2], res);
-      }
-      if (segments.length === 4 && segments[3] === "blocket" && req.method === "GET") {
-        return await handleGetBlocket(segments[2], res);
       }
       if (segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
         return await handleGetCover(segments[2], res);
@@ -1701,6 +2138,26 @@ const server = http.createServer(async (req, res) => {
      */
     if (url.pathname === "/kop" || url.pathname === "/kop/") {
       res.writeHead(301, { Location: "/butik" });
+      return res.end();
+    }
+
+    /**
+     * /salj → /, permanent.
+     *
+     * /salj var säljflödets adress medan roten ännu gick till marknadssajtens företagssida. Roten
+     * är nu vår (deploy/cloudflare/wrangler.toml), och då ska säljflödet ha EN adress: adressen
+     * står i länkar vi själva delat den vecka den fanns, och två adresser med samma sida är en
+     * dubblett för Google och en gissning för den som ska skriva den på ett papper.
+     *
+     * VARFÖR EN 301 OCH INTE EN BORTTAGEN RUTT. Tas Worker-rutten bort svarar marknadssajten på
+     * /salj i stället, alltså en 404 från en annan sajt — de delade länkarna hade dött tysta.
+     * Rutten ligger kvar och pekar hit; den här raden är vad "hit" betyder.
+     *
+     * Prefixet ingår med flit, till skillnad från /kop ovan: /salj ägde precis två mönster i
+     * routern (/salj och /salj/*) och ingen av dem har någon egen sida att skydda.
+     */
+    if (url.pathname === "/salj" || url.pathname === "/salj/" || url.pathname.startsWith("/salj/")) {
+      res.writeHead(301, { Location: "/" });
       return res.end();
     }
 
@@ -1774,6 +2231,27 @@ server.listen(PORT, BIND_HOST, () => {
   if (!process.env.CONDITION_SERVICE_KEY) {
     console.info("[condition-grading-server] CONDITION_SERVICE_KEY saknas — mätharnessen kan inte logga in.");
   }
+  /**
+   * KASSAN ÖPPEN OCH POSTEN STÄNGD ÄR DEN FARLIGA KOMBINATIONEN.
+   *
+   * Varje utskick faller tillbaka på `file` — breven skrivs till /outbox och ingen får dem. För en
+   * bevakning är det en missad artighet. För en order är det att köparen betalat, valt sina tider
+   * och väntar på en leverans ingen påbörjat, eftersom arbetsordern "BOKA FRAKT" ligger som en
+   * textfil på en server. Kombinationen kan bara uppstå i drift, och den syns inte i något
+   * gränssnitt — därför sägs den vid start, där den som rullar ut faktiskt tittar.
+   */
+  void import("./notify/outbox.js").then(async ({ sender }) => {
+    const { checkoutConfigured } = await import("./butik/checkout.js");
+    const kanal = sender().name;
+    const kassa = checkoutConfigured();
+    console.log(`[condition-grading-server] e-post: ${kanal} · kassa: ${kassa ? "konfigurerad" : "avstängd"}`);
+    if (kassa && kanal !== "gmail") {
+      console.warn(
+        `[condition-grading-server] VARNING: kassan tar emot köp men breven går till "${kanal}". ` +
+          "Köparens kvitto och arbetsordern BOKA FRAKT når då ingen. Sätt EMAIL_PROVIDER=gmail i server/.env.",
+      );
+    }
+  });
   void distExists().then((yes) => {
     console.log(yes ? "[condition-grading-server] serverar web/dist" : "[condition-grading-server] web/dist saknas — kör npm run web:build för att servera UI:t härifrån");
   });

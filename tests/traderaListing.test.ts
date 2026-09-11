@@ -118,9 +118,11 @@ function job(p: { damages?: Damage[]; attributes?: GeneratedListing["attributes"
   };
 }
 
-test("annonsen säger att den är skapad av Loopa, och att det är en AI som tittat", () => {
+test("annonsen säger vem som säljer möbeln, vem som skrivit texten, och att det är en AI som tittat", () => {
   const html = buildDescription(job());
-  assert.match(html, /Den här annonsen är skapad av Loopa/);
+  // Säljaren står i första raden. En köpare som tror att de handlar av en privatperson gissar fel
+  // om både frakt och ansvar — och den gissningen görs innan de läst en enda rad om möbeln.
+  assert.match(html, /Den här möbeln säljs av Loopa, och annonsen är skriven av Loopa/);
   assert.match(html, /Loopas AI har gått igenom 2 vyer av möbeln/);
 });
 
@@ -164,6 +166,71 @@ test("noll skador sägs som noll skador, inte genom att listan uteblir", () => {
   assert.match(html, /AI:n hittade inga synliga skador/);
 });
 
+/**
+ * Pälsdjur och lukt: de två uppgifterna ingen bild kan bära, och de enda i annonsen som inte är
+ * besiktningens ord.
+ *
+ * Testet finns för bortfallet är tyst i BÅDA riktningarna. Faller stycket bort läser annonsen som en
+ * möbel utan lukt och utan katt i hemmet — och blir ett obesvarat fält däremot ett "nej" i text har
+ * Loopa gjort ett påstående säljaren aldrig gjort.
+ */
+test("säljarens svar om pälsdjur och lukt står i annonsen, med säljaren som avsändare", () => {
+  const html = buildDescription({
+    ...job(),
+    sellerDisclosures: { pets: true, smell: true, smellNote: "svag röklukt i dynorna", answeredAt: "2026-09-11T10:00:00.000Z" },
+  });
+  assert.match(html, /<strong>Från säljaren<\/strong>/);
+  assert.match(html, /Det finns pälsdjur i hemmet där möbeln har stått/);
+  // Säljarens egna ord, oomskrivna: en köpare skiljer på röklukt och källarlukt.
+  assert.match(html, /Säljaren beskriver lukten: svag röklukt i dynorna/);
+  assert.match(html, /kommer från säljaren och inte från besiktningen/);
+});
+
+test("nejen skrivs ut som nej — en tystnad om lukt är inte ett svar", () => {
+  const html = buildDescription({
+    ...job(),
+    sellerDisclosures: { pets: false, smell: false, smellNote: null, answeredAt: "2026-09-11T10:00:00.000Z" },
+  });
+  assert.match(html, /Det finns inga pälsdjur i hemmet där möbeln har stått/);
+  assert.match(html, /Säljaren känner ingen lukt från möbeln/);
+});
+
+test("ett obesvarat fält blir inget stycke — appen svarar inte åt säljaren", () => {
+  const html = buildDescription(job());
+  assert.doesNotMatch(html, /Från säljaren/);
+  assert.doesNotMatch(html, /pälsdjur/i);
+});
+
+/**
+ * Antalet stolar hör till samma stycke, för samma skäl som resten av det: det är säljarens uppgift
+ * och inte besiktningens. Men det bär också priset ovanför — ett buntpris under ett foto av EN stol
+ * läser som ett styckpris, och raden är det enda som säger att talet gäller alla sex.
+ */
+test("ett set om sex sägs vara ett set, och priset sägs gälla alla", () => {
+  const html = buildDescription({
+    ...job(),
+    sellerDisclosures: { pets: false, smell: false, smellNote: null, chairCount: 6, answeredAt: "2026-09-11T10:00:00.000Z" },
+  });
+  assert.match(html, /Säljs som ett set om 6 stolar — priset gäller alla/);
+});
+
+test("en enda stol får ingen setrad — 'set om 1' är inget set", () => {
+  const html = buildDescription({
+    ...job(),
+    sellerDisclosures: { pets: false, smell: false, smellNote: null, chairCount: 1, answeredAt: "2026-09-11T10:00:00.000Z" },
+  });
+  assert.match(html, /<strong>Från säljaren<\/strong>/);
+  assert.doesNotMatch(html, /set om/);
+});
+
+test("lukt utan beskrivning erkänns ändå, och sägs vara obeskriven", () => {
+  const html = buildDescription({
+    ...job(),
+    sellerDisclosures: { pets: false, smell: true, smellNote: null, answeredAt: "2026-09-11T10:00:00.000Z" },
+  });
+  assert.match(html, /Möbeln luktar något\. Säljaren har inte beskrivit lukten närmare/);
+});
+
 test("måtten står för sig, före övriga specifikationer", () => {
   const html = buildDescription(job());
   const matt = html.indexOf("<strong>Mått</strong>");
@@ -184,13 +251,36 @@ test("saknade mått sägs rakt ut i stället för att rubriken tyst uteblir", ()
 // som vilken avhämtningsannons som helst, och köparen antar att de ska köra själva.
 test("leveransen säger både att den ingår och vad som händer efter köpet", () => {
   const html = buildDescription(job());
-  assert.match(html, /Leverans endast — frakt ingår\. Boka tid efter köp\./);
+  assert.match(html, /Endast hemleverans — frakten ingår i priset\./);
+  assert.match(html, /Loopa löser hemleveransen åt dig efter köpet/);
   assert.match(html, new RegExp(`Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad`));
   assert.match(html, /ingenting tillkommer i kassan/);
   assert.match(html, /budfirma kör möbeln hem till din dörr/);
   assert.match(html, /leveranstid via SMS/);
   assert.match(html, /Avhämtning erbjuds inte/);
   assert.doesNotMatch(html, /Hämtas hos säljaren/);
+});
+
+/**
+ * Beskrivningen skrivs av annonsgeneratorn, som inte vet något om affären och gärna avslutar med
+ * "Hämtas enligt överenskommelse". I en annons där Loopa kör hem möbeln och avhämtning inte erbjuds
+ * är den meningen inte bara överflödig — den säger emot leveransstycket, och köparen får två svar.
+ */
+test("generatorns egna hämt- och fraktlöften faller ur beskrivningen", () => {
+  const j = job();
+  j.result!.listing!.result!.listing.description =
+    "Fin ekstol med stoppad sits. Stolen är stabil och hel. Hämtas enligt överenskommelse. Kan skickas mot fraktkostnad.";
+  const html = buildDescription(j);
+  assert.match(html, /Fin ekstol med stoppad sits\. Stolen är stabil och hel\./);
+  assert.doesNotMatch(html, /Hämtas enligt överenskommelse/);
+  assert.doesNotMatch(html, /Kan skickas mot fraktkostnad/);
+});
+
+// "Fråga säljaren" är fel motpart när Loopa är säljaren: köparen skulle leta efter någon som inte
+// finns. Måttraderna ska tilltala den som faktiskt kan svara.
+test("måtten hänvisar till oss och inte till en säljare som inte finns", () => {
+  const html = buildDescription(job());
+  assert.doesNotMatch(html, /Fråga säljaren/);
 });
 
 test("Loopa-ID:t står i annonsen, med vad det går att göra med det", () => {

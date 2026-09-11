@@ -32,11 +32,14 @@ test("postnumret normaliseras — mellanslag och bindestreck är samma nummer", 
   assert.equal(normalizePostal("112-23"), "11223");
 });
 
-test("innerstad, närförort och storstockholm har olika pris", () => {
+// Zonen avgör numera LEVERANSTIDEN, inte priset: frakten är 600 kr i hela länet, samma tal som
+// annonserna lovar och räknar in i annonspriset. Se FRAKT_SEK i delivery.ts.
+test("postnumret hittar rätt zon, och zonen skiljer sig i tid men inte i pris", () => {
   assert.equal(zoneFor("11223")!.id, "innerstad");
   assert.equal(zoneFor("13145")!.id, "narforort");
   assert.equal(zoneFor("18732")!.id, "storstockholm");
-  assert.ok(zoneFor("11223")!.feeSek < zoneFor("18732")!.feeSek);
+  assert.equal(zoneFor("11223")!.feeSek, zoneFor("18732")!.feeSek);
+  assert.ok(zoneFor("11223")!.leadDays < zoneFor("18732")!.leadDays);
 });
 
 test("ett halvt postnummer ger inget löfte om en avgift", () => {
@@ -53,14 +56,37 @@ test("utanför Stockholm är ett besked, inte ett nej", () => {
   assert.match(q.message, /hämta den själv/, "köparen ska få veta vad som ändå går");
 });
 
-test("leveranstider hoppar över söndagar och respekterar framförhållningen", () => {
+/**
+ * Tiderna: fem ARBETSDAGAR, två pass per dag, med start dagen efter köpet.
+ *
+ * Regeln bytte skepnad — den utgick förut från zonens framförhållning (2–4 dagar) och hoppade bara
+ * över söndagar. Det gav en köpare i Storstockholm fyra tomma dagar innan första valbara tid, och en
+ * lördag mitt i listan som budfirman inte kör.
+ */
+test("leveranstider är fem arbetsdagar framåt, förmiddag och eftermiddag", () => {
   const zone = zoneFor("11223")!;
-  const from = new Date("2026-09-01T10:00:00Z"); // tisdag
-  const slots = slotsFor(zone, from, 6);
-  assert.equal(slots.length, 6);
-  assert.ok(slots.every((s) => new Date(s.date).getDay() !== 0), "inga söndagar");
-  const first = new Date(slots[0].date);
-  assert.ok(first.getTime() >= from.getTime(), "aldrig en tid som redan varit");
+  const slots = slotsFor(zone, new Date());
+  assert.equal(slots.length, 10, "fem dagar × två pass");
+  assert.deepEqual([...new Set(slots.map((s) => s.window))], ["08–12", "12–18"]);
+  assert.equal(new Set(slots.map((s) => s.date)).size, 5, "fem olika dagar");
+  for (const s of slots) {
+    const dag = new Date(`${s.date}T12:00:00`).getDay();
+    assert.ok(dag >= 1 && dag <= 5, `${s.date} ska vara en arbetsdag`);
+  }
+});
+
+/**
+ * Den som öppnar sin orderskärm en vecka efter köpet ska få tider — inte en tom lista.
+ *
+ * Listan räknas ur KÖPETS datum, och utan ett golv vid dagens datum räknade en gammal order fram
+ * fem dagar som redan varit, sållade bort dem alla och lämnade ingenting att välja.
+ */
+test("ett gammalt köp får framtida tider, aldrig passerade", () => {
+  const zone = zoneFor("11223")!;
+  const idag = new Date().toLocaleDateString("sv-SE");
+  const slots = slotsFor(zone, new Date(Date.now() - 9 * 86_400_000));
+  assert.equal(slots.length, 10);
+  assert.ok(slots.every((s) => s.date > idag), "aldrig en tid som redan varit");
 });
 
 // ---- kassans ordning ----

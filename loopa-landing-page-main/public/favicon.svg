@@ -1,4 +1,17 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
-  <rect width="64" height="64" rx="16" fill="#faf7f1"/>
-  <path d="M20 14h8v28a8 8 0 0 0 8 8h8v8h-8a16 16 0 0 1-16-16V14z" fill="#e4572e"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2848 1088" role="img" aria-label="Loopa">
+  <!-- Ordmärket loopa, satt i Poppins ExtraBold och omvandlat till kurvor.
+       KURVOR OCH INTE <text>: en favikon renderas utanför sidan, så varken Google Fonts eller
+       systemets fontstack finns att tillgå — ett <text> hade ritats i vad webbläsaren nu råkar ha,
+       eller inte alls. Formen ligger därför i path-datan och kan inte glida.
+       Bokstaven som bär märket är gemena "a": enkelvånings, en cirkel med en stapel. Se
+       --ordmark-font i web/src/styles.css för varför just den formen är logotypen.
+       Tegelorange #e4572e, samma som --accent. Bakgrunden är genomskinlig med flit: märket ska
+       sitta lika bra på en ljus som på en mörk flik.
+       Spärren -0.015em är inbakad i bokstävernas placering, som i .app-wordmark.
+       viewBox:en är ordets egen bbox — märket är brett, och i 16 px blir det ett orange streck
+       snarare än fem läsbara bokstäver. Det är priset för att fliken bär ordet och inte en symbol. -->
+  <title>Loopa</title>
+  <g transform="translate(-16 780) scale(1 -1)" fill="#e4572e">
+    <path d="M252.0 740.0V0.0H56.0V740.0ZM317.0 281.0Q317.0 368.0 355.5 433.0Q394.0 498.0 460.5 533.0Q527.0 568.0 611.0 568.0Q695.0 568.0 761.5 533.0Q828.0 498.0 866.5 433.0Q905.0 368.0 905.0 281.0Q905.0 194.0 866.5 128.5Q828.0 63.0 761.0 28.0Q694.0 -7.0 610.0 -7.0Q526.0 -7.0 459.5 28.0Q393.0 63.0 355.0 128.0Q317.0 193.0 317.0 281.0ZM706.0 281.0Q706.0 338.0 678.5 368.0Q651.0 398.0 611.0 398.0Q571.0 398.0 544.0 368.0Q517.0 338.0 517.0 281.0Q517.0 223.0 543.0 193.0Q569.0 163.0 610.0 163.0Q651.0 163.0 678.5 193.5Q706.0 224.0 706.0 281.0ZM938.0 281.0Q938.0 368.0 976.5 433.0Q1015.0 498.0 1081.5 533.0Q1148.0 568.0 1232.0 568.0Q1316.0 568.0 1382.5 533.0Q1449.0 498.0 1487.5 433.0Q1526.0 368.0 1526.0 281.0Q1526.0 194.0 1487.5 128.5Q1449.0 63.0 1382.0 28.0Q1315.0 -7.0 1231.0 -7.0Q1147.0 -7.0 1080.5 28.0Q1014.0 63.0 976.0 128.0Q938.0 193.0 938.0 281.0ZM1327.0 281.0Q1327.0 338.0 1299.5 368.0Q1272.0 398.0 1232.0 398.0Q1192.0 398.0 1165.0 368.0Q1138.0 338.0 1138.0 281.0Q1138.0 223.0 1164.0 193.0Q1190.0 163.0 1231.0 163.0Q1272.0 163.0 1299.5 193.5Q1327.0 224.0 1327.0 281.0ZM1951.0 568.0Q2018.0 568.0 2072.5 533.0Q2127.0 498.0 2158.5 433.0Q2190.0 368.0 2190.0 281.0Q2190.0 194.0 2158.5 128.5Q2127.0 63.0 2072.5 28.0Q2018.0 -7.0 1951.0 -7.0Q1894.0 -7.0 1852.5 16.0Q1811.0 39.0 1787.0 78.0V-268.0H1591.0V561.0H1787.0V483.0Q1810.0 522.0 1852.0 545.0Q1894.0 568.0 1951.0 568.0ZM1889.0 397.0Q1846.0 397.0 1816.5 366.0Q1787.0 335.0 1787.0 281.0Q1787.0 226.0 1816.5 195.0Q1846.0 164.0 1889.0 164.0Q1932.0 164.0 1961.5 195.5Q1991.0 227.0 1991.0 281.0Q1991.0 336.0 1961.5 366.5Q1932.0 397.0 1889.0 397.0ZM2463.0 568.0Q2521.0 568.0 2563.0 545.0Q2605.0 522.0 2628.0 483.0V561.0H2824.0V0.0H2628.0V78.0Q2605.0 39.0 2562.5 16.0Q2520.0 -7.0 2463.0 -7.0Q2396.0 -7.0 2341.5 28.0Q2287.0 63.0 2255.5 128.5Q2224.0 194.0 2224.0 281.0Q2224.0 368.0 2255.5 433.0Q2287.0 498.0 2341.5 533.0Q2396.0 568.0 2463.0 568.0ZM2526.0 397.0Q2482.0 397.0 2453.0 366.5Q2424.0 336.0 2424.0 281.0Q2424.0 227.0 2453.0 195.5Q2482.0 164.0 2526.0 164.0Q2569.0 164.0 2598.5 195.0Q2628.0 226.0 2628.0 281.0Q2628.0 335.0 2598.5 366.0Q2569.0 397.0 2526.0 397.0Z"/>
+  </g>
 </svg>
