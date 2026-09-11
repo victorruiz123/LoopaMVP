@@ -3,6 +3,7 @@ import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../c
 import { fargForAnnons, fargerI } from "./farg.js";
 import { mergeSpecs } from "../specHarvest.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
+import { registreradKandidatbild } from "../kandidatbild.js";
 import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
 import { kanVaraStol } from "../stolPris.js";
 import type { CapturedImage, ListingAttribute, ModelCandidate, ProductImage } from "../types.js";
@@ -138,6 +139,8 @@ function grundaIBakgrunden(
   visad: { candidates: ModelCandidate[]; sources: SourceRef[] },
 ): void {
   void (async () => {
+    // Registret först, och utan att vänta på något: se publiceraRegisterbilder.
+    await publiceraRegisterbilder(jobId, visad.candidates).catch(() => {});
     // Har säljaren redan valt är fas 2 igång och har läst sitt underlag; en sökning till hade varit
     // ett bränt anrop. Bilderna hämtas ändå — sidorna bär mått som annonsen fortfarande vill ha.
     const innan = getJobSync(jobId) ?? (await getJob(jobId));
@@ -170,6 +173,57 @@ const sameList = (a: ModelCandidate[], b: ModelCandidate[]) =>
   a.length === b.length && a.every((c, i) => c.model === b[i]?.model);
 
 /**
+ * Skriver in en kandidatlista med bilder — men bara i den lista bilderna faktiskt hör till.
+ *
+ * Hämtningen tar upp till åtta sekunder, och säljaren kan hinna trycka "hitta nya" under tiden. Utan
+ * jämförelsen hade den gamla omgången skrivit tillbaka sina fyra avfärdade förslag ovanpå de nya —
+ * långt efter att skärmen bytt innehåll.
+ *
+ * Skrivs ÄVEN när säljaren redan hunnit välja: hämtningen bär också sidans mått, och de är som mest
+ * värda EFTER valet, när annonsen ska fyllas.
+ */
+async function skrivKandidatbilder(
+  jobId: string,
+  candidates: ModelCandidate[],
+  withImages: ModelCandidate[],
+): Promise<void> {
+  const fresh = getJobSync(jobId) ?? (await getJob(jobId));
+  if (!fresh) return;
+  if (fresh.identityStatus !== "needs_selection" && fresh.identityStatus !== "resolved") return;
+  if (!sameList(fresh.candidates ?? [], candidates)) return;
+  fresh.candidates = withImages;
+  // Den valda kandidaten är den enda vars sida annonsen ska byggas på — flytta över den hit så
+  // fas 2 slipper leta i listan.
+  const chosen = fresh.selected && withImages.find((c) => c.model === fresh.selected!.model);
+  if (chosen) fresh.selected = { ...fresh.selected!, pageSpecs: chosen.pageSpecs, imageSource: chosen.imageSource };
+  await persist(fresh);
+}
+
+/**
+ * REGISTRETS BILDER, FRAMME DIREKT — före allt som kostar ett nätanrop.
+ *
+ * En modell någon letat upp förut har sin miniatyr på disk, och uppslaget är en filkontroll: några
+ * millisekunder. Jakten i candidateImages gör redan det uppslaget först, men den STARTAR inte förrän
+ * grundningen i bakgrunden kommit tillbaka — ett generatoranrop på 6-9 sekunder. Följden var att en
+ * bild som låg färdig skrevs ut tio sekunder efter att skärmen ritats, och säljaren såg skimmer hela
+ * tiden för en bild vi redan ägde.
+ *
+ * Kandidater utan träff lämnas orörda: `imageUrl` förblir `undefined`, alltså "letar fortfarande",
+ * och jakten fyller i dem när den får börja.
+ */
+async function publiceraRegisterbilder(jobId: string, candidates: ModelCandidate[]): Promise<void> {
+  const träffar = await Promise.all(
+    candidates.map((c) => registreradKandidatbild(c.brand, c.model).catch(() => null)),
+  );
+  if (!träffar.some(Boolean)) return;
+  await skrivKandidatbilder(
+    jobId,
+    candidates,
+    candidates.map((c, i) => (träffar[i] ? { ...c, imageUrl: träffar[i] } : c)),
+  );
+}
+
+/**
  * Produktbilderna hämtas EFTER att kandidaterna sparats, aldrig före.
  *
  * Väljarskärmen ska dyka upp exakt lika snabbt som förut — bilderna är en förbättring av den, inte
@@ -189,25 +243,7 @@ function attachCandidateImages(jobId: string, candidates: ModelCandidate[], sour
    * när den sista gett upp. I en sådan delskrivning saknar de kandidater som fortfarande letas
    * `imageUrl` helt — det är precis vad väljarskärmen läser som "vänta, fler är på väg".
    */
-  const publish = async (withImages: ModelCandidate[]): Promise<void> => {
-    const fresh = getJobSync(jobId) ?? (await getJob(jobId));
-    if (!fresh) return;
-    if (fresh.identityStatus !== "needs_selection" && fresh.identityStatus !== "resolved") return;
-    /**
-     * Men bara i den lista bilderna faktiskt hör till.
-     *
-     * Hämtningen tar upp till åtta sekunder, och säljaren kan hinna trycka "hitta nya" under tiden.
-     * Utan den här jämförelsen hade den gamla omgången skrivit tillbaka sina fyra avfärdade förslag
-     * ovanpå de nya — långt efter att skärmen bytt innehåll.
-     */
-    if (!sameList(fresh.candidates ?? [], candidates)) return;
-    fresh.candidates = withImages;
-    // Den valda kandidaten är den enda vars sida annonsen ska byggas på — flytta över den hit så
-    // fas 2 slipper leta i listan.
-    const chosen = fresh.selected && withImages.find((c) => c.model === fresh.selected!.model);
-    if (chosen) fresh.selected = { ...fresh.selected!, pageSpecs: chosen.pageSpecs, imageSource: chosen.imageSource };
-    await persist(fresh);
-  };
+  const publish = (withImages: ModelCandidate[]) => skrivKandidatbilder(jobId, candidates, withImages);
 
   void resolveCandidateImages(candidates, sources, publish)
     .then(async (withImages) => {
@@ -470,6 +506,21 @@ export async function collectNewCandidates(
   rejected: ModelCandidate[],
   search: (rejectedNames: string[], listedNames: string[]) => Promise<SellerCall>,
   stillWanted: () => boolean = () => true,
+  /**
+   * Anropas i det ögonblick platserna är fyllda, medan omgången kan ha sökningar kvar.
+   *
+   * Loopen nedan söker vidare av TVÅ skäl, och bara det ena har med förslagen att göra: platserna är
+   * inte fyllda, eller ingen sökning har kommit tillbaka grundad. Det andra skälet angår fas 2:s
+   * underlag — inte de fyra namn som ska stå på skärmen — men väntan drabbade ändå säljaren: en
+   * fylld lista kunde stå och hållas tillbaka genom ytterligare två sökningar på 6-9 sekunder var
+   * medan skärmen visade "vi letar". Och bakom listan står bildhämtningen, som inte får börja förrän
+   * kandidaterna finns.
+   *
+   * Listan som lämnas här ÄR den slutliga: `CANDIDATES_PER_ROUND` är ett tak, så en fylld lista kan
+   * inte växa, och de återstående sökningarna rör bara `research`. Den som visar den behöver alltså
+   * inte förbereda sig på att byta ut den under fingret på någon som läser.
+   */
+  onFilled?: (candidates: ModelCandidate[], sources: SourceRef[]) => void,
 ): Promise<CandidateRound> {
   const rejectedNames = rejected.map(fullName).filter(Boolean);
   const candidates: ModelCandidate[] = [];
@@ -477,6 +528,8 @@ export async function collectNewCandidates(
   let research: CandidateRound["research"] = null;
   let error: string | null = null;
   let searches = 0;
+  /** Har den fyllda listan redan lämnats ut? Den lämnas en gång, aldrig om. */
+  let anmalda = false;
 
   while ((candidates.length < CANDIDATES_PER_ROUND || !research) && searches < MAX_ROUND_SEARCHES) {
     // Bara mellan sökningarna: säljaren kan ha skrivit namnet själv medan den förra löpte, och då
@@ -506,6 +559,11 @@ export async function collectNewCandidates(
       candidates.push(c);
     }
     for (const s of call.sources) if (!sources.some((x) => x.url === s.url)) sources.push(s);
+    // Platserna är fyllda: visa dem nu, inte när grundningen nedan är klar.
+    if (candidates.length >= CANDIDATES_PER_ROUND && !anmalda) {
+      anmalda = true;
+      onFilled?.([...candidates], [...sources]);
+    }
     // Fas 2 ärver EN sökning, aldrig tre hopklistrade: den första grundade. Text om fyra andra
     // modeller hade gett annonsen mått som hör till någon annan möbel.
     if (!research && call.sources.length > 0) research = { researchText: call.researchText, sources: call.sources };
@@ -514,7 +572,16 @@ export async function collectNewCandidates(
   return { candidates, sources, research, error, searches };
 }
 
-/** Själva omvalssökningen. Skriver alltid tillbaka ett `needs_selection` — även när den blev tom. */
+/**
+ * Själva omvalssökningen. Skriver alltid tillbaka ett `needs_selection` — även när den blev tom.
+ *
+ * LISTAN VISAS SÅ FORT DEN ÄR FYLLD, inte när omgången är slut. De två sammanföll förut, och det var
+ * hela problemet med "hitta nya": omgången söker vidare efter en GRUNDAD sökning även när de fyra
+ * platserna redan är tagna, och de extra sökningarna kostar 6-9 sekunder var. Under dem stod jobbet
+ * kvar i `identifying`, skärmen sa "vi letar", och bildhämtningen — som inte kan börja förrän
+ * kandidaterna är skrivna — hade inte ens startat. Nu delas de: förslagen och deras bilder går ut på
+ * den första fyllda sökningen, och underlaget till fas 2 skrivs på när det kommer.
+ */
 async function runCandidateRound(
   jobId: string,
   brand: string,
@@ -523,44 +590,91 @@ async function runCandidateRound(
 ): Promise<void> {
   const startedAt = Date.now();
   const dir = jobDir(jobId);
+  const runda = getJobSync(jobId)?.candidateRound ?? 1;
+  /** Den lista som visats, om den visats. Håller isär "redan uppe" från "kom med slutresultatet". */
+  let uppe: ModelCandidate[] | null = null;
+
+  /**
+   * Skriv fram listan och sätt igång allt som hänger på den.
+   *
+   * Körs en gång per omgång: antingen från `onFilled` mitt i sökandet, eller på slutresultatet när
+   * platserna aldrig blev fyllda. Returnerar jobbet den skrev, eller null när den inte fick skriva.
+   */
+  const visa = async (found: ModelCandidate[], sources: SourceRef[], research: CandidateRound["research"], error: string | null) => {
+    const job = getJobSync(jobId) ?? (await getJob(jobId));
+    if (!job) return null;
+    // Säljaren kan ha skrivit namnet själv medan sökningen pågick. Då är identiteten avgjord, och en
+    // lista som landar efteråt får inte välta den.
+    if (job.identityStatus !== "identifying") return null;
+
+    job.candidates = found;
+    job.identityStatus = "needs_selection";
+    // Underlaget byts bara mot ett som faktiskt bär något: en tom omgång får inte kasta de källor den
+    // första gav, för det är dem fas 2 ärver när dess egen sökning kommer tillbaka tom.
+    if (found.length > 0 && research) job.identityResearch = research;
+    // Att inte hitta fler modeller är inget fel — det är ett svar, och skärmen säger det med sin egen
+    // text. Bara en fallen generator är värd en varningsrad, och bara när den lämnade skärmen tom:
+    // med fyra förslag uppe är en ursäkt för en sökning som föll däremellan bara brus.
+    if (found.length === 0 && error) job.identityError = error;
+    await persist(job);
+    uppe = found;
+
+    if (found.length > 0) {
+      attachCandidateImages(jobId, found, sources);
+      // Den förra omgångens förvärmning gäller ett namn säljaren just avfärdat. Bort med den, och
+      // värm den nya listans toppkandidat i stället.
+      forvarmda.delete(jobId);
+      forvarmFas2(jobId, brand, found[0], images, dir, job.identityResearch ?? undefined);
+    }
+    return job;
+  };
+
   const round = await collectNewCandidates(
     rejected,
     (rejectedNames, listedNames) => callSellerGenerate(brand, images, dir, undefined, undefined, rejectedNames, listedNames),
-    // Avbryt mellan sökningarna om säljaren hunnit avgöra identiteten själv. Saknas jobbet i
-    // minnet är det inget besked om att valet är gjort — då fortsätter omgången.
-    () => (getJobSync(jobId)?.identityStatus ?? "identifying") === "identifying",
+    /**
+     * Avbryt mellan sökningarna om säljaren hunnit avgöra identiteten själv. Saknas jobbet i minnet
+     * är det inget besked om att valet är gjort — då fortsätter omgången.
+     *
+     * `needs_selection` räknas som "fortfarande önskad" sedan listan börjat visas tidigt: det läget
+     * är numera VÅRT eget avtryck, inte ett besked om att någon annan tagit över. Det som säger att
+     * ingen väntar längre är `resolved` — och en ny omgång, som skriver om statusen till
+     * `identifying` och vars lista `visa` ovan vägrar välta.
+     */
+    () => {
+      const status = getJobSync(jobId)?.identityStatus ?? "identifying";
+      return status === "identifying" || (uppe !== null && status === "needs_selection");
+    },
+    // Fyllda platser: ut med dem direkt. Se doc-kommentaren på parametern.
+    (found, sources) => {
+      void visa(found, sources, null, null).catch(() => {});
+    },
   );
   const found = round.candidates;
 
-  const job = getJobSync(jobId) ?? (await getJob(jobId));
-  if (!job) return;
-  // Säljaren kan ha skrivit namnet själv medan sökningen pågick. Då är identiteten avgjord, och en
-  // lista som landar efteråt får inte välta den.
-  if (job.identityStatus !== "identifying") return;
-
-  job.candidates = found;
-  job.identityStatus = "needs_selection";
-  // Underlaget byts bara mot ett som faktiskt bär något: en tom omgång får inte kasta de källor den
-  // första gav, för det är dem fas 2 ärver när dess egen sökning kommer tillbaka tom.
-  if (found.length > 0 && round.research) job.identityResearch = round.research;
-  // Att inte hitta fler modeller är inget fel — det är ett svar, och skärmen säger det med sin egen
-  // text. Bara en fallen generator är värd en varningsrad, och bara när den lämnade skärmen tom:
-  // med fyra förslag uppe är en ursäkt för en sökning som föll däremellan bara brus.
-  if (found.length === 0 && round.error) job.identityError = round.error;
-  await persist(job);
+  /**
+   * Listan stod redan uppe: då återstår bara underlaget.
+   *
+   * `visa` får inte köras om — den skulle skriva samma fyra namn en gång till och starta om både
+   * bildhämtningen och förvärmningen för en lista som inte ändrat sig.
+   */
+  if (uppe) {
+    const job = getJobSync(jobId) ?? (await getJob(jobId));
+    // Bara om det fortfarande är DEN HÄR listan som står på skärmen. Ett nytt "hitta nya" under
+    // tiden har egna kandidater, och det underlaget hör inte till dem.
+    if (job && round.research && sameList(job.candidates ?? [], uppe)) {
+      job.identityResearch = round.research;
+      await persist(job);
+    }
+  } else {
+    await visa(found, round.sources, round.research, round.error);
+  }
 
   console.info(
-    `[identify] ${jobId.slice(0, 8)} omval=${job.candidateRound ?? 1} nya=${found.length}` +
-      ` sökningar=${round.searches} avfärdade=${rejected.length} ms=${Date.now() - startedAt}`,
+    `[identify] ${jobId.slice(0, 8)} omval=${runda} nya=${found.length}` +
+      ` sökningar=${round.searches} avfärdade=${rejected.length} ms=${Date.now() - startedAt}` +
+      `${uppe ? ` (visad efter sökning 1 av ${round.searches})` : ""}`,
   );
-
-  if (found.length > 0) {
-    attachCandidateImages(jobId, found, round.sources);
-    // Den förra omgångens förvärmning gäller ett namn säljaren just avfärdat. Bort med den, och
-    // värm den nya listans toppkandidat i stället.
-    forvarmda.delete(jobId);
-    forvarmFas2(jobId, brand, found[0], images, dir, job.identityResearch ?? undefined);
-  }
 }
 
 /**

@@ -230,3 +230,39 @@ test("en fallen generator stoppar inte de förslag som redan hittats", async () 
   assert.deepEqual(empty.candidates, []);
   assert.equal(empty.error, "AI-tjänsten svarade inte.");
 });
+
+/**
+ * Den fyllda listan lämnas ut mitt i omgången.
+ *
+ * Omgången söker vidare efter en GRUNDAD sökning även när platserna är tagna, och varje extra
+ * sökning kostar 6-9 sekunder. Förut syntes förslagen — och därmed deras bilder, som inte kan
+ * hämtas innan kandidaterna finns — först när den sista av dem kommit tillbaka.
+ */
+test("fyra förslag lämnas ut direkt, utan att vänta in grundningen", async () => {
+  const ogrundad = (models: string[]): SellerCall => ({
+    kind: "needs_selection",
+    candidates: models.map((m) => cand(m)),
+    sources: [],
+    researchText: "ogrundad",
+  });
+  const { search } = scripted([ogrundad(["LANDSKRONA", "FRIHETEN", "BACKSÄLEN", "GRÖNLID"]), selection(["VIMLE"])]);
+
+  const utlamnade: string[][] = [];
+  const round = await collectNewCandidates([], search, () => true, (found) =>
+    utlamnade.push(found.map((c) => c.model)),
+  );
+
+  assert.equal(utlamnade.length, 1, "listan lämnas en gång, aldrig om");
+  assert.deepEqual(utlamnade[0], ["LANDSKRONA", "FRIHETEN", "BACKSÄLEN", "GRÖNLID"]);
+  // Och omgången sökte ändå vidare efter underlaget — det som lämnades tidigt var listan, inte jobbet.
+  assert.equal(round.searches, 2);
+  assert.equal(round.research?.researchText, "underlag: VIMLE");
+  assert.deepEqual(round.candidates.map((c) => c.model), utlamnade[0], "den utlämnade listan är den slutliga");
+});
+
+test("en lista som aldrig fylls lämnas inte ut i förtid", async () => {
+  const { search } = scripted([selection(["LANDSKRONA"])]);
+  const utlamnade: string[][] = [];
+  await collectNewCandidates([], search, () => false, (found) => utlamnade.push(found.map((c) => c.model)));
+  assert.deepEqual(utlamnade, [], "tre förslag är inte fyra — slutresultatet får visa dem");
+});

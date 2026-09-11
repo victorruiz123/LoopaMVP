@@ -166,7 +166,16 @@ function CandidatePhoto({ url, searching }: { url?: string | null; searching: bo
         /* Ingen `loading="lazy"`: fyra miniatyrer, och de ÄR skärmens innehåll — säljaren väljer på
            bilden. En uppskjuten hämtning hade dessutom hunnit slå i tidsgränsen ovan utan att ett
            enda byte begärts, och rutan hade slocknat för en bild som aldrig ens efterfrågats. */
-        <img src={url} alt="" onLoad={() => setState("klar")} onError={() => setState("död")} />
+        <img
+          src={url}
+          alt=""
+          /* Miniatyren ÄR skärmens innehåll, och den är 10-20 kB. Den ska gå före allt annat
+             webbläsaren råkar ha i kö, och avkodas utan att hålla upp ritningen av de andra tre. */
+          fetchPriority="high"
+          decoding="async"
+          onLoad={() => setState("klar")}
+          onError={() => setState("död")}
+        />
       ) : (
         <span
           className={`candidate-photo-empty${url === undefined && searching ? " is-searching" : ""}`}
