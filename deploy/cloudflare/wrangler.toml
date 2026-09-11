@@ -14,30 +14,33 @@ compatibility_date = "2026-01-01"
 
 # ─── Appens sidor ───────────────────────────────────────────────────────────
 #
-# ROTEN ÄR MEDVETET INTE MED — den läggs till vid lansering.
+# ROTEN ÄR VÅR. loopa.nu/ visar säljflödet — det är appens startsida, på den domän folk faktiskt
+# skriver in. Marknadssajtens företagssida bor kvar på loopa.nu/company och nås därifrån.
 #
-# loopa.nu/ ska visa marknadssajtens företagssida fram till dess. Rutten fanns här en kort stund och
-# togs bort igen: en Worker-rutt VINNER över Cloudflares omdirigeringsregel, tvärtemot vad jag antog,
-# så roten började genast visa säljflödet.
+# EN WORKER-RUTT VINNER ÖVER EN OMDIRIGERINGSREGEL, tvärtemot vad man tror. Det upptäcktes när
+# rutten låg här en kort stund innan roten skulle flytta, och roten genast visade säljflödet.
+# Numera är det själva poängen — men det gör också ordningen nedan icke förhandlingsbar.
 #
-# VID LANSERING, i den här ordningen:
-#   1. Lägg tillbaka blocket nedan och kör `npx wrangler deploy`
-#   2. Ta bort omdirigeringsregeln loopa.nu/ → /company i Cloudflare (Rules → Redirect Rules)
-#   3. Sätt LOOPA_ROT_FLYTTAD=1 i server/.env och starta om, så att app.loopa.nu/ pekar hit
+# ORDNINGEN VID UTRULLNING:
+#   1. Ta bort omdirigeringsregeln loopa.nu/ → /company i Cloudflare (Rules → Redirect Rules)
+#   2. `npx wrangler deploy` härifrån
+#   3. Rulla servern (roten kanoniseras nu som allt annat, se butik/seo.ts)
 #
-# [[routes]]
-# pattern = "loopa.nu/"
-# zone_name = "loopa.nu"
+# Görs 3 före 1 är den gamla kedjan tillbaka: app.loopa.nu/ → 301 → loopa.nu/ → 302 → /company, och
+# säljflödet går inte att nå från någon adress alls. Det hände i drift en gång, och regeln kördes
+# före Workers just då eftersom rutten här ännu inte fanns.
+[[routes]]
+pattern = "loopa.nu/"
+zone_name = "loopa.nu"
 
-# ─── Säljflödet på en delbar adress, tills roten flyttar ────────────────────
+# ─── /salj: den gamla adressen, som fortfarande måste svara ────────────────
 #
-# loopa.nu/ går till marknadssajtens /company så länge omdirigeringsregeln ligger kvar (se ROTEN
-# ovan), och app.loopa.nu är ingen adress man skickar till någon. /salj lägger säljflödet på den
-# domän som faktiskt används, utan att röra roten.
+# /salj var säljflödets adress den vecka roten ännu gick till företagssidan. Den står i länkar vi
+# delat, och servern 301:ar den numera till roten (se server.ts) så att säljflödet har EN adress.
 #
-# INGEN KOD BEHÖVDES. Säljflödet har med flit ingen router — App.tsx väljer vy på adressen och låter
-# allt den inte känner igen falla till startsidan (se FlowApp). /salj är alltså inte en ny sida utan
-# en adress som råkar landa på den som redan finns.
+# RUTTEN LIGGER KVAR PRECIS DÄRFÖR. Tas den bort svarar marknadssajten på /salj i stället — en 404
+# från en annan sajt — och omdirigeringen får aldrig chansen att köra. En rutt som pekar på en
+# server som svarar 301 är hur en gammal adress dör med hedern i behåll.
 #
 # Två mönster och inte "loopa.nu/salj*": stjärnan hade också fångat /saljare och vad marknadssajten
 # än lägger där i framtiden. Den här rutten ska äga precis två adresser.
