@@ -3,7 +3,7 @@ import { getAnnons, patchAnnons } from "../api";
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning } from "../types";
+import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPublication, ChannelPlan } from "../types";
 
 /**
  * En annons, hela vägen ner — och vägen att ändra den.
@@ -160,9 +160,13 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
 
       {/* ---------------- Godkännandet ---------------- */}
       {/*
-        Kön. Säljaren har tryckt "Sälj med Loopa" och väntar på oss. Knappen gör båda kanalerna i ett
-        tryck — butiken direkt, Tradera i bakgrunden — och står överst i sin egen ruta: det är den
-        enda åtgärden på sidan som någon annan väntar på.
+        Kön. Säljaren har tryckt "Sälj med Loopa" och väntar på oss. ETT tryck lägger ut möbeln på
+        alla ställen som kan ta emot den — butiken direkt, Tradera och Blocket i bakgrunden — och det
+        står överst i sin egen ruta: det är den enda åtgärden på sidan som någon annan väntar på.
+
+        VAD KNAPPEN GÖR STÅR UTSKRIVET INNAN DEN TRYCKS (`Kanallista`). Det går inte att härleda ur
+        annonsen: det hänger på serverns miljö, och skillnaden mellan "läggs ut" och "fylls i men
+        publiceras inte" (Blockets torrkörning) är för stor för att gissa sig till.
       */}
       {(annons.traderaStatus === "pending" || annons.traderaStatus === "error") && (
         <section className="card-block annons-godkann">
@@ -171,18 +175,19 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
           </h2>
           <p className="admin-note">
             {annons.traderaStatus === "pending"
-              ? `Säljaren tryckte "Sälj med Loopa" ${datum(annons.begardAt)}. Godkänn så går möbeln upp i butiken och på Tradera i samma tryck.`
+              ? `Säljaren tryckte "Sälj med Loopa" ${datum(annons.begardAt)}. Godkänn så går möbeln upp i butiken och på marknadsplatserna i samma tryck.`
               : `Godkänd ${datum(annons.tradera?.approvedAt ?? null)}, men Tradera sa nej: ${annons.tradera?.error ?? "okänt fel"}. Möbeln ligger kvar i butiken. Rätta och försök igen.`}
           </p>
+          <Kanallista kanaler={annons.kanaler} />
           {annons.saknas.length > 0 && (
             <p className="public-card-error">Kan inte godkännas än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
           )}
           <button
             className="btn btn-primary"
             disabled={sparar || annons.saknas.length > 0}
-            onClick={() => skicka({ lage: "godkann" }, "Godkänd. Möbeln ligger i butiken; Tradera köar annonsen, det tar oftast under en minut.")}
+            onClick={() => skicka({ lage: "godkann" }, "Godkänd. Möbeln ligger i butiken; marknadsplatserna körs i bakgrunden.")}
           >
-            {annons.traderaStatus === "pending" ? "Godkänn och lägg ut" : "Försök Tradera igen"}
+            {annons.traderaStatus === "pending" ? "Godkänn och lägg ut" : "Försök igen"}
           </button>
         </section>
       )}
@@ -197,6 +202,7 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
           </a>
         </p>
       )}
+      <BlocketRuta blocket={annons.blocket} />
 
       {/* ---------------- Läget ---------------- */}
       <h2 className="profile-section-title">Läge</h2>
@@ -358,6 +364,102 @@ function Tal({ etikett, varde }: { etikett: string; varde: string | number }) {
       <div className="profile-stat-value">{varde}</div>
       <div className="profile-stat-label">{etikett}</div>
     </div>
+  );
+}
+
+/**
+ * Vad trycket kommer att göra, en rad per kanal.
+ *
+ * Står FÖRE knappen och inte efter den. Kanalerna är inte varandras kopior: Tradera går genom ett API
+ * på under en minut, Blocket genom en robot som klickar i deras formulär och som utan
+ * BLOCKET_PUBLICERA=1 stannar före sista knappen. Den som godkänner ska veta vilket av de två som
+ * gäller innan de trycker — "publicerad" och "ifylld men inte publicerad" är inte samma besked till
+ * en säljare som väntar.
+ *
+ * En kanal som inte är konfigurerad döljs inte. Att den saknas är själva upplysningen: möbeln går ut
+ * på ett ställe mindre än man tror, och raden säger vilken variabel som fattas.
+ */
+function Kanallista({ kanaler }: { kanaler: ChannelPlan[] }) {
+  if (!kanaler?.length) return null;
+  const namn: Record<ChannelPlan["channel"], string> = { tradera: "Tradera", blocket: "Blocket" };
+  return (
+    <ul className="admin-kanaler">
+      {kanaler.map((k) => {
+        const gar = k.configured && k.ready && !k.alreadyRunning;
+        const text = k.alreadyRunning
+          ? "ligger redan uppe — hoppas över"
+          : !k.configured
+            ? `inte konfigurerat (saknar ${k.missingEnv.join(", ")})`
+            : !k.ready
+              ? (k.reason ?? "går inte att publicera")
+              : k.dryRun
+                ? "TORRKÖRNING — allt fylls i, men sista knappen trycks aldrig"
+                : "läggs ut";
+        return (
+          <li key={k.channel} className={gar ? (k.dryRun ? "kanal-torr" : "kanal-gar") : "kanal-nej"}>
+            <strong>{namn[k.channel]}</strong> — {text}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+/**
+ * Blocket-annonsens utfall.
+ *
+ * Egen ruta och inte en rad bredvid Traderas, för de två har olika sorters svar. Tradera säger ja
+ * eller nej på en minut. Blocket-roboten går genom ett formulär i flera steg, och när något går fel
+ * är det stegen som säger var — de är det enda spåret som finns, eftersom ingen människa såg körningen.
+ *
+ * Torrkörningen får en egen, tydlig rad. Den ser annars ut som en lyckad publicering i allt utom att
+ * det inte finns någon annons.
+ */
+function BlocketRuta({ blocket }: { blocket: BlocketPublication | null }) {
+  if (!blocket) return null;
+  const problem = blocket.steps?.filter((s) => s.status === "error" || s.status === "warning") ?? [];
+  return (
+    <section className="card-block">
+      <h2 className="profile-section-title">Blocket</h2>
+      {blocket.status === "publishing" && (
+        <p className="admin-note">Roboten fyller i Blockets formulär just nu. Det tar minuter, inte sekunder.</p>
+      )}
+      {blocket.status === "dry-run" && (
+        <p className="admin-note">
+          Torrkörning {datum(blocket.startedAt)}: allt fylldes i, men ingen annons publicerades.
+          Sätt BLOCKET_PUBLICERA=1 på servern för skarpt läge.
+        </p>
+      )}
+      {blocket.status === "published" && (
+        <p className="admin-note">
+          Ligger på Blocket sedan {datum(blocket.publishedAt)}
+          {blocket.url ? (
+            <>
+              :{" "}
+              <a href={blocket.url} target="_blank" rel="noreferrer">
+                {blocket.url}
+              </a>
+            </>
+          ) : blocket.receiptUrl ? (
+            <> — adressen gick inte att härleda, kvittot ligger på {blocket.receiptUrl}</>
+          ) : (
+            "."
+          )}
+        </p>
+      )}
+      {blocket.status === "error" && (
+        <p className="public-card-error">Blocket: {blocket.error ?? "okänt fel"}</p>
+      )}
+      {problem.length > 0 && (
+        <ul className="admin-kanaler">
+          {problem.slice(-6).map((steg, i) => (
+            <li key={`${steg.name}-${i}`} className={steg.status === "error" ? "kanal-nej" : "kanal-torr"}>
+              {steg.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
 

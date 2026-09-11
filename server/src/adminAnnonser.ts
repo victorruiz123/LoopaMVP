@@ -40,9 +40,9 @@ import { allOrders, ordersForProduct, type Order } from "./butik/orders.js";
 import * as overrides from "./butik/overrides.js";
 import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
 import { makePriceLadder, nextRung } from "./priceLadder.js";
-import type { ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
-import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./integrations/tradera/publish.js";
-import { traderaConfigured, missingTraderaEnv } from "./integrations/tradera/tradera.js";
+import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
+import { markApproved } from "./integrations/tradera/publish.js";
+import { markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
@@ -93,6 +93,8 @@ export interface AdminAnnonsRad {
   // --- kanaler ---
   traderaStatus: TraderaPublication["status"] | null;
   traderaItemId: number | null;
+  /** Blockets läge, för listan. Null = annonsen har aldrig lagts ut dit. */
+  blocketStatus: BlocketPublication["status"] | null;
   /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. Kön sorteras på den. */
   begardAt: string | null;
 
@@ -113,6 +115,16 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   ladder: PriceLadder | null;
   /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
+  /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
+  blocket: BlocketPublication | null;
+  /**
+   * Vad ett tryck på "Godkänn och lägg ut" skulle göra, kanal för kanal — läst NU.
+   *
+   * Panelen ska kunna säga vad knappen gör innan den trycks, och det går inte att härleda ur jobbet:
+   * det hänger på serverns miljö (nycklar, session, torrkörningsläge). Utan den här visade panelen
+   * "går upp på Tradera" för en server där Tradera saknar nycklar och Blocket är det enda som kör.
+   */
+  kanaler: ChannelPlan[];
   /** Butikens huvudbok för möbeln: varje övergång, med vem och varför. */
   handelser: ProductEvent[];
   /** Mätningens råa rader, nyast först. */
@@ -237,6 +249,7 @@ function radAv(
 
     traderaStatus: job.tradera?.status ?? null,
     traderaItemId: job.tradera?.itemId ?? null,
+    blocketStatus: job.blocket?.status ?? null,
     begardAt: job.tradera?.startedAt ?? null,
 
     statistik,
@@ -364,6 +377,8 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     annonstext: overrides.annonstext(job, overstyrning),
     ladder: job.priceLadder ?? null,
     tradera: job.tradera ?? null,
+    blocket: job.blocket ?? null,
+    kanaler: (await planAutoPublish(job)).channels,
     handelser: await butikStore().events(id),
     matningar: await handelserFor(id),
     ordrarRader,
@@ -568,33 +583,47 @@ async function bytLage(
 /**
  * Godkännandet: det säljaren beställde med "Sälj med Loopa", verkställt av en admin.
  *
- * Två kanaler i samma tryck, i den här ordningen:
+ * ETT TRYCK, TRE STÄLLEN, i den här ordningen:
  *
  *   1. Butiken. Posten skapas om den saknas och går till `live` genom tillståndsmaskinen — samma väg
  *      som `publicera`. Det sker synkront; när svaret kommer ligger möbeln i rutnätet. Bara en förtur
  *      (efterlysning/fortur.ts) håller den kvar som utkast, och då publicerar `syncFromJobs` den när
- *      förturen gått ut — den läser `godkand()`, inte Traderas svar.
- *   2. Tradera. Köas i bakgrunden precis som förut; panelen läser `tradera.status` för utfallet. Ett
- *      avslag från Tradera tar INTE ner möbeln ur butiken: godkännandet är Loopas beslut, och det
- *      står. Admin ser felet på annonsen och kan trycka igen.
+ *      förturen gått ut — den läser `godkand()`, inte marknadsplatsernas svar.
+ *   2. Tradera. Köas i bakgrunden som förut; panelen läser `tradera.status` för utfallet.
+ *   3. Blocket. Samma annons, samma bilder, men lagd av en robot i Blockets eget formulär — det finns
+ *      inget API. Tar minuter i stället för sekunder och kan behöva BankID. Se integrations/blocket/.
  *
- * Ett andra tryck medan Tradera arbetar avvisas; ett tryck efter ett Tradera-fel är just det
- * omförsöket som behövs.
+ * KANALERNA ÄR OBEROENDE, och det är hela poängen med `planAutoPublish`. Saknas Tradera-nycklarna på
+ * servern går möbeln ändå ut i Butiken och på Blocket; går Blocket-roboten i väggen ligger annonsen
+ * kvar på Tradera. Halv framgång är ett riktigt utfall och syns som två statusar på jobbet, inte som
+ * ett gemensamt "misslyckades". Trycket avvisas bara när INGEN kanal kan ta emot annonsen — och då
+ * med varje kanals eget skäl utskrivet, för det är det admin behöver för att laga något.
+ *
+ * ETT ANDRA TRYCK publicerar det som saknas. En kanal som redan kör eller redan ligger uppe hoppas
+ * över (`alreadyRunning`), så en möbel kan inte läggas upp två gånger — men ligger den på Tradera
+ * medan Blocket föll, lägger nästa tryck bara upp Blocket.
+ *
+ * Ett avslag från en marknadsplats tar INTE ner möbeln ur butiken: godkännandet är Loopas beslut,
+ * och det står.
  */
 async function godkann(id: string, job: ConditionJob, adminId: string | null): Promise<void> {
-  const status = job.tradera?.status;
-  if (status === "publishing") throw new AndringsFel("Annonsen är redan på väg upp på Tradera.");
-  if (status === "published") throw new AndringsFel("Annonsen ligger redan uppe på Tradera.");
-  if (status !== "pending" && status !== "error") {
+  /**
+   * Beställningen måste finnas. `job.tradera` skapas av säljarens egen knapp (markTraderaPending) och
+   * av ingenting annat — fältet heter Tradera av historiska skäl men betyder "säljaren har beställt
+   * en publicering". Utan den är det här inte ett godkännande utan ett beslut åt någon annan.
+   */
+  if (!job.tradera) {
     throw new AndringsFel("Säljaren har inte tryckt \"Sälj med Loopa\" på den här annonsen.");
   }
-  if (!traderaConfigured()) {
-    throw new AndringsFel(`Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`);
-  }
 
-  // Samma krav som säljarens knapp ställde — underlaget kan ha ändrats sedan dess.
-  const readiness = await planTraderaPublish(job);
-  if (!readiness.ok) throw new AndringsFel(readiness.reason);
+  /**
+   * Vad trycket skulle göra, kanal för kanal — INNAN något skrivs.
+   *
+   * Planen är också grinden: är listan tom finns det ingenting att göra, och skälet står per kanal.
+   * Den prövar samma krav som säljarens knapp gjorde, eftersom underlaget kan ha ändrats sedan dess.
+   */
+  const plan = await planAutoPublish(job);
+  if (plan.willPublish.length === 0) throw new AndringsFel(varforIngenKanal(plan.channels));
 
   const produkt = jobToProduct(job, "draft");
   const rattat = produkt ? overrides.tillampaPaProdukt(produkt, await overrides.hamta(id)) : null;
@@ -602,8 +631,10 @@ async function godkann(id: string, job: ConditionJob, adminId: string | null): P
   const brist = shopReadiness(rattat);
   if (!brist.ready) throw new AndringsFel(`Annonsen saknar ${brist.missing.join(", ")}.`);
 
-  // Stämpeln först. Skulle Tradera-steget falla är möbeln ändå godkänd, och butiken vet det.
-  await markTraderaPublishing(job, adminId);
+  // Stämpeln först, och skild från kanalerna: möbeln är godkänd av en människa även om varje
+  // marknadsplats sedan faller. Det är den butiken läser (`godkand`).
+  await markApproved(job, adminId);
+  await markChannelsPublishing(job, plan.willPublish, adminId);
 
   await ensureRecord(id, job.id, "loopa", rattat.listedAt);
   const { publishBlocked } = await import("./efterlysning/fortur.js");
@@ -615,7 +646,24 @@ async function godkann(id: string, job: ConditionJob, adminId: string | null): P
     console.info(`[butik] ${id} godkänd men hålls av en förtur — publiceras när den gått ut.`);
   }
 
-  void runTraderaPublish(job.id);
+  console.info(`[godkann] ${id} läggs ut på: ${plan.willPublish.join(", ")}`);
+  void runAutoPublish(job.id, plan.willPublish);
+}
+
+/**
+ * Varför ingen kanal kan ta emot annonsen, sagt så att det går att laga.
+ *
+ * En rad per kanal och aldrig en sammanslagen mening: "det gick inte" hjälper ingen när Tradera
+ * saknar nycklar OCH Blocket saknar session, och när den ena bara ligger uppe redan.
+ */
+function varforIngenKanal(channels: ChannelPlan[]): string {
+  const namn: Record<ChannelPlan["channel"], string> = { tradera: "Tradera", blocket: "Blocket" };
+  const rader = channels.map((c) => {
+    if (c.alreadyRunning) return `${namn[c.channel]}: ligger redan uppe eller håller på att läggas ut.`;
+    if (!c.configured) return `${namn[c.channel]}: inte konfigurerat på servern (saknar ${c.missingEnv.join(", ")}).`;
+    return `${namn[c.channel]}: ${c.reason ?? "går inte att publicera."}`;
+  });
+  return `Ingen kanal kan ta emot annonsen just nu. ${rader.join(" ")}`;
 }
 
 /** Nästa steg ner, för förhandsvisningen i panelen. Ren funktion — samma som stegen själv använder. */

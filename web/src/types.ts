@@ -681,6 +681,43 @@ export interface AnnonsStatistik {
   senaste: string | null;
 }
 
+/** Ett steg i Blocket-robotens körning. Visas bara när något gick fel eller varnade. */
+export interface BlocketStep {
+  name: string;
+  status: "ok" | "warning" | "error" | "running";
+  at: string;
+}
+
+/**
+ * Annonsen på Blocket.
+ *
+ * Två fält som Tradera-motsvarigheten inte har, och båda följer av att Blocket inte är ett API:
+ * `dryRun` (roboten fyllde i allt men tryckte aldrig på sista knappen) och `receiptUrl` (kvittosidan
+ * är inte annonsen, och ibland är den allt vi får). Det finns inget itemId: Blocket ger oss aldrig
+ * något id, bara en adress.
+ */
+export interface BlocketPublication {
+  status: "publishing" | "published" | "dry-run" | "error";
+  url: string | null;
+  receiptUrl: string | null;
+  dryRun: boolean;
+  error: string | null;
+  startedAt: string;
+  publishedAt: string | null;
+  steps: BlocketStep[];
+}
+
+/** Vad ett tryck på knappen skulle göra, kanal för kanal. */
+export interface ChannelPlan {
+  channel: "tradera" | "blocket";
+  configured: boolean;
+  missingEnv: string[];
+  ready: boolean;
+  reason: string | null;
+  alreadyRunning: boolean;
+  dryRun: boolean;
+}
+
 export type AnnonsLage =
   | "misslyckad"
   | "pagaende"
@@ -723,6 +760,8 @@ export interface AdminAnnonsRad {
   soldChannel: "butik" | "tradera" | null;
   dagarUppe: number | null;
   traderaStatus: "pending" | "publishing" | "published" | "error" | null;
+  /** Blockets läge. Null = annonsen har aldrig lagts ut dit. */
+  blocketStatus: BlocketPublication["status"] | null;
   traderaItemId: number | null;
   /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. */
   begardAt: string | null;
@@ -795,6 +834,10 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   ladder: PriceLadder | null;
   /** Publiceringen mot Tradera i sin helhet: länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
+  /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
+  blocket: BlocketPublication | null;
+  /** Vad "Godkänn och lägg ut" skulle göra just nu, kanal för kanal. Läst ur serverns miljö. */
+  kanaler: ChannelPlan[];
   handelser: AnnonsHandelse[];
   matningar: AnnonsMatning[];
   ordrarRader: Array<{

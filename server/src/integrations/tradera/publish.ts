@@ -247,6 +247,27 @@ export async function markTraderaPending(job: ConditionJob): Promise<TraderaPubl
   return publication;
 }
 
+/**
+ * Godkännandestämpeln ENSAM, utan att påstå att Tradera arbetar.
+ *
+ * Finns för att godkännandet och Tradera-publiceringen inte längre är samma sak. Trycket i panelen
+ * lägger ut annonsen på varje kanal som kan ta emot den (se integrations/autoPublish.ts), och saknas
+ * Tradera-nycklarna på servern går möbeln ändå ut — i Butiken och på Blocket. `markTraderaPublishing`
+ * hade då satt status "publicerar" på en kanal som inte kör, alltså en lögn i panelen som aldrig
+ * går över.
+ *
+ * Stämpeln måste ändå sättas, för det är DEN butiken läser (`godkand`): utan den plockar nästa
+ * `syncFromJobs` ner möbeln ur rutnätet igen, trots att en människa just godkänt den.
+ *
+ * Skriver aldrig över en tidigare stämpel — ett omförsök är inte ett nytt godkännande.
+ */
+export async function markApproved(job: ConditionJob, approvedBy: string | null): Promise<void> {
+  const nuvarande = job.tradera;
+  if (!nuvarande || nuvarande.approvedAt) return;
+  job.tradera = { ...nuvarande, approvedAt: new Date().toISOString(), approvedBy };
+  await persist(job);
+}
+
 /** Godkänd av en admin. Sätts i samma skrivning som publiceringen startar, så stämpeln inte kan tappas. */
 export async function markTraderaPublishing(job: ConditionJob, approvedBy: string | null = null): Promise<TraderaPublication> {
   const publication: TraderaPublication = {

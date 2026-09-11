@@ -3,7 +3,10 @@
     "target": "ES2022",
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
-    "lib": ["ES2022"],
+    // DOM finns här för Blocket-publiceringen: koden inuti page.evaluate() kör i webbläsaren, inte i
+    // Node, och utan DOM-typerna är Element, ShadowRoot och HTMLSelectElement okända namn. Se
+    // integrations/blocket/browser.ts. Servern har fortfarande ingen DOM — typerna är bara typer.
+    "lib": ["ES2022", "DOM"],
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,

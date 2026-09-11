@@ -2105,6 +2105,18 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .card-done { margin-top: 4px; min-height: 52px; border-radius: var(--r); font-size: var(--fs-lg); }
 .provenance { margin: 0; font-size: var(--fs-xs); color: var(--muted-soft); letter-spacing: 0.01em; }
 
+/* ---- kanallistan i adminpanelen ----
+   Vad ett tryck på "Godkänn och lägg ut" gör, kanal för kanal. Färgen bär beskedet: grön går ut, gul
+   är en torrkörning som inte publicerar något, grå kan inte köras alls. */
+.admin-kanaler { margin: 8px 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
+.admin-kanaler li {
+  font-size: var(--fs-md); line-height: 1.45; padding: 6px 10px; border-radius: var(--r-sm);
+  background: var(--field); color: var(--muted);
+}
+.admin-kanaler .kanal-gar { background: #E4F1E8; color: #2F7A50; }
+.admin-kanaler .kanal-torr { background: #FBEEDC; color: #A9722A; }
+.admin-kanaler .kanal-nej { background: var(--field); color: var(--muted); }
+
 /* ---- ta bort annonsen ----
    Sist på säljarens kort, som text. Röd först i andra steget: färgen hör till handlingen som
    faktiskt raderar, inte till frågan om man vill. */

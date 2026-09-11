@@ -19,3 +19,8 @@ deploy/cloudflared/config.local.yml
 .price-backup/
 bench/
 bench-prov/
+
+# Nedladdad kopia av repot (zip från GitHub). 370 MB som inte hör hemma i historiken — och som ett
+# `git add -A` annars sväljer. Blocket-publiceringen som letades efter där ligger på grenen
+# blocket-autopublicering, inte i mappen.
+LoopaMVP-main/

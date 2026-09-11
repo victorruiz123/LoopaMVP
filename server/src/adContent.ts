@@ -5,9 +5,10 @@
  * stället för att annonsen är en sak och kanalen en annan: vad som står om möbeln — samma skador,
  * samma mått, samma skickord — ska avgöras på ETT ställe, oavsett var den sedan hamnar.
  *
- * Här fanns en andra väg ut: en färdig text att föra över för hand till Blocket. Den är borttagen,
- * och med den `renderAdPlain` som renderade blocken till den rena text Blockets beskrivningsfält
- * tog emot. Kvarvarande kanal är Tradera-publiceringen.
+ * Här fanns en andra väg ut: en färdig text att föra över för hand till Blocket. DEN vägen är
+ * borttagen — att lämna tillbaka annonsen som text att bära någon annanstans var inte att sälja med
+ * Loopa. `renderAdPlain` är däremot tillbaka, och nu för motsatt ärende: Blocket-roboten fyller i
+ * beskrivningsfältet i deras formulär, och det fältet tar ren text. Ingen människa för över något.
  *
  * Annonsen byggs ändå som BLOCK och inte som färdig HTML. Renderingen är ett eget steg
  * (`renderAdHtml`), så nästa kanal med ett annat textformat kostar en renderare och inte en andra
@@ -336,6 +337,26 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   );
 
   return blocks;
+}
+
+/**
+ * Annonsen som REN TEXT — Blockets beskrivningsfält är en textarea utan märkspråk.
+ *
+ * Granne med `renderAdHtml` och byggd ur samma block, vilket är hela poängen med att annonsen är
+ * block och inte färdig text: samma skador, samma mått och samma skickord går ut på båda kanalerna,
+ * och en ändring i `composeAd` når dem samtidigt. Det som skiljer är formen — `strong` finns inte i
+ * ren text, punktlistan blir bullets, och ingenting escapas eftersom blocken bär rå text.
+ */
+export function renderAdPlain(blocks: AdBlock[]): string {
+  let out = "";
+  for (const [i, block] of blocks.entries()) {
+    if (i > 0) out += block.kind === "list" && blocks[i - 1].kind === "paragraph" ? "\n" : "\n\n";
+    out +=
+      block.kind === "list"
+        ? block.items.map((item, n) => (block.ordered ? `${n + 1}. ${item}` : `• ${item}`)).join("\n")
+        : block.runs.map((run) => run.text).join("");
+  }
+  return out;
 }
 
 /**
