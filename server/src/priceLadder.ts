@@ -12,7 +12,7 @@
 
 import { getJob, listJobs, persist } from "./jobStore.js";
 import { traderaConfigured, updateTraderaPrice } from "./integrations/tradera/tradera.js";
-import { traderaPriceWithShipping } from "./integrations/tradera/shipping.js";
+import { prisMedHemleverans } from "./hemleverans.js";
 import type { ConditionJob, PriceLadder } from "./types.js";
 
 /** 15 % i veckan. Kan sättas per annons, men det här är förvalet hela funktionen är byggd kring. */
@@ -228,7 +228,7 @@ async function applyDrop(job: ConditionJob, now: number): Promise<boolean> {
     //
     // Frakten läggs på HÄR och räknas aldrig in i stegen: talen i `ladder` är möbelkronor, priset i
     // annonsen är möbeln plus hemleveransen. Sänkningen ska äta av möbeln, inte av leveransen.
-    await updateTraderaPrice(itemId, traderaPriceWithShipping(planned.to), ladder.listingMode ?? "fixed");
+    await updateTraderaPrice(itemId, prisMedHemleverans(planned.to), ladder.listingMode ?? "fixed");
   } catch (err) {
     const message = err instanceof Error ? err.message.slice(0, 300) : String(err);
     ladder.lastError = message;
@@ -250,7 +250,7 @@ async function applyDrop(job: ConditionJob, now: number): Promise<boolean> {
   const done = ladder.floorReachedAt ? " — golvet nått, priset ligger kvar" : "";
   console.info(
     `[pris-steg] ${job.id.slice(0, 8)} ${from} → ${planned.to} kr` +
-      ` (annonspris ${traderaPriceWithShipping(planned.to)} kr med frakt)${missed}${done}`,
+      ` (annonspris ${prisMedHemleverans(planned.to)} kr med frakt)${missed}${done}`,
   );
   return true;
 }

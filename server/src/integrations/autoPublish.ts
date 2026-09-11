@@ -1,12 +1,15 @@
 /**
  * "Publicera annonsen" = lägg upp den på alla kanaler som kan ta emot den.
  *
- * En knapp, två kanaler, och det är AVSIKTLIGT ojämnt: kanalerna är inte varandras kopior.
+ * SAMMA ANNONS PÅ BÅDA STÄLLENA: samma rubrik, samma bilder, samma skickrapport, samma pris (möbeln
+ * plus 600 kr hemleverans) och samma leveranslöfte. Loopa är säljare i båda fallen. En köpare som
+ * ser samma möbel på två marknadsplatser till två priser litar inte på någotdera.
  *
- *   Tradera  — Loopa är säljare. Priset är möbeln PLUS 600 kr hemleverans, och annonstexten lovar
- *              den leveransen. Läggs upp genom ett API som svarar på 10–60 sekunder.
- *   Blocket  — säljaren är säljare. Priset är BARA möbeln, och texten lovar ingen leverans. Läggs upp
- *              av en robot som klickar i Blockets formulär, tar minuter, och kan behöva BankID.
+ * VÄGEN DIT är däremot inte densamma, och det är hela skälet att den här filen finns:
+ *
+ *   Tradera  — ett API som svarar på 10–60 sekunder, och en annons som går att ta ner med ett anrop.
+ *   Blocket  — ingen skriv-API alls. En robot klickar i Blockets eget formulär, det tar minuter, det
+ *              kan behöva BankID, och annonsen går inte att ta ner automatiskt efteråt.
  *
  * ORDNINGEN ÄR TRADERA FÖRST. Den är snabb och svarar vad som hände; Blocket kan hänga i tre minuter
  * på en människa med en telefon. Vore det tvärtom skulle en BankID-väntan fördröja den kanal som

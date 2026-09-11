@@ -730,11 +730,11 @@ export interface ConditionJob {
    * Annonsen på Blocket, när den lagts ut dit.
    *
    * Vid sidan av `tradera` och inte i stället för den: samma möbel ligger på båda kanalerna efter ett
-   * tryck på "Godkänn och lägg ut", och de bär OLIKA PRIS med flit. På Tradera säljer Loopa, med
-   * hemleveransen inräknad i priset; på Blocket säljer säljaren själv, utan leverans (se AdOptions i
-   * adContent.ts). Fältet är också det som fryser prisstegen: en stege som sänker Tradera-priset
-   * medan Blocket-annonsen står still låter samma möbel glida isär till två priser av sig själv —
-   * se `ladderFrozenByBlocket` i priceLadder.ts.
+   * tryck på "Godkänn och lägg ut", med SAMMA annons och SAMMA pris — möbeln plus hemleveransen.
+   *
+   * Fältet är också det som fryser prisstegen, och det blir viktigare av att priserna är lika: stegen
+   * sänker Tradera-priset med 15 % i veckan, men Blocket-annonsen går inte att redigera i efterhand.
+   * Utan frysning skulle de två annonserna glida isär av sig själva — se `ladderFrozenByBlocket`.
    */
   blocket?: BlocketPublication | null;
   /**

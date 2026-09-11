@@ -17,7 +17,7 @@ import { publishToTradera, traderaConfigured, type TraderaImage } from "./trader
 import { armPriceLadder } from "../../priceLadder.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { medRattelser } from "../../butik/overrides.js";
-import { SHIPPING_INCLUDED_SEK, traderaPriceWithShipping } from "./shipping.js";
+import { SHIPPING_INCLUDED_SEK, prisMedHemleverans } from "../../hemleverans.js";
 import {
   TRADERA_CONDITION,
   TRADERA_SHIPPING_OTHER_ID,
@@ -123,7 +123,7 @@ export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishRe
       loopaId: loopaIdFor(job.id),
       categoryId: category.id,
       categoryName: category.name,
-      price: traderaPriceWithShipping(price.value),
+      price: prisMedHemleverans(price.value),
       itemPrice: price.value,
       shippingSek: SHIPPING_INCLUDED_SEK,
       priceSource: price.source,
@@ -336,10 +336,10 @@ async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
 /**
  * Annonstexten som går upp på Tradera.
  *
- * Vad som står i den avgörs i adContent.ts, tillsammans med den text Blocket-exporten visar — det är
- * SAMMA annons om samma möbel, och två texter som beskrev skicket var för sig hade förr eller senare
- * beskrivit det olika. Det som är Traderas eget ligger här: HTML som renderingsform, och
- * leveransstycket, som bara stämmer när annonsen ligger på Loopas eget konto.
+ * Vad som står i den avgörs i adContent.ts, tillsammans med Blocket-annonsens text — det är SAMMA
+ * annons om samma möbel, med samma löften och samma pris, och två texter som beskrev skicket var för
+ * sig hade förr eller senare beskrivit det olika. Det enda som är Traderas eget ligger här: HTML som
+ * renderingsform. Blocket får samma block renderade som ren text (blocket/publish.ts).
  */
 export function buildDescription(job: ConditionJob): string {
   return renderAdHtml(composeAd(job, { delivery: true, loopaSells: true }));

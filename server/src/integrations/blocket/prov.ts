@@ -92,7 +92,7 @@ console.log(`  Webbläsare   ${blocketHeadful() ? "synlig" : "osynlig (BankID g�
 console.log(`  Session      ${session}`);
 console.log("");
 console.log(`  Rubrik       ${plan.title}`);
-console.log(`  Pris         ${plan.price} kr  (möbeln, utan hemleverans)`);
+console.log(`  Pris         ${plan.price} kr  (${plan.itemPrice} kr möbel + ${plan.shippingSek} kr hemleverans)`);
 console.log(`  Kategori     ${[plan.category.main, plan.category.sub, plan.category.product].filter(Boolean).join(" > ")}`);
 console.log(`  Skick        ${plan.condition ?? "(inget betyg)"}`);
 console.log(`  Mått         ${[plan.measurements.height, plan.measurements.width, plan.measurements.depth].map((v) => v ?? "–").join(" / ")} cm (H/B/D)`);

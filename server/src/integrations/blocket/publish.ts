@@ -24,6 +24,7 @@
 import path from "node:path";
 import type { BrowserContext, Page } from "playwright";
 import { adImages, adTitle, composeAd, renderAdPlain, resolveAdPrice } from "../../adContent.js";
+import { prisMedHemleverans, SHIPPING_INCLUDED_SEK } from "../../hemleverans.js";
 import { medRattelser } from "../../butik/overrides.js";
 import { jobToProduct } from "../../butik/normalize.js";
 import { getJob, jobDir, persist } from "../../jobStore.js";
@@ -61,13 +62,17 @@ export interface BlocketPublishPlan {
   loopaId: string;
   category: BlocketCategory;
   /**
-   * MÖBELNS pris, utan de 600 kronorna för hemleveransen.
+   * Priset som ska STÅ I ANNONSEN: möbeln plus hemleveransen, samma tal som Tradera-annonsen bär.
    *
-   * Skillnaden mot Tradera-planen är inte en detalj: på Tradera säljer Loopa och kör hem möbeln, på
-   * Blocket säljer säljaren själv utan leverans. Ett Tradera-pris här hade tagit betalt för en
-   * leverans ingen lovat. Se integrations/blocket/ad.ts.
+   * Kanalerna bar olika pris så länge Blocket var en väg för säljaren att sälja själv. Den vägen är
+   * borta: annonsen ligger på ett Loopa-konto, Loopa kör hem möbeln, och då ska priset vara
+   * detsamma. En köpare som ser samma möbel på två ställen till två priser litar inte på någotdera.
    */
   price: number;
+  /** Möbeln utan frakt. Prisstegen räknar i de här kronorna — se hemleverans.ts. */
+  itemPrice: number;
+  /** Fraktens andel av `price`, utskriven så att gränssnittet slipper känna till beloppet. */
+  shippingSek: number;
   priceSource: "seller" | "condition" | "listing";
   /** Loopas skicksträng. Översätts till Blockets etiketter först i formuläret. */
   condition: string | null;
@@ -126,7 +131,12 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
       title: capTitle(title),
       loopaId: loopaIdFor(job.id),
       category: blocketCategoryFor(product.categorySlug, title),
-      price: price.value,
+      // Möbeln PLUS hemleveransen, samma tal som Tradera-annonsen bär. Prisstegen räknar i
+      // möbelkronor och frakten läggs på vid gränsen — se hemleverans.ts för varför de två aldrig
+      // slås ihop tidigare än här.
+      price: prisMedHemleverans(price.value),
+      itemPrice: price.value,
+      shippingSek: SHIPPING_INCLUDED_SEK,
       priceSource: price.source,
       condition: result.grade ? BLOCKET_CONDITION[result.grade.grade] : null,
       measurements: measurementsFrom(product.dimensions),
@@ -464,10 +474,11 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
     // Samma rättelse en gång till, för texten: `job` ovan skriver publiceringsläget och måste vara det
     // riktiga jobbet, medan beskrivningen ska byggas ur den rättade kopian.
     const annons = await medRattelser(job);
-    // `loopaSells: false` av samma skäl som `delivery: false`, och båda står i AdOptions: på Blocket är
-    // SÄLJAREN avsändare. Loopa har skrivit texten, inte tagit över affären — ett "Loopa säljer" här
-    // vore osant, och ett löfte om hemleverans vore något säljaren fick hålla utan att ha lovat det.
-    const description = renderAdPlain(composeAd(annons, { delivery: false, loopaSells: false }));
+    // SAMMA ANNONS SOM PÅ TRADERA, ord för ord. Loopa säljer möbeln och kör hem den på båda
+    // kanalerna — annonsen ligger på ett Loopa-konto, och hemleveransen är redan inräknad i priset
+    // (se `prisMedHemleverans`). Två olika löften om samma möbel vore det verkliga felet: en köpare
+    // som jämför de två annonserna ska se samma pris och samma leverans.
+    const description = buildBlocketDescription(annons);
     const files = await imagePaths(job);
 
     logga(plan.dryRun ? "Startar TORRKÖRNING — sista knappen trycks inte" : "Startar SKARP publicering", "running", {
@@ -594,6 +605,21 @@ async function pickCondition(page: Page, condition: string | null, logga: Logga)
  * Prövas på SÖKVÄGEN och inte på värdnamnet, så att flödet går att köra mot attrappen. Blocket har tre
  * former: `/annons/...`, `/recommerce/forsale/item/<id>` och det korta `/<id>`.
  */
+/**
+ * Annonstexten för Blocket. Motsvarigheten till `buildDescription` i tradera/publish.ts.
+ *
+ * SAMMA FLAGGOR SOM TRADERA, och det är själva poängen: Loopa säljer möbeln och kör hem den på båda
+ * kanalerna, hemleveransen är inräknad i priset på båda, och en köpare som jämför de två annonserna
+ * ska hitta samma löften. Skillnaden är renderingsformen — Tradera tar HTML, Blockets
+ * beskrivningsfält är en textarea.
+ *
+ * Egen funktion och inte en rad inuti körningen, så att pariteten går att PRÖVA utan att starta en
+ * webbläsare (tests/traderaListing.test.ts).
+ */
+export function buildBlocketDescription(job: ConditionJob): string {
+  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true }));
+}
+
 export function isAdUrl(url: string): boolean {
   try {
     return /^\/(annons|recommerce\/forsale\/item|\d{6,})(\/|$)/i.test(new URL(url).pathname);

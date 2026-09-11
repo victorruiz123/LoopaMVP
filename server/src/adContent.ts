@@ -21,7 +21,7 @@ import { jobDir } from "./jobStore.js";
 import { presentableImages } from "./pipeline/cover.js";
 import { TYPE_LABELS } from "./damageLabels.js";
 import { loopaIdFor } from "./loopaId.js";
-import { SHIPPING_INCLUDED_SEK } from "./integrations/tradera/shipping.js";
+import { SHIPPING_INCLUDED_SEK } from "./hemleverans.js";
 import type { CapturedImage, ConditionJob, Damage, ListingAttribute, Severity } from "./types.js";
 
 /**
@@ -42,19 +42,21 @@ export interface AdOptions {
   /**
    * Om leveransstycket ska stå med.
    *
-   * Sant bara för Tradera. Där är annonsen Loopas egen — den ligger på Loopas konto, och det är Loopa
-   * som bokar budfirman efter köpet, så texten kan lova hemleverans. På Blocket är säljaren sin egen
-   * avsändare och Loopa inte part i affären; ett löfte om hemleverans där vore något säljaren fick
-   * hålla själv utan att ha lovat det. Hellre inget stycke än ett stycke de måste redigera bort.
+   * Sant på BÅDA marknadsplatserna. Annonsen ligger på ett Loopa-konto, Loopa bokar budfirman efter
+   * köpet, och hemleveransen är inräknad i priset som står — så texten kan lova den.
+   *
+   * Flaggan finns kvar trots att båda kanalerna säger sant, och det är med flit: den dag en annons
+   * går ut i någon annans namn — en säljare som lägger upp själv — är löftet om hemleverans något de
+   * fick hålla utan att ha lovat det, och då ska det gå att stänga av med ett `false` i stället för
+   * att texten måste skrivas om. Det var precis så Blocket-vägen såg ut innan roboten fanns.
    */
   delivery: boolean;
   /**
    * Om Loopa ska stå som SÄLJARE och inte bara som avsändare för texten.
    *
-   * Samma skiljelinje som `delivery`, och av samma skäl: på Tradera ligger annonsen på Loopas konto,
-   * pengarna går till Loopa och det är Loopa som bokar budfirman. Då ska det stå i första raden —
-   * en köpare som tror att de handlar av en privatperson gissar fel om både frakt och ansvar. Där
-   * Loopa bara skrivit texten åt en säljare (Blocket-vägen) vore samma mening osann.
+   * Samma skiljelinje som `delivery` och sant i samma fall: ligger annonsen på Loopas konto går
+   * pengarna till Loopa och det är Loopa som bokar budfirman. Då ska det stå i första raden — en
+   * köpare som tror att de handlar av en privatperson gissar fel om både frakt och ansvar.
    */
   loopaSells: boolean;
 }

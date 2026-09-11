@@ -13,7 +13,8 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { buildDescription } from "../server/src/integrations/tradera/publish.js";
-import { SHIPPING_INCLUDED_SEK, traderaPriceWithShipping } from "../server/src/integrations/tradera/shipping.js";
+import { buildBlocketDescription } from "../server/src/integrations/blocket/publish.js";
+import { SHIPPING_INCLUDED_SEK, prisMedHemleverans } from "../server/src/hemleverans.js";
 import { DEFAULT_WEEKLY_DROP, ladderRungs } from "../server/src/priceLadder.js";
 import { publicCardFor } from "../server/src/publicCard.js";
 import { loopaIdFor } from "../server/src/loopaId.js";
@@ -249,6 +250,58 @@ test("saknade mått sägs rakt ut i stället för att rubriken tyst uteblir", ()
 // Leveransen är den enda uppgiften i texten som inte kommer ur besiktningen utan ur affären: köparen
 // betalar inget extra, och en budfirma kör hem möbeln efter köpet. Faller det bort ser annonsen ut
 // som vilken avhämtningsannons som helst, och köparen antar att de ska köra själva.
+/**
+ * ── Blocket-annonsen är samma annons ────────────────────────────────────────
+ *
+ * Kanalerna bar olika text och olika pris så länge Blocket var en väg för säljaren att sälja själv.
+ * Den vägen är borta: annonsen läggs av en robot på ett Loopa-konto, Loopa kör hem möbeln, och då
+ * ska löftena vara identiska. En köpare som ser samma möbel på två marknadsplatser till två priser
+ * — eller med hemleverans på det ena stället och avhämtning på det andra — litar inte på någotdera.
+ *
+ * Testet ligger här därför att det är HÄR jobbfixturen bor, och därför att pariteten bara betyder
+ * något som en jämförelse mellan de två.
+ */
+test("Blocket-annonsen bär samma leveranslöfte som Tradera-annonsen", () => {
+  const text = buildBlocketDescription(job());
+  assert.match(text, /Endast hemleverans — frakten ingår i priset\./);
+  assert.match(text, /Loopa löser hemleveransen åt dig efter köpet/);
+  assert.match(text, new RegExp(`Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad`));
+  assert.match(text, /Avhämtning erbjuds inte/);
+});
+
+test("Blocket-annonsen säger att Loopa är säljaren, precis som Tradera-annonsen", () => {
+  assert.match(buildBlocketDescription(job()), /Den här möbeln säljs av Loopa/);
+  assert.match(buildDescription(job()), /Den här möbeln säljs av Loopa/);
+});
+
+/**
+ * Samma innehåll, olika form. Det är den enda skillnad som får finnas mellan kanalernas texter: en
+ * textarea tar ingen HTML, och en `<strong>` i Blockets beskrivningsfält hade stått som taggar.
+ */
+test("skillnaden mot Tradera-texten är renderingen och ingenting annat", () => {
+  const html = buildDescription(job());
+  const text = buildBlocketDescription(job());
+  assert.ok(!text.includes("<"), "Blockets fält är ren text — ingen märkning ska följa med");
+  /**
+   * Normaliseringen förlåter exakt två saker, och båda ÄR renderingen: HTML-taggarna (som `<li>`,
+   * där punkten ritas av webbläsaren) och den rena textens egna listmarkörer, "•" och "1." — som
+   * måste skrivas ut därför att en textarea inte ritar några punkter åt oss. Allt annat ska vara
+   * tecken för tecken lika; det är hela påståendet testet finns för.
+   */
+  const avskalad = (s: string) =>
+    s
+      // Taggen blir ett MELLANSLAG, inte ingenting: `</li><li>` skiljer två listrader utan ett enda
+      // blanktecken, och en tom ersättning hade klistrat ihop dem till "180 cmDjup".
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/•\s*/g, "")
+      // Bara numret som inleder en listrad — "4 cm" och "600 kr" står kvar orörda.
+      .replace(/\b\d+\.\s(?=[A-ZÅÄÖ])/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  assert.equal(avskalad(text), avskalad(html), "samma ord om samma möbel, oavsett kanal");
+});
+
 test("leveransen säger både att den ingår och vad som händer efter köpet", () => {
   const html = buildDescription(job());
   assert.match(html, /Endast hemleverans — frakten ingår i priset\./);
@@ -313,19 +366,19 @@ test("texten är HTML, och säljarens tecken kan inte bryta ut ur den", () => {
 // annonstexten fortsätter påstå att beloppet är inräknat. Ingen av dem syns i något gränssnitt.
 
 test("annonspriset är möbeln plus frakten", () => {
-  assert.equal(traderaPriceWithShipping(2400), 2400 + SHIPPING_INCLUDED_SEK);
+  assert.equal(prisMedHemleverans(2400), 2400 + SHIPPING_INCLUDED_SEK);
   assert.equal(SHIPPING_INCLUDED_SEK, 600);
-  assert.equal(traderaPriceWithShipping(2399.6), 2400 + SHIPPING_INCLUDED_SEK, "öretal avrundas, som hos Tradera");
+  assert.equal(prisMedHemleverans(2399.6), 2400 + SHIPPING_INCLUDED_SEK, "öretal avrundas, som hos Tradera");
 });
 
 test("den veckovisa sänkningen tar bara av möbeln — frakten står stilla hela vägen ner", () => {
   const rungs = ladderRungs(2400, 900, DEFAULT_WEEKLY_DROP);
   assert.ok(rungs.length > 3, "spannet ska ha flera steg att gå igenom");
   for (const rung of rungs) {
-    assert.equal(traderaPriceWithShipping(rung) - rung, SHIPPING_INCLUDED_SEK, `steget ${rung} tappade frakt`);
+    assert.equal(prisMedHemleverans(rung) - rung, SHIPPING_INCLUDED_SEK, `steget ${rung} tappade frakt`);
   }
   // Golvet i annonsen är säljarens golv plus frakten — aldrig lägre.
-  assert.equal(traderaPriceWithShipping(rungs.at(-1)!), 900 + SHIPPING_INCLUDED_SEK);
+  assert.equal(prisMedHemleverans(rungs.at(-1)!), 900 + SHIPPING_INCLUDED_SEK);
 });
 
 // ─── Det publika kortet ──────────────────────────────────────────────────────

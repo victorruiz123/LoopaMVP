@@ -43,7 +43,7 @@ test("zonavgifterna kommer ur zonerna, inte ur en lista bredvid", () => {
  * inte av oss.
  */
 test("kassans frakt är samma tal som annonserna lovar, i varje zon", async () => {
-  const { SHIPPING_INCLUDED_SEK } = await import("../server/src/integrations/tradera/shipping.js");
+  const { SHIPPING_INCLUDED_SEK } = await import("../server/src/hemleverans.js");
   assert.deepEqual([...new Set(ZONE_FEES)], [SHIPPING_INCLUDED_SEK]);
   assert.ok(ZONE_FEES.every((a, i) => i === 0 || ZONE_FEES[i - 1] <= a), "sorterad");
 });

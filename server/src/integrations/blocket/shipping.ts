@@ -10,7 +10,14 @@ import type { Page } from "playwright";
 import { chooseRadio, clickFirstVisible, pageHasText, readRadios } from "./form.js";
 import type { Logga } from "./diag.js";
 
-/** Fraktalternativet Loopa-möbler ska ha. Möbeln hämtas eller körs ut — den går inte som paket. */
+/**
+ * Fraktalternativet Loopa-möbler ska ha: ingen frakt genom Blocket.
+ *
+ * Annonsen lovar hemleverans med de 600 kronorna INRÄKNADE I PRISET (se hemleverans.ts), och Loopa
+ * bokar budfirman efter köpet. Väljs ett av Blockets egna fraktsätt betalar köparen frakt en andra
+ * gång i deras kassa — exakt det dubbeluttag som fick beloppet att bakas in i priset från början.
+ * En soffa går dessutom inte som paket.
+ */
 const NO_SHIPPING = /jag kan inte skicka varan/i;
 
 /**
