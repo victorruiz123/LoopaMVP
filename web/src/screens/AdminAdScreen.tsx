@@ -158,46 +158,91 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
 
       <PrisForm annons={annons} sparar={sparar} skicka={skicka} />
 
-      {/* ---------------- Godkännandet ---------------- */}
+      {/* ---------------- Publiceringen ---------------- */}
       {/*
-        Kön. Säljaren har tryckt "Sälj med Loopa" och väntar på oss. ETT tryck lägger ut möbeln på
-        alla ställen som kan ta emot den — butiken direkt, Tradera och Blocket i bakgrunden — och det
-        står överst i sin egen ruta: det är den enda åtgärden på sidan som någon annan väntar på.
+        RUTAN FINNS SÅ LÄNGE DET FINNS NÅGOT ATT LÄGGA UT, inte bara medan säljaren väntar på ett
+        godkännande. Den ritades förut bara för lägena "pending" och "error", och det gjorde två
+        vanliga fall osynliga: en annons som redan ligger på Tradera kunde aldrig skickas vidare till
+        Blocket, och en annons utan beställning visade ingenting alls — panelen såg tom ut och det gick
+        inte att se varför.
+
+        ETT TRYCK lägger ut möbeln på alla kanaler som kan ta emot den. En kanal som redan ligger uppe
+        hoppas över, så ett andra tryck publicerar bara det som SAKNAS (se `godkann` i adminAnnonser.ts).
 
         VAD KNAPPEN GÖR STÅR UTSKRIVET INNAN DEN TRYCKS (`Kanallista`). Det går inte att härleda ur
         annonsen: det hänger på serverns miljö, och skillnaden mellan "läggs ut" och "fylls i men
         publiceras inte" (Blockets torrkörning) är för stor för att gissa sig till.
       */}
-      {(annons.traderaStatus === "pending" || annons.traderaStatus === "error") && (
-        <section className="card-block annons-godkann">
-          <h2 className="profile-section-title">
-            {annons.traderaStatus === "pending" ? "Väntar på godkännande" : "Tradera avvisade annonsen"}
-          </h2>
-          <p className="admin-note">
-            {annons.traderaStatus === "pending"
-              ? `Säljaren tryckte "Sälj med Loopa" ${datum(annons.begardAt)}. Godkänn så går möbeln upp i butiken och på marknadsplatserna i samma tryck.`
-              : `Godkänd ${datum(annons.tradera?.approvedAt ?? null)}, men Tradera sa nej: ${annons.tradera?.error ?? "okänt fel"}. Möbeln ligger kvar i butiken. Rätta och försök igen.`}
-          </p>
-          <Kanallista kanaler={annons.kanaler} />
-          {annons.saknas.length > 0 && (
-            <p className="public-card-error">Kan inte godkännas än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
-          )}
-          {/*
-            FELET STÅR OCKSÅ HÄR, bredvid knappen som avvisades.
-            Det ritas längst upp på sidan (se `fel` ovan), och godkännanderutan ligger en bra bit ner
-            — ett avvisat tryck såg därför ut som att ingenting hände. Ett besked som hamnar utanför
-            skärmen är inget besked.
-          */}
-          {fel && <p className="public-card-error">{fel}</p>}
-          <button
-            className="btn btn-primary"
-            disabled={sparar || annons.saknas.length > 0}
-            onClick={() => skicka({ lage: "godkann" }, "Godkänd. Möbeln ligger i butiken; marknadsplatserna körs i bakgrunden.")}
-          >
-            {annons.traderaStatus === "pending" ? "Godkänn och lägg ut" : "Försök igen"}
-          </button>
-        </section>
-      )}
+      {(() => {
+        /** Säljarens beställning. Utan den finns ingenting att godkänna — se grinden i `godkann`. */
+        const bestalld = annons.traderaStatus !== null;
+        const kanKora = (annons.kanaler ?? []).filter((k) => k.configured && k.ready && !k.alreadyRunning);
+        const namn: Record<string, string> = { tradera: "Tradera", blocket: "Blocket" };
+
+        if (!bestalld) {
+          return (
+            <section className="card-block">
+              <h2 className="profile-section-title">Publicering</h2>
+              <p className="admin-note">
+                Säljaren har inte tryckt "Sälj med Loopa" på den här annonsen, så det finns ingen
+                beställning att godkänna. Möbeln kan fortfarande läggas i butiken under Läge nedan.
+              </p>
+            </section>
+          );
+        }
+
+        const rubrik =
+          annons.traderaStatus === "pending"
+            ? "Väntar på godkännande"
+            : annons.traderaStatus === "error"
+              ? "Tradera avvisade annonsen"
+              : kanKora.length > 0
+                ? "Kan läggas ut på fler ställen"
+                : "Publicering";
+
+        const inledning =
+          annons.traderaStatus === "pending"
+            ? `Säljaren tryckte "Sälj med Loopa" ${datum(annons.begardAt)}. Godkänn så går möbeln upp i butiken och på marknadsplatserna i samma tryck.`
+            : annons.traderaStatus === "error"
+              ? `Godkänd ${datum(annons.tradera?.approvedAt ?? null)}, men Tradera sa nej: ${annons.tradera?.error ?? "okänt fel"}. Möbeln ligger kvar i butiken. Rätta och försök igen.`
+              : kanKora.length > 0
+                ? `Annonsen är godkänd sedan tidigare. ${kanKora.map((k) => namn[k.channel] ?? k.channel).join(" och ")} har inte fått den än — ett tryck lägger ut den där, och rör inte det som redan ligger uppe.`
+                : "Annonsen är godkänd. Ingen kanal kan ta emot den just nu — skälen står nedan.";
+
+        const knapptext =
+          annons.traderaStatus === "pending"
+            ? "Godkänn och lägg ut"
+            : annons.traderaStatus === "error"
+              ? "Försök igen"
+              : `Lägg ut på ${kanKora.map((k) => namn[k.channel] ?? k.channel).join(" och ")}`;
+
+        return (
+          <section className={`card-block${annons.traderaStatus === "pending" ? " annons-godkann" : ""}`}>
+            <h2 className="profile-section-title">{rubrik}</h2>
+            <p className="admin-note">{inledning}</p>
+            <Kanallista kanaler={annons.kanaler} />
+            {annons.saknas.length > 0 && (
+              <p className="public-card-error">Kan inte läggas ut än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
+            )}
+            {/*
+              FELET STÅR OCKSÅ HÄR, bredvid knappen som avvisades.
+              Det ritas längst upp på sidan (se `fel` ovan), och rutan ligger en bra bit ner — ett
+              avvisat tryck såg därför ut som att ingenting hände. Ett besked utanför skärmen är
+              inget besked.
+            */}
+            {fel && <p className="public-card-error">{fel}</p>}
+            {kanKora.length > 0 && (
+              <button
+                className="btn btn-primary"
+                disabled={sparar || annons.saknas.length > 0}
+                onClick={() => skicka({ lage: "godkann" }, "Godkänd. Möbeln ligger i butiken; marknadsplatserna körs i bakgrunden.")}
+              >
+                {knapptext}
+              </button>
+            )}
+          </section>
+        );
+      })()}
       {annons.traderaStatus === "publishing" && (
         <p className="admin-note">Tradera köar annonsen just nu. Ladda om sidan om en minut.</p>
       )}

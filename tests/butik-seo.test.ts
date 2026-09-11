@@ -106,6 +106,20 @@ test("en möbel som inte finns markeras noindex i stället för att svara 200 me
   assert.equal(head.noindex, true);
 });
 
+/**
+ * Den köpfria annonssidan är en näradubblett av produktsidan, och det är hela dess uppgift: samma
+ * möbel, samma skick, samma mått — allt utom köprutan. Två indexerade sidor om samma soffa
+ * konkurrerar om samma fråga, och den av dem som ska vinna är den där möbeln går att köpa.
+ *
+ * Prövas även på en möbel som inte finns: sidan får aldrig råka bli indexerbar för att uppslaget
+ * föll igenom till ett annat svar.
+ */
+test("den köpfria annonssidan indexeras aldrig", async () => {
+  const head = await seoFor("/butik/info/LP-FINNS-INTE", "");
+  assert.ok(head);
+  assert.equal(head.noindex, true);
+});
+
 test("adresser utanför butiken rör inte skalet", async () => {
   assert.equal(await seoFor("/butik/nagot-okant/x", ""), null);
   // Säljflödets egna skärmar ska ingen hitta via en sökmotor — bara roten själv har ett huvud.
