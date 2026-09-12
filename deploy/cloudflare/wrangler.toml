@@ -117,8 +117,13 @@ zone_name = "loopa.nu"
 #
 # EN RAD PER NAMNRYMD, aldrig hela /api/*. Marknadssajten har egna Pages Functions på /api/chat,
 # /api/generate-listing, /api/brand-preview och /api/seller/* — ett band till hela prefixet hade
-# dödat dem. Listan nedan är serverns tio namnrymder (server.ts) och måste utökas den dag en elfte
+# dödat dem. Listan nedan är serverns namnrymder (server.ts) och måste utökas den dag en till
 # tillkommer. Det är priset för att marknadssajten får behålla sitt eget /api.
+#
+# JÄMFÖR MOT SERVERN, inte mot klienten. `grep -roE "/api/[a-z-]+" web/src` missar varje namnrymd
+# vars adress servern lämnar ifrån sig som data, och det var så /api/kandidatbild kunde saknas här
+# medan klientkontrollen såg ren ut. Den som faktiskt täcker allt:
+#   grep -oE 'segments\[1\] === "[a-z-]+"' server/src/server.ts | grep -oE '"[a-z-]+"' | tr -d '"' | sort -u
 [[routes]]
 pattern = "loopa.nu/api/admin/*"
 zone_name = "loopa.nu"
@@ -138,6 +143,18 @@ zone_name = "loopa.nu"
 # Produktbilderna. Utan den här är varje möbel en trasig bild — även i Google Shopping.
 [[routes]]
 pattern = "loopa.nu/api/cards/*"
+zone_name = "loopa.nu"
+
+# Modellväljarens miniatyrer. Samma sort som /api/cards ovan, och samma sorts fel utan raden:
+# marknadssajten svarar med sitt eget appskal — 1,5 kB text/html med statuskod 200 — och varje ruta i
+# väljaren blir tom. `onError` utlöses inte ens: svaret ÄR ett svar, bara inte en bild.
+#
+# DEN HÄR MISSADES FÖR ATT KLIENTEN ALDRIG SKRIVER ADRESSEN. Kontrollen som står ovan —
+# `grep -roE "/api/[a-z-]+" web/src` — hittar de namnrymder klienten anropar själv. Miniatyrens
+# adress kommer i stället FRÅN servern, som ett fält i kandidatlistan (kandidatbild.ts, URL_PREFIX),
+# och hamnar rakt i en `<img src>`. Den syns alltså inte i klientens källkod alls.
+[[routes]]
+pattern = "loopa.nu/api/kandidatbild/*"
 zone_name = "loopa.nu"
 
 [[routes]]
