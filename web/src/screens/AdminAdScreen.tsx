@@ -441,7 +441,9 @@ function Kanallista({ kanaler }: { kanaler: ChannelPlan[] }) {
         const text = k.alreadyRunning
           ? "ligger redan uppe — hoppas över"
           : !k.configured
-            ? `inte konfigurerat (saknar ${k.missingEnv.join(", ")})`
+            ? k.missingEnv.length
+              ? `inte konfigurerat (saknar ${k.missingEnv.join(", ")})`
+              : "avstängd — ingenting läggs ut här"
             : !k.ready
               ? (k.reason ?? "går inte att publicera")
               : k.dryRun

@@ -28,7 +28,13 @@ import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
-import { getTraderaLage, missingTraderaEnv, traderaConfigured } from "./integrations/tradera/tradera.js";
+import {
+  getTraderaLage,
+  missingTraderaEnv,
+  TRADERA_PUBLISHING_ENABLED,
+  traderaConfigured,
+  traderaPublishingEnabled,
+} from "./integrations/tradera/tradera.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
@@ -579,8 +585,8 @@ async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: Serv
 async function traderaState(job: ConditionJob) {
   const readiness = await planTraderaPublish(job);
   return {
-    configured: traderaConfigured(),
-    missingEnv: missingTraderaEnv(),
+    configured: traderaPublishingEnabled(),
+    missingEnv: TRADERA_PUBLISHING_ENABLED ? missingTraderaEnv() : [],
     publication: job.tradera ?? null,
     plan: readiness.ok ? readiness.plan : null,
     blockedReason: readiness.ok ? null : readiness.reason,
@@ -625,9 +631,11 @@ async function handlePublishTradera(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
 
-  if (!traderaConfigured()) {
+  if (!traderaPublishingEnabled()) {
     return sendJson(res, 503, {
-      error: `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`,
+      error: TRADERA_PUBLISHING_ENABLED
+        ? `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`
+        : "Tradera-publiceringen är avstängd.",
       ...(await traderaState(job)),
     });
   }

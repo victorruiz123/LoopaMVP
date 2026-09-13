@@ -218,7 +218,7 @@ export async function getTraderaState(jobId: string): Promise<TraderaState> {
   return json(res);
 }
 
-/** Lägger ut möbeln till salu: en riktig Tradera-annons på Loopas konto. Svarar innan den är uppe. */
+/** Lägger ut möbeln till salu som Tradera-annons. Svarar innan den är uppe. Avstängt på servern tills vidare. */
 export async function publishToTradera(jobId: string): Promise<TraderaState> {
   const res = await authFetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
   return json(res);

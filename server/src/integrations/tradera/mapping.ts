@@ -109,9 +109,8 @@ export function traderaCategoryFor(signals: {
 }
 
 /**
- * Betalsätt. Kontot har i dag exakt ett aktiverat alternativ — "Swish / Kort / PayPal" (id 16384,
- * Braintree) — och det är det Tradera själv listar på GET /users/me/payment-options. Överstyrs med
- * TRADERA_PAYMENT_OPTION_IDS="16384,32" den dagen kontot har fler.
+ * Betalsätt. Standard är "Swish / Kort / PayPal" (id 16384, Braintree). Vad ett konto har aktiverat
+ * listar Tradera på GET /users/me/payment-options. Överstyrs med TRADERA_PAYMENT_OPTION_IDS="16384,32".
  */
 export function traderaPaymentOptionIds(): number[] {
   const raw = process.env.TRADERA_PAYMENT_OPTION_IDS?.trim();
