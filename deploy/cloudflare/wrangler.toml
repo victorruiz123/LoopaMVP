@@ -200,3 +200,9 @@ zone_name = "loopa.nu"
 [[routes]]
 pattern = "loopa.nu/api/feedback*"
 zone_name = "loopa.nu"
+
+# Adressförslagen i registreringen. Ny namnrymd, och samma fälla som /api/feedback och /api/salj/chat:
+# utan raden svarar marknadssajtens Pages Functions, och fältet ger inga förslag alls på loopa.nu.
+[[routes]]
+pattern = "loopa.nu/api/adress/*"
+zone_name = "loopa.nu"
