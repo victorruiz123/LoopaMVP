@@ -348,6 +348,53 @@ body {
 }
 .auth-input-wrap input::placeholder { color: var(--muted-soft); }
 .auth-input-wrap input:focus { outline: none; border-color: var(--accent); box-shadow: var(--focus); }
+/* Adressfälten har ingen ikon — utrymmet till vänster hade bara varit ett hål. */
+.auth-input-wrap.auth-input-plain input { padding: 0 14px; }
+.auth-label-optional { font-weight: 500; color: var(--muted); }
+.auth-hint { margin: -2px 0 0; font-size: var(--fs-xs); color: var(--muted); }
+.auth-row { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); gap: 10px; }
+/* Adressförslagen hänger under gatuadressen och lägger sig OVANPÅ fälten nedanför, inte mellan dem:
+   en lista som knuffar ned postnummerfältet flyttar det man just tänkt trycka på. */
+.adress-forslag {
+  position: absolute; z-index: 20; top: calc(100% + 4px); left: 0; right: 0;
+  margin: 0; padding: 4px 0; list-style: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.12);
+}
+.adress-forslag [role="option"] {
+  display: flex; flex-direction: column; justify-content: center; gap: 1px;
+  min-height: var(--tap); padding: 8px 14px; cursor: pointer;
+}
+.adress-forslag [role="option"]:hover, .adress-forslag .markerad { background: var(--field); }
+.adress-forslag-huvud { font-size: var(--fs-base); color: var(--ink); }
+.adress-forslag-rest { font-size: var(--fs-xs); color: var(--muted); }
+/* "Använd min nuvarande adress": en länkknapp under fältet, inte en knapp till bredvid "Skapa konto".
+   Den är en genväg, och en fylld knapp mitt i formuläret hade sett ut som nästa steg. */
+.adress-har {
+  align-self: flex-start; display: inline-flex; align-items: center;
+  min-height: 32px; margin: 0; padding: 0; border: 0; background: none; cursor: pointer;
+  font-family: inherit; font-size: var(--fs-sm); font-weight: 600; color: var(--accent);
+  text-decoration: underline; text-underline-offset: 3px;
+}
+.adress-har:disabled { color: var(--muted); cursor: progress; text-decoration: none; }
+.adress-har-besked { margin: -4px 0 0; font-size: var(--fs-xs); line-height: 1.45; color: var(--muted); }
+.adress-har-besked.fel { color: var(--danger-dark); }
+.adress-forslag-kalla {
+  margin-top: 4px; padding: 6px 14px 4px; border-top: 1px solid var(--hairline);
+  font-size: 11px; color: var(--muted-soft); text-align: right;
+}
+.auth-choice { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; border: 0; margin: 0; padding: 0; }
+.auth-choice legend { padding: 0; margin-bottom: 6px; }
+.auth-choice-option { position: relative; display: block; }
+.auth-choice-option input { position: absolute; opacity: 0; inset: 0; margin: 0; }
+.auth-choice-option span {
+  display: flex; align-items: center; justify-content: center; height: 44px;
+  border-radius: var(--r); border: 1px solid var(--border); background: var(--surface);
+  font-size: var(--fs-field); color: var(--ink); cursor: pointer;
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+.auth-choice-option input:checked + span { border-color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); font-weight: 600; }
+.auth-choice-option input:focus-visible + span { box-shadow: var(--focus); }
 .auth-input-toggle {
   position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
   display: flex; align-items: center; justify-content: center;

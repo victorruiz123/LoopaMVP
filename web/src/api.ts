@@ -611,3 +611,50 @@ export async function skickaFeedback(input: {
 export async function listaFeedback(): Promise<AdminFeedbackSvar> {
   return json(await authFetch("/api/admin/feedback"));
 }
+
+export interface AdressForslag {
+  id: string;
+  huvud: string;
+  rest: string | null;
+}
+
+export interface AdressTraff {
+  gatuadress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+}
+
+/**
+ * Förslag på adresser till registreringen. Publik och utan token — den som registrerar sig har inget
+ * konto än. Ett fel blir en tom lista: förslagen är en genväg, och fältet fungerar utan dem.
+ */
+export async function adressForslag(q: string, ort: string, session: string): Promise<AdressForslag[]> {
+  const params = new URLSearchParams({ q, session });
+  if (ort) params.set("ort", ort);
+  try {
+    const res = await fetch(`/api/adress/forslag?${params}`, { headers: { Accept: "application/json" } });
+    if (!res.ok) return [];
+    return ((await res.json()) as { forslag: AdressForslag[] }).forslag;
+  } catch {
+    return [];
+  }
+}
+
+/** Gatan, postnumret och orten för ett valt förslag. Kastar — anroparen lämnar då fälten som de är. */
+export async function adressDetalj(id: string, session: string): Promise<AdressTraff> {
+  const params = new URLSearchParams({ id, session });
+  const res = await fetch(`/api/adress/detalj?${params}`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`Adressen kunde inte slås upp (${res.status})`);
+  return (await res.json()) as AdressTraff;
+}
+
+/**
+ * Adressen vid en position, för "Använd min nuvarande adress". null = ingen adress där (eller utanför
+ * Sverige). Kastar när uppslaget inte gick att göra alls.
+ */
+export async function adressFranPosition(lat: number, lng: number): Promise<AdressTraff | null> {
+  const params = new URLSearchParams({ lat: lat.toFixed(6), lng: lng.toFixed(6) });
+  const res = await fetch(`/api/adress/har?${params}`, { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`Adressen kunde inte hämtas (${res.status})`);
+  return ((await res.json()) as { traff: AdressTraff | null }).traff;
+}

@@ -241,9 +241,9 @@ export const LEGAL: Record<string, Translation> = {
   "nedan, går till": { en: "below, go to", fr: "ci-dessous, sont à adresser à" },
   "Vad vi samlar in, och varför": { en: "What we collect, and why", fr: "Ce que nous collectons, et pourquoi" },
   "Ditt konto": { en: "Your account", fr: "Votre compte" },
-  "E-postadress och lösenord när du registrerar dig, samt namn, användarnamn och profilbild om din profil har sådana. Lösenordet lagras aldrig i klartext — det hanteras av Supabase, som driver inloggningen åt oss.": {
-    en: "Email address and password when you sign up, plus name, username and profile picture if your profile has them. The password is never stored in clear text — it is handled by Supabase, which runs the login for us.",
-    fr: "Adresse e-mail et mot de passe lors de l'inscription, ainsi que nom, nom d'utilisateur et photo de profil s'ils existent. Le mot de passe n'est jamais stocké en clair — il est géré par Supabase, qui assure la connexion pour nous.",
+  "E-postadress, lösenord och adress när du registrerar dig — med portkod och våning om du anger dem — samt namn, användarnamn och profilbild om din profil har sådana. Adressen behövs för att vi ska kunna hämta och leverera möbler. Lösenordet lagras aldrig i klartext — det hanteras av Supabase, som driver inloggningen åt oss.": {
+    en: "Email address, password and home address when you sign up — with door code and floor if you give them — plus name, username and profile picture if your profile has them. The address is needed so we can pick up and deliver furniture. The password is never stored in clear text — it is handled by Supabase, which runs the login for us.",
+    fr: "Adresse e-mail, mot de passe et adresse postale lors de l'inscription — avec code d'entrée et étage si vous les indiquez — ainsi que nom, nom d'utilisateur et photo de profil s'ils existent. L'adresse nous permet de récupérer et de livrer les meubles. Le mot de passe n'est jamais stocké en clair — il est géré par Supabase, qui assure la connexion pour nous.",
   },
   "Det är samma konto som i Vips.": { en: "It's the same account as in Vips.", fr: "C'est le même compte que sur Vips." },
   "Loopa och Vips delar användardatabas, så ett konto du redan har i Vips fungerar här utan ny registrering — och ett konto du skapar här fungerar i Vips. Det är värt att veta innan du registrerar dig, inte efteråt.": {
@@ -365,6 +365,14 @@ export const LEGAL: Record<string, Translation> = {
   "Väljer du att lägga ut möbeln till salu skickas annonstexten, bilderna som ska visas i annonsen, priset och ditt Loopa-ID till Tradera, där annonsen publiceras. Annonsen läggs upp via Loopas konto.": {
     en: "If you choose to put the furniture up for sale, the listing text, the photos to be shown in the ad, the price and your Loopa ID are sent to Tradera, where the ad is published. The ad goes up via Loopa's account.",
     fr: "Si vous choisissez de mettre le meuble en vente, le texte de l'annonce, les photos à afficher, le prix et votre identifiant Loopa sont transmis à Tradera, où l'annonce est publiée. L'annonce est publiée via le compte de Loopa.",
+  },
+  "Trycker du på ”Använd min nuvarande adress” frågar webbläsaren först om lov. Sedan skickas din position samma väg till Google för att göras om till en adress. Positionen sparas inte — bara adressen, om du registrerar dig med den.": {
+    en: "If you tap “Use my current address”, your browser asks for permission first. Your location is then sent the same way to Google to be turned into an address. The location is not stored — only the address, if you sign up with it.",
+    fr: "Si vous appuyez sur « Utiliser mon adresse actuelle », votre navigateur demande d'abord l'autorisation. Votre position est ensuite envoyée par la même voie à Google pour être convertie en adresse. La position n'est pas conservée — seulement l'adresse, si vous vous inscrivez avec.",
+  },
+  "När du skriver din gatuadress vid registreringen skickas det du skrivit, och orten om du fyllt i den, till Google för att ge förslag på adresser och hitta postnumret. Det går via Loopas server, så din IP-adress når inte Google den vägen, och sökningarna sparas inte.": {
+    en: "When you type your street address during sign-up, what you've typed — and the town, if you've filled it in — is sent to Google to suggest addresses and find the postcode. It goes via Loopa's server, so your IP address doesn't reach Google that way, and the searches are not stored.",
+    fr: "Lorsque vous saisissez votre adresse lors de l'inscription, ce que vous avez tapé — et la ville, si vous l'avez indiquée — est envoyé à Google pour proposer des adresses et trouver le code postal. Cela passe par le serveur de Loopa : votre adresse IP ne parvient donc pas à Google par ce biais, et les recherches ne sont pas conservées.",
   },
   "Appens typsnitt hämtas från Googles servrar, vilket innebär att din IP-adress når Google när sidan laddas. Ingen kaka sätts av det.": {
     en: "The app's fonts are loaded from Google's servers, which means your IP address reaches Google when the page loads. No cookie is set by this.",

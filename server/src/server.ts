@@ -38,6 +38,7 @@ import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
 import { handleButikOrderRead, handleButikRequest, handleButikWrite } from "./butik/routes.js";
 import { flyttadAdress } from "./butik/seo.js";
 import { handleAffar, handleAffarPublic } from "./affar/routes.js";
+import { handleAdress } from "./adress.js";
 import { handleEfterlysning, handleEfterlysningPublic } from "./efterlysning/routes.js";
 import { startEfterlysningSweeper } from "./efterlysning/matcher.js";
 import { migrateBevakningar } from "./efterlysning/migrate.js";
@@ -624,6 +625,7 @@ async function handleGetTradera(jobId: string, res: ServerResponse) {
 async function handlePublishTradera(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
+
 
   if (!traderaConfigured()) {
     return sendJson(res, 503, {
@@ -1764,6 +1766,14 @@ const server = http.createServer(async (req, res) => {
         if (segments[2] === "tolka") {
           if (await handleButikWrite(segments.slice(2), req, res, null)) return;
         }
+      }
+
+      /**
+       * Adressförslagen i registreringen, före grinden: den som fyller i adressen har inget konto än.
+       * Nyckeln och taket ligger på servern — se adress.ts.
+       */
+      if (segments[1] === "adress") {
+        if (await handleAdress(segments.slice(2), req, res)) return;
       }
 
       /**
