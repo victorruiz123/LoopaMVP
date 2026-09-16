@@ -25,7 +25,7 @@ try {
 
 const { getJob } = await import("../../jobStore.js");
 const { planBlocketPublish, runBlocketPublish } = await import("./publish.js");
-const { blocketBaseUrl, blocketConfigured, blocketHeadful, blocketLivePublishing, blocketPostalCode, missingBlocketEnv, sessionFile } =
+const { blocketBaseUrl, blocketConfigured, blocketHeadful, blocketLivePublishing, missingBlocketEnv, sessionFile } =
   await import("./blocket.js");
 
 const jobId = process.argv[2]?.trim();
@@ -97,7 +97,7 @@ console.log(`  Kategori     ${[plan.category.main, plan.category.sub, plan.categ
 console.log(`  Skick        ${plan.condition ?? "(inget betyg)"}`);
 console.log(`  Mått         ${[plan.measurements.height, plan.measurements.width, plan.measurements.depth].map((v) => v ?? "–").join(" / ")} cm (H/B/D)`);
 console.log(`  Bilder       ${plan.imageCount}`);
-console.log(`  Postnummer   ${blocketPostalCode()}`);
+console.log(`  Postnummer   ${plan.postalCode}  (säljarens)`);
 console.log("");
 
 // `--plan` stannar här: ingen webbläsare, ingen sida besökt, ingenting skrivet. Vägen att kontrollera

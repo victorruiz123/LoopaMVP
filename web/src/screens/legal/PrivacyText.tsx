@@ -41,7 +41,7 @@ export default function PrivacyText() {
       <h3>{t("Ditt konto")}</h3>
       <p>
         {t(
-          "E-postadress och lösenord när du registrerar dig, samt namn, användarnamn och profilbild om din profil har sådana. Lösenordet lagras aldrig i klartext — det hanteras av Supabase, som driver inloggningen åt oss.",
+          "E-postadress, lösenord och adress när du registrerar dig — med portkod och våning om du anger dem — samt namn, användarnamn och profilbild om din profil har sådana. Adressen behövs för att vi ska kunna hämta och leverera möbler. Lösenordet lagras aldrig i klartext — det hanteras av Supabase, som driver inloggningen åt oss.",
         )}
       </p>
       <p>
@@ -157,6 +157,16 @@ export default function PrivacyText() {
         <dd>
           {t(
             "Väljer du att lägga ut möbeln till salu skickas annonstexten, bilderna som ska visas i annonsen, priset och ditt Loopa-ID till Tradera, där annonsen publiceras. Annonsen läggs upp via Loopas konto.",
+          )}
+        </dd>
+
+        <dt>Google Maps</dt>
+        <dd>
+          {t(
+            "När du skriver din gatuadress vid registreringen skickas det du skrivit, och orten om du fyllt i den, till Google för att ge förslag på adresser och hitta postnumret. Det går via Loopas server, så din IP-adress når inte Google den vägen, och sökningarna sparas inte.",
+          )}{" "}
+          {t(
+            "Trycker du på ”Använd min nuvarande adress” frågar webbläsaren först om lov. Sedan skickas din position samma väg till Google för att göras om till en adress. Positionen sparas inte — bara adressen, om du registrerar dig med den.",
           )}
         </dd>
 

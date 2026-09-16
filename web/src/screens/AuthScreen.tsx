@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { useAuth } from "../auth/AuthProvider";
+import { useAuth, type Adress } from "../auth/AuthProvider";
+import AdressFalt from "../components/AdressFalt";
+import type { AdressTraff } from "../api";
+import NuvarandeAdress from "../components/NuvarandeAdress";
 import { ArrowLeftIcon, EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "../components/icons";
 import { usePageTitle } from "../lib/pageTitle";
 import { t as translate, useT } from "../lib/i18n";
@@ -60,6 +63,12 @@ export default function AuthScreen({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
+  const [gatuadress, setGatuadress] = useState("");
+  const [postnummer, setPostnummer] = useState("");
+  const [ort, setOrt] = useState("");
+  const [boende, setBoende] = useState<Adress["boende"] | null>(null);
+  const [portkod, setPortkod] = useState("");
+  const [vaning, setVaning] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
 
@@ -70,11 +79,30 @@ export default function AuthScreen({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setMessage(null);
+    // Det webbläsaren inte kan kontrollera själv: postnumrets form och ett val bland radioknappar
+    // som `required` inte alltid fångar i Safari.
+    const postnummerSiffror = postnummer.replace(/\D/g, "");
+    if (isSignup && postnummerSiffror.length !== 5) {
+      setMessage({ tone: "error", text: t("Postnumret ska vara fem siffror.") });
+      return;
+    }
+    if (isSignup && !boende) {
+      setMessage({ tone: "error", text: t("Välj om du bor i hus eller lägenhet.") });
+      return;
+    }
+    setBusy(true);
     try {
       if (isSignup) {
-        const { error } = await signUp(email, password);
+        const adress: Adress = {
+          gatuadress: gatuadress.trim(),
+          postnummer: postnummerSiffror,
+          ort: ort.trim(),
+          boende: boende!,
+          portkod: portkod.trim() || null,
+          vaning: boende === "lagenhet" ? vaning.trim() || null : null,
+        };
+        const { error } = await signUp(email, password, adress);
         if (error) throw error;
         // Kontot är skapat — logga in direkt i stället för att skicka säljaren tillbaka till
         // formuläret med samma uppgifter en gång till.
@@ -95,6 +123,16 @@ export default function AuthScreen({
     } finally {
       setBusy(false);
     }
+  }
+
+  /**
+   * Ett adressförslag eller en position, in i fälten. Bara det Google faktiskt har skrivs över: ett
+   * svar utan postnummer ska inte tömma ett postnummer säljaren redan skrivit.
+   */
+  function fyllAdress(traff: AdressTraff) {
+    if (traff.gatuadress) setGatuadress(traff.gatuadress);
+    if (traff.postnummer) setPostnummer(`${traff.postnummer.slice(0, 3)} ${traff.postnummer.slice(3)}`);
+    if (traff.ort) setOrt(traff.ort);
   }
 
   return (
@@ -215,6 +253,98 @@ export default function AuthScreen({
                 </button>
               </span>
             </label>
+
+            {isSignup && (
+              <>
+                {/* En div och inte en label runt fältet: förslagslistan är klickbar, och klickbart
+                    innehåll hör inte hemma inuti en label. */}
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-gatuadress">
+                    {t("Gatuadress")}
+                  </label>
+                  <AdressFalt
+                    id="auth-gatuadress"
+                    value={gatuadress}
+                    ort={ort}
+                    onChange={setGatuadress}
+                    onValj={fyllAdress}
+                  />
+                  <NuvarandeAdress onTraff={fyllAdress} />
+                  <span className="auth-hint">{t("Dit vi hämtar och levererar möbler.")}</span>
+                </div>
+
+                <div className="auth-row">
+                  <label className="auth-field">
+                    <span className="auth-label">{t("Postnummer")}</span>
+                    <span className="auth-input-wrap auth-input-plain">
+                      <input
+                        value={postnummer}
+                        onChange={(e) => setPostnummer(e.target.value)}
+                        required
+                        inputMode="numeric"
+                        autoComplete="postal-code"
+                        maxLength={6}
+                        placeholder="123 45"
+                      />
+                    </span>
+                  </label>
+                  <label className="auth-field">
+                    <span className="auth-label">{t("Ort")}</span>
+                    <span className="auth-input-wrap auth-input-plain">
+                      <input
+                        value={ort}
+                        onChange={(e) => setOrt(e.target.value)}
+                        required
+                        autoComplete="address-level2"
+                        placeholder="Stockholm"
+                      />
+                    </span>
+                  </label>
+                </div>
+
+                <fieldset className="auth-choice">
+                  <legend className="auth-label">{t("Boende")}</legend>
+                  {(["hus", "lagenhet"] as const).map((val) => (
+                    <label key={val} className="auth-choice-option">
+                      <input
+                        type="radio"
+                        name="boende"
+                        value={val}
+                        checked={boende === val}
+                        onChange={() => setBoende(val)}
+                        required
+                      />
+                      <span>{val === "hus" ? t("Hus") : t("Lägenhet")}</span>
+                    </label>
+                  ))}
+                </fieldset>
+
+                <div className={boende === "lagenhet" ? "auth-row" : undefined}>
+                  {boende === "lagenhet" && (
+                    <label className="auth-field">
+                      <span className="auth-label">{t("Våning")}</span>
+                      <span className="auth-input-wrap auth-input-plain">
+                        <input
+                          value={vaning}
+                          onChange={(e) => setVaning(e.target.value)}
+                          required
+                          inputMode="numeric"
+                          placeholder={t("t.ex. 3")}
+                        />
+                      </span>
+                    </label>
+                  )}
+                  <label className="auth-field">
+                    <span className="auth-label">
+                      {t("Portkod")} <span className="auth-label-optional">({t("Valfritt").toLowerCase()})</span>
+                    </span>
+                    <span className="auth-input-wrap auth-input-plain">
+                      <input value={portkod} onChange={(e) => setPortkod(e.target.value)} autoComplete="off" />
+                    </span>
+                  </label>
+                </div>
+              </>
+            )}
 
             {message && <p className={`auth-message auth-message-${message.tone}`}>{message.text}</p>}
 

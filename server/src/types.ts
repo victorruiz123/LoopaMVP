@@ -668,6 +668,14 @@ export interface ConditionJob {
    * adress i Supabase ska nås på den nya.
    */
   ownerEmail?: string | null;
+  /**
+   * Säljarens postnummer, sparat på jobbet när säljaren trycker "Sälj med Loopa".
+   *
+   * Blocket-annonsen läggs på det, och det läggs ut först när admin godkänner — då står säljaren inte
+   * i anropet, och kontot går bara att läsa med en servicenyckel. Samma skäl som `ownerEmail` ovan.
+   * Se integrations/blocket/saljare.ts.
+   */
+  sellerPostalCode?: string | null;
   progress: JobProgress;
   result: ConditionResult | null;
   error: string | null;
