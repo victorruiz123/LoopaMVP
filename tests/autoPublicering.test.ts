@@ -76,7 +76,7 @@ function medMiljo(vars: Record<string, string | undefined>, fn: () => Promise<vo
 
 test("en okonfigurerad kanal fäller inte den andra — den rapporterar vad som fattas", async () => {
   await medMiljo(
-    { BLOCKET_SESSION: undefined, BLOCKET_POSTNUMMER: undefined, TRADERA_APP_ID: undefined },
+    { BLOCKET_SESSION: undefined, TRADERA_APP_ID: undefined },
     async () => {
       const plan = await planAutoPublish(jobb());
       const blocket = plan.channels.find((c) => c.channel === "blocket")!;
@@ -84,8 +84,8 @@ test("en okonfigurerad kanal fäller inte den andra — den rapporterar vad som 
       assert.equal(blocket.configured, false);
       assert.deepEqual(
         blocket.missingEnv,
-        ["BLOCKET_SESSION", "BLOCKET_POSTNUMMER"],
-        "raden ska säga VILKEN variabel som fattas — annars går felet inte att laga",
+        ["BLOCKET_SESSION"],
+        "raden ska säga VILKEN variabel som fattas — annars går felet inte att laga. Postnumret är inte en av dem: det är säljarens",
       );
       // Båda kanalerna finns kvar i listan. Att dölja en okonfigurerad kanal hade gjort en möbel som
       // gick ut på ett ställe mindre till något ingen kunde se.
@@ -95,7 +95,7 @@ test("en okonfigurerad kanal fäller inte den andra — den rapporterar vad som 
 });
 
 test("det som redan ligger uppe läggs inte upp igen", async () => {
-  await medMiljo({ BLOCKET_SESSION: SESSIONSFIL, BLOCKET_POSTNUMMER: "11234" }, async () => {
+  await medMiljo({ BLOCKET_SESSION: SESSIONSFIL }, async () => {
     const plan = await planAutoPublish(
       jobb({
         tradera: traderaPub({ status: "published", itemId: 42 }),
@@ -120,7 +120,7 @@ test("det som redan ligger uppe läggs inte upp igen", async () => {
 });
 
 test("en torrkörning som redan gjorts stänger inte kanalen", async () => {
-  await medMiljo({ BLOCKET_SESSION: SESSIONSFIL, BLOCKET_POSTNUMMER: "11234" }, async () => {
+  await medMiljo({ BLOCKET_SESSION: SESSIONSFIL }, async () => {
     const plan = await planAutoPublish(
       jobb({
         blocket: {
@@ -143,7 +143,7 @@ test("en torrkörning som redan gjorts stänger inte kanalen", async () => {
 
 test("torrkörningen syns i planen, och BLOCKET_PUBLICERA=1 stänger av den", async () => {
   await medMiljo(
-    { BLOCKET_SESSION: SESSIONSFIL, BLOCKET_POSTNUMMER: "11234", BLOCKET_PUBLICERA: undefined },
+    { BLOCKET_SESSION: SESSIONSFIL, BLOCKET_PUBLICERA: undefined },
     async () => {
       const plan = await planAutoPublish(jobb());
       assert.equal(plan.channels.find((c) => c.channel === "blocket")!.dryRun, true, "torrkörning är förvalet");
@@ -151,7 +151,7 @@ test("torrkörningen syns i planen, och BLOCKET_PUBLICERA=1 stänger av den", as
   );
 
   await medMiljo(
-    { BLOCKET_SESSION: SESSIONSFIL, BLOCKET_POSTNUMMER: "11234", BLOCKET_PUBLICERA: "1" },
+    { BLOCKET_SESSION: SESSIONSFIL, BLOCKET_PUBLICERA: "1" },
     async () => {
       const plan = await planAutoPublish(jobb());
       assert.equal(plan.channels.find((c) => c.channel === "blocket")!.dryRun, false, "skarpt läge");

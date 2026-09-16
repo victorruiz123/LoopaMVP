@@ -31,9 +31,10 @@ import { getJob, jobDir, persist } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { resolveCoverImageId } from "../../pipeline/cover.js";
 import type { BlocketPublication, BlocketStep, ConditionJob } from "../../types.js";
-import { blocketConfigured, blocketLivePublishing, blocketPostalCode, missingBlocketEnv, sessionFileExists } from "./blocket.js";
+import { blocketConfigured, blocketLivePublishing, missingBlocketEnv, sessionFileExists } from "./blocket.js";
 import { ensureSession, handleBankID, openTorgetForm, reopenTorgetForm, saveSessionIfReal, startBrowser, ON_FORM } from "./browser.js";
 import { MAX_STEPS, nyttSteg, type Logga } from "./diag.js";
+import { saljarensPostnummer } from "./saljare.js";
 import {
   chooseRadio,
   clickFirstVisible,
@@ -94,7 +95,8 @@ export type BlocketReadiness = { ok: true; plan: BlocketPublishPlan } | { ok: fa
  *
  * Samma tre grundkrav som Tradera-vägen — annonstext, pris och minst en bild — och med SAMMA ORD, för
  * att det inte ska gå att tro att den ena kanalen kan något den andra inte kan. Ovanpå det ett krav
- * till: postnumret, som Blocket kräver och Loopa inte känner.
+ * till: postnumret, som Blocket kräver. Det är SÄLJARENS, och hämtas därför ur jobbet eller kontot — se
+ * saljare.ts.
  */
 export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketReadiness> {
   const job = await medRattelser(rajob);
@@ -112,9 +114,13 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
   const images = await listingImages(job);
   if (images.length === 0) return { ok: false, reason: "Jobbet har inga bilder kvar på disk." };
 
-  const postalCode = blocketPostalCode();
+  // Ur det RÅA jobbet: postnumret är ingen annonsuppgift, och rättelserna ovan har inget med det att göra.
+  const postalCode = await saljarensPostnummer(rajob);
   if (!postalCode) {
-    return { ok: false, reason: "Postnumret saknas. Blocket kräver det — sätt BLOCKET_POSTNUMMER på servern." };
+    return {
+      ok: false,
+      reason: "Säljarens postnummer saknas. Det står inte på jobbet och gick inte att läsa från kontot.",
+    };
   }
 
   // Butiksprojektionen är den enda vägen från ett jobb till strukturerade fält (kategori, färg,

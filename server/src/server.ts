@@ -622,10 +622,27 @@ async function handleGetTradera(jobId: string, res: ServerResponse) {
  * Kravet att Tradera är konfigurerat står kvar: det är fortfarande en Tradera-annons som beställs,
  * och en kö som inte kan tömmas hade varit värre än en gömd knapp.
  */
-async function handlePublishTradera(jobId: string, res: ServerResponse) {
+async function handlePublishTradera(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
 
+  /**
+   * Säljarens postnummer, skrivet in på jobbet MEDAN säljarens token finns.
+   *
+   * Blocket-annonsen läggs på det (se integrations/blocket/saljare.ts), men den läggs ut först när
+   * admin godkänner — med adminens token, inte säljarens. Det här trycket är det sista tillfälle
+   * säljaren själv står i anropet. Tyst: ett uteblivet postnummer stoppar inte Tradera, och Blocket
+   * säger själv till i panelen om det saknas.
+   */
+  const token = bearerToken(req);
+  if (token) {
+    const { postnummerForToken } = await import("./integrations/blocket/saljare.js");
+    const postnummer = await postnummerForToken(token);
+    if (postnummer && postnummer !== job.sellerPostalCode) {
+      job.sellerPostalCode = postnummer;
+      await persist(job).catch(() => undefined);
+    }
+  }
 
   if (!traderaConfigured()) {
     return sendJson(res, 503, {
@@ -2210,7 +2227,7 @@ const server = http.createServer(async (req, res) => {
         return await handleSetDisclosures(segments[2], req, res);
       }
       if (segments.length === 4 && segments[3] === "tradera") {
-        if (req.method === "POST") return await handlePublishTradera(segments[2], res);
+        if (req.method === "POST") return await handlePublishTradera(segments[2], req, res);
         if (req.method === "GET") return await handleGetTradera(segments[2], res);
       }
       if (segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
