@@ -19,6 +19,11 @@ WorkingDirectory=/opt/loopa/server
 Environment=NODE_ENV=production
 Environment=PORT=8799
 
+# Blocket-robotens Chromium. SAMMA sokvag som deploy/rulla-ut.sh installerar till — utan raden
+# letar Playwright i /home/opc/.cache/ms-playwright, och hittar webblasaren bara om just opc
+# rakade kora installationen. En fast sokvag gor att det inte hanger pa vem som rullade ut.
+Environment=PLAYWRIGHT_BROWSERS_PATH=/opt/loopa/ms-playwright
+
 # tsx direkt i stallet for `npm start`: ett processled mindre, och signaler nar fram till
 # servern utan att npm star i vagen vid omstart.
 ExecStart=/opt/loopa/server/node_modules/.bin/tsx src/server.ts

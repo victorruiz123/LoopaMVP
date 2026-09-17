@@ -21,6 +21,7 @@
  * tests/blocketAttrapp.ts utan ett jobb på disk, utan en session och utan Blocket.
  */
 
+import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { BrowserContext, Page } from "playwright";
 import { adImages, adTitle, composeAd, renderAdPlain, resolveAdPrice } from "../../adContent.js";
@@ -31,10 +32,19 @@ import { getJob, jobDir, persist } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { resolveCoverImageId } from "../../pipeline/cover.js";
 import type { BlocketPublication, BlocketStep, ConditionJob } from "../../types.js";
-import { blocketConfigured, blocketLivePublishing, missingBlocketEnv, sessionFileExists } from "./blocket.js";
+import {
+  blocketConfigured,
+  blocketDataDir,
+  blocketLivePublishing,
+  lasHalsa,
+  missingBlocketEnv,
+  sessionFileExists,
+  skrivHalsa,
+} from "./blocket.js";
 import { ensureSession, handleBankID, openTorgetForm, reopenTorgetForm, saveSessionIfReal, startBrowser, ON_FORM } from "./browser.js";
 import { MAX_STEPS, nyttSteg, type Logga } from "./diag.js";
 import { saljarensPostnummer } from "./saljare.js";
+import { markeraUpptagen } from "./vakt.js";
 import {
   chooseRadio,
   clickFirstVisible,
@@ -113,6 +123,19 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
 
   const images = await listingImages(job);
   if (images.length === 0) return { ok: false, reason: "Jobbet har inga bilder kvar på disk." };
+
+  // Vaktens senaste besked (vakt.ts). En utgången session är serverns fel, inte annonsens, och den
+  // står FÖRE postnumret: annars lagar admin postnumret och möts av nästa fel. Beskedet försvinner
+  // av sig självt när en ny session klistras in (blocket.ts, glomHalsa).
+  const halsa = lasHalsa();
+  if (halsa && !halsa.ok) {
+    return {
+      ok: false,
+      reason:
+        `Blocket-sessionen har gått ut (kontrollerad ${halsa.kontrolleradAt.slice(0, 16).replace("T", " ")}). ` +
+        "Logga in på nytt och byt sessionen på servern — BLOCKET-PLAN.md, fas B.",
+    };
+  }
 
   // Ur det RÅA jobbet: postnumret är ingen annonsuppgift, och rättelserna ovan har inget med det att göra.
   const postalCode = await saljarensPostnummer(rajob);
@@ -462,6 +485,8 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
   };
 
   let session: Awaited<ReturnType<typeof startBrowser>> | null = null;
+  // Vakten (vakt.ts) ska inte starta en webbläsare bredvid den här.
+  markeraUpptagen(true);
 
   try {
     // Äldre jobb saknar omslagsvalet helt och skulle annars lägga sin första bildruta överst — den som
@@ -495,7 +520,17 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
     });
 
     session = await startBrowser();
-    await ensureSession(session.page, logga);
+    try {
+      await ensureSession(session.page, logga);
+      skrivHalsa({ kontrolleradAt: new Date().toISOString(), ok: true, url: session.page.url(), fel: null });
+    } catch (err) {
+      // Bara inloggningssidan räknas som utgången session. En timeout eller en spärrsida är något
+      // annat, och ska inte få vakten att be om en ny inloggning som inte hade hjälpt.
+      if (/gått ut/i.test(felText(err))) {
+        skrivHalsa({ kontrolleradAt: new Date().toISOString(), ok: false, url: session.page.url(), fel: felText(err) });
+      }
+      throw err;
+    }
     await handleBankID(session.page, session.context, logga);
 
     const result = await driveBlocketForm(session.page, session.context, { plan, description, files }, logga);
@@ -519,8 +554,24 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
     const message = felText(err);
     console.warn(`[blocket] job ${jobId} kunde inte publiceras — ${message}`);
     steps.push(nyttSteg("Körningen stoppades", "error", { fel: message }));
+
+    // Skärmbilden. Stegloggen säger VAR det stannade; bilden säger hur sidan såg ut. Från en osynlig
+    // webbläsare på en server är det enda vägen att skilja ett ombyggt formulär från en spärrsida
+    // från en cookiebanner som la sig i vägen. Hjälp, inte krav: faller den fortsätter felskrivningen.
+    if (session && !session.page.isClosed()) {
+      const fil = path.join(blocketDataDir(), `fel-${jobId}.png`);
+      try {
+        mkdirSync(path.dirname(fil), { recursive: true, mode: 0o700 });
+        await session.page.screenshot({ path: fil, fullPage: true });
+        steps.push(nyttSteg("Skärmbild sparad", "warning", { fil, url: session.page.url() }));
+      } catch {
+        // Sidan kan vara borta. Loggen ovan står kvar.
+      }
+    }
+
     await update(jobId, (current) => ({ ...current, status: "error", error: message, steps: [...steps] })).catch(() => undefined);
   } finally {
+    markeraUpptagen(false);
     await writing.catch(() => undefined);
     await session?.browser.close().catch(() => undefined);
   }

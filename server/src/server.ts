@@ -47,6 +47,7 @@ import { attachScan } from "./affar/scan.js";
 import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
 import { startTraderaMailWatch } from "./integrations/tradera/mailwatch.js";
+import { startBlocketVakt } from "./integrations/blocket/vakt.js";
 import { bearerToken } from "./supabaseAuth.js";
 import { avtryck, KLIENTHANDELSER, spara, allStatistik, type AnnonsStatistik } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
@@ -2397,6 +2398,11 @@ startButikSweeper();
 // Tradera-posten: Gmail läses var halvtimme, sålda möbler blir sålda i butiken, frågor når panelen
 // och adminadressen. Av av sig själv tills GMAIL_USER/GMAIL_APP_PASSWORD finns i server/.env.
 startTraderaMailWatch();
+
+// Blocket-vakten: kontrollerar var tolfte timme att sessionen fortfarande gäller, skriver beskedet
+// där panelen läser det, och mejlar adminadresserna när den gått ut — innan en säljare upptäcker
+// det. Av av sig själv när ingen session finns i server/.env.
+startBlocketVakt();
 
 /**
  * Efterlysningarna: migrering en gång, sedan sveparen.

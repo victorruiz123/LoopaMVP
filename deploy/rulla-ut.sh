@@ -64,6 +64,25 @@ else
   echo "web: oförändrad"
 fi
 
+# ── 2b. Blockets webbläsare ─────────────────────────────────────────────────
+#
+# `npm ci` hämtar paketet playwright men INTE Chromium — den hämtas av `playwright install`, som
+# ingen körde på servern. Blocket-roboten föll då redan i första steget, med "Executable doesn't
+# exist", och det syntes bara som status "error" på jobbet i panelen.
+#
+# Sökvägen sätts uttryckligen, och samma sökväg står i deploy/oracle/loopa-server.service. Utan
+# den hamnar webbläsaren i hemkatalogen hos den som råkar köra skriptet, och tjänsten — som kör som
+# opc — letar i sin. Installationen är en no-op när rätt version redan finns.
+#
+# Provstarten är själva kontrollen: ett paket som laddats ner men saknar systembibliotek startar
+# inte, och det ska stoppa utrullningen här — inte visa sig som ett trasigt jobb i morgon. Listan
+# över bibliotek finns i deploy/oracle/chromium-beroenden.sh.
+steg "Blockets webbläsare"
+export PLAYWRIGHT_BROWSERS_PATH=/opt/loopa/ms-playwright
+(cd server && npx playwright install chromium)
+node -e "require('./server/node_modules/playwright').chromium.launch({args:['--no-sandbox']}).then(b=>{console.log('✓ Chromium startar');return b.close()})" \
+  || fel "Chromium startar inte. Kör: sudo ./deploy/oracle/chromium-beroenden.sh — och försök igen."
+
 # ── 3. Frontend ─────────────────────────────────────────────────────────────
 #
 # Servern skickar web/dist (static.ts). Utan det här steget serveras gårdagens gränssnitt av

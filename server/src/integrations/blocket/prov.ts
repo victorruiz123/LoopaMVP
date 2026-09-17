@@ -65,12 +65,18 @@ if (!existsSync(session)) {
  */
 if (process.argv.includes("--session")) {
   const { startBrowser, ensureSession } = await import("./browser.js");
+  const { skrivHalsa } = await import("./blocket.js");
   const s = await startBrowser();
   try {
     await ensureSession(s.page, (namn, status) => console.log(`  [${status}] ${namn}`));
+    // Samma besked som vakten skriver (vakt.ts), så att panelen och den här kontrollen aldrig säger
+    // olika saker om samma session.
+    skrivHalsa({ kontrolleradAt: new Date().toISOString(), ok: true, url: s.page.url(), fel: null });
     console.log("\n  ✓ Sessionen gäller. Du kan köra en torrkörning.\n");
   } catch (err) {
-    console.error(`\n  ✗ ${err instanceof Error ? err.message : String(err)}\n`);
+    const fel = err instanceof Error ? err.message : String(err);
+    if (/gått ut/i.test(fel)) skrivHalsa({ kontrolleradAt: new Date().toISOString(), ok: false, url: s.page.url(), fel });
+    console.error(`\n  ✗ ${fel}\n`);
     process.exitCode = 1;
   } finally {
     await s.browser.close().catch(() => null);

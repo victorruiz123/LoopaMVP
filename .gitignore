@@ -24,3 +24,9 @@ bench-prov/
 # `git add -A` annars sväljer. Blocket-publiceringen som letades efter där ligger på grenen
 # blocket-autopublicering, inte i mappen.
 LoopaMVP-main/
+
+# Blocket-sessionen: Playwrights storageState från en inloggning för hand (npm run blocket:logga-in),
+# och den packade kopian som klistras in i serverns .env. Inloggade kakor — hör aldrig hemma i
+# historiken, hur privat repot än är.
+blocket-session.json
+blocket-session.b64

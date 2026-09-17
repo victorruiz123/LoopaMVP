@@ -12,7 +12,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { gunzipSync } from "node:zlib";
 import { DATA_DIR } from "../../jobStore.js";
@@ -77,7 +77,7 @@ function sessionFranMiljo(): string | null {
     return null;
   }
 
-  const katalog = process.env.BLOCKET_DATA_DIR?.trim() || path.join(DATA_DIR, "blocket");
+  const katalog = blocketDataDir();
   const fil = path.join(katalog, "session.json");
   const markering = path.join(katalog, "session.kalla");
   const avtryck = createHash("sha256").update(kalla).digest("hex");
@@ -87,8 +87,53 @@ function sessionFranMiljo(): string | null {
     mkdirSync(katalog, { recursive: true, mode: 0o700 });
     writeFileSync(fil, json, { encoding: "utf8", mode: 0o600 });
     writeFileSync(markering, avtryck, "utf8");
+    // En ny session klistrades in. Vaktens dom över den gamla gäller inte den nya — utan den här
+    // raden stod "sessionen har gått ut" kvar i panelen i upp till tolv timmar efter bytet.
+    glomHalsa();
   }
   return fil;
+}
+
+/** Katalogen för sessionen, hälsofilen och felskärmbilderna. BLOCKET_DATA_DIR pekar om den (testerna). */
+export function blocketDataDir(): string {
+  return process.env.BLOCKET_DATA_DIR?.trim() || path.join(DATA_DIR, "blocket");
+}
+
+/**
+ * Vaktens senaste besked om sessionen. Se vakt.ts.
+ *
+ * Skrivs av vakten och av en publicering som mötte inloggningssidan; läses av `planBlocketPublish`
+ * så att Kanallistan i panelen säger "sessionen har gått ut" INNAN någon trycker — inte efter tre
+ * minuters väntan på en robot som aldrig kom förbi första sidan.
+ */
+export interface BlocketHalsa {
+  kontrolleradAt: string;
+  ok: boolean;
+  url: string | null;
+  fel: string | null;
+}
+
+const HALSOFIL = "halsa.json";
+
+export function lasHalsa(): BlocketHalsa | null {
+  try {
+    const halsa = JSON.parse(readFileSync(path.join(blocketDataDir(), HALSOFIL), "utf8")) as Partial<BlocketHalsa>;
+    if (typeof halsa.ok !== "boolean" || typeof halsa.kontrolleradAt !== "string") return null;
+    return { kontrolleradAt: halsa.kontrolleradAt, ok: halsa.ok, url: halsa.url ?? null, fel: halsa.fel ?? null };
+  } catch {
+    return null;
+  }
+}
+
+export function skrivHalsa(halsa: BlocketHalsa): void {
+  const katalog = blocketDataDir();
+  mkdirSync(katalog, { recursive: true, mode: 0o700 });
+  writeFileSync(path.join(katalog, HALSOFIL), JSON.stringify(halsa, null, 2), "utf8");
+}
+
+/** Glömmer beskedet. Kallas när en ny session tagits i bruk — den gamla domen gäller inte den. */
+export function glomHalsa(): void {
+  rmSync(path.join(blocketDataDir(), HALSOFIL), { force: true });
 }
 
 /** storageState-JSON ur ett miljövärde i något av proxyns två format, eller null. */

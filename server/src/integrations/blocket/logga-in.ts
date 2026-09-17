@@ -26,7 +26,7 @@ try {
   // Variablerna kan lika gärna komma ur skalet.
 }
 
-const { blocketBaseUrl, isRealBlocket, sessionFile } = await import("./blocket.js");
+const { blocketBaseUrl, glomHalsa, isRealBlocket, sessionFile } = await import("./blocket.js");
 const { isLoggedOut } = await import("./browser.js");
 
 const fil = sessionFile();
@@ -108,6 +108,9 @@ while (Date.now() < slut) {
   }
 
   await context.storageState({ path: fil });
+  // Vaktens dom över den gamla sessionen gäller inte den nya. Utan raden står "sessionen har gått
+  // ut" kvar i panelen tills nästa kontroll, fast inloggningen just lyckades.
+  glomHalsa();
   sparad = true;
   console.log(`\n  ✓ Inloggad. Sessionen sparad till ${fil}`);
   console.log("    Verifiera med: npm run blocket:prov -- <jobId> --session\n");
