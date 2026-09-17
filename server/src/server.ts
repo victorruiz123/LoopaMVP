@@ -28,13 +28,7 @@ import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
-import {
-  getTraderaLage,
-  missingTraderaEnv,
-  TRADERA_PUBLISHING_ENABLED,
-  traderaConfigured,
-  traderaPublishingEnabled,
-} from "./integrations/tradera/tradera.js";
+import { getTraderaLage, traderaConfigured } from "./integrations/tradera/tradera.js";
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
@@ -607,9 +601,21 @@ async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: Serv
  */
 async function traderaState(job: ConditionJob) {
   const readiness = await planTraderaPublish(job);
+  const { planAutoPublish } = await import("./integrations/autoPublish.js");
+  const { channels } = await planAutoPublish(job);
   return {
-    configured: traderaPublishingEnabled(),
-    missingEnv: TRADERA_PUBLISHING_ENABLED ? missingTraderaEnv() : [],
+    /**
+     * Konfigurerad = NÅGON kanal kan ta emot en beställning.
+     *
+     * Fältet var Traderas eget läge, och säljvyn gömde sig bakom det: när Tradera stängdes av
+     * (TRADERA_PUBLISHING_ENABLED) försvann "Sälj med Loopa" för alla kanaler, fast Blocket stod redo.
+     * Kanalerna följer med var för sig, så att klienten kan säga vad som händer och vad som fattas.
+     */
+    configured: channels.some((c) => c.configured),
+    missingEnv: Array.from(new Set(channels.flatMap((c) => c.missingEnv))),
+    channels,
+    /** Blockets utfall, så att säljarens kvitto kan visa annonsen även när bara Blocket kör. */
+    blocket: job.blocket ?? null,
     publication: job.tradera ?? null,
     plan: readiness.ok ? readiness.plan : null,
     blockedReason: readiness.ok ? null : readiness.reason,
@@ -643,43 +649,39 @@ async function handleGetTradera(jobId: string, res: ServerResponse) {
  * Säljarens tryck på "Sälj med Loopa": annonsen ställs i kö för granskning.
  *
  * Ingenting publiceras här. Annonsen dyker upp i adminpanelen (victor@ruiz.se) som "väntar", och
- * det är admins knapp där som lägger ut den — i Butiken och på Tradera i samma tryck. Se
+ * det är admins knapp där som lägger ut den — i Butiken och på marknadsplatserna i samma tryck. Se
  * adminAnnonser.ts. Svaret är samma `traderaState` som klienten redan pollar, så knappen låses
  * direkt och visar "granskas".
  *
- * Kravet att Tradera är konfigurerat står kvar: det är fortfarande en Tradera-annons som beställs,
- * och en kö som inte kan tömmas hade varit värre än en gömd knapp.
+ * BESTÄLLNINGEN GRINDAS PÅ KANALERNA, INTE PÅ TRADERA. Fältet heter Tradera av historiska skäl, men
+ * det som beställs är en försäljning, och den kan tas emot så länge NÅGON kanal är konfigurerad.
+ * Grinden var Traderas spärr, och när den slogs av (13 september) svarade rutten 503 för alla —
+ * knappen försvann, ingen beställning skrevs, och godkännandet i panelen hade ingenting att godkänna.
+ * En kö som inte kan tömmas är fortfarande värre än en gömd knapp; därför avvisas trycket när ingen
+ * kanal alls kan ta emot det, med varje kanals eget skäl.
  */
 async function handlePublishTradera(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
 
-  if (!traderaPublishingEnabled()) {
-    return sendJson(res, 503, {
-      error: TRADERA_PUBLISHING_ENABLED
-        ? `Tradera är inte konfigurerat på servern. Saknar ${missingTraderaEnv().join(", ")}.`
-        : "Tradera-publiceringen är avstängd.",
-      ...(await traderaState(job)),
-    });
-  }
-
   /**
-   * Säljarens postnummer, skrivet in på jobbet MEDAN säljarens token finns.
+   * Säljarens postnummer, skrivet in på jobbet MEDAN säljarens token finns — FÖRE varje grind.
    *
    * Blocket-annonsen läggs på det (se integrations/blocket/saljare.ts), men den läggs ut först när
    * admin godkänner — med adminens token, inte säljarens. Det här trycket är det sista tillfälle
-   * säljaren själv står i anropet. Tyst: ett uteblivet postnummer stoppar inte Tradera, och Blocket
-   * säger själv till i panelen om det saknas.
+   * säljaren själv står i anropet. Raden låg förut efter Tradera-grinden, och när Tradera stängdes
+   * av nåddes den aldrig: varje jobb saknade postnummer utan att någon såg varför. Tyst: ett
+   * uteblivet postnummer stoppar inte beställningen, och Blocket säger själv till i panelen.
    */
   const token = bearerToken(req);
   if (token) {
-    const { postnummerForToken } = await import("./integrations/blocket/saljare.js");
-    const postnummer = await postnummerForToken(token);
-    if (postnummer && postnummer !== job.sellerPostalCode) {
-      job.sellerPostalCode = postnummer;
-      await persist(job).catch(() => undefined);
-    }
+    const { skrivSaljarensPostnummer } = await import("./integrations/blocket/saljare.js");
+    await skrivSaljarensPostnummer(job, token);
   }
+
+  const { bestallningsGrind } = await import("./integrations/autoPublish.js");
+  const grind = await bestallningsGrind(job);
+  if (!grind.ok) return sendJson(res, 503, { error: grind.reason, ...(await traderaState(job)) });
 
   const status = job.tradera?.status;
   if (status === "pending" || status === "publishing") return sendJson(res, 202, await traderaState(job));
@@ -709,7 +711,7 @@ async function notifyAdminsOfPending(loopaId: string, title: string, price: numb
       `${title} (${loopaId}) väntar på godkännande. Pris till köpare: ${price} kr.`,
       "",
       `Öppna adminpanelen${base ? `: ${base}/admin` : ""} och tryck "Godkänn och lägg ut" så går den`,
-      "upp i Butiken och på Tradera.",
+      "upp i Butiken och på marknadsplatserna.",
     ].join("\n");
     for (const to of adminEmails()) {
       await sendLetter({ to, subject: `Ny annons att godkänna: ${title}`, body, kind: "granskning" });

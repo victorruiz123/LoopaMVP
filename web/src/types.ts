@@ -455,8 +455,16 @@ export interface TraderaPlan {
 
 /** Svaret från GET/POST /api/jobs/:id/tradera. */
 export interface TraderaState {
+  /** Sant när NÅGON kanal kan ta emot en beställning — inte Traderas eget läge. */
   configured: boolean;
   missingEnv: string[];
+  /**
+   * Kanalerna var för sig, med skälet när en inte kan köra. Valfritt: en äldre server skickar det
+   * inte, och då gäller `configured` ensamt.
+   */
+  channels?: ChannelPlan[];
+  /** Blockets utfall. Kvittot visar annonsen härifrån när bara Blocket kör. */
+  blocket?: BlocketPublication | null;
   publication: TraderaPublication | null;
   plan: TraderaPlan | null;
   blockedReason: string | null;

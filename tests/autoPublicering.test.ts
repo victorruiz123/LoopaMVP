@@ -32,7 +32,7 @@ process.on("exit", () => {
   rmSync(process.env.BUTIK_DATA_DIR!, { recursive: true, force: true });
 });
 
-const { planAutoPublish } = await import("../server/src/integrations/autoPublish.js");
+const { bestallningsGrind, planAutoPublish } = await import("../server/src/integrations/autoPublish.js");
 import type { ConditionJob, TraderaPublication } from "../server/src/types.js";
 
 function jobb(patch: Partial<ConditionJob> = {}): ConditionJob {
@@ -161,4 +161,54 @@ test("torrkörningen syns i planen, och BLOCKET_PUBLICERA=1 stänger av den", as
   // Tradera har ingen torrkörning: där finns ett API som svarar, och en annons går att ta ner igen.
   const plan = await planAutoPublish(jobb());
   assert.equal(plan.channels.find((c) => c.channel === "tradera")!.dryRun, false);
+});
+
+// ─── Beställningen ───────────────────────────────────────────────────────────
+//
+// Säljarens "Sälj med Loopa" grindades på Traderas spärr, och när den slogs av (13 september)
+// svarade rutten 503 för ALLA kanaler: knappen försvann, ingen beställning skrevs, och godkännandet
+// i panelen hade ingenting att godkänna. Blocket stod redo hela tiden. Beställningen kräver bara att
+// NÅGON kanal är konfigurerad — vilka som kör avgörs vid godkännandet.
+
+const INGEN_SESSION = {
+  BLOCKET_SESSION: undefined,
+  BLOCKET_STORAGE_STATE_GZIP: undefined,
+  BLOCKET_STORAGE_STATE: undefined,
+  BLOCKET_COMPANY_STORAGE_STATE_GZIP: undefined,
+  BLOCKET_COMPANY_STORAGE_STATE: undefined,
+};
+
+test("beställningen går igenom när Tradera är avstängt men Blocket är konfigurerat", async () => {
+  await medMiljo({ TRADERA_APP_ID: undefined, BLOCKET_SESSION: SESSIONSFIL }, async () => {
+    const grind = await bestallningsGrind(jobb());
+    assert.equal(grind.ok, true, "Blocket är konfigurerat — att Tradera är avstängt får inte stoppa beställningen");
+    assert.deepEqual(
+      grind.plan.channels.map((c) => [c.channel, c.configured]),
+      [
+        ["tradera", false],
+        ["blocket", true],
+      ],
+    );
+  });
+});
+
+test("beställningen kräver inte att Blocket är REDO — bara att det är konfigurerat", async () => {
+  // Jobbet saknar analys, rubrik, bilder och postnummer. Allt det går att laga i panelen efteråt;
+  // en beställning som avvisas för något admin kan rätta är en förlorad säljare.
+  await medMiljo({ TRADERA_APP_ID: undefined, BLOCKET_SESSION: SESSIONSFIL }, async () => {
+    const grind = await bestallningsGrind(jobb());
+    assert.equal(grind.ok, true);
+    assert.equal(grind.plan.channels.find((c) => c.channel === "blocket")!.ready, false);
+  });
+});
+
+test("utan någon kanal avvisas beställningen med varje kanals eget skäl", async () => {
+  await medMiljo({ TRADERA_APP_ID: undefined, ...INGEN_SESSION }, async () => {
+    const grind = await bestallningsGrind(jobb());
+    assert.equal(grind.ok, false);
+    if (grind.ok) return;
+    assert.match(grind.reason, /^Ingen kanal är konfigurerad på servern\./);
+    assert.match(grind.reason, /Tradera: avstängt på servern\./, "avstängd i koden är inte samma sak som saknade nycklar");
+    assert.match(grind.reason, /Blocket: inte konfigurerat på servern \(saknar BLOCKET_SESSION\)\./);
+  });
 });

@@ -42,7 +42,7 @@ import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHand
 import { makePriceLadder, nextRung } from "./priceLadder.js";
 import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
 import { markApproved } from "./integrations/tradera/publish.js";
-import { markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
+import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
@@ -653,17 +653,11 @@ async function godkann(id: string, job: ConditionJob, adminId: string | null): P
 /**
  * Varför ingen kanal kan ta emot annonsen, sagt så att det går att laga.
  *
- * En rad per kanal och aldrig en sammanslagen mening: "det gick inte" hjälper ingen när Tradera
- * saknar nycklar OCH Blocket saknar session, och när den ena bara ligger uppe redan.
+ * Raderna per kanal bor i autoPublish.ts (`beskrivKanaler`): beställningens grind skriver samma
+ * lista, och två formuleringar av den hade glidit isär.
  */
 function varforIngenKanal(channels: ChannelPlan[]): string {
-  const namn: Record<ChannelPlan["channel"], string> = { tradera: "Tradera", blocket: "Blocket" };
-  const rader = channels.map((c) => {
-    if (c.alreadyRunning) return `${namn[c.channel]}: ligger redan uppe eller håller på att läggas ut.`;
-    if (!c.configured) return `${namn[c.channel]}: inte konfigurerat på servern (saknar ${c.missingEnv.join(", ")}).`;
-    return `${namn[c.channel]}: ${c.reason ?? "går inte att publicera."}`;
-  });
-  return `Ingen kanal kan ta emot annonsen just nu. ${rader.join(" ")}`;
+  return `Ingen kanal kan ta emot annonsen just nu. ${beskrivKanaler(channels)}`;
 }
 
 /** Nästa steg ner, för förhandsvisningen i panelen. Ren funktion — samma som stegen själv använder. */

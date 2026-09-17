@@ -109,6 +109,11 @@ export const LISTING: Record<string, Translation> = {
     en: "The furniture can't be put up for sale yet.",
     fr: "Le meuble ne peut pas encore être mis en vente.",
   },
+  "Försäljningen är inte påkopplad på servern än.": {
+    en: "Selling isn't switched on on the server yet.",
+    fr: "La vente n'est pas encore activée sur le serveur.",
+  },
+  "Saknar {vars}.": { en: "Missing {vars}.", fr: "Il manque {vars}." },
   "Annonsen kunde inte läggas ut: {fel}": { en: "The ad couldn't be published: {fel}", fr: "L'annonce n'a pas pu être publiée : {fel}" },
   "Vi lägger ut möbeln till salu till fast pris, med bilderna från skanningen och skicket från besiktningen. Sedan sköter vi annonsen — och hör av oss så fort den är såld.": {
     en: "We put the furniture up for sale at a fixed price, with the photos from the scan and the condition from the inspection. Then we run the ad — and get in touch as soon as it sells.",

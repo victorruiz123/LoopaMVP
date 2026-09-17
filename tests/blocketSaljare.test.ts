@@ -103,3 +103,40 @@ test("med servicenyckel slås ägarens konto upp när jobbet saknar postnummer",
     else process.env.SUPABASE_SERVICE_ROLE_KEY = fore;
   }
 });
+
+// ─── Skrivningen på jobbet ───────────────────────────────────────────────────
+//
+// Postnumret skrivs när säljaren trycker, medan deras token finns. Raden låg efter Tradera-grinden och
+// nåddes aldrig när Tradera stängdes av — därför är den en egen funktion nu, med hämtningen och
+// sparandet utbytbara, så att ordningen och skrivningen går att pröva utan Supabase.
+
+const { skrivSaljarensPostnummer } = await import("../server/src/integrations/blocket/saljare.js");
+
+test("postnumret skrivs på jobbet med säljarens token, normaliserat, och sparas", async () => {
+  const job = jobb();
+  const sparade: string[] = [];
+  const skrevs = await skrivSaljarensPostnummer(
+    job,
+    "token-1",
+    async () => "112 23",
+    async (j) => {
+      sparade.push(j.id);
+    },
+  );
+  assert.equal(skrevs, true);
+  assert.equal(job.sellerPostalCode, "11223");
+  assert.deepEqual(sparade, ["job-1"]);
+});
+
+test("samma postnummer igen skriver inte om jobbet, och inget svar rör det inte", async () => {
+  const job = jobb({ sellerPostalCode: "11223" });
+  let sparningar = 0;
+  const spara = async () => {
+    sparningar++;
+  };
+  assert.equal(await skrivSaljarensPostnummer(job, "t", async () => "11223", spara), false);
+  assert.equal(await skrivSaljarensPostnummer(job, "t", async () => null, spara), false);
+  assert.equal(await skrivSaljarensPostnummer(job, "t", async () => "1122", spara), false, "ett halvt postnummer skrivs aldrig");
+  assert.equal(job.sellerPostalCode, "11223");
+  assert.equal(sparningar, 0);
+});

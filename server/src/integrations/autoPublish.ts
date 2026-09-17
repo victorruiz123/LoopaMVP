@@ -90,6 +90,50 @@ export async function planAutoPublish(job: ConditionJob): Promise<AutoPublishPla
 }
 
 /**
+ * Kanalernas läge i klartext, en rad per kanal — det admin behöver för att laga något.
+ *
+ * Aldrig en sammanslagen mening: "det gick inte" hjälper ingen när Tradera är avstängt OCH Blocket
+ * saknar session, eller när den ena bara ligger uppe redan. Samma rader används i två svar —
+ * godkännandets "ingen kanal kan ta emot annonsen" och beställningens "ingen kanal är konfigurerad" —
+ * och två formuleringar av samma lista hade glidit isär.
+ */
+export function beskrivKanaler(channels: ChannelPlan[]): string {
+  const namn: Record<Channel, string> = { tradera: "Tradera", blocket: "Blocket" };
+  return channels
+    .map((c) => {
+      if (c.alreadyRunning) return `${namn[c.channel]}: ligger redan uppe eller håller på att läggas ut.`;
+      if (!c.configured) {
+        // Tom saknar-lista = avstängd i koden, inte oinstallerad. Panelen skriver samma sak.
+        return c.missingEnv.length
+          ? `${namn[c.channel]}: inte konfigurerat på servern (saknar ${c.missingEnv.join(", ")}).`
+          : `${namn[c.channel]}: avstängt på servern.`;
+      }
+      return `${namn[c.channel]}: ${c.reason ?? "går inte att publicera."}`;
+    })
+    .join(" ");
+}
+
+export type BestallningsGrind = { ok: true; plan: AutoPublishPlan } | { ok: false; reason: string; plan: AutoPublishPlan };
+
+/**
+ * Kan en beställning tas emot alls?
+ *
+ * Säljarens "Sälj med Loopa" grindades förut på Traderas spärr, och när den slogs av (13 september)
+ * svarade rutten 503 för ALLA kanaler, fast Blocket stod redo — knappen försvann, ingen beställning
+ * skrevs, och godkännandet hade ingenting att godkänna. Beställningen är inte en publicering på en
+ * viss kanal; den kräver bara att NÅGON kanal är konfigurerad. Vilka som sedan kör avgörs vid
+ * godkännandet, med samma plan.
+ *
+ * Kanalens egen beredskap (postnummer, bilder) grindar INTE här. Den går att laga i panelen efteråt,
+ * och en beställning som avvisas för något admin kan rätta är en förlorad säljare.
+ */
+export async function bestallningsGrind(job: ConditionJob): Promise<BestallningsGrind> {
+  const plan = await planAutoPublish(job);
+  if (plan.channels.some((c) => c.configured)) return { ok: true, plan };
+  return { ok: false, reason: `Ingen kanal är konfigurerad på servern. ${beskrivKanaler(plan.channels)}`, plan };
+}
+
+/**
  * Kör publiceringen på varje kanal som kan ta emot annonsen.
  *
  * Fire-and-forget, som Tradera-vägen alltid varit: anropas med `void` från rutten och skriver sitt

@@ -20,7 +20,7 @@
  * värre än inget: det står utåt, under möbeln, som om det vore sant.
  */
 
-import { ownerIdOf } from "../../jobStore.js";
+import { ownerIdOf, persist } from "../../jobStore.js";
 import { supabaseAnonKey, supabaseUrl } from "../../supabaseAuth.js";
 import type { ConditionJob } from "../../types.js";
 
@@ -83,4 +83,30 @@ export async function saljarensPostnummer(job: ConditionJob): Promise<string | n
   if (paJobbet) return paJobbet;
   const agare = ownerIdOf(job);
   return agare ? postnummerForAnvandare(agare) : null;
+}
+
+/**
+ * Skriver säljarens postnummer på jobbet, medan säljarens token finns.
+ *
+ * Anropas FÖRE varje grind i beställningen (server.ts, handlePublishTradera). Raden låg förut efter
+ * Tradera-grinden, och när Tradera stängdes av nåddes den aldrig: varje jobb saknade postnummer, och
+ * Blocket blev "inte redo" utan att någon såg varför.
+ *
+ * Tyst vid fel, som `postnummerForToken`: ett uteblivet svar från Supabase får inte fälla säljarens
+ * tryck, och postnumret går att hämta igen vid godkännandet. Sant när jobbet ändrades.
+ *
+ * `hamta` och `spara` går att byta ut i testerna — det som ska prövas är ordningen och skrivningen,
+ * inte Supabase.
+ */
+export async function skrivSaljarensPostnummer(
+  job: ConditionJob,
+  token: string,
+  hamta: (token: string) => Promise<string | null> = postnummerForToken,
+  spara: (job: ConditionJob) => Promise<void> = persist,
+): Promise<boolean> {
+  const postnummer = normaliseraPostnummer(await hamta(token));
+  if (!postnummer || postnummer === job.sellerPostalCode) return false;
+  job.sellerPostalCode = postnummer;
+  await spara(job).catch(() => undefined);
+  return true;
 }

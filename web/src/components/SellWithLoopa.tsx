@@ -80,7 +80,9 @@ export default function SellWithLoopa({
     try {
       const next = await getTraderaState(jobId);
       setState(next);
-      if (next.publication?.status === "publishing") {
+      if (next.publication?.status === "publishing" || next.blocket?.status === "publishing") {
+        // Båda kanalerna. Blocket-roboten klickar i ett riktigt formulär och tar minuter — slutar
+        // pollningen när Tradera är klar står kvittot kvar utan länken, fast annonsen gått upp.
         timer.current = window.setTimeout(refresh, 2500);
       } else if (next.publication?.status === "pending") {
         // Granskningen görs av en människa och tar minuter till timmar. Sällan nog att inte belasta,
@@ -116,12 +118,31 @@ export default function SellWithLoopa({
     }
   }
 
-  // Ingen integration konfigurerad på servern: visa ingenting alls. En knapp som inte kan göra något
-  // är sämre än ingen knapp.
-  if (!state || !state.configured) return null;
+  if (!state) return null;
+
+  /**
+   * Rutan syns även när ingen kanal är påkopplad.
+   *
+   * Den gömdes förut bakom `configured`, som var Traderas eget läge: när Tradera stängdes av
+   * försvann knappen för ALLA kanaler, och säljaren stod på en skärm utan väg vidare och utan
+   * förklaring. En osynlig knapp förklarar ingenting. Saknas kanalerna står det i klartext här i
+   * stället för knappen, och ett tryck får serverns eget svar om vad som fattas.
+   */
+  const kanaler = state.channels ?? [];
+  const nagonKanal = kanaler.length > 0 ? kanaler.some((c) => c.configured) : state.configured;
+  const saknade = Array.from(new Set(kanaler.flatMap((c) => c.missingEnv ?? [])));
 
   const publication = state.publication;
   const plan = state.plan;
+  /**
+   * Annonsen uppe: Traderas länk först, annars Blockets. Samma kvitto vilken kanal som än tog den —
+   * säljaren beställde en försäljning, inte en marknadsplats. Utan Blocket-grenen stod kvittot
+   * kvar på "vi tar över" för evigt när bara Blocket kör: `tradera.status` förblir "pending" då.
+   */
+  const annonsUrl =
+    (publication?.status === "published" && publication.url) ||
+    (state.blocket?.status === "published" && state.blocket.url) ||
+    null;
 
   /**
    * Rutan ritas i VARJE utfall efter ett ja, inte bara i kvittot för annonsen i kö.
@@ -140,7 +161,7 @@ export default function SellWithLoopa({
     />
   ) : null;
 
-  if (publication?.status === "published" && publication.url) {
+  if (annonsUrl) {
     return (
       <section className="card-block sell-block sell-done">
         <h3>{t("Möbeln är till salu")}</h3>
@@ -150,7 +171,7 @@ export default function SellWithLoopa({
           )}
         </p>
         {state.ladder && <LadderStatus ladder={state.ladder} shippingSek={plan?.shippingSek ?? 0} />}
-        <a className="btn btn-primary sell-link" href={publication.url} target="_blank" rel="noreferrer">
+        <a className="btn btn-primary sell-link" href={annonsUrl} target="_blank" rel="noreferrer">
           {t("Se annonsen")}
         </a>
         {/* Kvittot gäller EN möbel. Frågorna som kommer efter det — vad har jag ute nu, och kan jag
@@ -205,7 +226,15 @@ export default function SellWithLoopa({
     );
   }
 
-  const blocked = !plan ? (state.blockedReason ?? t("Möbeln går inte att lägga ut till salu än.")) : null;
+  // Ingen kanal påkopplad väger tyngre än en ofullständig annons: det första är serverns fel, det
+  // andra säljarens att rätta, och de ska inte se likadana ut.
+  const blocked = !nagonKanal
+    ? [t("Försäljningen är inte påkopplad på servern än."), saknade.length ? t("Saknar {vars}.", { vars: saknade.join(", ") }) : null]
+        .filter((rad): rad is string => rad !== null)
+        .join(" ")
+    : !plan
+      ? (state.blockedReason ?? t("Möbeln går inte att lägga ut till salu än."))
+      : null;
   const error = failure ?? publication?.error ?? null;
 
   return (
