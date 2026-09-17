@@ -844,6 +844,9 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
   blocket: BlocketPublication | null;
+  /** Säljarens postnummer, det Blocket-annonsen läggs på, och var det kom ifrån. Null = saknas. */
+  postnummer: string | null;
+  postnummerKalla: "jobb" | "konto" | null;
   /** Vad "Godkänn och lägg ut" skulle göra just nu, kanal för kanal. Läst ur serverns miljö. */
   kanaler: ChannelPlan[];
   handelser: AnnonsHandelse[];
@@ -880,6 +883,8 @@ export interface AdminAnnonser {
 export interface AnnonsAndring {
   falt?: Record<string, string | number | null>;
   prisNu?: number;
+  /** Säljarens postnummer, fem siffror i valfri form. Null tömmer det. */
+  postnummer?: string | null;
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
   /** `godkann` lägger ut möbeln i Butiken OCH på Tradera. `publicera` är bara butiken. */
   lage?: "godkann" | "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";

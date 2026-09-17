@@ -221,6 +221,7 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
             <h2 className="profile-section-title">{rubrik}</h2>
             <p className="admin-note">{inledning}</p>
             <Kanallista kanaler={annons.kanaler} />
+            <PostnummerFalt annons={annons} sparar={sparar} skicka={skicka} />
             {annons.saknas.length > 0 && (
               <p className="public-card-error">Kan inte läggas ut än — saknar {annons.saknas.join(", ")}. Fyll i under Innehåll nedan.</p>
             )}
@@ -732,4 +733,60 @@ function harlettVarde(h: AdminAnnonsDetalj["harlett"], falt: string): string | n
 function datum(iso: string | null): string {
   if (!iso) return "—";
   return new Date(iso).toLocaleString("sv-SE", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * Säljarens postnummer — det Blocket-annonsen läggs på.
+ *
+ * Kommer normalt från säljarens konto (adressen i registreringen) och skrivs på jobbet när säljaren
+ * trycker "Sälj med Loopa". Konton från före adressfältet (16 september) har inget, och då står
+ * Blocket stilla med "postnumret saknas" i Kanallistan ovanför. Fältet finns för att admin ska kunna
+ * fylla i det efter ett samtal med säljaren, utan att säljaren behöver registrera om sig.
+ *
+ * Ritas bara när Blocket är påkopplat: utan den kanalen finns ingen som frågar efter numret, och ett
+ * fält utan mottagare är en gåta.
+ */
+function PostnummerFalt({
+  annons,
+  sparar,
+  skicka,
+}: {
+  annons: AdminAnnonsDetalj;
+  sparar: boolean;
+  skicka: (a: AnnonsAndring, kvitto: string) => void;
+}) {
+  const [varde, setVarde] = useState("");
+  useEffect(() => {
+    setVarde(annons.postnummer ?? "");
+  }, [annons]);
+
+  const blocket = annons.kanaler?.find((k) => k.channel === "blocket");
+  if (!blocket?.configured) return null;
+
+  const kalla =
+    annons.postnummerKalla === "jobb" ? "sparat på annonsen" : annons.postnummerKalla === "konto" ? "från säljarens konto" : null;
+  const femSiffror = varde.replace(/\D/g, "").length === 5;
+
+  return (
+    <div className="annons-form">
+      <label className="annons-falt">
+        <span>Säljarens postnummer{kalla ? ` (${kalla})` : ""}</span>
+        <input type="text" inputMode="numeric" placeholder="Fem siffror" value={varde} onChange={(e) => setVarde(e.target.value)} />
+      </label>
+      <div className="annons-falt annons-falt-knapp">
+        <button
+          className="btn btn-outline btn-small"
+          disabled={sparar || !femSiffror}
+          onClick={() => skicka({ postnummer: varde }, "Postnumret sparat. Blocket-annonsen läggs på det.")}
+        >
+          Spara postnumret
+        </button>
+      </div>
+      {!annons.postnummer && (
+        <p className="admin-note annons-falt-bred">
+          Utan postnummer läggs annonsen inte ut på Blocket. Fråga säljaren var möbeln står och fyll i det här.
+        </p>
+      )}
+    </div>
+  );
 }

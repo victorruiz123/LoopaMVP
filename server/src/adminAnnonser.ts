@@ -43,6 +43,7 @@ import { makePriceLadder, nextRung } from "./priceLadder.js";
 import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
 import { markApproved } from "./integrations/tradera/publish.js";
 import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
+import { normaliseraPostnummer, saljarensPostnummer } from "./integrations/blocket/saljare.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
@@ -117,6 +118,15 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
   blocket: BlocketPublication | null;
+  /**
+   * Säljarens postnummer — det Blocket-annonsen läggs på — och var det kom ifrån.
+   *
+   * "jobb" = skrevs när säljaren tryckte "Sälj med Loopa" eller sattes av admin; "konto" = läst ur
+   * säljarens konto med servicenyckeln, just nu. Null = finns ingenstans, och då står Blocket stilla
+   * tills någon fyller i det (se `postnummer` i AndringsPatch).
+   */
+  postnummer: string | null;
+  postnummerKalla: "jobb" | "konto" | null;
   /**
    * Vad ett tryck på "Godkänn och lägg ut" skulle göra, kanal för kanal — läst NU.
    *
@@ -368,6 +378,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
   const produkt = harlett ? overrides.tillampaPaProdukt(harlett, overstyrning) : null;
   const ordrarRader = await ordersForProduct(id);
   const statistik = await statistikFor(id);
+  const postnummer = await saljarensPostnummer(job);
 
   return {
     ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length),
@@ -378,6 +389,8 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     ladder: job.priceLadder ?? null,
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
+    postnummer,
+    postnummerKalla: postnummer ? (normaliseraPostnummer(job.sellerPostalCode) ? "jobb" : "konto") : null,
     kanaler: (await planAutoPublish(job)).channels,
     handelser: await butikStore().events(id),
     matningar: await handelserFor(id),
@@ -402,6 +415,14 @@ export interface AndringsPatch {
   aterstallFalt?: overrides.OverstyrbartFalt[];
   /** Nytt pris nu. Flyttar prisstegens `currentPrice` och skrivs vidare till Tradera om den ligger uppe. */
   prisNu?: number;
+  /**
+   * Säljarens postnummer, satt av admin. Fem siffror i valfri form; null tömmer fältet.
+   *
+   * Vägen för konton som saknar adress (registrerade före adressfältet, 16 september): utan ett
+   * postnummer läggs annonsen inte ut på Blocket, och säljaren ska inte behöva registrera om sig för
+   * att admin ska kunna skriva in fem siffror efter ett samtal.
+   */
+  postnummer?: string | null;
   /** Nytt spann för prisstegen. Startpris och golv måste följas åt — se makePriceLadder. */
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
   /**
@@ -480,6 +501,14 @@ export async function andraAnnons(
 
   if (typeof patch.prisNu === "number") {
     await sattPris(job, patch.prisNu);
+  }
+
+  if (patch.postnummer !== undefined) {
+    // Fem siffror eller ingenting. Ett halvt postnummer står utåt under möbeln som om det vore sant.
+    const postnummer = patch.postnummer === null ? null : normaliseraPostnummer(patch.postnummer);
+    if (patch.postnummer !== null && !postnummer) throw new AndringsFel("Postnumret ska vara fem siffror.");
+    job.sellerPostalCode = postnummer;
+    await persist(job);
   }
 
   if (patch.lage) {
