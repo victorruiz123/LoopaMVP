@@ -1,13 +1,9 @@
 /**
  * Tradera REST API v4 — klienten.
  *
- * Publicerar en färdig Loopa-annons på Tradera. Fyra miljövariabler krävs (se .env.example);
- * saknas någon är hela integrationen frånkopplad i stället för att fela.
- *
- * NY UPPLADDNING ÄR AVSTÄNGD (`TRADERA_PUBLISHING_ENABLED`). Inga nya annonser läggs upp på något
- * Tradera-konto förrän spärren slås på igen, oavsett vilka nycklar servern har. Det som rör annonser
- * som redan ligger ute — ta ner, ändra pris, läsa bud — fungerar som förut, så en såld möbel
- * fortfarande kan tas ner. `traderaPublishingEnabled()` är det knappar och köer frågar.
+ * Publicerar en färdig Loopa-annons på Loopas eget Tradera-konto. Fyra miljövariabler krävs
+ * (se .env.example); saknas någon är hela integrationen frånkopplad i stället för att fela —
+ * `traderaConfigured()` är det knappen i annonsen frågar innan den visar sig.
  *
  * Ingen npm-beroende. Node 18+ (inbyggd fetch).
  */
@@ -35,18 +31,6 @@ export function missingTraderaEnv(): string[] {
 
 export function traderaConfigured(): boolean {
   return missingTraderaEnv().length === 0;
-}
-
-/**
- * Spärren för nya annonser. Står i koden och inte i en env-variabel med flit: ingen nyckel på någon
- * server ska kunna slå på uppladdningen igen av misstag. Sätts till true först när det finns ett
- * konto som annonserna faktiskt ska till.
- */
-export const TRADERA_PUBLISHING_ENABLED: boolean = false;
-
-/** Får en ny annons läggas upp på Tradera just nu? */
-export function traderaPublishingEnabled(): boolean {
-  return TRADERA_PUBLISHING_ENABLED && traderaConfigured();
 }
 
 function env(name: string): string {
@@ -151,8 +135,6 @@ interface SellerItem {
  * 10–60 s. Anropa aldrig det här i ett HTTP-svar.
  */
 export async function publishToTradera(listing: TraderaListingInput): Promise<PublishResult> {
-  // Sista spärren: vilken väg anropet än kom, lämnar ingen annons servern.
-  if (!TRADERA_PUBLISHING_ENABLED) throw new Error("Tradera-publiceringen är avstängd.");
   const mode = listing.mode ?? "auction";
 
   const body: Record<string, unknown> = {

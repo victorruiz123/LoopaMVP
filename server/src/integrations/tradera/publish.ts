@@ -34,7 +34,8 @@ const MAX_TRADERA_IMAGES = 10;
  * värdering brukar sluta utan bud.
  *
  * Växeln finns för att Tradera kan säga nej. Ett nytt eller obetygsatt privatkonto är *restricted*
- * och avvisar allt utom rena auktioner med "only auctions allowed". Slår det till är
+ * och avvisar allt utom rena auktioner med "only auctions allowed" — kontot vi kör på i dag är
+ * privat, utan butik och utan omdömen, alltså precis den profilen. Slår det till är
  * `TRADERA_LISTING_MODE=auction` hela åtgärden, utan omdeploy av något annat.
  *
  * LÄSES VID ANROP, inte vid modulladdning. server.ts kallar `loadEnvFile` i sin modulkropp, och ESM
