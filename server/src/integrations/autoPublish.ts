@@ -22,7 +22,7 @@
 
 import type { ConditionJob } from "../types.js";
 import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./tradera/publish.js";
-import { missingTraderaEnv, TRADERA_PUBLISHING_ENABLED, traderaPublishingEnabled } from "./tradera/tradera.js";
+import { missingTraderaEnv, traderaConfigured } from "./tradera/tradera.js";
 import { markBlocketPublishing, planBlocketPublish, runBlocketPublish } from "./blocket/publish.js";
 import { blocketConfigured, blocketLivePublishing, missingBlocketEnv } from "./blocket/blocket.js";
 
@@ -62,9 +62,8 @@ export async function planAutoPublish(job: ConditionJob): Promise<AutoPublishPla
   const channels: ChannelPlan[] = [
     {
       channel: "tradera",
-      // Avstängd = inte konfigurerad, med tom saknar-lista. Panelen skriver då "avstängd".
-      configured: traderaPublishingEnabled(),
-      missingEnv: TRADERA_PUBLISHING_ENABLED ? missingTraderaEnv() : [],
+      configured: traderaConfigured(),
+      missingEnv: missingTraderaEnv(),
       ready: traderaReadiness.ok,
       reason: traderaReadiness.ok ? null : traderaReadiness.reason,
       alreadyRunning: job.tradera?.status === "publishing" || job.tradera?.status === "published",

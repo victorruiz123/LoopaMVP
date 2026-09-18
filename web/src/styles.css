@@ -2602,6 +2602,11 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .dim-row + .dim-row { border-top: 1px solid var(--hairline); }
 .dim-row dt { font-size: var(--fs-md); color: var(--brand-muted); }
 .dim-row dd { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--brand-ink-strong); font-variant-numeric: tabular-nums; }
+/* Rättelsen i måttsteget: samma rader, värdet blir ett fält. 16px så att iOS inte zoomar in när
+   fältet får fokus — telefonen är där säljaren står med tumstocken. */
+.listing-edit .dim-row { align-items: center; gap: 12px; }
+.listing-edit .dim-row dd { flex: 0 1 55%; }
+.listing-edit .dim-edit-varde { font-size: 16px; font-weight: 700; text-align: right; font-variant-numeric: tabular-nums; }
 
 
 /* ==========================================================================

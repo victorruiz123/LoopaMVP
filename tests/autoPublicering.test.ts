@@ -208,7 +208,7 @@ test("utan någon kanal avvisas beställningen med varje kanals eget skäl", asy
     assert.equal(grind.ok, false);
     if (grind.ok) return;
     assert.match(grind.reason, /^Ingen kanal är konfigurerad på servern\./);
-    assert.match(grind.reason, /Tradera: avstängt på servern\./, "avstängd i koden är inte samma sak som saknade nycklar");
+    assert.match(grind.reason, /Tradera: inte konfigurerat på servern \(saknar TRADERA_APP_ID[,)]/);
     assert.match(grind.reason, /Blocket: inte konfigurerat på servern \(saknar BLOCKET_SESSION\)\./);
   });
 });
