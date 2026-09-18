@@ -555,6 +555,9 @@ export const FLOW: Record<string, Translation> = {
     fr: "Les dimensions n'ont pu être confirmées par aucune source. Voici les dimensions typiques de ce type de meuble — sont-elles correctes ?",
   },
   "Såhär blev måtten. Kan det stämma?": { en: "These are the dimensions. Do they look right?", fr: "Voici les dimensions. Cela vous semble correct ?" },
+  "Stämmer detta inte? Ändra måtten": { en: "Not right? Change the dimensions", fr: "Ce n'est pas correct ? Modifier les dimensions" },
+  "Måtten kunde inte sparas just nu.": { en: "The dimensions couldn't be saved right now.", fr: "Les dimensions n'ont pas pu être enregistrées pour le moment." },
+  "angivet av dig": { en: "entered by you", fr: "saisi par vous" },
   "Inga specifikationer kunde beläggas mot en källa.": {
     en: "No specifications could be backed by a source.",
     fr: "Aucune caractéristique n'a pu être confirmée par une source.",

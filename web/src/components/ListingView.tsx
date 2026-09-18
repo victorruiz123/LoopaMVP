@@ -752,7 +752,7 @@ export default function ListingView({
  * Felet står ÖVER knapparna och inte under. Ett fel under en knapp man just tryckt på hamnar under
  * tummen på en telefon, och den som inte ser det trycker igen.
  */
-function EditFot({
+export function EditFot({
   sparar,
   fel,
   onAvbryt,

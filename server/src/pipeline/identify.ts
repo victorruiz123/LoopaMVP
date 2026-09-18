@@ -6,7 +6,14 @@ import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { registreradKandidatbild } from "../kandidatbild.js";
 import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
 import { kanVaraStol } from "../stolPris.js";
-import type { CapturedImage, ListingAttribute, ModelCandidate, ProductImage } from "../types.js";
+import type {
+  CapturedImage,
+  GeneratedListing,
+  ListingAttribute,
+  ListingResult,
+  ModelCandidate,
+  ProductImage,
+} from "../types.js";
 
 /** Hur länge prissättningen väntar på att skickbedömningen ska bli klar. */
 const CONDITION_WAIT_MS = 180_000;
@@ -833,7 +840,7 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     job.identity = { brand, model };
     // Märkt med om fler försök kan komma. Klienten slutar polla först när den ser `improving: false`,
     // annars fastnar skärmen på det första svaret medan ett bättre skrivs in bakom den.
-    const marked = { ...listing, improving };
+    const marked = behallSaljarensRattelser({ ...listing, improving }, job.result?.listing ?? job.pendingListing);
     if (job.result) job.result.listing = marked;
     else job.pendingListing = marked;
     /**
@@ -1045,8 +1052,9 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   const afterListing = getJobSync(jobId) ?? (await getJob(jobId));
   if (afterListing) {
     afterListing.identity = { brand, model };
-    if (afterListing.result) afterListing.result.listing = listing;
-    else afterListing.pendingListing = listing;
+    const behallen = behallSaljarensRattelser(listing, afterListing.result?.listing ?? afterListing.pendingListing);
+    if (afterListing.result) afterListing.result.listing = behallen;
+    else afterListing.pendingListing = behallen;
     await persist(afterListing);
   }
 
@@ -1057,9 +1065,35 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   const target = getJobSync(jobId) ?? (await getJob(jobId));
   if (!target?.result) return;
   target.result.identity = { brand, model };
-  target.result.listing = listing;
+  target.result.listing = behallSaljarensRattelser(listing, target.result.listing);
   await persist(target);
   console.info(`[identify] ${jobId.slice(0, 8)} fas2 klar total_ms=${Date.now() - startedAt}`);
+}
+
+/**
+ * Säljarens rättade rader, burna över till en annons som pipelinen skriver om.
+ *
+ * Måttsteget visas så fort första annonsen finns, men pipelinen fortsätter efter det: ett omförsök
+ * som hittar bättre mått, och den sista skrivningen när besiktningen blir klar, ersätter annonsen
+ * HELT. Utan det här försvann en rättelse säljaren gjort i måttsteget tyst några sekunder senare —
+ * värre än att aldrig ha fått rätta, för säljaren tror att det är gjort.
+ *
+ * Raden matchas på nyckel eller etikett och byts på sin plats; en rättad rad som den nya annonsen
+ * saknar läggs sist. Säljarens värde går alltid före generatorns, också när generatorn fått en källa.
+ */
+export function behallSaljarensRattelser<T extends { result: GeneratedListing | null }>(
+  ny: T,
+  nu: ListingResult | null | undefined,
+): T {
+  const kvar = nu?.result?.attributes.filter((a) => a.sellerEdited) ?? [];
+  if (!ny.result || kvar.length === 0) return ny;
+  const samma = (a: ListingAttribute, b: ListingAttribute) =>
+    a.key === b.key || a.label.trim().toLowerCase() === b.label.trim().toLowerCase();
+  const attributes = ny.result.attributes.map((a) => {
+    const i = kvar.findIndex((r) => samma(a, r));
+    return i < 0 ? a : kvar.splice(i, 1)[0];
+  });
+  return { ...ny, result: { ...ny.result, attributes: [...attributes, ...kvar] } };
 }
 
 async function waitForCondition(jobId: string) {

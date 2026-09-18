@@ -1612,10 +1612,16 @@ const kort = (v: unknown, max: number): string => (typeof v === "string" ? v.tri
  */
 async function handleListingEdit(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
-  if (!job?.result?.listing?.result) return sendJson(res, 404, { error: "Job or listing not found" });
+  /*
+   * Samma kedja som klienten läser annonsen ur. Måttsteget visas direkt efter modellvalet, oftast
+   * innan besiktningen är klar — då finns annonsen bara i `pendingListing`, och det är där säljaren
+   * först ser måtten och ska kunna rätta dem. Pipelinen bär rättelsen vidare när den skriver om
+   * annonsen; se `behallSaljarensRattelser` i pipeline/identify.ts.
+   */
+  const listing = (job?.result?.listing ?? job?.listing ?? job?.pendingListing)?.result;
+  if (!job || !listing) return sendJson(res, 404, { error: "Job or listing not found" });
 
   const body = await readJsonBody<ListingEditBody>(req);
-  const listing = job.result.listing.result;
 
   const { notera: noteraAnnons } = await import("./data/rattelser.js");
 
@@ -1668,7 +1674,8 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
   }
 
   await persist(job);
-  sendJson(res, 200, job.result);
+  // Null när besiktningen inte är klar än: måttsteget läser inte svaret, det väntar på nästa poll.
+  sendJson(res, 200, job.result ?? null);
 }
 
 const server = http.createServer(async (req, res) => {

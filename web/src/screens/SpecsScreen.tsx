@@ -1,5 +1,7 @@
-import { useMemo } from "react";
-import type { GeneratedListing } from "../types";
+import { useMemo, useState } from "react";
+import type { GeneratedListing, ListingAttribute } from "../types";
+import { saveListingDetails } from "../api";
+import { EditFot } from "../components/ListingView";
 import { ArrowLeftIcon, ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
 import FlowSteps from "../components/FlowSteps";
@@ -35,15 +37,32 @@ const STATUS_LABELS: Record<string, string> = {
  * det är bara den här skärmen som håller det utanför.
  */
 export default function SpecsScreen({
-  card,
+  jobId,
+  card: franServern,
   onNext,
   onBack,
 }: {
+  /** Utan jobb går måtten inte att rätta — köparflödet visar samma skärm för en annons som inte är köparens. */
+  jobId?: string;
   card: GeneratedListing;
   onNext: () => void;
   onBack: () => void;
 }) {
   const t = useT();
+  /*
+   * Det säljaren sparat, tills nästa poll bär det. Servern svarar inte med annonsen här — oftast finns
+   * inget besiktningsresultat att svara med än — så skärmen visar de rader den själv skickade. Pollen
+   * ersätter dem med samma rader, nu med serverns märkning, och pipelinen skriver inte över dem (se
+   * `behallSaljarensRattelser` på servern).
+   */
+  const [sparade, setSparade] = useState<ListingAttribute[] | null>(null);
+  const card = useMemo(
+    () => (sparade ? { ...franServern, attributes: sparade } : franServern),
+    [franServern, sparade],
+  );
+  const [utkast, setUtkast] = useState<Record<string, string> | null>(null);
+  const [sparar, setSparar] = useState(false);
+  const [sparfel, setSparfel] = useState<string | null>(null);
   const name = card.identity.exactProduct ?? card.identity.variant ?? t("Möbel");
   usePageTitle("Mått och specifikationer");
   // Raderna visar attributets EGEN text ("80–82 cm"), inte ett avrundat tal: det säljaren ska
@@ -81,6 +100,35 @@ export default function SpecsScreen({
   // under rubriken är densamma — kan det stämma? — men säljaren ska veta att det är en gissning hen
   // rättar, inte en uppgift hen kontrollerar.
   const dimsEstimated = dimRows.length > 0 && dimRows.every((r) => r.attr!.estimated);
+  /**
+   * Rättar måtten på plats. Bara värdena: raderna är de fem mått en möbel mäts i, och det säljaren
+   * håller i är en tumstock, inte en lista att bygga om. Resten av uppgifterna rättas på annonsen.
+   *
+   * Hela listan skickas, eftersom servern ersätter den. Orörda rader känns igen där och behåller sin
+   * källa; en ändrad rad blir "angivet av dig".
+   */
+  const oppna = () => {
+    setSparfel(null);
+    setUtkast(Object.fromEntries(dimRows.map(({ attr }) => [attr!.key + attr!.label, attr!.value])));
+  };
+  const spara = async () => {
+    if (!utkast || !jobId) return;
+    const attributes = card.attributes.map((a) => {
+      const nytt = utkast[a.key + a.label]?.trim();
+      return nytt && nytt !== a.value ? { ...a, value: nytt, sourceUrl: null, estimated: false, sellerEdited: true } : a;
+    });
+    setSparar(true);
+    setSparfel(null);
+    try {
+      await saveListingDetails(jobId, { attributes });
+      setSparade(attributes);
+      setUtkast(null);
+    } catch (err) {
+      setSparfel(err instanceof Error ? err.message : t("Måtten kunde inte sparas just nu."));
+    } finally {
+      setSparar(false);
+    }
+  };
   // Måtten bor i sitt eget segment — de ska inte stå två gånger på samma skärm.
   const other = card.attributes.filter((a) => !DIM_LABEL.test(a.label));
   return (
@@ -120,17 +168,54 @@ export default function SpecsScreen({
                 <FurnitureRender model={model} still />
               </div>
             )}
-            <dl className="dim-list">
-              {dimRows.map(({ label, attr }) => (
-                <div key={label} className="dim-row">
-                  <dt>{t(label)}</dt>
-                  <dd>
-                    {attr!.value}
-                    {attr!.estimated && <span className="card-est">{t("uppskattat")}</span>}
-                  </dd>
-                </div>
-              ))}
-            </dl>
+            {utkast ? (
+              <div className="listing-edit">
+                <dl className="dim-list">
+                  {dimRows.map(({ label, attr }) => (
+                    <div key={label} className="dim-row">
+                      <dt>
+                        <label htmlFor={`dim-${label}`}>{t(label)}</label>
+                      </dt>
+                      <dd>
+                        <input
+                          id={`dim-${label}`}
+                          className="listing-edit-varde dim-edit-varde"
+                          value={utkast[attr!.key + attr!.label] ?? ""}
+                          placeholder={attr!.value}
+                          onChange={(e) =>
+                            setUtkast((u) => (u ? { ...u, [attr!.key + attr!.label]: e.target.value } : u))
+                          }
+                        />
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                <EditFot sparar={sparar} fel={sparfel} onAvbryt={() => setUtkast(null)} onSpara={() => void spara()} />
+              </div>
+            ) : (
+              <>
+                <dl className="dim-list">
+                  {dimRows.map(({ label, attr }) => (
+                    <div key={label} className="dim-row">
+                      <dt>{t(label)}</dt>
+                      <dd>
+                        {attr!.value}
+                        {attr!.sellerEdited ? (
+                          <span className="card-est">{t("angivet av dig")}</span>
+                        ) : (
+                          attr!.estimated && <span className="card-est">{t("uppskattat")}</span>
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                </dl>
+                {jobId && dimRows.length > 0 && (
+                  <button type="button" className="listing-edit-knapp dim-edit-knapp" onClick={oppna}>
+                    {t("Stämmer detta inte? Ändra måtten")}
+                  </button>
+                )}
+              </>
+            )}
           </section>
         )}
 

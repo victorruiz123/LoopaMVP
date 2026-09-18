@@ -884,5 +884,5 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
       </div>
     );
   }
-  return <SpecsScreen card={listing.result} onNext={onNext} onBack={onBack} />;
+  return <SpecsScreen jobId={jobId} card={listing.result} onNext={onNext} onBack={onBack} />;
 }
