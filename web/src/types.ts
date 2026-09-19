@@ -462,6 +462,62 @@ export interface TraderaState {
   blockedReason: string | null;
   /** Säljarens prisspann, när det är satt. Driver både bekräftelsesteget och den publicerade vyn. */
   ladder: PriceLadder | null;
+  /** Vad säljaren får och vad Loopa tar. Räknat på servern (server/src/provision.ts). Saknas i äldre svar. */
+  villkor?: SaljVillkor;
+}
+
+/** Loopas del av ett möbelpris, uträknad av servern. */
+export interface Uppdelning {
+  mobelprisSek: number;
+  andel: number;
+  loopaSek: number;
+  saljarenSek: number;
+  tak: boolean;
+}
+
+/**
+ * Villkoren i "Sälj med Loopa".
+ *
+ * `last` = möbeln har redan tryckts iväg, och valet om gratisförsäljningen står fast. `gratis` finns
+ * bara när säljaren har en kredit att använda och inget val ännu gjorts.
+ */
+export interface SaljVillkor {
+  last: boolean;
+  valdGratis: boolean;
+  standard: Uppdelning | null;
+  gratis: Uppdelning | null;
+  krediter: number;
+  forstaUtgang: string | null;
+}
+
+/** GET /api/salj/inbjudan. */
+export interface MinInbjudan {
+  kod: string;
+  lank: string;
+  tillgangliga: number;
+  krediter: Array<{ id: string; status: "available" | "used" | "expired"; skapad: string; gar_ut: string; anvand: string | null }>;
+  inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "salt" }>;
+}
+
+/** En rad i adminpanelens utbetalningar. Se server/src/butik/utbetalning.ts. */
+export interface UtbetalningsRad {
+  productId: string;
+  titel: string;
+  kanal: "butik" | "tradera" | null;
+  state: string;
+  soldAt: string | null;
+  sellerEmail: string | null;
+  gratis: boolean;
+  forslag: Uppdelning | null;
+  utbetalning: {
+    at: string;
+    mobelprisSek: number;
+    andel: number;
+    loopaSek: number;
+    saljarenSek: number;
+    referralCreditId: string | null;
+    av: string | null;
+  } | null;
 }
 
 export interface ConditionJob {
@@ -619,6 +675,8 @@ export interface JobShopState {
   soldChannel: "butik" | "tradera" | null;
   /** Priset som gällde när den reserverades. Null tills någon lagt den i kassan. */
   priceSek: number | null;
+  /** Kvittot på utbetalningen. Null tills Loopa betalat ut; saknas i äldre svar. */
+  utbetalning?: { at: string; saljarenSek: number; loopaSek: number; andel: number } | null;
 }
 
 // ---- adminpanelen (GET /api/admin/users) ----

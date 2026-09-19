@@ -4924,3 +4924,44 @@ body:has(.grind) .consent { display: none; }
 .feedback-text-svar { margin: 0; white-space: pre-wrap; line-height: 1.5; color: var(--ink-soft); }
 .feedback-tom { margin: 0; font-size: var(--fs-sm); color: var(--muted); font-style: italic; }
 .feedback-avsandare { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+
+/* ── Inbjudan (components/BjudIn.tsx) ──────────────────────────────────────
+   Samma yta som korten i profilen. Rubriken är erbjudandet, noten villkoret — villkoret står
+   alltid med, för det är skillnaden mellan ett löfte och en reklamrad. */
+.bjudin-ruta {
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
+  padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.bjudin-rubrik { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); line-height: 1.3; }
+.bjudin-not { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
+.bjudin-knappar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.bjudin-lank {
+  width: 100%; font: inherit; font-size: var(--fs-md); padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--field); color: var(--ink);
+}
+.bjudin-krediter {
+  margin-top: 8px; padding: 14px 16px; border-radius: var(--r-lg);
+  background: var(--green-light); color: var(--green-dark);
+}
+.bjudin-krediter-antal { margin: 0 0 4px; font-weight: 700; }
+.bjudin-krediter ul { margin: 0 0 6px; padding-left: 18px; font-size: var(--fs-md); }
+.bjudin-inbjudna { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.bjudin-inbjudna li {
+  display: flex; justify-content: space-between; gap: 12px; align-items: center;
+  background: var(--surface); border-radius: var(--r); padding: 10px 14px; font-size: var(--fs-md);
+  box-shadow: var(--shadow-card); min-width: 0;
+}
+.bjudin-inbjudna li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bjudin-status { color: var(--muted); flex: none; }
+.bjudin-status-salt { color: var(--green-dark); font-weight: 600; }
+
+/* Valet i "Sälj med Loopa". Två rader med radioknappar, gratis först — det är därför rutan finns. */
+.sell-gratis { display: grid; gap: 8px; margin: 4px 0 2px; border: 0; padding: 0; min-width: 0; }
+.sell-gratis-fraga { margin: 0 0 8px; padding: 0; font-weight: 700; color: var(--ink); }
+.sell-gratis label {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--surface);
+}
+.sell-gratis label:has(input:checked) { border-color: var(--green); background: var(--green-light); }
+.sell-gratis input { margin-top: 3px; accent-color: var(--green-dark); }
+.sell-gratis small { display: block; color: var(--muted); font-size: var(--fs-sm); }

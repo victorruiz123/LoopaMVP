@@ -646,6 +646,15 @@ export interface BlocketPublication {
   steps: BlocketStep[];
 }
 
+/** Se ConditionJob.saleTerms. */
+export interface SaleTerms {
+  /** Loopas andel av möbelpriset: 0,2 som förval, 0 med en gratisförsäljning. */
+  commissionRate: number;
+  /** Krediten som användes, när en användes. Samma kredit står som `used` med den här möbeln. */
+  referralCreditId: string | null;
+  decidedAt: string;
+}
+
 export interface ConditionJob {
   id: string;
   createdAt: string;
@@ -676,6 +685,15 @@ export interface ConditionJob {
    * Se integrations/blocket/saljare.ts.
    */
   sellerPostalCode?: string | null;
+  /**
+   * Försäljningens villkor: vilken andel Loopa tar, och om en gratisförsäljning använts.
+   *
+   * Sätts EN gång, när säljaren trycker "Sälj med Loopa", och ändras aldrig efter det — ett nytt tryck
+   * efter ett avslag i granskningen återanvänder samma villkor. Saknas den (jobb från före
+   * inbjudningarna) gäller förvalet i provision.ts. Utbetalningen läser andelen HÄRIFRÅN och räknar
+   * med provision.ts; se butik/utbetalning.ts.
+   */
+  saleTerms?: SaleTerms | null;
   progress: JobProgress;
   result: ConditionResult | null;
   error: string | null;

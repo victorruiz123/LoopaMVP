@@ -611,6 +611,11 @@ async function traderaState(job: ConditionJob) {
     // och den publicerade vyn var priset står i dag och när det sänks nästa gång.
     ladder: job.priceLadder ?? null,
     /**
+     * Vad säljaren får och vad Loopa tar, uträknat HÄR (provision.ts) och inte i klienten. Bär också
+     * gratisförsäljningen när säljaren har en att använda — se saljvillkor.
+     */
+    villkor: await saljvillkor(job, readiness.ok ? readiness.plan.itemPrice : null),
+    /**
      * Hur annonsen går HOS TRADERA: bud och om den gått ut.
      *
      * Hämtas bara för en publicerad annons, och bara när den här vyn öppnas — inte i någon lista.
@@ -624,6 +629,38 @@ async function traderaState(job: ConditionJob) {
       job.tradera?.status === "published" && typeof job.tradera.itemId === "number" && traderaConfigured()
         ? await getTraderaLage(job.tradera.itemId)
         : null,
+  };
+}
+
+/**
+ * Uppdelningen i "Sälj med Loopa", och valet om gratisförsäljningen.
+ *
+ * `last` är sant när villkoren redan är satta — möbeln har tryckts iväg en gång, och valet står fast.
+ * Då visas bara det som gäller. Annars visas förvalet, och `gratis` bredvid när säljaren har en
+ * tillgänglig kredit: klienten ritar valet, men beloppen i båda utfallen kommer härifrån.
+ */
+async function saljvillkor(job: ConditionJob, mobelpris: number | null) {
+  const { STANDARD_ANDEL, GRATIS_ANDEL, uppdelning } = await import("./provision.js");
+  const las = job.saleTerms ?? null;
+  let krediter: { antal: number; forstaUtgang: string | null } = { antal: 0, forstaUtgang: null };
+  const agare = ownerIdOf(job);
+  if (!las && agare) {
+    try {
+      const { krediterFor, tillgangliga } = await import("./referral/regler.js");
+      const t = tillgangliga(await krediterFor(agare));
+      krediter = { antal: t.length, forstaUtgang: t[0]?.expiresAt ?? null };
+    } catch {
+      // Utan inbjudningslagret säljs möbeln på vanliga villkor. Det ska aldrig stoppa trycket.
+    }
+  }
+  const andel = las ? las.commissionRate : STANDARD_ANDEL;
+  return {
+    last: !!las,
+    valdGratis: las ? las.commissionRate === GRATIS_ANDEL : false,
+    standard: mobelpris !== null ? uppdelning(mobelpris, andel) : null,
+    gratis: !las && krediter.antal > 0 && mobelpris !== null ? uppdelning(mobelpris, GRATIS_ANDEL) : null,
+    krediter: krediter.antal,
+    forstaUtgang: krediter.forstaUtgang,
   };
 }
 
@@ -682,7 +719,47 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
   const readiness = await planTraderaPublish(job);
   if (!readiness.ok) return sendJson(res, 409, { error: readiness.reason, ...(await traderaState(job)) });
 
-  await markTraderaPending(job);
+  /**
+   * Villkoren, EN gång. Finns de redan (ett nytt tryck efter ett avslag i granskningen) står de kvar
+   * som de var — valet om gratisförsäljningen är låst från första trycket, åt båda hållen.
+   *
+   * Bad säljaren om gratisförsäljningen och den inte går att få (krediten hann gå ut, eller användes
+   * i en annan flik) läggs möbeln INTE ut på vanliga villkor i tysthet. Säljaren sa ja till 0 kr i
+   * avgift, och ett ja till ett belopp gäller det beloppet.
+   */
+  const body = await readJsonBody<{ anvandGratis?: unknown }>(req, 1024).catch(() => ({}) as { anvandGratis?: unknown });
+  let nyKredit: { id: string } | null = null;
+  if (!job.saleTerms) {
+    const { STANDARD_ANDEL, GRATIS_ANDEL } = await import("./provision.js");
+    const agare = ownerIdOf(job);
+    if (body.anvandGratis === true) {
+      const { anvandKredit } = await import("./referral/regler.js");
+      nyKredit = agare ? await anvandKredit(agare, readiness.plan.loopaId) : null;
+      if (!nyKredit) {
+        return sendJson(res, 409, {
+          error: "Gratisförsäljningen gick inte att använda — den kan ha gått ut. Välj igen.",
+          ...(await traderaState(job)),
+        });
+      }
+    }
+    job.saleTerms = {
+      commissionRate: nyKredit ? GRATIS_ANDEL : STANDARD_ANDEL,
+      referralCreditId: nyKredit?.id ?? null,
+      decidedAt: new Date().toISOString(),
+    };
+  }
+
+  try {
+    await markTraderaPending(job);
+  } catch (err) {
+    // Villkoren skrevs i samma anrop och möbeln kom aldrig i kö. Krediten går tillbaka.
+    if (nyKredit) {
+      job.saleTerms = null;
+      const { lamnaTillbakaKredit } = await import("./referral/regler.js");
+      await lamnaTillbakaKredit(nyKredit.id).catch(() => undefined);
+    }
+    throw err;
+  }
   console.info(`[tradera] job ${jobId} väntar på godkännande — ${readiness.plan.loopaId} "${readiness.plan.title}"`);
   void notifyAdminsOfPending(readiness.plan.loopaId, readiness.plan.title, readiness.plan.price);
   sendJson(res, 202, await traderaState(job));
@@ -968,7 +1045,14 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
    * profilen inte skilja en möbel som ligger ute i vår egen butik från en som bara är sparad. Det är
    * den enda frågan en säljare öppnar profilen för att få svar på.
    */
-  const shopByJob = new Map<string, { state: string; listedAt: string; soldAt: string | null; soldChannel: string | null; priceSek: number | null }>();
+  const shopByJob = new Map<string, {
+    state: string;
+    listedAt: string;
+    soldAt: string | null;
+    soldChannel: string | null;
+    priceSek: number | null;
+    utbetalning: { at: string; saljarenSek: number; loopaSek: number; andel: number } | null;
+  }>();
   try {
     const { store: butikStore } = await import("./butik/store.js");
     for (const r of await butikStore().all()) {
@@ -979,6 +1063,10 @@ async function sendJobSummaries(res: ServerResponse, jobs: Awaited<ReturnType<ty
           soldAt: r.soldAt,
           soldChannel: r.soldChannel,
           priceSek: r.reservedPriceSek,
+          // Kvittot, när möbeln är utbetald. Det säljaren faktiskt fick, inte vad den såldes för.
+          utbetalning: r.utbetalning
+            ? { at: r.utbetalning.at, saljarenSek: r.utbetalning.saljarenSek, loopaSek: r.utbetalning.loopaSek, andel: r.utbetalning.andel }
+            : null,
         });
       }
     }
@@ -1887,6 +1975,13 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Not found" });
       }
 
+      /** Inbjudningarna: koden, krediterna, anspråket efter registreringen. Se referral/routes.ts. */
+      if (segments[1] === "salj" && segments[2] === "inbjudan") {
+        const { handleInbjudan } = await import("./referral/routes.js");
+        if (await handleInbjudan(segments.slice(2), req, res, sendJson, (r) => readJsonBody(r, 4 * 1024))) return;
+        return sendJson(res, 404, { error: "Not found" });
+      }
+
       /** Efterlysningens kontobundna halva: spara, lista, ändra, pausa, förnya. */
       if (segments[1] === "efterlysning") {
         if (await handleEfterlysning(segments.slice(2), req, res, { userId: identity.id, email: identity.email })) return;
@@ -1993,6 +2088,26 @@ const server = http.createServer(async (req, res) => {
           } catch (err) {
             if (err instanceof OrderFel) return sendJson(res, 400, { error: err.message });
             if (err instanceof Error && err.name === "CheckoutError") return sendJson(res, 409, { error: err.message });
+            throw err;
+          }
+        }
+        /**
+         * Utbetalningarna: sålda möbler, vad säljaren ska ha, och trycket som säger att det är gjort.
+         *
+         * Pengarna går för hand (Swish/bank). Trycket fryser beloppen och är det som räknas som
+         * "utbetald" — se butik/utbetalning.ts, och referral/regler.ts för vad det utlöser.
+         */
+        if (segments[2] === "utbetalningar" && segments.length === 3 && req.method === "GET") {
+          const { listaUtbetalningar } = await import("./butik/utbetalning.js");
+          return sendJson(res, 200, { rader: await listaUtbetalningar() });
+        }
+        if (segments[2] === "utbetalningar" && segments.length === 4 && req.method === "POST") {
+          const { markeraUtbetald, UtbetalningFel } = await import("./butik/utbetalning.js");
+          try {
+            const body = await readJsonBody<{ mobelprisSek?: number | null }>(req, 4 * 1024);
+            return sendJson(res, 200, await markeraUtbetald(decodeURIComponent(segments[3]), body, identity.id));
+          } catch (err) {
+            if (err instanceof UtbetalningFel) return sendJson(res, 409, { error: err.message });
             throw err;
           }
         }

@@ -1,6 +1,8 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { medInbjudan, rensaInbjudan, sparadInbjudan } from "../lib/referral";
+import { gorInbjudningsansprak } from "../api";
 
 /**
  * Inloggningen, med samma mekanik som vips-buy-sell-hub.
@@ -105,6 +107,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Inbjudningskoden, lämnad till servern vid första sessionen efter att länken öppnats.
+   *
+   * Servern avgör allt — att koden finns, att kontot är nytt, att referred_by inte redan är satt — och
+   * koden töms efter ett svar vilket det än blev. Föll anropet (nätet, servern) ligger den kvar till
+   * nästa session. Se lib/referral.ts.
+   */
+  const skickarAnsprak = useRef(false);
+  const skickaAnsprak = useCallback(async () => {
+    const kod = sparadInbjudan();
+    if (!kod || skickarAnsprak.current) return;
+    skickarAnsprak.current = true;
+    try {
+      await gorInbjudningsansprak(kod);
+      rensaInbjudan();
+    } catch {
+      // Ligger kvar till nästa gång.
+    } finally {
+      skickarAnsprak.current = false;
+    }
+  }, []);
+
   const loadProfile = useCallback(async (userId: string) => {
     if (lastLoadedProfileFor.current === userId) return;
     lastLoadedProfileFor.current = userId;
@@ -130,6 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // väntar på samma lås.
         const u = next.user;
         setTimeout(() => void fullfoljAdress(u), 0);
+        setTimeout(() => void skickaAnsprak(), 0);
       } else {
         setProfile(null);
         lastLoadedProfileFor.current = null;
@@ -144,6 +169,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (existing?.user) {
         void loadProfile(existing.user.id);
         void fullfoljAdress(existing.user);
+        void skickaAnsprak();
       }
     });
 
@@ -163,7 +189,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       clearInterval(refresh);
     };
-  }, [loadProfile, fullfoljAdress]);
+  }, [loadProfile, fullfoljAdress, skickaAnsprak]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -198,7 +224,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registrera = async (email: string, password: string, adress: Adress) => {
     try {
       const { error } = await supabase.functions.invoke("handle-signup", {
-        body: { email, password, redirectUrl: `${window.location.origin}/` },
+        body: { email, password, redirectUrl: medInbjudan(`${window.location.origin}/`) },
       });
       if (!error) return { error: null };
       const detail = await readFunctionError(error);
@@ -209,7 +235,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: `${window.location.origin}/`, data: { email_confirm: true, adress } },
+      options: { emailRedirectTo: medInbjudan(`${window.location.origin}/`), data: { email_confirm: true, adress } },
     });
     return { error };
   };

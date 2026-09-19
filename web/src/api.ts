@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar } from "./types";
+import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -219,9 +219,56 @@ export async function getTraderaState(jobId: string): Promise<TraderaState> {
 }
 
 /** Lägger ut möbeln till salu: en riktig Tradera-annons på Loopas konto. Svarar innan den är uppe. */
-export async function publishToTradera(jobId: string): Promise<TraderaState> {
-  const res = await authFetch(`/api/jobs/${jobId}/tradera`, { method: "POST" });
+export async function publishToTradera(jobId: string, opts: { anvandGratis?: boolean } = {}): Promise<TraderaState> {
+  const res = await authFetch(`/api/jobs/${jobId}/tradera`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ anvandGratis: opts.anvandGratis === true }),
+  });
   return json(res);
+}
+
+// ---- inbjudningar (/api/salj/inbjudan) ----
+
+export async function getMinInbjudan(): Promise<MinInbjudan> {
+  return json(await authFetch("/api/salj/inbjudan"));
+}
+
+/** Den nyss registrerade kom via en länk. Utfallet spelar ingen roll för klienten — koden töms oavsett. */
+export async function gorInbjudningsansprak(kod: string): Promise<{ utfall: string }> {
+  return json(
+    await authFetch("/api/salj/inbjudan/ansprak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kod }),
+    }),
+  );
+}
+
+/** Tyst. En mätning som inte gick fram får aldrig märkas av den som delade länken. */
+export function loggaLankKopierad(kanal: "kopiera" | "dela"): void {
+  void authFetch("/api/salj/inbjudan/handelse", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ event: "invite_link_copied", kanal }),
+  }).catch(() => undefined);
+}
+
+// ---- utbetalningar (adminpanelen) ----
+
+export async function listaUtbetalningar(): Promise<{ rader: UtbetalningsRad[] }> {
+  return json(await authFetch("/api/admin/utbetalningar"));
+}
+
+/** Markerar möbeln utbetald. Görs EFTER att pengarna skickats — trycket är kvittot, inte överföringen. */
+export async function markeraUtbetald(productId: string, mobelprisSek: number | null): Promise<UtbetalningsRad> {
+  return json(
+    await authFetch(`/api/admin/utbetalningar/${encodeURIComponent(productId)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mobelprisSek }),
+    }),
+  );
 }
 
 /**

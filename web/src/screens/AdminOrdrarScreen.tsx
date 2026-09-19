@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { andraOrder, getOrderDetalj, listaOrdrar } from "../api";
+import { andraOrder, getOrderDetalj, listaOrdrar, listaUtbetalningar, markeraUtbetald } from "../api";
 import { TruckIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { useT } from "../lib/i18n";
-import type { AdminOrderDetalj, AdminOrderRad, AdminOrdrar } from "../types";
+import type { AdminOrderDetalj, AdminOrderRad, AdminOrdrar, UtbetalningsRad } from "../types";
 
 /**
  * Orderfliken: alla köp, och framför allt det som väntar på oss.
@@ -120,7 +120,133 @@ export default function AdminOrdrarScreen({ onOpenAd }: { onOpenAd?: (loopaId: s
           ))}
         </ul>
       )}
+
+      <Utbetalningar />
     </div>
+  );
+}
+
+/**
+ * Utbetalningarna: sålda möbler och vad säljaren ska ha.
+ *
+ * TRYCKET ÄR KVITTOT, INTE ÖVERFÖRINGEN. Pengarna skickas via Swish eller bank som förut; "Markera
+ * utbetald" trycks efteråt och fryser beloppen. Det är också det tryck som ger en inbjudare sin
+ * gratisförsäljning — se server/src/referral/regler.ts — så det ska tryckas när pengarna faktiskt
+ * gått, inte innan.
+ *
+ * Beloppen räknas på servern (provision.ts). Fältet här är bara möbelpriset: för Tradera-försäljningar
+ * vet vi inte slutpriset, och admin skriver in det som står i Traderas mejl.
+ */
+function Utbetalningar() {
+  const t = useT();
+  const [rader, setRader] = useState<UtbetalningsRad[] | null>(null);
+  const [fel, setFel] = useState<string | null>(null);
+  const [visaGjorda, setVisaGjorda] = useState(false);
+
+  const ladda = useCallback(() => {
+    listaUtbetalningar()
+      .then((d) => setRader(d.rader))
+      .catch((err: unknown) => setFel(err instanceof Error ? err.message : "Kunde inte hämta utbetalningarna."));
+  }, []);
+  useEffect(ladda, [ladda]);
+
+  const vantar = (rader ?? []).filter((r) => !r.utbetalning);
+  const visade = (rader ?? []).filter((r) => visaGjorda || !r.utbetalning);
+
+  return (
+    <>
+      <h2 className="profile-section-title">
+        {t("Utbetalningar")} {rader ? `· ${vantar.length} ${t("väntar")}` : ""}
+      </h2>
+      {fel && <p className="public-card-error">{fel}</p>}
+      <div className="admin-verktyg">
+        <label className="admin-sok">
+          <input type="checkbox" checked={visaGjorda} onChange={(e) => setVisaGjorda(e.target.checked)} />{" "}
+          {t("Visa även utbetalda")}
+        </label>
+      </div>
+      {rader === null && !fel ? (
+        <div className="profile-loading"><div className="spinner" /></div>
+      ) : (
+        <ul className="card-list">
+          {visade.map((r) => (
+            <UtbetalningsRadVy key={r.productId} rad={r} onKlar={ladda} onFel={setFel} />
+          ))}
+        </ul>
+      )}
+    </>
+  );
+}
+
+function UtbetalningsRadVy({ rad, onKlar, onFel }: { rad: UtbetalningsRad; onKlar: () => void; onFel: (f: string | null) => void }) {
+  const t = useT();
+  const [pris, setPris] = useState(rad.forslag ? String(rad.forslag.mobelprisSek) : "");
+  const [skickar, setSkickar] = useState(false);
+  const u = rad.utbetalning;
+
+  async function markera() {
+    const belopp = Number(pris.replace(/\s/g, ""));
+    if (!Number.isFinite(belopp) || belopp <= 0) return onFel(t("Ange vad möbeln såldes för."));
+    // Beloppet säljaren får står inte i bekräftelsen: det räknas på servern, och det vi visar här är
+    // förslaget för förslagspriset. Står priset ändrat säger bekräftelsen det.
+    const text = rad.forslag && belopp === rad.forslag.mobelprisSek
+      ? t("Har du betalat ut {belopp} till säljaren?", { belopp: formatSek(rad.forslag.saljarenSek) })
+      : t("Markera utbetald med möbelpriset {pris}?", { pris: formatSek(belopp) });
+    if (!window.confirm(text)) return;
+    setSkickar(true);
+    onFel(null);
+    try {
+      await markeraUtbetald(rad.productId, belopp);
+      onKlar();
+    } catch (err) {
+      onFel(err instanceof Error ? err.message : "Kunde inte markera utbetald.");
+    } finally {
+      setSkickar(false);
+    }
+  }
+
+  return (
+    <li className="card-row" style={{ cursor: "default", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+      <span className="card-row-title">
+        {rad.titel}
+        {rad.gratis && <span className="admin-tag" style={{ background: "var(--green)" }}>{t("gratisförsäljning")}</span>}
+      </span>
+      <span className="card-row-meta">
+        {rad.productId} · {rad.kanal === "tradera" ? "Tradera" : t("Butik")} · {rad.sellerEmail ?? t("säljaren saknar e-post")}
+      </span>
+      {u ? (
+        <span className="card-row-meta" style={{ color: "var(--green-dark)" }}>
+          {t("Utbetald {datum}: {saljaren} till säljaren, {loopa} till Loopa", {
+            datum: datum(u.at.slice(0, 10)),
+            saljaren: formatSek(u.saljarenSek),
+            loopa: formatSek(u.loopaSek),
+          })}
+        </span>
+      ) : (
+        <>
+          {rad.forslag && (
+            <span className="card-row-meta">
+              {t("Säljaren får {saljaren}, Loopa {loopa}", { saljaren: formatSek(rad.forslag.saljarenSek), loopa: formatSek(rad.forslag.loopaSek) })}
+              {rad.kanal === "tradera" ? ` · ${t("kontrollera slutpriset i Traderas mejl")}` : ""}
+            </span>
+          )}
+          <span style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              className="admin-search"
+              style={{ width: 140 }}
+              inputMode="numeric"
+              value={pris}
+              onChange={(e) => setPris(e.target.value)}
+              aria-label={t("Möbelns pris i kronor")}
+              placeholder={t("Möbelns pris")}
+            />
+            <button className="btn btn-small btn-primary" onClick={() => void markera()} disabled={skickar}>
+              {skickar ? t("Sparar…") : t("Markera utbetald")}
+            </button>
+          </span>
+        </>
+      )}
+    </li>
   );
 }
 
