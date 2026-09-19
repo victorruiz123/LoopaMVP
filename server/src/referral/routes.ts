@@ -16,7 +16,7 @@
 
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { bearerToken, supabaseAnonKey, supabaseUrl } from "../supabaseAuth.js";
-import { inbjudningslank } from "./kod.js";
+import { inbjudningsbas, inbjudningslank } from "./kod.js";
 import { gorAnsprak, krediterFor, logga, profilFor, tillgangliga, type Konto } from "./regler.js";
 import { referralStore } from "./store.js";
 
@@ -60,7 +60,9 @@ export async function minInbjudan(konto: Konto) {
   const inbjudna = await referralStore().inbjudna(konto.id);
   return {
     kod: profil.kod,
-    lank: inbjudningslank(profil.kod),
+    // Null när ingen bas är satt: då bygger klienten länken på sidans egen adress i stället för att
+    // få en produktionslänk till en sajt som kanske inte har koden.
+    lank: inbjudningsbas() ? inbjudningslank(profil.kod) : null,
     tillgangliga: tillgangliga(krediter, nu).length,
     krediter: krediter.map((k) => ({ id: k.id, status: k.status, skapad: k.createdAt, gar_ut: k.expiresAt, anvand: k.usedAt })),
     inbjudna: inbjudna.map((p) => ({

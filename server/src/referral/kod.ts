@@ -34,13 +34,26 @@ export function normaliseraKod(raw: unknown): string | null {
 }
 
 /**
+ * Var inbjudningslänkarna pekar, när det är bestämt. Null = inte satt.
+ *
+ * REFERRAL_LINK_BASE går först, och finns för lokal utveckling: där är LOOPA_PUBLIC_URL osatt (den
+ * styr också truth-cardets länk i Tradera-annonser, och en localhost-adress där vore skarp och fel),
+ * men en inbjudan måste gå att öppna på en telefon. Sätt den till datorns nätverksadress,
+ * t.ex. https://192.168.1.140:5190, så fungerar samma länk på datorn och telefonen. I drift räcker
+ * LOOPA_PUBLIC_URL (https://loopa.nu).
+ */
+export function inbjudningsbas(): string | null {
+  const bas = process.env.REFERRAL_LINK_BASE?.trim() || process.env.LOOPA_PUBLIC_URL?.trim() || "";
+  return bas ? bas.replace(/\/$/, "") : null;
+}
+
+/**
  * Länken som delas: loopa.nu/?ref=KOD.
  *
- * Roten, för att det är dit Workern skickar säljflödet (deploy/cloudflare/wrangler.toml, rutten
- * "loopa.nu/") och där klienten fångar koden. LOOPA_PUBLIC_URL är https://loopa.nu i drift; utan den
- * står den kanoniska domänen här, inte localhost — en länk i ett utbetalningsbrev ska fungera.
+ * Roten, för att det är dit Workern skickar säljflödet och där klienten fångar koden. Utan en satt
+ * bas står den kanoniska domänen här — utbetalningsbrevet har ingen sida att fråga, och en länk i
+ * ett brev ska fungera.
  */
 export function inbjudningslank(kod: string): string {
-  const bas = (process.env.LOOPA_PUBLIC_URL?.trim() || "https://loopa.nu").replace(/\/$/, "");
-  return `${bas}/?ref=${encodeURIComponent(kod)}`;
+  return `${inbjudningsbas() ?? "https://loopa.nu"}/?ref=${encodeURIComponent(kod)}`;
 }

@@ -103,12 +103,11 @@ export function ProfilInbjudan() {
 
   if (!data) return null;
   /**
-   * Länken byggs på SIDANS egen adress, inte på serverns `lank`. Servern känner bara
-   * LOOPA_PUBLIC_URL (loopa.nu i drift, osatt lokalt) och gav därför en produktionslänk på localhost
-   * — till en sajt som inte har koden än. Sidan vet alltid var den själv står. Serverns länk behövs
-   * bara i utbetalningsbrevet, där ingen sida finns.
+   * Serverns länk när den har en bestämd bas — loopa.nu i drift, datorns nätverksadress lokalt
+   * (REFERRAL_LINK_BASE), så att en länk kopierad på datorn också går att öppna på telefonen. Annars
+   * sidans egen adress: bättre än en produktionslänk till en sajt som kanske inte har koden.
    */
-  const lank = `${window.location.origin}/?ref=${encodeURIComponent(data.kod)}`;
+  const lank = data.lank ?? `${window.location.origin}/?ref=${encodeURIComponent(data.kod)}`;
   const datum = (iso: string) => new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "short", year: "numeric" });
   const tillgangliga = data.krediter.filter((k) => k.status === "available");
 

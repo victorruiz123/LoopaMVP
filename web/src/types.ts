@@ -493,7 +493,8 @@ export interface SaljVillkor {
 /** GET /api/salj/inbjudan. */
 export interface MinInbjudan {
   kod: string;
-  lank: string;
+  /** Satt när servern har en bestämd bas (loopa.nu i drift, REFERRAL_LINK_BASE lokalt). */
+  lank: string | null;
   tillgangliga: number;
   krediter: Array<{ id: string; status: "available" | "used" | "expired"; skapad: string; gar_ut: string; anvand: string | null }>;
   inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "salt" }>;
