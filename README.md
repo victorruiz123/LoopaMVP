@@ -445,16 +445,17 @@ med en förklaring är bättre än att blanka ut ett tal säljaren redan tittade
 
 ## Inbjudningar och provisionen
 
-**Regeln:** den som bjuder in en ny säljare får en försäljning utan Loopas provision (0 % i stället
-för 20 %, högst 1 000 kr), när den inbjudnas första möbel är såld **och utbetald**.
+**Regeln:** den som bjuder in någon får en försäljning utan Loopas provision (0 % i stället för 20 %,
+högst 1 000 kr), när den inbjudna lägger upp sin **första annons** efter inbjudan. Regeln ändrades
+2026-09-19. Tidigare krävdes att vännens möbel var såld och utbetald.
 
-1. **Länken** är `loopa.nu/?ref=KOD` (fyra plus fyra tecken, utan 0/O/1/I/L). Klienten sparar koden i
-   30 dagar (`web/src/lib/referral.ts`) och lämnar den till servern vid första inloggningen efter
-   registreringen. Servern skriver `referred_by` en gång, och bara för konton som är högst en vecka
-   gamla.
-2. **Krediten** skapas när admin trycker *Markera utbetald* på den inbjudnas första sålda möbel
-   (Admin → Ordrar → Utbetalningar). Registrering, publicering eller en försäljning som inte betalats
-   ut ger ingenting. En inbjuden person ger högst en kredit, och krediten gäller i 12 månader.
+1. **Länken** är `loopa.nu/?ref=KOD` (fyra plus fyra tecken, utan 0/O/1/I/L). Den som öppnar den
+   möts av "Victor bjöd in dig!" på startsidan, som bara leder till att lägga upp en annons. Koden
+   sparas i 30 dagar och lämnas till servern vid inloggning. Befintliga konton kan bjudas in så länge
+   de aldrig har sålt något, och `referred_by` skrivs en gång.
+2. **Krediten** skapas när den inbjudna trycker *Sälj med Loopa*. En inbjuden person ger högst en
+   kredit, och krediten gäller i 12 månader. Inbjudaren får en popup: *Din nästa försäljning är
+   gratis!*
 3. **Användningen** sker i *Sälj med Loopa*. Har säljaren en kredit frågar rutan om den ska användas
    på möbeln, och uppdelningen visar då *Loopas del 0 kr*. Valet skrivs på jobbet (`saleTerms`) vid
    trycket och går inte att ändra efteråt.
@@ -463,13 +464,16 @@ för 20 %, högst 1 000 kr), när den inbjudnas första möbel är såld **och u
 Gmail-punkter räknas som samma adress), gatuadress med postnummer, telefon eller Stripe-konto.
 Telefon och Stripe-konto sparas inte i dag, så de två kontrollerna gör ingenting förrän de fälten
 börjar fyllas i. Ingen får ha fler än 10 oanvända krediter samtidigt. En nekad kredit skrivs i
-huvudboken med orsaken.
+huvudboken med orsaken, och ett nekat anspråk står i serverloggen.
 
 **Provisionen räknas på ett ställe:** `server/src/provision.ts`. Utbetalningen
 (`server/src/butik/utbetalning.ts`), bekräftelsen i *Sälj med Loopa* och utbetalningsbrevet läser
 därifrån. Andelen läses från möbelns villkor (`ConditionJob.saleTerms`). Möbler som publicerades före
 inbjudningarna saknar villkor och får förvalet 20 %. Kassan är en Stripe Checkout utan Connect, så
 det finns ingen `application_fee_amount` att sätta. Kommer Connect ska den räknas med samma funktion.
+
+**Lokalt:** sätt `REFERRAL_LINK_BASE` i `server/.env` till datorns nätverksadress
+(t.ex. `https://192.168.1.140:5190`), så fungerar länken både på datorn och på telefonen.
 
 **Lagring:** filer under `server/data/referral` eller Supabase när `SUPABASE_SERVICE_ROLE_KEY` finns.
 Schemat står i `server/sql/003_referral.sql`, och den måste köras för hand **före** den första

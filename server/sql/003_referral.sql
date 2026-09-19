@@ -26,13 +26,16 @@ create table if not exists public.referral_profiles (
   referral_code      text not null unique check (referral_code ~ '^[A-HJKMNP-Z2-9]{4}-[A-HJKMNP-Z2-9]{4}$'),
   referred_by        uuid references public.referral_profiles (user_id),
   referred_at        timestamptz,
-  first_paid_out_at  timestamptz,
+  -- Första annonsen efter inbjudan. Det är den som ger inbjudaren sin kredit.
+  first_listing_at   timestamptz,
   -- Avtrycken skydden jämför. Normaliserade, aldrig råa. Se referral/avtryck.ts.
   email_key          text,
   address_key        text,
   phone_key          text,
   stripe_account_id  text,
   email_masked       text,
+  -- Förnamnet på landningssidan: "Victor bjöd in dig!". Visas för den som har länken.
+  display_name       text,
   created_at         timestamptz not null default now(),
   updated_at         timestamptz not null default now(),
   check (referred_by is null or referred_by <> user_id)
@@ -76,6 +79,8 @@ create table if not exists public.referral_credits (
   used_at           timestamptz,
   created_at        timestamptz not null default now(),
   expires_at        timestamptz not null,
+  -- När inbjudaren såg popupen "Din nästa försäljning är gratis!". Null = visas vid nästa besök.
+  shown_at          timestamptz,
   check (user_id <> referred_user_id),
   check ((status = 'used') = (used_on_sale_id is not null)),
   check (expires_at > created_at)

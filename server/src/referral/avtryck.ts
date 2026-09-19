@@ -77,3 +77,21 @@ export function delarIdentitet(a: ReferralProfil, b: ReferralProfil): string | n
   if (lika(a.adressNyckel, b.adressNyckel)) return "samma_adress";
   return null;
 }
+
+/**
+ * Förnamnet som visas för den som öppnar en inbjudan: "Victor bjöd in dig!".
+ *
+ * Profilens namn först, och bara första ordet — ett efternamn på en publik landningssida är mer än
+ * inbjudan behöver. Utan namn tas e-postadressens första del ("victor.ruiz@…" blir "Victor"), men
+ * bara när den ser ut som ett namn: "vr1987" är ingen hälsning, och då blir svaret null och sidan
+ * säger "En vän bjöd in dig!".
+ */
+export function fornamn(fullName: unknown, email: string | null | undefined): string | null {
+  const snygga = (s: string) => s.charAt(0).toLocaleUpperCase("sv-SE") + s.slice(1).toLocaleLowerCase("sv-SE");
+  if (typeof fullName === "string") {
+    const forsta = fullName.trim().split(/\s+/)[0];
+    if (forsta && /^[\p{L}-]{2,20}$/u.test(forsta)) return snygga(forsta);
+  }
+  const lokal = email?.split("@")[0]?.split(/[._+-]/)[0] ?? "";
+  return /^\p{L}{2,12}$/u.test(lokal) ? snygga(lokal) : null;
+}

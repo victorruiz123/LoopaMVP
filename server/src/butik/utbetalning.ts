@@ -10,15 +10,15 @@
  * PROVISIONEN RÄKNAS I provision.ts, med andelen från möbelns villkor (ConditionJob.saleTerms).
  * Ingen rad här multiplicerar med ett tal.
  *
- * Utbetald är det ögonblick en inbjudan belönas (referral/regler.ts, efterUtbetalning). Inte
- * registreringen, inte publiceringen, inte ens försäljningen — pengar som kan gå tillbaka vid en
- * retur är inte en försäljning än.
+ * Inbjudningarna belönas INTE här längre, utan när den inbjudna lägger upp sin första annons (se
+ * referral/regler.ts). Utbetalningsbrevet bär fortfarande inbjudan: den som just fått pengar är den
+ * som bäst kan berätta för en vän att det fungerar.
  */
 
 import { randomUUID } from "node:crypto";
 import { getJob, ownerIdOf } from "../jobStore.js";
 import { STANDARD_ANDEL, uppdelning, type Uppdelning } from "../provision.js";
-import { efterUtbetalning, profilFor } from "../referral/regler.js";
+import { profilFor } from "../referral/regler.js";
 import { inbjudningslank } from "../referral/kod.js";
 import { ordersForProduct } from "./orders.js";
 import { priceOf } from "./normalize.js";
@@ -95,19 +95,8 @@ export async function listaUtbetalningar(): Promise<UtbetalningsRad[]> {
   });
 }
 
-/** Hur många ANDRA möbler säljaren redan fått utbetalt för. Se efterUtbetalning. */
-async function tidigareUtbetalda(saljarId: string, utom: string): Promise<number> {
-  let n = 0;
-  for (const r of await store().all()) {
-    if (r.id === utom || !r.utbetalning || !r.jobId) continue;
-    const job = await getJob(r.jobId);
-    if (job && ownerIdOf(job) === saljarId) n += 1;
-  }
-  return n;
-}
-
 /**
- * Admin har betalat ut. Fryser beloppen, belönar en eventuell inbjudan och skriver till säljaren.
+ * Admin har betalat ut. Fryser beloppen och skriver till säljaren.
  *
  * `mobelprisSek` behövs för Tradera-försäljningar (se foreslagetPris) och får anges för butikens —
  * admin är den som vet vad som faktiskt kom in.
@@ -158,15 +147,8 @@ export async function markeraUtbetald(
     .catch(() => undefined);
 
   const saljarId = job ? ownerIdOf(job) : null;
-  if (saljarId) {
-    // Varken triggern eller brevet får fälla utbetalningen — den är gjord, och kvittot står.
-    try {
-      await efterUtbetalning({ saljarId, saleId: productId, tidigareUtbetalda: await tidigareUtbetalda(saljarId, productId) });
-    } catch (err) {
-      console.warn(`[utbetalning] inbjudningsregeln föll för ${productId}:`, err instanceof Error ? err.message : err);
-    }
-    if (job?.ownerEmail) void skrivTillSaljaren(job, saljarId, updated, delning);
-  }
+  // Brevet får aldrig fälla utbetalningen — den är gjord, och kvittot står.
+  if (saljarId && job?.ownerEmail) void skrivTillSaljaren(job, saljarId, updated, delning);
 
   return radAv(updated);
 }
@@ -192,7 +174,7 @@ async function skrivTillSaljaren(job: ConditionJob, saljarId: string, record: Bu
       "Bjud in en vän – din nästa försäljning blir gratis.",
       inbjudningslank(profil.kod),
       "",
-      "När din vän har sålt sin första möbel genom oss tar vi ingen avgift på din nästa.",
+      "När din vän har lagt upp sin första annons tar vi ingen avgift på din nästa försäljning.",
       "",
       "Loopa AI",
     ].join("\n");

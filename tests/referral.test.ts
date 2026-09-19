@@ -1,8 +1,9 @@
 // ─── Inbjudningarna: koden, triggern, skydden och provisionen i utbetalningen ─────────────────
 //
-// Regeln: den som bjuder in en ny säljare får EN försäljning utan Loopas provision, när den inbjudnas
-// första möbel är såld OCH utbetald. Testerna låser fast att krediten kommer då och bara då, att
-// skydden håller, och att en möbel med andelen 0 betalas ut i sin helhet.
+// Regeln: den som bjuder in någon får EN försäljning utan Loopas provision, när den inbjudna lägger upp
+// sin första annons. Befintliga konton kan bjudas in så länge de aldrig sålt något. Testerna låser fast
+// att krediten kommer då och bara då, att skydden håller, och att en möbel med andelen 0 betalas ut i
+// sin helhet.
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
@@ -30,7 +31,7 @@ const butik = await import("../server/src/butik/store.js");
 const { createJob, persist } = await import("../server/src/jobStore.js");
 const webbFees = await import("../web/src/lib/fees.js");
 
-const { gorAnsprak, profilFor, efterUtbetalning, anvandKredit, krediterFor, tillgangliga, MAX_TILLGANGLIGA } = regler;
+const { gorAnsprak, profilFor, efterForstaAnnons, anvandKredit, krediterFor, tillgangliga, MAX_TILLGANGLIGA } = regler;
 
 // ─── hjälpare ───────────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ async function paret(overB: Parameters<typeof konto>[0] = {}, overA: Parameters<
   const a = konto(overA);
   const pa = await profilFor(a, NU);
   const b = konto(overB);
-  assert.equal(await gorAnsprak(b, pa.kod, NU), "ok");
+  assert.equal(await gorAnsprak(b, pa.kod, false, NU), "ok");
   return { a, b, pa };
 }
 
@@ -90,70 +91,70 @@ test("koden normaliseras förlåtande men rättas aldrig till en annan", () => {
 test("anspråket skriver referred_by en gång och aldrig igen", async () => {
   const { b, pa } = await paret();
   const annan = await profilFor(konto(), NU);
-  assert.equal(await gorAnsprak(b, annan.kod, NU), "redan_inbjuden");
+  assert.equal(await gorAnsprak(b, annan.kod, false, NU), "redan_inbjuden");
   assert.equal((await referralStore().profil(b.id))!.referredBy, pa.userId, "första inbjudaren står kvar");
 });
 
-test("anspråket nekas för befintliga konton, egna koder och koder som inte finns", async () => {
+test("ett befintligt konto kan bjudas in — så länge det aldrig sålt något", async () => {
   const a = konto();
   const pa = await profilFor(a, NU);
   const gammal = konto({ createdAt: "2025-01-01T00:00:00Z" });
-  assert.equal(await gorAnsprak(gammal, pa.kod, NU), "befintligt_konto");
-  assert.equal(await gorAnsprak(konto({ createdAt: null }), pa.kod, NU), "befintligt_konto", "okänd ålder räknas som befintligt");
-  assert.equal(await gorAnsprak(a, pa.kod, NU), "egen_kod");
-  assert.equal(await gorAnsprak(konto(), "AAAA-BBBB", NU), "ogiltig_kod");
-  assert.equal((await referralStore().profil(gammal.id))?.referredBy ?? null, null);
+  assert.equal(await gorAnsprak(gammal, pa.kod, false, NU), "ok", "gammalt konto utan försäljningar");
+  const saljare = konto({ createdAt: "2025-01-01T00:00:00Z" });
+  assert.equal(await gorAnsprak(saljare, pa.kod, true, NU), "har_salt");
+  assert.equal((await referralStore().profil(saljare.id))?.referredBy ?? null, null);
 });
 
-test("registrering och publicering ger ingen kredit — bara utbetalningen", async () => {
-  const { a, b } = await paret();
-  assert.equal((await krediterFor(a.id, NU)).length, 0, "ingen kredit vid registrering");
-  const job = await createJob(null, null, b.id, null);
-  const id = `LP-TEST-${randomUUID().slice(0, 8)}`;
-  await butik.ensureRecord(id, job.id, "loopa", NU.toISOString());
-  await butik.publish(id, { kind: "seller", userId: b.id });
-  assert.ok(await butik.claimForSale(id, "butik", { kind: "buyer", userId: "k" }));
-  assert.equal((await krediterFor(a.id, NU)).length, 0, "ingen kredit vid publicering eller försäljning utan utbetalning");
+test("anspråket nekas för egna koder och koder som inte finns", async () => {
+  const a = konto();
+  const pa = await profilFor(a, NU);
+  assert.equal(await gorAnsprak(a, pa.kod, false, NU), "egen_kod");
+  assert.equal(await gorAnsprak(konto(), "AAAA-BBBB", false, NU), "ogiltig_kod");
+  assert.equal(await gorAnsprak(konto(), "trasig", false, NU), "ogiltig_kod");
+});
+
+test("anspråket i sig ger ingen kredit — först vännens annons gör det", async () => {
+  const { a } = await paret();
+  assert.equal((await krediterFor(a.id, NU)).length, 0);
 });
 
 // ─── triggern ──────────────────────────────────────────────────────────────
 
-test("den inbjudnas första utbetalda möbel ger inbjudaren en kredit som gäller i 12 månader", async () => {
+test("den inbjudnas första annons ger inbjudaren en kredit som gäller i 12 månader", async () => {
   const { a, b } = await paret();
-  const r = await efterUtbetalning({ saljarId: b.id, saleId: "LP-1", tidigareUtbetalda: 0, nu: NU });
+  const r = await efterForstaAnnons({ saljarId: b.id, saleId: "LP-1", nu: NU });
   assert.equal(r.utfall, "kredit");
   const k = (await krediterFor(a.id, NU))[0];
   assert.equal(k.status, "available");
   assert.equal(k.referredUserId, b.id);
   assert.equal(k.expiresAt, "2027-09-18T10:00:00.000Z");
-  assert.ok((await referralStore().profil(b.id))!.forstaUtbetalningAt, "inbjudarens lista visar 'sålt'");
+  assert.ok((await referralStore().profil(b.id))!.forstaAnnonsAt, "inbjudarens lista visar 'har lagt upp en annons'");
 });
 
-test("bara den första utbetalningen räknas, och en inbjuden ger högst en kredit", async () => {
+test("en inbjuden ger högst en kredit, hur många annonser de än lägger upp", async () => {
   const { a, b } = await paret();
-  assert.equal((await efterUtbetalning({ saljarId: b.id, saleId: "LP-2", tidigareUtbetalda: 1, nu: NU })).utfall, "inte_forsta");
-  assert.equal((await efterUtbetalning({ saljarId: b.id, saleId: "LP-3", tidigareUtbetalda: 0, nu: NU })).utfall, "kredit");
-  assert.equal((await efterUtbetalning({ saljarId: b.id, saleId: "LP-4", tidigareUtbetalda: 0, nu: NU })).utfall, "redan_kredit");
+  assert.equal((await efterForstaAnnons({ saljarId: b.id, saleId: "LP-3", nu: NU })).utfall, "kredit");
+  assert.equal((await efterForstaAnnons({ saljarId: b.id, saleId: "LP-4", nu: NU })).utfall, "redan_kredit");
   assert.equal((await krediterFor(a.id, NU)).length, 1);
 });
 
 test("en säljare utan inbjudare utlöser ingenting", async () => {
   const c = konto();
   await profilFor(c, NU);
-  assert.equal((await efterUtbetalning({ saljarId: c.id, saleId: "LP-5", tidigareUtbetalda: 0, nu: NU })).utfall, "ingen_inbjudare");
+  assert.equal((await efterForstaAnnons({ saljarId: c.id, saleId: "LP-5", nu: NU })).utfall, "ingen_inbjudare");
 });
 
 test("ingen kredit när inbjudare och inbjuden delar e-post, adress eller telefon", async () => {
   // Samma Gmail-adress med punkter och +tillägg — så gör man ett andra konto.
   const e = await paret({ email: "a.nna+2@gmail.com" }, { email: "anna@gmail.com" });
-  assert.equal((await efterUtbetalning({ saljarId: e.b.id, saleId: "LP-6", tidigareUtbetalda: 0, nu: NU })).utfall, "delar_identitet");
+  assert.equal((await efterForstaAnnons({ saljarId: e.b.id, saleId: "LP-6", nu: NU })).utfall, "delar_identitet");
 
   const adress = { gatuadress: "Storgatan 1 A", postnummer: "112 23" };
   const ad = await paret({ adress: { gatuadress: "storgatan 1a", postnummer: "11223" } }, { adress });
-  assert.equal((await efterUtbetalning({ saljarId: ad.b.id, saleId: "LP-7", tidigareUtbetalda: 0, nu: NU })).utfall, "delar_identitet");
+  assert.equal((await efterForstaAnnons({ saljarId: ad.b.id, saleId: "LP-7", nu: NU })).utfall, "delar_identitet");
 
   const tel = await paret({ telefon: "+46 70-123 45 67" }, { telefon: "070 123 45 67" });
-  assert.equal((await efterUtbetalning({ saljarId: tel.b.id, saleId: "LP-8", tidigareUtbetalda: 0, nu: NU })).utfall, "delar_identitet");
+  assert.equal((await efterForstaAnnons({ saljarId: tel.b.id, saleId: "LP-8", nu: NU })).utfall, "delar_identitet");
 
   const nekade = (await referralStore().handelser()).filter((h) => h.event === "referral_credit_denied");
   assert.ok(nekade.some((h) => h.props.orsak === "samma_epost"));
@@ -163,7 +164,7 @@ test("ingen kredit när inbjudare och inbjuden delar e-post, adress eller telefo
 
 test("grannar med samma postnummer men olika gata får sin kredit", async () => {
   const g = await paret({ adress: { gatuadress: "Storgatan 3", postnummer: "11223" } }, { adress: { gatuadress: "Storgatan 1", postnummer: "11223" } });
-  assert.equal((await efterUtbetalning({ saljarId: g.b.id, saleId: "LP-9", tidigareUtbetalda: 0, nu: NU })).utfall, "kredit");
+  assert.equal((await efterForstaAnnons({ saljarId: g.b.id, saleId: "LP-9", nu: NU })).utfall, "kredit");
 });
 
 test("den som redan har tio oanvända krediter får ingen elfte", async () => {
@@ -171,12 +172,12 @@ test("den som redan har tio oanvända krediter får ingen elfte", async () => {
   const pa = await profilFor(a, NU);
   for (let i = 0; i < MAX_TILLGANGLIGA; i++) {
     const b = konto();
-    assert.equal(await gorAnsprak(b, pa.kod, NU), "ok");
-    assert.equal((await efterUtbetalning({ saljarId: b.id, saleId: `LP-M${i}`, tidigareUtbetalda: 0, nu: NU })).utfall, "kredit");
+    assert.equal(await gorAnsprak(b, pa.kod, false, NU), "ok");
+    assert.equal((await efterForstaAnnons({ saljarId: b.id, saleId: `LP-M${i}`, nu: NU })).utfall, "kredit");
   }
   const elfte = konto();
-  await gorAnsprak(elfte, pa.kod, NU);
-  assert.equal((await efterUtbetalning({ saljarId: elfte.id, saleId: "LP-M11", tidigareUtbetalda: 0, nu: NU })).utfall, "tak");
+  await gorAnsprak(elfte, pa.kod, false, NU);
+  assert.equal((await efterForstaAnnons({ saljarId: elfte.id, saleId: "LP-M11", nu: NU })).utfall, "tak");
   assert.equal(tillgangliga(await krediterFor(a.id, NU), NU).length, MAX_TILLGANGLIGA);
 });
 
@@ -184,14 +185,14 @@ test("den som redan har tio oanvända krediter får ingen elfte", async () => {
 
 test("en kredit används en gång, och en utgången går inte att använda", async () => {
   const { a, b } = await paret();
-  await efterUtbetalning({ saljarId: b.id, saleId: "LP-10", tidigareUtbetalda: 0, nu: NU });
+  await efterForstaAnnons({ saljarId: b.id, saleId: "LP-10", nu: NU });
   const k = await anvandKredit(a.id, "LP-NY", NU);
   assert.equal(k?.status, "used");
   assert.equal(k?.usedOnSaleId, "LP-NY");
   assert.equal(await anvandKredit(a.id, "LP-NY2", NU), null, "samma kredit kan inte användas två gånger");
 
   const x = await paret();
-  await efterUtbetalning({ saljarId: x.b.id, saleId: "LP-11", tidigareUtbetalda: 0, nu: NU });
+  await efterForstaAnnons({ saljarId: x.b.id, saleId: "LP-11", nu: NU });
   const omEttAr = new Date("2027-09-19T00:00:00Z");
   assert.equal(await anvandKredit(x.a.id, "LP-SEN", omEttAr), null);
   assert.equal((await krediterFor(x.a.id, omEttAr))[0].status, "expired");
@@ -231,16 +232,18 @@ test("ingen annan serverfil räknar provision", () => {
 test("utbetalningen med commission_rate 0 ger säljaren hela priset och Loopa 0 kr", async () => {
   const { a, b } = await paret();
 
-  // B:s första möbel: vanliga villkor.
+  // B lägger upp sin första annons: A får krediten. Utbetalningen har ingen del i det längre.
+  assert.equal((await efterForstaAnnons({ saljarId: b.id, saleId: "LP-B" })).utfall, "kredit");
+
+  // B:s möbel säljs och betalas ut på vanliga villkor.
   const forsta = await saldMobel(b.id);
   const r1 = await markeraUtbetald(forsta, { mobelprisSek: 3000 }, "admin");
   assert.equal(r1.utbetalning?.andel, STANDARD_ANDEL);
   assert.equal(r1.utbetalning?.loopaSek, 600);
   assert.equal(r1.utbetalning?.saljarenSek, 2400);
 
-  // Triggern gick via utbetalningen: A har nu en kredit.
   const [kredit] = tillgangliga(await krediterFor(a.id));
-  assert.ok(kredit, "utbetalningen ska ha gett inbjudaren en kredit");
+  assert.ok(kredit, "B:s annons ska ha gett A en kredit");
 
   // A publicerar en möbel med krediten. Villkoren sätts som i "Sälj med Loopa".
   const anvand = await anvandKredit(a.id, "LP-A");
@@ -253,7 +256,7 @@ test("utbetalningen med commission_rate 0 ger säljaren hela priset och Loopa 0 
   assert.equal(r2.utbetalning?.referralCreditId, kredit.id);
   assert.equal(r2.gratis, true);
 
-  // B:s andra möbel ger ingen andra kredit.
+  // Utbetalningar ger ingen kredit i sig — A har fortfarande bara den ena.
   const andra = await saldMobel(b.id);
   await markeraUtbetald(andra, { mobelprisSek: 1000 }, "admin");
   assert.equal((await krediterFor(a.id)).length, 1);
@@ -285,4 +288,33 @@ test("avtrycken normaliseras så att alias och skrivsätt inte räcker för att 
   assert.equal(adressNyckel({ gatuadress: "Storgatan 1 A", postnummer: "112 23" }), "storgatan1a|11223");
   assert.equal(adressNyckel({ gatuadress: "", postnummer: "11223" }), null, "postnummer ensamt är inget avtryck");
   assert.equal(telefonNyckel("070-123 45 67"), telefonNyckel("+46701234567"));
+});
+
+// ─── landningssidan och popupen ─────────────────────────────────────────────
+
+test("landningssidan får inbjudarens förnamn och ingenting annat", async () => {
+  const { fornamn } = await import("../server/src/referral/avtryck.js");
+  assert.equal(fornamn("victor ruiz", "x@y.se"), "Victor", "bara förnamnet");
+  assert.equal(fornamn(null, "victor.ruiz@ruiz.se"), "Victor", "e-postens första del när namn saknas");
+  assert.equal(fornamn(null, "vr1987@gmail.com"), null, "ingen hälsning på något som inte ser ut som ett namn");
+
+  const { inbjudareFor } = await import("../server/src/referral/routes.js");
+  const a = konto({ email: "victor@ruiz.se" });
+  const pa = await profilFor(a, NU);
+  assert.deepEqual(await inbjudareFor(pa.kod), { namn: "Victor" });
+  assert.deepEqual(await inbjudareFor(pa.kod.toLowerCase().replace("-", "")), { namn: "Victor" });
+  assert.equal(await inbjudareFor("AAAA-BBBB"), null);
+});
+
+test("popupen om en ny gratisförsäljning visas en gång, och bara för mottagaren", async () => {
+  const { a, b } = await paret();
+  await efterForstaAnnons({ saljarId: b.id, saleId: "LP-POP", nu: NU });
+  const [k] = await krediterFor(a.id, NU);
+  assert.equal(k.visadAt ?? null, null, "ny kredit är inte visad");
+
+  await referralStore().markeraVisad(k.id, b.id, NU.toISOString());
+  assert.equal((await krediterFor(a.id, NU))[0].visadAt ?? null, null, "någon annan kan inte kvittera");
+
+  await referralStore().markeraVisad(k.id, a.id, NU.toISOString());
+  assert.equal((await krediterFor(a.id, NU))[0].visadAt, NU.toISOString());
 });

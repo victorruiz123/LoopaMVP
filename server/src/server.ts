@@ -760,6 +760,20 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
     }
     throw err;
   }
+
+  /**
+   * Inbjudan belönas HÄR: säljaren kom kanske via en väns länk, och det här är deras annons. Är det
+   * den första efter inbjudan får vännen sin gratisförsäljning (referral/regler.ts). Efter att
+   * annonsen står i kö, så att ett tryck som föll aldrig ger något — och utan att vänta: säljarens
+   * svar ska inte hänga på inbjudningslagret.
+   */
+  const saljare = ownerIdOf(job);
+  if (saljare) {
+    void import("./referral/regler.js")
+      .then(({ efterForstaAnnons }) => efterForstaAnnons({ saljarId: saljare, saleId: readiness.plan.loopaId }))
+      .then((r) => { if (r.utfall === "kredit") console.info(`[referral] ${saljare} lade upp sin första annons — inbjudaren fick en gratisförsäljning.`); })
+      .catch((err) => console.warn(`[referral] inbjudan kunde inte belönas för ${jobId}:`, err instanceof Error ? err.message : err));
+  }
   console.info(`[tradera] job ${jobId} väntar på godkännande — ${readiness.plan.loopaId} "${readiness.plan.title}"`);
   void notifyAdminsOfPending(readiness.plan.loopaId, readiness.plan.title, readiness.plan.price);
   sendJson(res, 202, await traderaState(job));
@@ -1858,6 +1872,12 @@ const server = http.createServer(async (req, res) => {
        */
       if (segments[1] === "salj" && segments.length === 3 && segments[2] === "chat" && req.method === "POST") {
         return await handleSaljChat(req, res);
+      }
+      /** Vem som bjöd in, för landningssidan — utanför grinden. Se referral/routes.ts, inbjudareFor. */
+      if (segments[1] === "salj" && segments[2] === "inbjudan" && segments[3] === "fran" && segments.length === 5 && req.method === "GET") {
+        const { inbjudareFor } = await import("./referral/routes.js");
+        const svar = await inbjudareFor(decodeURIComponent(segments[4]));
+        return svar ? sendJson(res, 200, svar) : sendJson(res, 404, { error: "Okänd inbjudan." });
       }
       /** Modellväljarens miniatyrer, utanför grinden. Se handleKandidatbild. */
       if (segments[1] === "kandidatbild" && segments.length === 3 && req.method === "GET") {

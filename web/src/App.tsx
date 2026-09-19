@@ -24,6 +24,7 @@ import { isAffarPath } from "./affar/router";
 import { legalDocFromPath } from "./lib/legal";
 import LegalScreen from "./screens/LegalScreen";
 import CookieConsent from "./components/CookieConsent";
+import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchLoader from "./components/ModelSearchLoader";
 import ListingBuildLoader from "./components/ListingBuildLoader";
@@ -184,6 +185,8 @@ export default function App() {
       {/* Utanför växlingen ovan: rutan ska finnas på varje väg in i appen — även på det publika
           kortet, som är det enda stället där något funktionellt faktiskt lagras. */}
       <CookieConsent />
+      {/* Också utanför växlingen: inbjudaren ska få beskedet var i appen de än står. */}
+      <GratisPopup />
     </>
   );
 }

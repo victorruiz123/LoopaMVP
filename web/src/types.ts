@@ -497,7 +497,7 @@ export interface MinInbjudan {
   lank: string | null;
   tillgangliga: number;
   krediter: Array<{ id: string; status: "available" | "used" | "expired"; skapad: string; gar_ut: string; anvand: string | null }>;
-  inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "salt" }>;
+  inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "annons" }>;
 }
 
 /** En rad i adminpanelens utbetalningar. Se server/src/butik/utbetalning.ts. */

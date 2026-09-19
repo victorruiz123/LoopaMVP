@@ -14,6 +14,8 @@ import MobelParad from "../components/MobelParad";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 import { useViewMode } from "../lib/viewMode";
+import { sparadInbjudan } from "../lib/referral";
+import { hamtaInbjudare } from "../api";
 
 function fold(s: string): string {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -84,6 +86,26 @@ export default function HomeScreen({
   const [hurOppen, setHurOppen] = useState(false);
 
   /**
+   * INBJUDAN. Kom besökaren via en väns länk (loopa.nu/?ref=KOD) blir sidan en inbjudan: rubriken
+   * säger vem som bjöd in, och allt som inte leder till att lägga upp en annons — köpvägen,
+   * möbelparaden — lämnar plats. Märkesvalet står kvar, för det ÄR första steget i annonsen.
+   *
+   * Koden läses en gång, vid första ritningen: anspråket i AuthProvider tömmer den så fort en session
+   * finns, och sidan ska inte byta rubrik under den som just börjat läsa den.
+   */
+  const [inbjudningskod] = useState(() => sparadInbjudan());
+  const [inbjudare, setInbjudare] = useState<{ namn: string | null } | null>(null);
+  useEffect(() => {
+    if (!inbjudningskod) return;
+    let live = true;
+    hamtaInbjudare(inbjudningskod)
+      .then((svar) => live && setInbjudare(svar))
+      .catch(() => undefined);
+    return () => { live = false; };
+  }, [inbjudningskod]);
+  const inbjuden = inbjudare !== null;
+
+  /**
    * Förifyllningen från affären, hämtad en gång.
    *
    * Går rakt in i filmningen när märket är känt: säljaren kom hit för att filma sin möbel, inte för
@@ -133,7 +155,7 @@ export default function HomeScreen({
       <div className="home-bar">
         <span className="home-wordmark">loopa</span>
         <div className="home-bar-hoger">
-          {dator && <LetarDuMobel varifran="/" variant="bar" />}
+          {dator && !inbjuden && <LetarDuMobel varifran="/" variant="bar" />}
           {/* Ingen knapp alls medan sessionen läses: att gissa fel i en tiondels sekund byter ut
               brickan framför ögonen på den som just siktat in sig på den. */}
           {!loading && (
@@ -160,12 +182,26 @@ export default function HomeScreen({
         många, och det ska inte ligga tre skärmar ned.
       */}
       <header className="home-hero">
-        <h1 className="home-rubrik">
-          {t("Låt")} <span className="home-rubrik-loopa">loopa</span> {t("sälja din möbel.")}
-        </h1>
-        <p className="home-ingress">
-          {t("AI identifierar, granskar och säljer din möbel. Möt aldrig köparen!")}
-        </p>
+        {inbjuden ? (
+          <>
+            <h1 className="home-rubrik">
+              {inbjudare.namn ? t("{namn} bjöd in dig!", { namn: inbjudare.namn }) : t("En vän bjöd in dig!")}
+            </h1>
+            <p className="home-ingress">
+              {t("Lägg upp din möbel på en minut. Filma den, så skriver")} <span className="home-rubrik-loopa">loopa</span>{" "}
+              {t("annonsen, sätter priset och säljer den åt dig – du möter aldrig köparen.")}
+            </p>
+          </>
+        ) : (
+          <>
+            <h1 className="home-rubrik">
+              {t("Låt")} <span className="home-rubrik-loopa">loopa</span> {t("sälja din möbel.")}
+            </h1>
+            <p className="home-ingress">
+              {t("AI identifierar, granskar och säljer din möbel. Möt aldrig köparen!")}
+            </p>
+          </>
+        )}
         {/* Vägen till förklaringen. En knapp och inte en textlänk: det är sidans andra handling
             efter att välja märke, och den som tvekar ska se att det finns någonstans att fråga. */}
         <button className="home-hur-knapp" onClick={() => setHurOppen(true)}>
@@ -174,7 +210,7 @@ export default function HomeScreen({
 
         {/* Möblerna fyller ytan under löftet på datorn och ritas inte alls på en telefon, där det
             inte finns någon yta att fylla — se `.mobel-parad` i styles.css. */}
-        <MobelParad />
+        {!inbjuden && <MobelParad />}
       </header>
 
       <section className="home-marken">
@@ -301,7 +337,7 @@ export default function HomeScreen({
         ingångar till samma vy på samma sida hade varit en upprepning, och den i toppen är den som
         faktiskt syns — den nedersta raden på en datorskärm är den man skrollat förbi.
       */}
-      {!dator && <LetarDuMobel varifran="/" />}
+      {!dator && !inbjuden && <LetarDuMobel varifran="/" />}
 
       <footer className="home-fot">
         <span className="home-wordmark">loopa</span>

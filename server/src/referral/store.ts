@@ -30,10 +30,10 @@ export interface ReferralProfil {
   referredBy: string | null;
   referredAt: string | null;
   /**
-   * När personens första möbel betalades ut. Satt oavsett om inbjudaren fick en kredit för den — en
-   * kredit kan nekas av skydden, men försäljningen hände ändå. Driver "sålt" i inbjudarens lista.
+   * När personen lade upp sin första annons efter inbjudan. Satt oavsett om inbjudaren fick en kredit
+   * för den — en kredit kan nekas av skydden, men annonsen finns ändå. Driver inbjudarens lista.
    */
-  forstaUtbetalningAt: string | null;
+  forstaAnnonsAt: string | null;
   /**
    * AVTRYCKEN SKYDDEN JÄMFÖR. Normaliserade, aldrig råa: e-posten utan +tillägg och Gmail-punkter,
    * adressen som gata + postnummer i en form. Se avtryck.ts. Telefon och Stripe-konto är null tills
@@ -45,6 +45,11 @@ export interface ReferralProfil {
   stripeKonto: string | null;
   /** "an•••@gmail.com" — det inbjudaren får se om den de bjudit in. */
   emailMaskerad: string | null;
+  /**
+   * Förnamnet, som det står på landningssidan för den som öppnar personens länk: "Victor bjöd in
+   * dig!". Ur kontots profil (full_name) eller, i brist på det, e-postadressens första del.
+   */
+  namn: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +68,8 @@ export interface ReferralKredit {
   usedAt: string | null;
   createdAt: string;
   expiresAt: string;
+  /** När inbjudaren såg popupen om krediten. Null = inte visad än, och då visas den. */
+  visadAt?: string | null;
 }
 
 export type ReferralHandelseNamn =
@@ -96,7 +103,7 @@ export interface ReferralStore {
   /** Avtrycken och första utbetalningen. Rör aldrig kod eller referredBy. */
   uppdateraProfil(
     userId: string,
-    patch: Partial<Pick<ReferralProfil, "emailNyckel" | "adressNyckel" | "telefonNyckel" | "stripeKonto" | "emailMaskerad" | "forstaUtbetalningAt">>,
+    patch: Partial<Pick<ReferralProfil, "emailNyckel" | "adressNyckel" | "telefonNyckel" | "stripeKonto" | "emailMaskerad" | "namn" | "forstaAnnonsAt">>,
   ): Promise<void>;
   /** Sant om den sattes nu. Falskt om den redan var satt — då ändras ingenting. */
   sattReferredBy(userId: string, referrerId: string, at: string): Promise<boolean>;
@@ -105,6 +112,8 @@ export interface ReferralStore {
   kreditForInbjuden(referredUserId: string): Promise<ReferralKredit | null>;
   /** Falskt om den inbjudna redan gett en kredit. Det är lagrets garanti, inte bara reglernas. */
   skapaKredit(k: ReferralKredit): Promise<boolean>;
+  /** Popupen är visad. Villkorat på mottagaren — ingen kan kvittera någon annans kredit. */
+  markeraVisad(id: string, userId: string, at: string): Promise<void>;
   /** Villkorat: bara från `from`. Sant om bytet skedde. */
   bytStatus(id: string, from: KreditStatus, to: KreditStatus, patch?: Partial<Pick<ReferralKredit, "usedOnSaleId" | "usedAt">>): Promise<boolean>;
 
@@ -226,6 +235,16 @@ class FileStore implements ReferralStore {
     });
   }
 
+  markeraVisad(id: string, userId: string, at: string) {
+    return serialize(async () => {
+      const map = await this.lasKrediter();
+      const k = map.get(id);
+      if (!k || k.userId !== userId || k.visadAt) return;
+      map.set(id, { ...k, visadAt: at });
+      await this.sparaKrediter();
+    });
+  }
+
   bytStatus(id: string, from: KreditStatus, to: KreditStatus, patch: Partial<Pick<ReferralKredit, "usedOnSaleId" | "usedAt">> = {}) {
     return serialize(async () => {
       const map = await this.lasKrediter();
@@ -289,12 +308,13 @@ function profilFranRad(r: Record<string, any>): ReferralProfil {
     kod: r.referral_code,
     referredBy: r.referred_by ?? null,
     referredAt: r.referred_at ?? null,
-    forstaUtbetalningAt: r.first_paid_out_at ?? null,
+    forstaAnnonsAt: r.first_listing_at ?? null,
     emailNyckel: r.email_key ?? null,
     adressNyckel: r.address_key ?? null,
     telefonNyckel: r.phone_key ?? null,
     stripeKonto: r.stripe_account_id ?? null,
     emailMaskerad: r.email_masked ?? null,
+    namn: r.display_name ?? null,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -306,7 +326,8 @@ const PROFILKOLUMNER: Record<string, string> = {
   telefonNyckel: "phone_key",
   stripeKonto: "stripe_account_id",
   emailMaskerad: "email_masked",
-  forstaUtbetalningAt: "first_paid_out_at",
+  namn: "display_name",
+  forstaAnnonsAt: "first_listing_at",
 };
 
 function kreditFranRad(r: Record<string, any>): ReferralKredit {
@@ -319,6 +340,7 @@ function kreditFranRad(r: Record<string, any>): ReferralKredit {
     usedAt: r.used_at ?? null,
     createdAt: r.created_at,
     expiresAt: r.expires_at,
+    visadAt: r.shown_at ?? null,
   };
 }
 
@@ -345,12 +367,13 @@ class SupabaseStore implements ReferralStore {
         referral_code: p.kod,
         referred_by: p.referredBy,
         referred_at: p.referredAt,
-        first_paid_out_at: p.forstaUtbetalningAt,
+        first_listing_at: p.forstaAnnonsAt,
         email_key: p.emailNyckel,
         address_key: p.adressNyckel,
         phone_key: p.telefonNyckel,
         stripe_account_id: p.stripeKonto,
         email_masked: p.emailMaskerad,
+        display_name: p.namn,
         created_at: p.createdAt,
         updated_at: p.updatedAt,
       });
@@ -405,6 +428,10 @@ class SupabaseStore implements ReferralStore {
       if (err instanceof KonfliktFel) return false;
       throw err;
     }
+  }
+
+  async markeraVisad(id: string, userId: string, at: string) {
+    await call("PATCH", `referral_credits?id=eq.${q(id)}&user_id=eq.${q(userId)}&shown_at=is.null`, { shown_at: at });
   }
 
   async bytStatus(id: string, from: KreditStatus, to: KreditStatus, patch: Partial<Pick<ReferralKredit, "usedOnSaleId" | "usedAt">> = {}) {

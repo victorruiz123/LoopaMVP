@@ -234,6 +234,26 @@ export async function getMinInbjudan(): Promise<MinInbjudan> {
   return json(await authFetch("/api/salj/inbjudan"));
 }
 
+/**
+ * Vem som bjöd in, för landningssidan. UTAN inloggning — den som öppnar länken har sällan ett konto.
+ * Null när koden inte finns; sidan visar då sin vanliga rubrik.
+ */
+export async function hamtaInbjudare(kod: string): Promise<{ namn: string | null } | null> {
+  const res = await fetch(`/api/salj/inbjudan/fran/${encodeURIComponent(kod)}`);
+  if (!res.ok) return null;
+  return res.json();
+}
+
+/** En ny gratisförsäljning som inbjudaren inte sett än. Driver popupen. */
+export async function hamtaNyKredit(): Promise<{ kredit: { id: string; van: string | null; garUt: string } | null }> {
+  return json(await authFetch("/api/salj/inbjudan/nytt"));
+}
+
+/** Popupen är stängd och visas inte igen. */
+export async function markeraKreditVisad(id: string): Promise<void> {
+  await authFetch(`/api/salj/inbjudan/visad/${encodeURIComponent(id)}`, { method: "POST" });
+}
+
 /** Den nyss registrerade kom via en länk. Utfallet spelar ingen roll för klienten — koden töms oavsett. */
 export async function gorInbjudningsansprak(kod: string): Promise<{ utfall: string }> {
   return json(

@@ -7,8 +7,8 @@ import type { MinInbjudan } from "../types";
  * Inbjudan: länken, knapparna, och vad den gett.
  *
  * REGELN står i server/src/referral/regler.ts: den som bjuder in en ny säljare får en försäljning
- * utan Loopas avgift när den inbjudnas första möbel är såld och utbetald. Texten här lovar exakt det
- * och inget mer — inte "när din vän registrerar sig", för det är inte då krediten kommer.
+ * utan Loopas avgift när den inbjudna lägger upp sin första annons. Texten här lovar exakt det och
+ * inget mer — inte "när din vän registrerar sig", för det är inte då krediten kommer.
  */
 
 /** Kopierar länken. Faller urklippet (osäker kontext, gammal webbläsare) visas länken markerbar. */
@@ -63,7 +63,7 @@ export function BjudInRuta({ lank }: { lank: string }) {
     <div className="bjudin-ruta">
       <p className="bjudin-rubrik">{t("Bjud in en vän – din nästa försäljning blir gratis.")}</p>
       <p className="bjudin-not">
-        {t("När din vän har sålt sin första möbel tar vi ingen avgift på din nästa.")}
+        {t("När din vän har lagt upp sin första annons tar vi ingen avgift på din nästa försäljning.")}
       </p>
       <div className="bjudin-knappar">
         <button type="button" className="btn btn-primary btn-small" onClick={() => void onKopiera("kopiera")}>
@@ -137,8 +137,8 @@ export function ProfilInbjudan() {
           {data.inbjudna.map((p, i) => (
             <li key={i}>
               <span>{p.email ?? t("En vän")}</span>
-              <span className={p.status === "salt" ? "bjudin-status bjudin-status-salt" : "bjudin-status"}>
-                {p.status === "salt" ? t("Har sålt") : t("Registrerad")}
+              <span className={p.status === "annons" ? "bjudin-status bjudin-status-salt" : "bjudin-status"}>
+                {p.status === "annons" ? t("Har lagt upp en annons") : t("Registrerad")}
               </span>
             </li>
           ))}

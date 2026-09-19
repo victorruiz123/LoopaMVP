@@ -1,54 +1,49 @@
 /**
  * Inbjudningarnas regler.
  *
- * REGELN, i en mening: den som bjuder in en ny säljare får EN försäljning utan Loopas provision, när
- * den inbjudnas första möbel är såld och utbetald.
+ * REGELN, i en mening: den som bjuder in någon får EN försäljning utan Loopas provision, när den
+ * inbjudna lägger upp sin första annons efter inbjudan.
  *
  * Tre ögonblick, och bara tre:
  *
- *   1. REGISTRERINGEN  (gorAnsprak)       referred_by skrivs, en gång. Ingen kredit.
- *   2. UTBETALNINGEN   (efterUtbetalning) den inbjudnas första möbel betalas ut → kredit till
- *                                         inbjudaren, om skydden släpper igenom den.
- *   3. PUBLICERINGEN   (anvandKredit)     inbjudaren trycker "Sälj med Loopa" på en ny möbel och väljer
- *                                         att använda krediten. Andelen på den möbeln blir 0.
+ *   1. ANSPRÅKET       (gorAnsprak)        den inbjudna loggar in efter att ha öppnat länken →
+ *                                          referred_by skrivs, en gång. Ingen kredit.
+ *   2. VÄNNENS ANNONS  (efterForstaAnnons) den inbjudna trycker "Sälj med Loopa" → kredit till
+ *                                          inbjudaren, om skydden släpper igenom den.
+ *   3. PUBLICERINGEN   (anvandKredit)      inbjudaren trycker "Sälj med Loopa" på en egen möbel och
+ *                                          väljer att använda krediten. Andelen på den möbeln blir 0.
  *
- * `efterUtbetalning` är det uppdraget kallade databastriggern. Den ligger här och inte i Postgres av
+ * Regeln var först "när vännens första möbel är såld och utbetald". Den ändrades 2026-09-19 till
+ * annonsen: belöningen ska komma medan inbjudan fortfarande känns, inte veckor senare. Skyddet mot
+ * påhittade konton vilar därför på avtrycken (avtryck.ts), taket och en kredit per inbjuden.
+ *
+ * `efterForstaAnnons` är det uppdraget kallade databastriggern. Den ligger här och inte i Postgres av
  * samma skäl som butikens övergångar gör: lagret kör på filer när servicenyckeln saknas, och en
  * regel som bara finns i ena ryggen är en regel som inte gäller i den andra. Den anropas från EN
- * plats — butik/utbetalning.ts, när admin markerat en möbel utbetald — och ingenting annat
- * (registrering, publicering, försäljning utan utbetalning) kan skapa en kredit.
+ * plats — "Sälj med Loopa" i server.ts, när annonsen väl står i kö.
  */
 
 import { randomUUID } from "node:crypto";
 import { normaliseraKod, nyKod } from "./kod.js";
-import { adressNyckel, delarIdentitet, emailNyckel, maskeraEmail, telefonNyckel } from "./avtryck.js";
+import { adressNyckel, delarIdentitet, emailNyckel, fornamn, maskeraEmail, telefonNyckel } from "./avtryck.js";
 import { referralStore, type ReferralHandelseNamn, type ReferralKredit, type ReferralProfil } from "./store.js";
 
 /** Hur länge en kredit gäller från att den skapats. */
 export const KREDIT_GILTIG_MANADER = 12;
 /** Fler tillgängliga krediter än så samlar ingen på sig. Den elfte inbjudna ger ingen kredit. */
 export const MAX_TILLGANGLIGA = 10;
-/**
- * Hur nytt ett konto måste vara för att en kod ska fästa.
- *
- * "Ignorera om användaren redan finns." Registreringen och anspråket är två anrop — kontot skapas hos
- * Supabase, bekräftas kanske via mejl, och först vid första inloggningen skickar klienten koden. En
- * vecka rymmer ett bekräftelsemejl som legat i skräpposten, men inte ett gammalt konto som klistrar
- * in en väns kod för att den råkar ligga i en länk.
- */
-export const NYTT_KONTO_DAGAR = 7;
 
 /** Det vi vet om kontot bakom en token. Se routes.ts, som hämtar det hos Supabase. */
 export interface Konto {
   id: string;
   email: string | null;
-  /** Kontots skapelsetid hos Supabase. Null = okänd, och då räknas kontot som befintligt. */
+  /** Kontots skapelsetid hos Supabase. Läses inte av reglerna längre — befintliga konton går bra. */
   createdAt: string | null;
   adress: { gatuadress?: unknown; postnummer?: unknown } | null;
   telefon: unknown;
+  /** Profilens fullständiga namn, när det finns. Se avtryck.ts, fornamn. */
+  fullName?: string | null;
 }
-
-const DAG_MS = 24 * 60 * 60 * 1000;
 
 function plusManader(d: Date, manader: number): Date {
   const x = new Date(d);
@@ -92,6 +87,7 @@ export async function profilFor(konto: Konto, nu: Date = new Date()): Promise<Re
     adressNyckel: adressNyckel(konto.adress),
     telefonNyckel: telefonNyckel(konto.telefon),
     emailMaskerad: maskeraEmail(konto.email),
+    namn: fornamn(konto.fullName, konto.email),
   };
 
   const befintlig = await store.profil(konto.id);
@@ -112,7 +108,7 @@ export async function profilFor(konto: Konto, nu: Date = new Date()): Promise<Re
       kod: nyKod(),
       referredBy: null,
       referredAt: null,
-      forstaUtbetalningAt: null,
+      forstaAnnonsAt: null,
       stripeKonto: null,
       ...avtryck,
       createdAt: nu.toISOString(),
@@ -131,25 +127,35 @@ export async function profilFor(konto: Konto, nu: Date = new Date()): Promise<Re
 // 1. Registreringen
 // ---------------------------------------------------------------------------
 
-export type AnsprakUtfall = "ok" | "ogiltig_kod" | "egen_kod" | "redan_inbjuden" | "befintligt_konto";
+export type AnsprakUtfall = "ok" | "ogiltig_kod" | "egen_kod" | "redan_inbjuden" | "har_salt";
 
 /**
- * Den nya användaren kom via en länk. Skriver referred_by, om allt stämmer.
+ * Användaren kom via en länk. Skriver referred_by, om allt stämmer.
  *
- * Tyst åt alla håll: utfallet går tillbaka till klienten, som tömmer sin sparade kod oavsett. Ingen
- * av de nekade vägarna är något användaren behöver läsa om — en ogiltig kod är en trasig länk, inte
- * ett fel de gjort.
+ * BEFINTLIGA KONTON GÅR BRA, så länge de aldrig sålt något. Den som skapade ett konto förra året men
+ * aldrig kom igång är precis den en vän kan få över tröskeln. Den som redan säljer genom oss är inte
+ * en ny säljare, och en inbjudan till dem hade varit en rabatt utan motprestation.
+ *
+ * `harSalt` räknas av den som anropar (routes.ts) — butiken vet vad som sålts, inbjudningarna vet
+ * det inte.
+ *
+ * Tyst åt alla håll: utfallet går tillbaka till klienten, som tömmer sin sparade kod oavsett. Ett
+ * nekat anspråk skrivs ändå i serverloggen, så att "inbjudan fäste inte" går att förklara.
  */
-export async function gorAnsprak(konto: Konto, rawKod: unknown, nu: Date = new Date()): Promise<AnsprakUtfall> {
+export async function gorAnsprak(konto: Konto, rawKod: unknown, harSalt: boolean, nu: Date = new Date()): Promise<AnsprakUtfall> {
+  const utfall = await provaAnsprak(konto, rawKod, harSalt, nu);
+  if (utfall !== "ok") console.info(`[referral] anspråk från ${konto.id} med "${String(rawKod).slice(0, 12)}" nekades: ${utfall}`);
+  return utfall;
+}
+
+async function provaAnsprak(konto: Konto, rawKod: unknown, harSalt: boolean, nu: Date): Promise<AnsprakUtfall> {
   const kod = normaliseraKod(rawKod);
   if (!kod) return "ogiltig_kod";
   const store = referralStore();
   const inbjudare = await store.profilForKod(kod);
   if (!inbjudare) return "ogiltig_kod";
   if (inbjudare.userId === konto.id) return "egen_kod";
-
-  const skapat = konto.createdAt ? new Date(konto.createdAt).getTime() : NaN;
-  if (!Number.isFinite(skapat) || nu.getTime() - skapat > NYTT_KONTO_DAGAR * DAG_MS) return "befintligt_konto";
+  if (harSalt) return "har_salt";
 
   const profil = await profilFor(konto, nu);
   if (profil.referredBy !== null) return "redan_inbjuden";
@@ -193,43 +199,39 @@ export function tillgangliga(krediter: ReferralKredit[], nu: Date = new Date()):
 export type TriggerUtfall =
   | "kredit"
   | "ingen_inbjudare"
-  | "inte_forsta"
   | "redan_kredit"
   | "okand_inbjudare"
   | "delar_identitet"
   | "tak";
 
 /**
- * En möbel har betalats ut. Var det säljarens första, och kom säljaren via en inbjudan, får
- * inbjudaren en kredit.
+ * Säljaren har lagt upp en annons. Kom säljaren via en inbjudan, och har inbjudan inte redan gett
+ * något, får inbjudaren en kredit.
  *
- * `tidigareUtbetalda` är hur många ANDRA möbler säljaren redan fått utbetalt för. Den som anropar
- * räknar det (butiken vet vilka möbler som är utbetalda; inbjudningarna vet inte). Noll betyder att
- * det här är den första.
+ * "Första annonsen" behöver inte räknas: en inbjuden ger högst en kredit någonsin (lagret garanterar
+ * det med unik referred_user_id), så den första annonsen efter inbjudan är den enda som kan ge en.
+ * En nekad kredit (skydden nedan) kan prövas igen vid nästa annons — utfallet blir detsamma för delad
+ * identitet, men taket kan ha lättat.
  *
  * Skydden, i ordning:
- *   - bara första utbetalningen räknas, och en inbjuden person ger högst en kredit någonsin — det
- *     senare garanteras av lagret (unik referred_user_id), inte bara av kontrollen här
+ *   - en inbjuden person ger högst en kredit, någonsin
  *   - inbjudare och inbjuden får inte dela e-post, adress, telefon eller Stripe-konto (avtryck.ts)
  *   - inbjudaren får inte redan ha MAX_TILLGANGLIGA oanvända krediter
  *
- * En nekad kredit skrivs i huvudboken med orsaken. Den är inte ett fel, och den försöks inte igen:
- * en senare utbetalning är inte den första.
+ * En nekad kredit skrivs i huvudboken med orsaken. Den är inte ett fel.
  */
-export async function efterUtbetalning(input: {
+export async function efterForstaAnnons(input: {
   saljarId: string;
   saleId: string;
-  tidigareUtbetalda: number;
   nu?: Date;
 }): Promise<{ utfall: TriggerUtfall; kredit: ReferralKredit | null }> {
   const nu = input.nu ?? new Date();
   const store = referralStore();
   const profil = await store.profil(input.saljarId);
   if (!profil?.referredBy) return { utfall: "ingen_inbjudare", kredit: null };
-  if (input.tidigareUtbetalda > 0) return { utfall: "inte_forsta", kredit: null };
 
-  // "Sålt" i inbjudarens lista — oavsett hur det går med krediten nedan.
-  if (!profil.forstaUtbetalningAt) await store.uppdateraProfil(profil.userId, { forstaUtbetalningAt: nu.toISOString() });
+  // "Har lagt upp en annons" i inbjudarens lista — oavsett hur det går med krediten nedan.
+  if (!profil.forstaAnnonsAt) await store.uppdateraProfil(profil.userId, { forstaAnnonsAt: nu.toISOString() });
 
   if (await store.kreditForInbjuden(profil.userId)) return { utfall: "redan_kredit", kredit: null };
 
