@@ -736,3 +736,16 @@ export async function adressFranPosition(lat: number, lng: number): Promise<Adre
   if (!res.ok) throw new Error(`Adressen kunde inte hämtas (${res.status})`);
   return ((await res.json()) as { traff: AdressTraff | null }).traff;
 }
+
+/**
+ * Säljarens variant — "2-sitssoffa", "fåtölj". Servern skriver om annonsen och hämtar måtten för
+ * just den varianten, så anropet är mer än ett sparat fält.
+ */
+export async function selectVariant(jobId: string, variant: string): Promise<void> {
+  const res = await authFetch(`/api/jobs/${jobId}/variant`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ variant }),
+  });
+  await json<{ ok: true }>(res);
+}

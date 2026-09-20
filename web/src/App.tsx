@@ -5,6 +5,7 @@ import AnalysisScreen from "./screens/AnalysisScreen";
 import ModelSelectScreen from "./screens/ModelSelectScreen";
 import SpecsScreen from "./screens/SpecsScreen";
 import DisclosuresScreen from "./screens/DisclosuresScreen";
+import VariantScreen from "./screens/VariantScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
 import ListingScreen from "./screens/ListingScreen";
@@ -28,7 +29,7 @@ import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchLoader from "./components/ModelSearchLoader";
 import ListingBuildLoader from "./components/ListingBuildLoader";
-import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, saveDisclosures, type CapturedShot, ensureMediaSession } from "./api";
+import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
@@ -429,11 +430,13 @@ function FlowApp() {
         // Frågorna om pälsdjur och lukt ligger framför väntan på annonsen, inte i en egen skärm i
         // flödet: bygget pågår bakom dem. Se DisclosuresGate.
         <DisclosuresGate jobId={screen.jobId}>
+          <VariantGate jobId={screen.jobId}>
           <SpecsGate
             jobId={screen.jobId}
             onNext={() => setScreen({ ...screen, name: "price" })}
             onBack={() => setScreen({ ...screen, name: "identify" })}
           />
+          </VariantGate>
         </DisclosuresGate>
       );
     case "price":
@@ -792,6 +795,88 @@ function IdentifyGate({
  * en. Faller anropet visas felet och nästa tryck går vidare ändå — resten av flödet är kvar, och
  * annonsen står utan stycket "Från säljaren" i stället för att säljaren står utan annons.
  */
+/**
+ * "Välj variant", direkt efter frågorna om pälsdjur och lukt.
+ *
+ * VARFÖR EFTER OCH INTE FÖRE. Listan hämtas i bakgrunden när modellen valts (pipeline/varianter.ts på
+ * servern) och tar några sekunder. Frågorna om pälsdjur och lukt är den enda tid i flödet som ändå är
+ * väntan — hämtningen hinner alltså bli klar medan säljaren svarar på dem, och variantfrågan kostar
+ * ingen egen paus.
+ *
+ * FRÅGAN STÄLLS BARA NÄR DET FINNS MINST TVÅ VARIANTER. En modell som bara finns i ett utförande ger
+ * inget val, och en skärm med ett enda alternativ är ett tryck utan innehåll. Samma sak när listan
+ * uteblir: en modell Gemini inte känner igen, eller ett anrop som föll, ska inte lägga en fråga i
+ * vägen som säljaren ändå inte kan svara bättre på än vi.
+ *
+ * VÄNTAN HAR ETT TAK. Har listan inte kommit inom tolv sekunder går säljaren vidare utan frågan.
+ * Annonsen blir då som förut — gissad variant — och det är fortfarande bättre än en skärm som står
+ * och snurrar på en uppgift som bara gör annonsen bättre, inte möjlig.
+ */
+function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }) {
+  const [job, setJob] = useState<ConditionJob | null>(null);
+  const [klar, setKlar] = useState(false);
+  const [svarat, setSvarat] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  /** Ett andra tryck efter ett fall betyder "gå vidare ändå" — samma regel som i DisclosuresGate. */
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let avbruten = false;
+    const slutar = Date.now() + 12_000;
+    async function titta() {
+      try {
+        const j = await getJob(jobId);
+        if (avbruten) return;
+        setJob(j);
+        // undefined = hämtningen pågår fortfarande. null/[] = det blir ingen fråga.
+        if (j.variantOptions !== undefined || j.variantChosen != null || Date.now() > slutar) {
+          setKlar(true);
+          return;
+        }
+      } catch {
+        if (Date.now() > slutar) return setKlar(true);
+      }
+      if (!avbruten) window.setTimeout(titta, 1200);
+    }
+    void titta();
+    return () => {
+      avbruten = true;
+    };
+  }, [jobId]);
+
+  async function valj(variant: string) {
+    if (failed) return setSvarat(true);
+    setSaving(true);
+    setError(null);
+    try {
+      await selectVariant(jobId, variant);
+      setSvarat(true);
+    } catch (err) {
+      setFailed(true);
+      setError(
+        `${err instanceof Error ? err.message : "Varianten kunde inte sparas."} Tryck igen för att gå vidare utan den.`,
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!klar) return <BuildingListing />;
+  const varianter = job?.variantOptions ?? [];
+  if (svarat || job?.variantChosen != null || varianter.length < 2) return <>{children}</>;
+  return (
+    <VariantScreen
+      brand={job?.identity?.brand ?? null}
+      model={job?.identity?.model ?? null}
+      varianter={varianter}
+      onDone={valj}
+      saving={saving}
+      error={error}
+    />
+  );
+}
+
 function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNode }) {
   const t = useT();
   const [answered, setAnswered] = useState(false);

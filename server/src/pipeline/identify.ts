@@ -1,7 +1,9 @@
 import { callSellerGenerate, type Resolution, type SellerCall } from "../listing.js";
+import { hamtaVarianter } from "./varianter.js";
 import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../candidateImages.js";
 import { fargForAnnons, fargerI } from "./farg.js";
 import { mergeSpecs } from "../specHarvest.js";
+import { mattminnetsRader } from "../mattminne.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { registreradKandidatbild } from "../kandidatbild.js";
 import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
@@ -720,6 +722,28 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   await persist(job);
 
   /**
+   * Variantlistan hämtas HÄR, i bakgrunden.
+   *
+   * Frågan ställs för säljaren först efter pälsdjur och lukt (se VariantGate i klienten), men
+   * hämtningen måste börja nu för att svaret ska ligga färdigt när de kommer dit. Den kör bredvid
+   * annonsen och priset, precis som allt annat i den här funktionen, och faller den tyst blir det
+   * ingen fråga alls.
+   *
+   * Hoppas över vid ett omval: då har säljaren redan svarat, och listan ska inte hämtas på nytt.
+   */
+  if (job.variantChosen == null) {
+    void hamtaVarianter(brand, model)
+      .then(async (varianter) => {
+        const fresh = getJobSync(jobId) ?? (await getJob(jobId));
+        if (!fresh || fresh.variantChosen != null) return;
+        fresh.variantOptions = varianter;
+        await persist(fresh);
+        console.info(`[varianter] ${jobId.slice(0, 8)} ${varianter.length} varianter för "${model}"`);
+      })
+      .catch((err) => console.warn(`[varianter] ${jobId.slice(0, 8)} föll:`, err instanceof Error ? err.message : err));
+  }
+
+  /**
    * Annonsen och priset körs PARALLELLT.
    *
    * De behöver inte varandra: annonsen byggs på modellen och bilderna, priset på modellen och
@@ -808,8 +832,11 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
 
   // Uppskattade mått räknas inte som fynd. Annonsen bär dem alltid numera, och läste villkoret dem
   // som mått hade omförsöket — det som faktiskt hämtar hem de riktiga måtten — aldrig kört igen.
+  // Måttminnet räknas inte heller: det är en mätning av modellen, men det är fortfarande ingen källa,
+  // och ett minne som stoppade omförsöken hade gjort att vi slutade leta efter tillverkarens egna tal.
+  const eget = (a: ListingAttribute) => !a.estimated && !a.fromSellers;
   const hasDimensions = (l: Awaited<ReturnType<typeof generateOnce>>) =>
-    !!l.result?.attributes.some((a) => !a.estimated && /(mått|bredd|djup|höjd|längd|diameter|sitthöjd|sitsdjup)/i.test(a.label));
+    !!l.result?.attributes.some((a) => eget(a) && /(mått|bredd|djup|höjd|längd|diameter|sitthöjd|sitsdjup)/i.test(a.label));
 
   /**
    * Upp till tre försök, bundna av en väggklocka.
@@ -865,10 +892,23 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   const moreToCome = (l: Awaited<ReturnType<typeof generateOnce>>, until: number) =>
     !hasDimensions(l) && until - Date.now() >= MIN_TIME_FOR_ATTEMPT_MS;
 
+  /**
+   * Vad säljare av samma modell mätt upp. Läses EN gång per fas 2 — minnet ligger i processen och
+   * ändras inte under de sekunder annonsen byggs.
+   *
+   * Aldrig före en källa: sidskörden läggs in först, och `mergeSpecs` släpper bara in minnet där
+   * ingen källa svarat. Där en uppskattning står tar minnet över — det är en mätning av modellen,
+   * inte en tabell över möbeltypen. Se mattminne.ts.
+   */
+  const minnet = await mattminnetsRader(brand, model).catch(() => [] as ListingAttribute[]);
+  if (minnet.length > 0) {
+    console.info(`[identify] ${jobId.slice(0, 8)} måttminnet har ${minnet.map((m) => m.label).join("/")} för "${model}"`);
+  }
+
   const listingPromise = (async () => {
     const until = Date.now() + RETRY_BUDGET_MS;
     const enrich = async <T extends { result: { attributes: ListingAttribute[] } | null }>(listing: T) =>
-      withPageSpecs(listing, await freshPageSpecs());
+      withPageSpecs(withPageSpecs(listing, await freshPageSpecs()), minnet);
     let best = await enrich(await generateOnce());
     await publish(best, moreToCome(best, until));
     // `ms` är SÄLJARENS väntan: från trycket på modellen till att annonsen ligger på jobbet. Skild
@@ -887,7 +927,7 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
       const next = await enrich(await generateOnce());
       // Bara belagda attribut räknas. De uppskattade måtten följer med varje försök och säger inget om
       // vilket av dem som fick veta mest — de hade bara gjort jämförelsen till en fråga om möbeltyp.
-      const count = (l: typeof best) => l.result?.attributes.filter((a) => !a.estimated).length ?? 0;
+      const count = (l: typeof best) => l.result?.attributes.filter(eget).length ?? 0;
       if (hasDimensions(next) || count(next) > count(best)) {
         best = next;
         await publish(best, moreToCome(best, until));
@@ -1008,7 +1048,7 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    * omförsök tar. Läses ur sidans egen HTML, aldrig gissat: se harvestSpecs.
    */
   const saknarSpecar =
-    !listing.result?.attributes.some((a) => !a.estimated && /(mått|bredd|djup|höjd|längd|diameter)/i.test(a.label)) ||
+    !listing.result?.attributes.some((a) => eget(a) && /(mått|bredd|djup|höjd|längd|diameter)/i.test(a.label)) ||
     !listing.result?.attributes.some((a) => /(material|klädsel|stomme|träslag)/i.test(a.label));
 
   /** Sant när hämtningen görs BARA för specarnas skull: omslaget är redan satt och bekräftat. */
@@ -1040,6 +1080,11 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
       const current = withCover.result?.listing ?? withCover.pendingListing ?? null;
       if (specs.length > 0 && current?.result) {
         current.result.attributes = mergeSpecs(current.result.attributes, specs);
+      }
+      // Manualvägen bygger sin annons utan att passera slingan ovan, och ett mått ur minnet är
+      // fortfarande bättre än den uppskattning som annars står kvar. Efter sidskörden: sidan först.
+      if (minnet.length > 0 && current?.result) {
+        current.result.attributes = mergeSpecs(current.result.attributes, minnet);
       }
       await persist(withCover);
       console.info(

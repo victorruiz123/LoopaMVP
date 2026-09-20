@@ -578,6 +578,10 @@ export interface ConditionJob {
    * stol, eller ett jobb från före frågan fanns — ingetdera får läsas som en stol.
    */
   chairLike?: boolean;
+  /** Varianterna modellen finns i. undefined = hämtas fortfarande, [] = ingen fråga ska ställas. */
+  variantOptions?: string[] | null;
+  /** Säljarens svar på variantfrågan. */
+  variantChosen?: string | null;
 }
 
 /** Svaren, som de ligger på jobbet. Se DisclosuresScreen och annonstexten på servern. */

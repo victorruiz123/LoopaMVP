@@ -4812,6 +4812,19 @@ body:has(.grind) .consent { display: none; }
    lika stora knappar under den — inte en strömbrytare, som hade haft ett förvalt
    läge och därmed svarat "nej" om lukt åt säljaren.
    ========================================================================== */
+/* Variantvalet: ett val per rad, hela raden klickbar. Samma form som modellväljaren ovanför i
+   flödet — säljaren har just pekat ut en modell på precis det här sättet. */
+.variant-val { display: flex; flex-direction: column; gap: 10px; margin: 4px 0 18px; }
+.variant-knapp {
+  width: 100%; min-height: 54px; padding: 14px 16px; text-align: left;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--surface);
+  font-family: inherit; font-size: var(--fs-field); color: var(--ink); cursor: pointer;
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+.variant-knapp:hover { border-color: var(--accent); }
+.variant-knapp.vald { border-color: var(--accent); box-shadow: var(--focus); font-weight: 700; }
+.variant-knapp-egen { color: var(--ink-soft); font-size: var(--fs-sm); }
+
 .fragor { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
 .fraga {
   background: var(--surface); border-radius: var(--r-lg); padding: 16px;

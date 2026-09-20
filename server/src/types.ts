@@ -859,6 +859,15 @@ export interface ConditionJob {
    * från före frågan fanns. Ingen av dem får läsas som "en stol".
    */
   chairLike?: boolean;
+  /**
+   * Varianterna modellen finns i, hämtade i bakgrunden efter modellvalet (pipeline/varianter.ts).
+   *
+   * `undefined` = hämtningen pågår eller gjordes aldrig, `[]` = modellen är okänd eller frågan föll.
+   * Ett enda namn betyder att modellen bara finns i ett utförande, och då ställs ingen fråga.
+   */
+  variantOptions?: string[] | null;
+  /** Säljarens svar på variantfrågan — valt ur listan eller skrivet för hand. */
+  variantChosen?: string | null;
 }
 
 /**
