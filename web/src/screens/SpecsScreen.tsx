@@ -100,6 +100,9 @@ export default function SpecsScreen({
   // under rubriken är densamma — kan det stämma? — men säljaren ska veta att det är en gissning hen
   // rättar, inte en uppgift hen kontrollerar.
   const dimsEstimated = dimRows.length > 0 && dimRows.every((r) => r.attr!.estimated);
+  // Måtten kommer ur måttminnet: andra säljare av samma modell har mätt dem. Frågan är densamma,
+  // men hen ska veta att talen är uppmätta och inte belagda — och att hens eget svar bär vidare.
+  const dimsFranSaljare = dimRows.length > 0 && !dimsEstimated && dimRows.some((r) => r.attr!.fromSellers);
   /**
    * Rättar måtten på plats. Bara värdena: raderna är de fem mått en möbel mäts i, och det säljaren
    * håller i är en tumstock, inte en lista att bygga om. Resten av uppgifterna rättas på annonsen.
@@ -161,7 +164,9 @@ export default function SpecsScreen({
                 ? t(
                     "Måtten gick inte att belägga mot någon källa. Det här är typiska mått för möbeltypen — stämmer de?",
                   )
-                : t("Såhär blev måtten. Kan det stämma?")}
+                : dimsFranSaljare
+                  ? t("Måtten är uppmätta av andra säljare av samma modell. Stämmer de på din?")
+                  : t("Såhär blev måtten. Kan det stämma?")}
             </p>
             {model && (
               <div className="dim-render">
@@ -202,6 +207,11 @@ export default function SpecsScreen({
                         {attr!.value}
                         {attr!.sellerEdited ? (
                           <span className="card-est">{t("angivet av dig")}</span>
+                        ) : attr!.fromSellers ? (
+                          /* Ingen källa gav måttet, men någon har mätt modellen: medianen av vad
+                             säljare av samma möbel skrivit in här (se mattminne.ts på servern).
+                             Märks som vad det är — det är varken belagt eller en gissning. */
+                          <span className="card-est">{t("uppmätt av säljare")}</span>
                         ) : (
                           attr!.estimated && <span className="card-est">{t("uppskattat")}</span>
                         )}

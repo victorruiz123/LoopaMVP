@@ -482,6 +482,50 @@ async function handleGetDebug(id: string, res: ServerResponse) {
  * Efteråt är de låsta av samma skäl som prisspannet: ligger annonsen uppe på Tradera står svaren
  * redan i texten, och ett nytt svar här hade beskrivit en annons som inte finns.
  */
+/**
+ * Säljarens variant: "2-sitssoffa", "fåtölj", eller något de skrivit själva.
+ *
+ * SVARET ÄR INTE BARA ETT SPARAT FÄLT. Varianten ändrar vilken produktsida annonsen ska läsa måtten
+ * ur, och därmed rubriken, specifikationerna och omslaget. Därför körs identifieringens fas 2 om med
+ * varianten isatt — samma väg som när modellen valdes, bara med ett mer exakt namn. Det tar ungefär
+ * lika lång tid som första bygget och sker medan säljaren läser specifikationsskärmen, som pollar
+ * och byter ut texten när den nya kommer.
+ *
+ * Svaret går tillbaka direkt, innan omskrivningen är klar: säljaren ska inte vänta på en annons som
+ * ändå byggs om i bakgrunden.
+ */
+async function handleSetVariant(id: string, req: IncomingMessage, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  if (job.tradera?.status === "published") {
+    return sendJson(res, 409, { error: "Annonsen ligger redan uppe på Tradera, så varianten går inte att ändra här." });
+  }
+
+  const body = await readJsonBody<{ variant?: unknown }>(req);
+  const variant = typeof body.variant === "string" ? body.variant.trim() : "";
+  if (!variant || variant.length > 40) {
+    return sendJson(res, 400, { error: "Varianten måste vara mellan 1 och 40 tecken." });
+  }
+
+  job.variantChosen = variant;
+  if (job.selected) job.selected = { ...job.selected, variant };
+  await persist(job);
+  sendJson(res, 200, { ok: true });
+
+  /**
+   * Omskrivningen EFTER svaret, och utan att fälla det.
+   *
+   * Faller den står annonsen kvar som den var — gissad variant — vilket är precis läget vi hade före
+   * frågan. Att svara säljaren med ett fel för något som bara förbättrar annonsen vore att göra en
+   * vinst till en förlust.
+   */
+  const selected = job.selected;
+  const modell = [job.identity?.model, variant].filter(Boolean).join(" ").trim();
+  void finalizeWithModel(id, selected ? { kind: "seller_selected", selected } : { kind: "manual", manualModel: modell })
+    .then(() => console.info(`[varianter] ${id.slice(0, 8)} annonsen byggd om för "${variant}"`))
+    .catch((err) => console.warn(`[varianter] ${id.slice(0, 8)} omskrivningen föll:`, err instanceof Error ? err.message : err));
+}
+
 async function handleSetDisclosures(id: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(id);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
@@ -1756,6 +1800,12 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
   const body = await readJsonBody<ListingEditBody>(req);
 
   const { notera: noteraAnnons } = await import("./data/rattelser.js");
+  const { noteraMatt } = await import("./mattminne.js");
+  /**
+   * Modellen måttet gäller. Läses ur jobbet och inte ur annonsens `identity`: det är den modell
+   * säljaren VALDE, medan annonsens identitet är vad generatorn skrev om den.
+   */
+  const identitet = job.identity ?? job.result?.identity ?? null;
 
   if (Array.isArray(body.attributes)) {
     const tidigare = new Map(listing.attributes.map((a) => [a.key, a]));
@@ -1785,6 +1835,15 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
           kalla: "saljare",
           notis: fore?.estimated ? "värdet var uppskattat" : (fore?.sourceUrl ?? null),
         });
+        /**
+         * MÅTTMINNET: samma rättelse, buren vidare till nästa möbel av samma modell.
+         *
+         * Säljaren står bredvid möbeln med ett måttband — det är den enda mätningen i hela kedjan
+         * som gjorts på en riktig möbel, och den gällde tidigare bara den här annonsen. Nästa
+         * säljare med samma modell fick samma felaktiga mått att rätta en gång till. Minnet sparar
+         * bara det som ÄR en mätning, tyst i övrigt, och kan aldrig fälla rättelsen ovan.
+         */
+        void noteraMatt({ jobId, brand: identitet?.brand ?? null, model: identitet?.model ?? null, attr: { key, label, value } });
         return { key, label, value, sourceUrl: null, estimated: false, sellerEdited: true };
       })
       .filter((a): a is NonNullable<typeof a> => a !== null);
@@ -2417,6 +2476,9 @@ const server = http.createServer(async (req, res) => {
       }
       if (segments.length === 4 && segments[3] === "price-plan" && req.method === "POST") {
         return await handleSetPricePlan(segments[2], req, res);
+      }
+      if (segments.length === 4 && segments[3] === "variant" && req.method === "POST") {
+        return await handleSetVariant(segments[2], req, res);
       }
       if (segments.length === 4 && segments[3] === "disclosures" && req.method === "POST") {
         return await handleSetDisclosures(segments[2], req, res);

@@ -262,3 +262,40 @@ test("utan rättelse lämnas jobbet ifred, samma objekt tillbaka", async () => {
   const original = jobbMedText("jobb-utan-rattelse", "result");
   assert.equal(await overrides.medRattelser(original), original);
 });
+
+// ---------------------------------------------------------------------------
+// Den handskrivna beskrivningen
+// ---------------------------------------------------------------------------
+
+test("en handskriven beskrivning rider med på kopian, inte in i annonsunderlaget", async () => {
+  const jobbId = "jobb-adtext-1";
+  await overrides.satt(loopaIdFor(jobbId), { adText: "Soffan är nytvättad.\n\nHämtas i Solna." }, "admin-1");
+
+  const original = jobbMedText(jobbId, "result");
+  const ut = await overrides.medRattelser(original);
+  assert.equal(ut.adText, "Soffan är nytvättad.\n\nHämtas i Solna.");
+  assert.equal(
+    ut.result?.listing?.result?.listing.description,
+    "Generatorns text.",
+    "hela texten ersätts vid bygget — generatorns stycke ska inte skrivas över på vägen",
+  );
+  assert.equal(original.adText, undefined, "kopian får aldrig läcka tillbaka in i jobbet");
+});
+
+test("en tom handskriven text är ingen text — annonsen byggs som vanligt", async () => {
+  const jobbId = "jobb-adtext-2";
+  await overrides.satt(loopaIdFor(jobbId), { adText: "   " }, "admin-1");
+  const ut = await overrides.medRattelser(jobbMedText(jobbId, "result"));
+  assert.equal(ut.adText, undefined, "blanktecken får inte bli en annons utan beskrivning");
+});
+
+test("↺ på beskrivningen lämnar tillbaka annonsen till den byggda texten", async () => {
+  const jobbId = "jobb-adtext-3";
+  const id = loopaIdFor(jobbId);
+  await overrides.satt(id, { adText: "Handskriven.", title: "Rättad rubrik" }, "admin-1");
+  await overrides.taBortFalt(id, ["adText"], "admin-1");
+
+  const ut = await overrides.medRattelser(jobbMedText(jobbId, "result"));
+  assert.equal(ut.adText, undefined);
+  assert.equal(ut.result?.listing?.result?.listing.title, "Rättad rubrik", "rubrikrättelsen ska stå kvar");
+});

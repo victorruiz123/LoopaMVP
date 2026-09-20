@@ -726,6 +726,10 @@ export default function ListingView({
                           <a className="card-src" href={a.sourceUrl} target="_blank" rel="noreferrer">
                             {t("källa")}
                           </a>
+                        ) : a.fromSellers ? (
+                          // Ur måttminnet: medianen av vad säljare av samma modell mätt upp. Står
+                          // mellan källan och uppskattningen, och märks därefter — se mattminne.ts.
+                          <span className="card-est">{t("uppmätt av säljare")}</span>
                         ) : (
                           // Uppskattningen står på källänkens plats, i grått och utan länk — det finns
                           // ingen sida att gå till, och det är hela poängen med märkningen.

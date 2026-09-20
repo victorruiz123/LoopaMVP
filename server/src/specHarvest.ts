@@ -313,14 +313,22 @@ function rowsCovered(attribute: ListingAttribute): string[] {
  * Ordningen är medveten: en uppgift generatorn hittat har gått genom både sökning och strukturering
  * och bär ofta en egen källa. Sidskörden fyller luckorna — den ersätter aldrig något belagt.
  *
- * Det ENDA som ger vika är en uppskattning. Annonsen går numera aldrig ut utan mått: saknas belagda
+ * Det som ger vika är en uppskattning — och ett mått ur måttminnet. Annonsen går numera aldrig ut utan mått: saknas belagda
  * fylls de på med typiska mått för möbeltypen, märkta `estimated`. Sidskörden kommer efter — den
  * läser produktsidans egen HTML — och ett mått som står på tillverkarens sida är alltid bättre än ett
  * ur tabellen. Utan det här hade uppskattningen blockerat det riktiga måttet den bara var ställföreträdare för.
+ *
+ * MÅTTMINNET LIGGER PÅ SAMMA PLATS I ORDNINGEN, ett steg ovanför uppskattningen: det är säljares
+ * mätningar av samma modell (se mattminne.ts), bättre än en tabell över möbeltypen och sämre än
+ * tillverkarens egen sida. Att låta det ge vika likadant är vad som gör att en sen sidskörd ändå
+ * skriver in det belagda måttet — och att ett minne som kommer efter aldrig rör en källa.
+ *
+ * SÄLJARENS EGEN RÄTTELSE RÖRS ALDRIG: den är varken uppskattad eller ur minnet, alltså tagen plats.
  */
 export function mergeSpecs(attributes: ListingAttribute[], harvested: ListingAttribute[]): ListingAttribute[] {
   if (harvested.length === 0) return attributes;
-  const taken = new Set(attributes.filter((a) => !a.estimated).flatMap(rowsCovered));
+  const viker = (a: ListingAttribute) => !!a.estimated || !!a.fromSellers;
+  const taken = new Set(attributes.filter((a) => !viker(a)).flatMap(rowsCovered));
   const extra = harvested.filter((h) => {
     const [row] = rowsCovered(h);
     if (!row || taken.has(row)) return false;
@@ -329,6 +337,6 @@ export function mergeSpecs(attributes: ListingAttribute[], harvested: ListingAtt
   });
   if (extra.length === 0) return attributes;
   const replaced = new Set(extra.flatMap(rowsCovered));
-  const kept = attributes.filter((a) => !(a.estimated && rowsCovered(a).some((row) => replaced.has(row))));
+  const kept = attributes.filter((a) => !(viker(a) && rowsCovered(a).some((row) => replaced.has(row))));
   return [...kept, ...extra];
 }

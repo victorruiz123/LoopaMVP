@@ -277,6 +277,15 @@ export interface ListingAttribute {
    */
   sellerEdited?: boolean;
   /**
+   * Värdet kommer ur MÅTTMINNET: medianen av vad säljare av samma modell mätt upp.
+   *
+   * Står mellan det belagda och det uppskattade, och behandlas därefter. Det är inte en uppgift om
+   * just den här möbeln — ingen har mätt den — men det är en mätning av modellen, gjord med måttband
+   * av någon som stod bredvid en. Därför går det före en uppskattning för möbeltypen och viker för
+   * varje källa, och därför skrivs det ut som vad det är i stället för att tiga. Se mattminne.ts.
+   */
+  fromSellers?: boolean;
+  /**
    * Sant när värdet är UPPSKATTAT och inte en uppgift om just den här möbeln.
    *
    * Sätts bara för mått, och bara när ingen källa gav några: annonsgeneratorn fyller på med typiska
@@ -839,6 +848,20 @@ export interface ConditionJob {
    */
   sellerDisclosures?: SellerDisclosures | null;
   /**
+   * Adminens egen annonstext — HELA beskrivningen som går ut, i stället för den byggda.
+   *
+   * ALDRIG SPARAD PÅ JOBBET. Fältet sätts bara på den grunda kopia `medRattelser` lämnar ifrån sig
+   * (butik/overrides.ts), av exakt samma skäl som rubrik- och beskrivningsrättelsen ligger bredvid
+   * jobbet och inte i det: annonsen byggs om vid varje publicering, och en text skriven in i
+   * `job.json` hade försvunnit tyst vid nästa omräkning. Det lagrade värdet bor i
+   * `overstyrningar.json`; det här är bara vägen in i `composeAd`, som är synkron och därför inte
+   * kan slå upp rättelsen själv.
+   *
+   * Satt = annonsen är skriven av en människa och byggs inte alls (se composeAd). Osatt eller tom =
+   * besiktningen skriver texten som vanligt.
+   */
+  adText?: string;
+  /**
    * Möbeln är en stol, så frågan om ANTAL ska ställas.
    *
    * Avgörs vid modellvalet och sparas där (se finalizeWithModel), inte när frågorna ställs. Skälet
@@ -850,6 +873,15 @@ export interface ConditionJob {
    * från före frågan fanns. Ingen av dem får läsas som "en stol".
    */
   chairLike?: boolean;
+  /**
+   * Varianterna modellen finns i, hämtade i bakgrunden efter modellvalet (pipeline/varianter.ts).
+   *
+   * `undefined` = hämtningen pågår eller gjordes aldrig, `[]` = modellen är okänd eller frågan föll.
+   * Ett enda namn betyder att modellen bara finns i ett utförande, och då ställs ingen fråga.
+   */
+  variantOptions?: string[] | null;
+  /** Säljarens svar på variantfrågan — valt ur listan eller skrivet för hand. */
+  variantChosen?: string | null;
 }
 
 /**

@@ -142,6 +142,8 @@ export interface ListingAttribute {
    * den är i stället för att tiga eller låna någon annans trovärdighet. Se handleListingEdit.
    */
   sellerEdited?: boolean;
+  /** Medianen av vad säljare av samma modell mätt upp. Går före en uppskattning, viker för varje källa. */
+  fromSellers?: boolean;
   /** Uppskattat värde, inte belagt: typiska mått för möbeltypen när ingen källa gav några. Visas märkt. */
   estimated?: boolean;
 }
@@ -584,6 +586,10 @@ export interface ConditionJob {
    * stol, eller ett jobb från före frågan fanns — ingetdera får läsas som en stol.
    */
   chairLike?: boolean;
+  /** Varianterna modellen finns i. undefined = hämtas fortfarande, [] = ingen fråga ska ställas. */
+  variantOptions?: string[] | null;
+  /** Säljarens svar på variantfrågan. */
+  variantChosen?: string | null;
 }
 
 /** Svaren, som de ligger på jobbet. Se DisclosuresScreen och annonstexten på servern. */
@@ -843,6 +849,13 @@ export interface AnnonsOverstyrning {
   id: string;
   title?: string | null;
   description?: string | null;
+  /**
+   * Hela den publicerade beskrivningen, skriven för hand.
+   *
+   * Satt = annonsen byggs inte alls, texten går ut ordagrant på både Tradera och Blocket. Skilt från
+   * `description`, som bara byter ut generatorns stycke om möbeln. Se butik/overrides.ts på servern.
+   */
+  adText?: string | null;
   brand?: string | null;
   model?: string | null;
   categorySlug?: string | null;
@@ -920,6 +933,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   harlett: AnnonsProdukt | null;
   overstyrning: AnnonsOverstyrning | null;
   annonstext: { title: string; description: string; conditionText: string } | null;
+  /** Den byggda beskrivningen i sin helhet, som ren text. Det `adText` skrivs över, och återvänder till. */
+  harleddBeskrivning: string | null;
   ladder: PriceLadder | null;
   /** Publiceringen mot Tradera i sin helhet: länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
