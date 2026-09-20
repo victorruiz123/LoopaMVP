@@ -30,3 +30,9 @@ LoopaMVP-main/
 # historiken, hur privat repot än är.
 blocket-session.json
 blocket-session.b64
+
+# Blockets webbläsare. rulla-ut.sh installerar Chromium hit (PLAYWRIGHT_BROWSERS_PATH), alltså inuti
+# repot, för att tjänsten och skriptet ska leta på samma ställe oavsett vem som kör. Utan den här
+# raden ser skriptets egen kontroll i steg 1 mappen som en lokal ändring och avbryter NÄSTA
+# utrullning — en spärr som utlöses av det förra steget i samma skript.
+ms-playwright/
