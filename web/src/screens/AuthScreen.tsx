@@ -128,11 +128,25 @@ export default function AuthScreen({
   /**
    * Ett adressförslag eller en position, in i fälten. Bara det Google faktiskt har skrivs över: ett
    * svar utan postnummer ska inte tömma ett postnummer säljaren redan skrivit.
+   *
+   * KOM DET AV SIG SJÄLVT VIKER DET FÖR VAD SÄLJAREN SKRIVIT. Positionen hämtas när formuläret
+   * öppnas och kan ta några sekunder; hinner säljaren börja skriva under tiden är det deras ord som
+   * gäller. Ett fält som byter innehåll under fingrarna är värre än ett fält man fyller i själv.
+   * Tryckte de på knappen är det tvärtom: då har de BETT om adressen, och den ska slå igenom.
    */
-  function fyllAdress(traff: AdressTraff) {
-    if (traff.gatuadress) setGatuadress(traff.gatuadress);
-    if (traff.postnummer) setPostnummer(`${traff.postnummer.slice(0, 3)} ${traff.postnummer.slice(3)}`);
-    if (traff.ort) setOrt(traff.ort);
+  function fyllAdress(traff: AdressTraff, automatiskt = false) {
+    const satt = (varde: string | null, nuvarande: string, sattare: (v: string) => void) => {
+      if (!varde) return;
+      if (automatiskt && nuvarande.trim()) return;
+      sattare(varde);
+    };
+    satt(traff.gatuadress, gatuadress, setGatuadress);
+    satt(
+      traff.postnummer && `${traff.postnummer.slice(0, 3)} ${traff.postnummer.slice(3)}`,
+      postnummer,
+      setPostnummer,
+    );
+    satt(traff.ort, ort, setOrt);
   }
 
   return (
@@ -269,7 +283,10 @@ export default function AuthScreen({
                     onChange={setGatuadress}
                     onValj={fyllAdress}
                   />
-                  <NuvarandeAdress onTraff={fyllAdress} />
+                  {/* Fylls i direkt när registreringen öppnas: säljaren står hemma med möbeln, och
+                      det är den adressen vi frågar om. Knappen står kvar för den som säger nej till
+                      platsfrågan eller flyttat sedan sist. */}
+                  <NuvarandeAdress onTraff={fyllAdress} auto />
                   <span className="auth-hint">{t("Dit vi hämtar och levererar möbler.")}</span>
                 </div>
 
