@@ -724,6 +724,34 @@ export interface AdminUser {
  */
 export type AdminDirectory = "service" | "profiles" | "jobs";
 
+/** Säljarens adress som registreringen skrev den. Varje fält kan saknas för sig. */
+export interface AdminKontoAdress {
+  gatuadress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+  /** "hus" | "lagenhet". Våningen är bara en uppgift i det senare fallet. */
+  boende: string | null;
+  portkod: string | null;
+  vaning: string | null;
+}
+
+/**
+ * ETT konto, allt vi vet om det (GET /api/admin/users/:id).
+ *
+ * Slås upp för ett konto i taget och inte i listan: adressen och inloggningstiderna kostar ett eget
+ * anrop till Supabase, och hör hemma på en sida någon valt att öppna. Se kontoDetalj på servern.
+ */
+export interface AdminKontoDetalj extends AdminUser {
+  adress: AdminKontoAdress | null;
+  telefon: string | null;
+  senastInloggad: string | null;
+  /** Null = e-postadressen är obekräftad, vilket är en upplysning och inte ett tomt fält. */
+  epostBekraftad: string | null;
+  inloggningssatt: string[];
+  /** "auth" = läst ur kontot. "jobb" = Supabase svarade inte, och bara jobben talar. */
+  kalla: "auth" | "jobb";
+}
+
 export interface AdminUsers {
   /** ALLA konton, nyast först och odaterade sist. Inget urval — se serverns listAccounts. */
   users: AdminUser[];

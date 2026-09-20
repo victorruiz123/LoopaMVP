@@ -118,7 +118,24 @@ interface AuthUserRow {
   id: string;
   email: string | null;
   created_at?: string | null;
-  user_metadata?: { full_name?: string | null; name?: string | null; avatar_url?: string | null } | null;
+  /**
+   * Fälten nedan läses BARA av `kontoDetalj`, för ett konto i taget. Listan rör dem aldrig — den
+   * ritar hundra rader och har varken plats för dem eller rätt att sprida dem över en skärm ingen
+   * bett om. De står ändå här, och inte i en egen typ, för att det är ETT svar från Auth.
+   */
+  phone?: string | null;
+  last_sign_in_at?: string | null;
+  email_confirmed_at?: string | null;
+  confirmed_at?: string | null;
+  app_metadata?: { providers?: unknown } | null;
+  user_metadata?: {
+    full_name?: string | null;
+    name?: string | null;
+    avatar_url?: string | null;
+    telefon?: string | null;
+    /** Adressen som registreringen skrev den. Formen står i AuthScreen — se adressUrMetadata. */
+    adress?: Record<string, unknown> | null;
+  } | null;
 }
 
 const serviceRoleKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
@@ -321,4 +338,144 @@ export async function listAccounts(
   const users = [...byId.values()].sort(jamforSenastRegistrerad);
 
   return { users, directory: dir.source, total: users.length };
+}
+
+/**
+ * Säljarens adress, som registreringen skrev den (AuthScreen → user_metadata.adress).
+ *
+ * VARJE FÄLT FÅR VARA NULL var för sig. Adressen samlas in i ett svep vid registreringen, men konton
+ * finns från före formuläret såg ut som det gör i dag, och portkod och våning är frivilliga även nu.
+ * Ett tomt fält ska stå som tomt i panelen — inte få hela adressen att försvinna.
+ */
+export interface AdminKontoAdress {
+  gatuadress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+  /** "hus" | "lagenhet" — avgör om våningen är en uppgift eller inte. */
+  boende: string | null;
+  portkod: string | null;
+  vaning: string | null;
+}
+
+/**
+ * ETT konto, allt vi vet om det.
+ *
+ * Skilt från raden i listan (`AdminAccount`) med flit: listan ritas för hundra konton och bär bara
+ * det som får plats i en rad, medan det här slås upp för ETT konto som någon valt att titta på.
+ * Adressen och inloggningstiderna hör till det andra fallet — de kostar ett eget anrop till Supabase
+ * per konto, och de har ingen plats i en lista.
+ */
+export interface AdminKontoDetalj extends AdminAccount {
+  adress: AdminKontoAdress | null;
+  telefon: string | null;
+  senastInloggad: string | null;
+  /** När e-postadressen bekräftades. Null = obekräftad, vilket är en upplysning i sig. */
+  epostBekraftad: string | null;
+  /** Hur kontot loggar in: "email", "google". Tomt när Auth inte svarade. */
+  inloggningssatt: string[];
+  /**
+   * Varifrån uppgifterna kom.
+   *
+   * "auth" = servicenyckeln svarade, och allt ovan är läst ur kontot. "jobb" = den vägen fanns inte,
+   * och det som står är vad jobben själva kan berätta om ägaren. Panelen skriver ut skillnaden i
+   * stället för att visa tomma fält som om de vore ett svar: en adress som saknas för att ingen
+   * frågat, och en adress som saknas för att vi inte fick läsa den, är inte samma sak.
+   */
+  kalla: "auth" | "jobb";
+}
+
+/** Ett fält ur `user_metadata.adress`, städat. Tom sträng är inte en uppgift. */
+function textOrNull(v: unknown): string | null {
+  return typeof v === "string" && v.trim() ? v.trim() : null;
+}
+
+function adressUrMetadata(metadata: unknown): AdminKontoAdress | null {
+  const a = (metadata as { adress?: Record<string, unknown> | null } | null | undefined)?.adress;
+  if (!a || typeof a !== "object") return null;
+  const adress: AdminKontoAdress = {
+    gatuadress: textOrNull(a.gatuadress),
+    postnummer: textOrNull(a.postnummer),
+    ort: textOrNull(a.ort),
+    boende: textOrNull(a.boende),
+    portkod: textOrNull(a.portkod),
+    vaning: textOrNull(a.vaning),
+  };
+  // Ett objekt där varje fält är tomt är ingen adress. Då är "ingen adress angiven" det sanna svaret.
+  return Object.values(adress).some(Boolean) ? adress : null;
+}
+
+/**
+ * ETT konto ur Supabase Auth, med servicenyckeln.
+ *
+ * Eget anrop och inte ett uppslag i listan: listan sidas igenom med tak (fem sidor), och ett konto
+ * bortom taket hade svarat "finns inte" på en sida som öppnats från en annons där kontot bevisligen
+ * finns. Adressen går dessutom bara att läsa här — listans rader bär den inte.
+ */
+async function fetchAuthUser(serviceKey: string, id: string): Promise<AuthUserRow | null> {
+  try {
+    const res = await fetch(`${supabaseUrl()}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+      headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` },
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as AuthUserRow;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Allt om ett konto: uppgifterna ur Auth och siffrorna ur jobben.
+ *
+ * SIFFRORNA RÄKNAS HÄR och lånas inte från `listAccounts`. Den läser hela katalogen ur Supabase för
+ * att kunna visa konton som aldrig filmat något — ett arbete som inte har något med ETT konto att
+ * göra, och som hade gjort den här sidan långsammare än annonssidan den öppnas från.
+ *
+ * Null bara när kontot varken finns i Auth eller äger ett enda jobb. Ett konto som Auth inte vill
+ * svara om men som äger annonser ska gå att öppna — det är då man som mest behöver se dem.
+ */
+export async function kontoDetalj(id: string): Promise<AdminKontoDetalj | null> {
+  const serviceKey = serviceRoleKey();
+  const [auth, jobs] = await Promise.all([serviceKey ? fetchAuthUser(serviceKey, id) : null, listJobs()]);
+
+  const egna = jobs.filter((job) => ownerIdOf(job) === id);
+  if (!auth && egna.length === 0) return null;
+
+  const konto: AdminKontoDetalj = {
+    ...blank({
+      id,
+      email: auth?.email ?? null,
+      name: auth?.user_metadata?.full_name || auth?.user_metadata?.name || null,
+      avatarUrl: auth?.user_metadata?.avatar_url ?? null,
+      createdAt: auth?.created_at ?? null,
+    }),
+    adress: adressUrMetadata(auth?.user_metadata),
+    telefon: textOrNull(auth?.phone) ?? textOrNull(auth?.user_metadata?.telefon),
+    senastInloggad: auth?.last_sign_in_at ?? null,
+    epostBekraftad: auth?.email_confirmed_at ?? auth?.confirmed_at ?? null,
+    inloggningssatt: Array.isArray(auth?.app_metadata?.providers)
+      ? (auth!.app_metadata!.providers as string[]).filter((p): p is string => typeof p === "string")
+      : [],
+    kalla: auth ? "auth" : "jobb",
+  };
+
+  for (const job of egna) {
+    konto.jobCount += 1;
+    const listing = listingOf(job);
+    if (listing?.status === "ok" && listing.result) {
+      konto.cardCount += 1;
+      const price = job.result?.price;
+      if (price?.status === "ok" && price.default !== null) konto.totalValue += price.default;
+    }
+    if (!konto.lastActivity || job.createdAt > konto.lastActivity) konto.lastActivity = job.createdAt;
+    // Saknas registreringsdatumet är det första jobbet det närmaste vi kommer — och panelen skriver
+    // ut att det är en uppskattning, precis som i listan.
+    if (!konto.signedUpAt || job.createdAt < konto.signedUpAt) {
+      if (!auth?.created_at) {
+        konto.signedUpAt = job.createdAt;
+        konto.signupApproximate = true;
+      }
+    }
+  }
+
+  return konto;
 }

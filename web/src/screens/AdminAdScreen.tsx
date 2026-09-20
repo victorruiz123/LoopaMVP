@@ -42,7 +42,19 @@ const TEXTFALT = [
   ["imageUrl", "Bild-URL", "text"],
 ] as const;
 
-export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; onBack: () => void }) {
+export default function AdminAdScreen({
+  loopaId,
+  onBack,
+  onOpenSaljare,
+}: {
+  loopaId: string;
+  onBack: () => void;
+  /**
+   * Vägen till säljarens profil. Frivillig: skärmen ska gå att rita även där ingen sådan väg finns,
+   * och utan den står adressen kvar som text i stället för att bli en knapp som inte leder någonstans.
+   */
+  onOpenSaljare?: (userId: string) => void;
+}) {
   const [annons, setAnnons] = useState<AdminAnnonsDetalj | null>(null);
   const [fel, setFel] = useState<string | null>(null);
   const [sparar, setSparar] = useState(false);
@@ -103,7 +115,22 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
           <p className="admin-lede">
             {annons.id} · {annons.lage}
             {annons.grade ? ` · betyg ${annons.grade}` : ""}
-            {annons.ownerEmail || annons.ownerId ? ` · säljare ${annons.ownerEmail ?? annons.ownerId}` : ""}
+            {/* Säljaren är en väg vidare och inte bara en uppgift: adressen, postnumret och de andra
+                annonserna står på kontot, och det är dem man är ute efter när man läser raden här.
+                Utan ownerId finns inget konto att slå upp — då står adressen kvar som text. */}
+            {annons.ownerId && onOpenSaljare ? (
+              <>
+                {" · "}
+                säljare{" "}
+                <button className="lank-knapp" onClick={() => onOpenSaljare(annons.ownerId!)}>
+                  {annons.ownerEmail ?? annons.ownerId}
+                </button>
+              </>
+            ) : annons.ownerEmail || annons.ownerId ? (
+              ` · säljare ${annons.ownerEmail ?? annons.ownerId}`
+            ) : (
+              ""
+            )}
           </p>
           {annons.saknas.length > 0 && (
             <p className="admin-note">Saknar {annons.saknas.join(", ")} — kan inte ligga i butiken förrän det är ifyllt.</p>

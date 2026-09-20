@@ -15,7 +15,7 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
-import { adminEmails, listAccounts } from "./admin.js";
+import { adminEmails, kontoDetalj, listAccounts } from "./admin.js";
 import { identityFromRequest, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
 import { estimatePrice, repriceResult, synkaStolpris } from "./pricing.js";
 import { MAX_ANTAL_STOLAR } from "./stolPris.js";
@@ -2137,6 +2137,18 @@ const server = http.createServer(async (req, res) => {
         }
         if (segments[2] === "users" && segments.length === 5 && segments[4] === "jobs" && req.method === "GET") {
           return await handleAdminUserJobs(segments[3], res);
+        }
+
+        /**
+         * ETT konto, allt vi vet om det — adressen, inloggningarna, siffrorna.
+         *
+         * Egen väg och inte ett filter på `users`: listan sidas igenom med tak och bär inte adressen,
+         * och den här sidan öppnas från en annons där ägaren står med sitt id. Se kontoDetalj.
+         */
+        if (segments[2] === "users" && segments.length === 4 && req.method === "GET") {
+          const konto = await kontoDetalj(segments[3]);
+          if (!konto) return sendJson(res, 404, { error: "Kontot finns inte." });
+          return sendJson(res, 200, konto);
         }
 
         /**

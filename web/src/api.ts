@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -748,4 +748,15 @@ export async function selectVariant(jobId: string, variant: string): Promise<voi
     body: JSON.stringify({ variant }),
   });
   await json<{ ok: true }>(res);
+}
+
+/**
+ * Allt om ett konto, för adminens profilsida.
+ *
+ * Eget anrop per konto — adressen finns inte i användarlistan, och ska inte finnas där. Se
+ * kontoDetalj på servern.
+ */
+export async function hamtaKonto(userId: string): Promise<AdminKontoDetalj> {
+  const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}`);
+  return json<AdminKontoDetalj>(res);
 }

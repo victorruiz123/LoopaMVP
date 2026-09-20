@@ -12,7 +12,7 @@ import ListingScreen from "./screens/ListingScreen";
 import AuthScreen from "./screens/AuthScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AdminScreen from "./screens/AdminScreen";
-import AdminUserScreen from "./screens/AdminUserScreen";
+import AdminUserScreen, { type AdminUserFlik } from "./screens/AdminUserScreen";
 import AdminAdScreen from "./screens/AdminAdScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
@@ -64,7 +64,11 @@ type Screen =
   // `flik` bärs i skärmen och inte inuti panelen, för att vägen tillbaka från en annons ska landa i
   // annonsfliken. Utan den hade varje besök i en annons kastat tillbaka en till förvalet.
   | { name: "admin"; flik?: AdminFlik }
-  | { name: "adminUser"; user: AdminUser }
+  // Säljarens profil. Bär ett ID och inte en färdig rad: vägen hit går också från en annons, där
+  // allt som står om ägaren är ett id. `user` är listans rad när den finns, bara som första bild.
+  // `flik` och `back` av samma skäl som i "admin" — vägen tillbaka ska leda dit man faktiskt kom
+  // ifrån, och den som klickar på en mejladress i en annons är ute efter kontot, inte annonslistan.
+  | { name: "adminUser"; userId: string; user?: AdminUser; flik?: AdminUserFlik; back?: Screen }
   // Den enskilda annonsen, i redigeringsvyn. Nås ur panelens annonsflik, aldrig direkt — rollen
   // prövas på servern vid varje anrop.
   | { name: "adminAd"; loopaId: string };
@@ -524,21 +528,32 @@ function FlowApp() {
         <AdminScreen
           flik={screen.flik}
           onBack={() => setScreen({ name: "profile" })}
-          onOpenUser={(u) => setScreen({ name: "adminUser", user: u })}
+          onOpenUser={(u) => setScreen({ name: "adminUser", userId: u.id, user: u })}
           onOpenAd={(rad) => setScreen({ name: "adminAd", loopaId: rad.id })}
           onOpenAdId={(loopaId) => setScreen({ name: "adminAd", loopaId })}
         />
       );
-    case "adminAd":
+    case "adminAd": {
+      const fran = screen;
       return (
-        <AdminAdScreen loopaId={screen.loopaId} onBack={() => setScreen({ name: "admin", flik: "annonser" })} />
+        <AdminAdScreen
+          loopaId={screen.loopaId}
+          onBack={() => setScreen({ name: "admin", flik: "annonser" })}
+          // Mejladressen i annonsens huvud leder till kontot, och öppnar den flik frågan gällde:
+          // den som klickar där undrar vem säljaren är och var möbeln står, inte vad de mer lagt upp.
+          onOpenSaljare={(userId) => setScreen({ name: "adminUser", userId, flik: "konto", back: fran })}
+        />
       );
+    }
     case "adminUser": {
       const from = screen;
       return (
         <AdminUserScreen
+          userId={screen.userId}
           user={screen.user}
-          onBack={() => setScreen({ name: "admin" })}
+          flik={screen.flik}
+          backLabel={screen.back?.name === "adminAd" ? t("Tillbaka till annonsen") : undefined}
+          onBack={() => setScreen(screen.back ?? { name: "admin" })}
           // Kortet och inte skickvyn: adminvägarna är läsande, och skickvyn är den som har knappar
           // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
           onOpenJob={async (jobId) => {

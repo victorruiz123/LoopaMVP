@@ -3154,6 +3154,41 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .admin-stub-title { font-size: var(--fs-md); font-weight: 600; color: var(--muted); }
 .admin-stub-meta { font-size: var(--fs-xs); color: var(--muted-soft); }
 
+/* --------------------------------------------------------------------------
+   Säljarens konto: uppgifterna om den som lämnat in möbeln
+
+   EN FAKTALISTA OCH INTE ETT FORMULÄR. Adminvägarna hit svarar bara på GET, och
+   sidan ska se ut som det den är — något man slår upp, inte något man fyller i.
+   Etiketten över värdet och inte bredvid: adresser och e-post är långa, och en
+   tvåspaltig rad hade brutit dem mitt i på en telefon.
+   ========================================================================== */
+.admin-faktalista {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px; margin: 0 0 20px;
+}
+.admin-fakta {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 10px 12px; border-radius: var(--r-sm); background: var(--field);
+}
+.admin-fakta-etikett { font-size: var(--fs-xs); color: var(--muted); }
+.admin-fakta-varde { margin: 0; font-size: var(--fs-md); color: var(--ink); overflow-wrap: anywhere; }
+/* Strecket är inte ett värde. Det står dämpat så att en tom uppgift inte läses som en ifylld. */
+.admin-fakta-tomt { color: var(--muted-soft); }
+.admin-fakta-notis { display: block; font-size: var(--fs-xs); color: var(--muted); }
+.admin-tomt { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 20px; }
+.admin-notis {
+  font-size: var(--fs-sm); color: var(--muted); margin: 0 0 16px;
+  padding: 10px 12px; border-radius: var(--r-sm); background: var(--field);
+}
+
+/* En mejladress som bär vidare till kontot. Ser ut som text tills den pekas på — raden är en
+   upplysning först och en väg sedan, och ska inte skrika som en knapp i annonsens huvud. */
+.lank-knapp {
+  border: 0; padding: 0; background: none; font: inherit; color: inherit;
+  text-decoration: underline; text-underline-offset: 2px; cursor: pointer;
+}
+.lank-knapp:hover { color: var(--accent); }
+
 /* En dämpad knapp: adminpanelen är en genväg för en handfull konton, inte profilens huvudhandling. */
 .profile-admin-link {
   margin-top: 8px; width: 100%;
