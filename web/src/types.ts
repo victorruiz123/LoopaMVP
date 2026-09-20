@@ -142,6 +142,8 @@ export interface ListingAttribute {
    * den är i stället för att tiga eller låna någon annans trovärdighet. Se handleListingEdit.
    */
   sellerEdited?: boolean;
+  /** Medianen av vad säljare av samma modell mätt upp. Går före en uppskattning, viker för varje källa. */
+  fromSellers?: boolean;
   /** Uppskattat värde, inte belagt: typiska mått för möbeltypen när ingen källa gav några. Visas märkt. */
   estimated?: boolean;
 }

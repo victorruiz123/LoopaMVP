@@ -564,6 +564,11 @@ export const FLOW: Record<string, Translation> = {
   },
   källa: { en: "source", fr: "source" },
   uppskattat: { en: "estimated", fr: "estimé" },
+  "uppmätt av säljare": { en: "measured by sellers", fr: "mesuré par des vendeurs" },
+  "Måtten är uppmätta av andra säljare av samma modell. Stämmer de på din?": {
+    en: "These measurements were taken by other sellers of the same model. Do they match yours?",
+    fr: "Ces dimensions ont été mesurées par d'autres vendeurs du même modèle. Correspondent-elles aux vôtres ?",
+  },
   "Allt belagt med källa": { en: "All backed by sources", fr: "Tout confirmé par des sources" },
   "Delvis belagt": { en: "Partly backed", fr: "Partiellement confirmé" },
   "Kunde inte beläggas mot källor": { en: "Could not be backed by sources", fr: "Impossible à confirmer par des sources" },

@@ -1745,6 +1745,12 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
   const body = await readJsonBody<ListingEditBody>(req);
 
   const { notera: noteraAnnons } = await import("./data/rattelser.js");
+  const { noteraMatt } = await import("./mattminne.js");
+  /**
+   * Modellen måttet gäller. Läses ur jobbet och inte ur annonsens `identity`: det är den modell
+   * säljaren VALDE, medan annonsens identitet är vad generatorn skrev om den.
+   */
+  const identitet = job.identity ?? job.result?.identity ?? null;
 
   if (Array.isArray(body.attributes)) {
     const tidigare = new Map(listing.attributes.map((a) => [a.key, a]));
@@ -1774,6 +1780,15 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
           kalla: "saljare",
           notis: fore?.estimated ? "värdet var uppskattat" : (fore?.sourceUrl ?? null),
         });
+        /**
+         * MÅTTMINNET: samma rättelse, buren vidare till nästa möbel av samma modell.
+         *
+         * Säljaren står bredvid möbeln med ett måttband — det är den enda mätningen i hela kedjan
+         * som gjorts på en riktig möbel, och den gällde tidigare bara den här annonsen. Nästa
+         * säljare med samma modell fick samma felaktiga mått att rätta en gång till. Minnet sparar
+         * bara det som ÄR en mätning, tyst i övrigt, och kan aldrig fälla rättelsen ovan.
+         */
+        void noteraMatt({ jobId, brand: identitet?.brand ?? null, model: identitet?.model ?? null, attr: { key, label, value } });
         return { key, label, value, sourceUrl: null, estimated: false, sellerEdited: true };
       })
       .filter((a): a is NonNullable<typeof a> => a !== null);

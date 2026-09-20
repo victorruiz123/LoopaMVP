@@ -277,6 +277,15 @@ export interface ListingAttribute {
    */
   sellerEdited?: boolean;
   /**
+   * Värdet kommer ur MÅTTMINNET: medianen av vad säljare av samma modell mätt upp.
+   *
+   * Står mellan det belagda och det uppskattade, och behandlas därefter. Det är inte en uppgift om
+   * just den här möbeln — ingen har mätt den — men det är en mätning av modellen, gjord med måttband
+   * av någon som stod bredvid en. Därför går det före en uppskattning för möbeltypen och viker för
+   * varje källa, och därför skrivs det ut som vad det är i stället för att tiga. Se mattminne.ts.
+   */
+  fromSellers?: boolean;
+  /**
    * Sant när värdet är UPPSKATTAT och inte en uppgift om just den här möbeln.
    *
    * Sätts bara för mått, och bara när ingen källa gav några: annonsgeneratorn fyller på med typiska
