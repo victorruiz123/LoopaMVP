@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import type { CardDamage, ListingAttribute, ListingViewData } from "../types";
+import type { AdText, CardDamage, ListingAttribute, ListingViewData } from "../types";
 import { formatSek } from "../lib/price";
 import { severityLabel, typeLabel } from "../lib/labels";
 import { brandLook, brandNameStyle } from "../lib/brandLook";
@@ -51,6 +51,7 @@ export default function ListingView({
   hideSources = false,
   collapsible = false,
   onSaveListing,
+  annonstext,
   only,
 }: ListingViewData & {
   /**
@@ -141,6 +142,17 @@ export default function ListingView({
    * Utelämnad = ingen redigering. Så ser det publika kortet och butiken ut: där är uppgifterna
    * någon annans, och en penna vore ett löfte som inte går att infria.
    */
+  /**
+   * Tradera-annonsens text, i block. SÄLJARENS VY, och bara den.
+   *
+   * Säljaren ska under "Beskrivning" läsa exakt det som står på Tradera — inte generatorns stycke
+   * för sig, som på Tradera bara är ett stycke bland flera och dessutom rensas på leveranslöften.
+   * Anges den ritas blocken i stället för `card.listing.description` och skicktexten.
+   *
+   * Utelämnad (eller inte hämtad än) = kortets egen beskrivning, som på det publika kortet och i
+   * butiken.
+   */
+  annonstext?: AdText | null;
   onSaveListing?: (patch: {
     attributes?: ListingAttribute[];
     description?: string;
@@ -519,9 +531,17 @@ export default function ListingView({
             </div>
           ) : (
             <>
-              <p className="card-listing-body">{card.listing.description}</p>
-              {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
-              {onSaveListing && (
+              {annonstext ? (
+                <AnnonsText blocks={annonstext.blocks} />
+              ) : (
+                <>
+                  <p className="card-listing-body">{card.listing.description}</p>
+                  {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
+                </>
+              )}
+              {/* Ingen penna på en publicerad annons: texten på Tradera byggs en gång och ändras inte
+                  efteråt, så en rättelse här hade bara ändrat appen och inte annonsen köparen läser. */}
+              {onSaveListing && !annonstext?.published && (
                 <button type="button" className="listing-edit-knapp" onClick={oppnaText}>
                   {t("Ändra texten")}
                 </button>
@@ -891,5 +911,29 @@ function SkadeFoto({
       </span>
       <span className="skadefoto-titel">{titel}</span>
     </button>
+  );
+}
+
+/**
+ * Tradera-annonsens block, ritade som text. Samma form som renderAdHtml på servern ger dem — fetstil,
+ * stycken och listor — men som React-element: blocken bär rå text och ska inte tolkas som HTML.
+ */
+function AnnonsText({ blocks }: { blocks: AdText["blocks"] }) {
+  return (
+    <div className="card-listing-body annons-text">
+      {blocks.map((block, i) =>
+        block.kind === "list" ? (
+          block.ordered ? (
+            <ol key={i}>{block.items.map((item, n) => <li key={n}>{item}</li>)}</ol>
+          ) : (
+            <ul key={i}>{block.items.map((item, n) => <li key={n}>{item}</li>)}</ul>
+          )
+        ) : (
+          <p key={i}>
+            {block.runs.map((run, n) => (run.strong ? <strong key={n}>{run.text}</strong> : <span key={n}>{run.text}</span>))}
+          </p>
+        ),
+      )}
+    </div>
   );
 }

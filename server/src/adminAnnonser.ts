@@ -22,6 +22,7 @@
 
 import { getJob, listJobs, listRemovedJobs, ownerIdOf, persist } from "./jobStore.js";
 import { loopaIdFor } from "./loopaId.js";
+import { epostPerKonto } from "./admin.js";
 import { jobToProduct } from "./butik/normalize.js";
 import { shopReadiness } from "./butik/state.js";
 import {
@@ -43,6 +44,7 @@ import { makePriceLadder, nextRung } from "./priceLadder.js";
 import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
 import { markApproved } from "./integrations/tradera/publish.js";
 import { markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
+import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
@@ -53,6 +55,8 @@ export interface AdminAnnonsRad {
   id: string;
   jobId: string;
   ownerId: string | null;
+  /** Säljarens e-postadress — det panelen visar i stället för id:t. Null när den inte går att slå upp. */
+  ownerEmail: string | null;
   createdAt: string;
   lage: AnnonsLage;
   /** Butikens tillstånd, när möbeln finns där. Null = aldrig inlagd. */
@@ -111,12 +115,21 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   /** Vad besiktningen och generatorn HÄRLEDDE, före rättelserna. Det man jämför mot. */
   harlett: Product | null;
   overstyrning: overrides.Overstyrning | null;
+  /** Adressen till den admin som senast rättade annonsen. */
+  overstyrdAvEmail: string | null;
   annonstext: { title: string; description: string; conditionText: string } | null;
   ladder: PriceLadder | null;
   /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
   blocket: BlocketPublication | null;
+  /**
+   * Annonsen färdig att lägga på Blocket för hand: fälten, texten och bilderna.
+   *
+   * Finns bara när säljaren tryckt "Sälj med Loopa" — utan beställningen finns ingen annons att lägga
+   * ut, och ett paket i panelen hade sett ut som en uppmaning att sälja någon annans möbel.
+   */
+  blocketPaket: BlocketPaket | null;
   /**
    * Vad ett tryck på "Godkänn och lägg ut" skulle göra, kanal för kanal — läst NU.
    *
@@ -202,8 +215,10 @@ function radAv(
   produkt: Product | null,
   statistik: AnnonsStatistik,
   ordrar: number,
+  epost: Map<string, string>,
 ): AdminAnnonsRad {
   const id = loopaIdFor(job.id);
+  const ownerId = ownerIdOf(job);
   const listing = listingOf(job);
   const ladder = job.priceLadder ?? null;
   const pris = job.result?.price;
@@ -212,7 +227,8 @@ function radAv(
   return {
     id,
     jobId: job.id,
-    ownerId: ownerIdOf(job),
+    ownerId,
+    ownerEmail: job.ownerEmail ?? (ownerId ? (epost.get(ownerId) ?? null) : null),
     createdAt: job.createdAt,
     lage: lageAv(job, record),
     state: record?.state ?? null,
@@ -281,6 +297,7 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     overrides.alla(),
     allStatistik(),
   ]);
+  const epost = await epostPerKonto();
   const jobs = [...aktiva, ...borttagna].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const byId = new Map(records.map((r) => [r.id, r]));
 
@@ -303,7 +320,7 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     const harlett = jobToProduct(job, record?.state ?? "draft");
     const produkt = harlett ? overrides.tillampaPaProdukt(harlett, overstyrning) : null;
     rader.push(
-      radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0),
+      radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0, epost),
     );
   }
 
@@ -368,9 +385,11 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
   const produkt = harlett ? overrides.tillampaPaProdukt(harlett, overstyrning) : null;
   const ordrarRader = await ordersForProduct(id);
   const statistik = await statistikFor(id);
+  const epost = await epostPerKonto();
 
   return {
-    ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length),
+    ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length, epost),
+    overstyrdAvEmail: overstyrning?.updatedBy ? (epost.get(overstyrning.updatedBy) ?? null) : null,
     produkt,
     harlett,
     overstyrning: overstyrning ?? null,
@@ -378,6 +397,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     ladder: job.priceLadder ?? null,
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
+    blocketPaket: job.tradera ? await blocketPaket(job) : null,
     kanaler: (await planAutoPublish(job)).channels,
     handelser: await butikStore().events(id),
     matningar: await handelserFor(id),

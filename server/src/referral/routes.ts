@@ -164,6 +164,24 @@ export async function handleInbjudan(
     return true;
   }
 
+  /**
+   * GET /api/salj/inbjudan/inbjuden — vem som bjöd in DIG, så länge inbjudan är öppen.
+   *
+   * Driver landningssidans rubrik för ett inloggat konto. Koden i webbläsaren töms när anspråket gjorts,
+   * så utan det här hade "Victor bjöd in dig!" försvunnit så fort den inbjudna gick till sin profil och
+   * tillbaka. Öppen = inbjudan fäste och den första annonsen är inte upplagd än; därefter har rubriken
+   * gjort sitt.
+   *
+   * Profilen skapas inte här — ett konto utan profil har aldrig blivit inbjudet.
+   */
+  if (segments.length === 2 && segments[1] === "inbjuden" && req.method === "GET") {
+    const profil = await referralStore().profil(konto.id);
+    const oppen = !!profil?.referredBy && !profil.forstaAnnonsAt;
+    const inbjudare = oppen ? await referralStore().profil(profil!.referredBy!) : null;
+    svara(res, 200, { oppen, namn: inbjudare?.namn ?? null });
+    return true;
+  }
+
   /** POST /api/salj/inbjudan/visad/:id — popupen är stängd. Visas inte igen. */
   if (segments.length === 3 && segments[1] === "visad" && req.method === "POST") {
     await referralStore().markeraVisad(decodeURIComponent(segments[2]), konto.id, new Date().toISOString());

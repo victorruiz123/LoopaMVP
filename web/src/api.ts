@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -242,6 +242,11 @@ export async function hamtaInbjudare(kod: string): Promise<{ namn: string | null
   const res = await fetch(`/api/salj/inbjudan/fran/${encodeURIComponent(kod)}`);
   if (!res.ok) return null;
   return res.json();
+}
+
+/** Vem som bjöd in det inloggade kontot, så länge inbjudan är öppen (första annonsen inte upplagd). */
+export async function hamtaMinInbjudare(): Promise<{ oppen: boolean; namn: string | null }> {
+  return json(await authFetch("/api/salj/inbjudan/inbjuden"));
 }
 
 /** En ny gratisförsäljning som inbjudaren inte sett än. Driver popupen. */
@@ -584,6 +589,12 @@ export async function addDamageFromPhoto(jobId: string, dataUrl: string): Promis
  * `ConditionResult`, som resten av jobbets skrivningar — vyn byter ut sitt tillstånd mot det i
  * stället för att gissa vad servern gjorde med indata.
  */
+/** Annonstexten som den står (eller skulle stå) på Tradera. Se handleGetAdText i server/src/server.ts. */
+export async function getAdText(jobId: string): Promise<AdText> {
+  const res = await authFetch(`/api/jobs/${jobId}/annonstext`);
+  return json(res);
+}
+
 export async function saveListingDetails(
   jobId: string,
   patch: { attributes?: ListingAttribute[]; description?: string; conditionText?: string },

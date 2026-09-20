@@ -1680,6 +1680,25 @@ async function handleAddDamage(jobId: string, req: IncomingMessage, res: ServerR
   sendJson(res, 200, job.result);
 }
 
+/**
+ * Annonstexten som den står på Tradera, för säljarens annonsvy.
+ *
+ * Säljaren ska läsa exakt det köparen läser. Är annonsen publicerad är det blocken som gick upp — de
+ * byggs en gång och uppdateras aldrig på Tradera — annars det publiceringen skulle skicka just nu.
+ * Samma funktion bygger texten i båda fallen (traderaAdBlocks), så de kan inte börja skilja sig.
+ */
+async function handleGetAdText(jobId: string, res: ServerResponse) {
+  const job = await getJob(jobId);
+  if (!job?.result?.listing?.result) return sendJson(res, 404, { error: "Job or listing not found" });
+
+  const publicerad = job.tradera?.status === "published" ? (job.tradera.adBlocks ?? null) : null;
+  if (publicerad) return sendJson(res, 200, { blocks: publicerad, published: true });
+
+  const { traderaAdBlocks } = await import("./integrations/tradera/publish.js");
+  const { medRattelser } = await import("./butik/overrides.js");
+  sendJson(res, 200, { blocks: traderaAdBlocks(await medRattelser(job)), published: false });
+}
+
 interface ListingEditBody {
   attributes?: Array<{ key?: string; label?: string; value?: string }>;
   description?: string;
@@ -2413,6 +2432,9 @@ const server = http.createServer(async (req, res) => {
       // Säljarens rättelser av annonsens uppgifter — måtten och beskrivningen. Se handleListingEdit.
       if (segments.length === 4 && segments[3] === "listing" && req.method === "POST") {
         return await handleListingEdit(segments[2], req, res);
+      }
+      if (segments.length === 4 && segments[3] === "annonstext" && req.method === "GET") {
+        return await handleGetAdText(segments[2], res);
       }
       if (segments.length === 6 && segments[3] === "damages" && segments[5] === "dispute" && req.method === "POST") {
         return await handleDispute(segments[2], segments[4], req, res);

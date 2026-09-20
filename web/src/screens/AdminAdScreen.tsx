@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { getAnnons, patchAnnons } from "../api";
+import { getAnnons, imageUrl, patchAnnons } from "../api";
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPublication, ChannelPlan } from "../types";
+import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan } from "../types";
 
 /**
  * En annons, hela vägen ner — och vägen att ändra den.
@@ -103,7 +103,7 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
           <p className="admin-lede">
             {annons.id} · {annons.lage}
             {annons.grade ? ` · betyg ${annons.grade}` : ""}
-            {annons.ownerId ? ` · säljare ${annons.ownerId.slice(0, 8)}` : ""}
+            {annons.ownerEmail || annons.ownerId ? ` · säljare ${annons.ownerEmail ?? annons.ownerId}` : ""}
           </p>
           {annons.saknas.length > 0 && (
             <p className="admin-note">Saknar {annons.saknas.join(", ")} — kan inte ligga i butiken förrän det är ifyllt.</p>
@@ -255,6 +255,7 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
         </p>
       )}
       <BlocketRuta blocket={annons.blocket} />
+      {annons.blocketPaket && <BlocketPaketRuta paket={annons.blocketPaket} jobId={annons.jobId} loopaId={annons.id} />}
 
       {/* ---------------- Läget ---------------- */}
       <h2 className="profile-section-title">Läge</h2>
@@ -350,7 +351,7 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
       {annons.overstyrning && (
         <p className="admin-note">
           Senast rättad {datum(annons.overstyrning.updatedAt)}
-          {annons.overstyrning.updatedBy ? ` av ${annons.overstyrning.updatedBy.slice(0, 8)}` : ""}.
+          {annons.overstyrning.updatedBy ? ` av ${annons.overstyrdAvEmail ?? annons.overstyrning.updatedBy}` : ""}.
           {annons.overstyrning.note ? ` "${annons.overstyrning.note}"` : ""}
         </p>
       )}
@@ -511,6 +512,149 @@ function BlocketRuta({ blocket }: { blocket: BlocketPublication | null }) {
           ))}
         </ul>
       )}
+    </section>
+  );
+}
+
+/**
+ * Blocket-annonsen för hand: varje fält som ska in i Blockets formulär, med en kopieraknapp, och
+ * bilderna i uppladdningsordning.
+ *
+ * Finns för annonser där säljaren tryckt "Sälj med Loopa". Innehållet byggs på servern av samma
+ * funktioner som roboten använder (blocketPaket i integrations/blocket/publish.ts), så en annons lagd
+ * härifrån är samma annons som roboten hade lagt — rubrik, pris med hemleverans, text ord för ord.
+ *
+ * FÄLTEN STÅR I FORMULÄRETS ORDNING: kategori, rubrik, beskrivning, skick, pris, mått, postnummer.
+ * Den som lägger annonsen ska kunna gå uppifrån och ner i båda fönstren samtidigt.
+ */
+function BlocketPaketRuta({ paket, jobId, loopaId }: { paket: BlocketPaket; jobId: string; loopaId: string }) {
+  const [kopierat, setKopierat] = useState<string | null>(null);
+  const [laddar, setLaddar] = useState(false);
+
+  const kopiera = async (nyckel: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setKopierat(nyckel);
+      setTimeout(() => setKopierat((k) => (k === nyckel ? null : k)), 1500);
+    } catch {
+      setKopierat(null);
+    }
+  };
+
+  const filnamn = (i: number) => `${loopaId}-${String(i + 1).padStart(2, "0")}.jpg`;
+
+  /**
+   * Alla bilder, en fil i taget och numrerade i uppladdningsordning.
+   *
+   * Hämtas som blob och inte som en rad `<a download>`-klick: bildvägen kräver inloggningskakan, och
+   * en nedladdning som går via en blob-adress får filnamnet vi sätter i stället för bildens id.
+   */
+  const laddaNerAlla = async () => {
+    setLaddar(true);
+    try {
+      for (const [i, bild] of paket.bilder.entries()) {
+        const res = await fetch(imageUrl(jobId, bild.id), { credentials: "same-origin" });
+        if (!res.ok) continue;
+        const url = URL.createObjectURL(await res.blob());
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filnamn(i);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 5000);
+        await new Promise((r) => setTimeout(r, 250));
+      }
+    } finally {
+      setLaddar(false);
+    }
+  };
+
+  const kategori = [paket.kategori.main, paket.kategori.sub, paket.kategori.product].filter(Boolean).join(" › ");
+  const matt = [
+    paket.matt.width !== null ? `Bredd ${paket.matt.width} cm` : null,
+    paket.matt.depth !== null ? `Djup ${paket.matt.depth} cm` : null,
+    paket.matt.height !== null ? `Höjd ${paket.matt.height} cm` : null,
+  ].filter(Boolean).join(" · ");
+
+  const rader: Array<[string, string, string | null, string?]> = [
+    ["kategori", "Kategori", kategori],
+    ["rubrik", "Rubrik", paket.rubrik, paket.rubrik !== paket.rubrikHel ? `Kapad till 50 tecken. Hel: "${paket.rubrikHel}"` : undefined],
+    ["skick", "Skick", paket.skick],
+    [
+      "pris",
+      "Pris (kr)",
+      paket.pris === null ? null : String(paket.pris),
+      paket.prisMobel === null ? undefined : `${formatSek(paket.prisMobel)} för möbeln + ${formatSek(paket.frakt)} hemleverans`,
+    ],
+    ["bredd", "Bredd (cm)", paket.matt.width === null ? null : String(paket.matt.width)],
+    ["djup", "Djup (cm)", paket.matt.depth === null ? null : String(paket.matt.depth)],
+    ["hojd", "Höjd (cm)", paket.matt.height === null ? null : String(paket.matt.height)],
+    ["marke", "Märke", paket.marke],
+    ["farg", "Färg", paket.farg],
+    ["material", "Material", paket.material],
+    ["postnummer", "Postnummer", paket.postnummer],
+  ];
+
+  return (
+    <section className="card-block blocket-paket">
+      <h2 className="profile-section-title">Blocket-annonsen</h2>
+      <p className="admin-note">
+        Allt som ska in i Blockets formulär, i formulärets ordning. Samma annons som roboten lägger — rubrik,
+        pris med hemleverans och text ord för ord.
+      </p>
+      {paket.saknas.length > 0 && <p className="public-card-error">Saknas: {paket.saknas.join(", ")}.</p>}
+
+      <dl className="blocket-paket-falt">
+        {rader.map(([nyckel, etikett, varde, not]) => (
+          <div key={nyckel} className="blocket-paket-rad">
+            <dt>{etikett}</dt>
+            <dd>
+              <span className={varde ? "" : "blocket-paket-tomt"}>{varde ?? "—"}</span>
+              {not && <small>{not}</small>}
+            </dd>
+            {varde && (
+              <button type="button" className="btn btn-outline btn-small" onClick={() => kopiera(nyckel, varde)}>
+                {kopierat === nyckel ? "Kopierat" : "Kopiera"}
+              </button>
+            )}
+          </div>
+        ))}
+      </dl>
+      {matt === "" && <p className="admin-note">Måtten är uppskattade eller saknas och skrivs därför inte ut — lämna fälten tomma.</p>}
+
+      <div className="blocket-paket-text">
+        <div className="blocket-paket-rubrik">
+          <strong>Beskrivning</strong>
+          <button type="button" className="btn btn-outline btn-small" onClick={() => kopiera("beskrivning", paket.beskrivning)}>
+            {kopierat === "beskrivning" ? "Kopierat" : "Kopiera"}
+          </button>
+        </div>
+        <textarea readOnly rows={12} value={paket.beskrivning} onFocus={(e) => e.currentTarget.select()} />
+      </div>
+
+      <div className="blocket-paket-rubrik">
+        <strong>
+          Bilder ({paket.bilder.length}){paket.bilder.length > paket.maxBilder ? ` — Blocket tar ${paket.maxBilder}, ta de första` : ""}
+        </strong>
+        {paket.bilder.length > 0 && (
+          <button type="button" className="btn btn-small" disabled={laddar} onClick={laddaNerAlla}>
+            {laddar ? "Laddar ner…" : "Ladda ner alla"}
+          </button>
+        )}
+      </div>
+      <ol className="blocket-paket-bilder">
+        {paket.bilder.map((bild, i) => (
+          <li key={bild.id}>
+            <a href={imageUrl(jobId, bild.id)} download={filnamn(i)} target="_blank" rel="noreferrer">
+              <img src={imageUrl(jobId, bild.id)} alt={bild.etikett ?? `Bild ${i + 1}`} loading="lazy" />
+            </a>
+            <span>
+              {i + 1}. {i === 0 ? "Omslag" : (bild.etikett ?? "")}
+            </span>
+          </li>
+        ))}
+      </ol>
     </section>
   );
 }

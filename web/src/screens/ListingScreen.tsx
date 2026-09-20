@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
-import type { CardCover, CardDamage, ConditionResult } from "../types";
+import type { AdText, CardCover, CardDamage, ConditionResult } from "../types";
 import { damageStands } from "../lib/damages";
 import { ArrowLeftIcon } from "../components/icons";
 import ListingView from "../components/ListingView";
 import SellWithLoopa from "../components/SellWithLoopa";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
-import { deleteJob, imageUrl, saveListingDetails } from "../api";
+import { deleteJob, getAdText, imageUrl, saveListingDetails } from "../api";
 
 /**
  * Säljarens vy av sin annons.
@@ -80,6 +80,24 @@ export default function ListingScreen({
    */
   const [result, setResult] = useState(initialResult);
   useEffect(() => setResult(initialResult), [initialResult]);
+
+  /**
+   * Beskrivningen som den står på Tradera — hela annonstexten, byggd på servern av samma funktion som
+   * publiceringen. Hämtas om varje gång resultatet byts: en rättad mening eller ett rättat mått
+   * ändrar texten. Går hämtningen fel står kortets egen beskrivning kvar.
+   */
+  const [annonstext, setAnnonstext] = useState<AdText | null>(null);
+  const listingReady = result.listing?.status === "ok" && !!result.listing.result;
+  useEffect(() => {
+    if (!listingReady) return;
+    let aktuell = true;
+    getAdText(result.jobId)
+      .then((text) => aktuell && setAnnonstext(text))
+      .catch(() => aktuell && setAnnonstext(null));
+    return () => {
+      aktuell = false;
+    };
+  }, [result, listingReady]);
 
   /**
    * Borttagningen, i två tryck.
@@ -186,6 +204,7 @@ export default function ListingScreen({
             /* Säljaren har inga frågor att ställa om sin egen möbel — se `hideChat` i ListingView. */
             hideChat
             onSaveListing={async (patch) => setResult(await saveListingDetails(result.jobId, patch))}
+            annonstext={annonstext}
           />
           {/* Sist på kortet, efter allt som ska granskas: vägen ut. Det är det enda på den här
               skärmen som lämnar appen, så den ska komma efter att säljaren läst vad som skickas.

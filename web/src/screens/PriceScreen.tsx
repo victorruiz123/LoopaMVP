@@ -5,6 +5,7 @@ import { ChevronRight } from "../components/icons";
 import BrandAvatar from "../components/BrandAvatar";
 import FlowSteps from "../components/FlowSteps";
 import PriceLadderPicker from "../components/PriceLadderPicker";
+import ManuellPrisplan from "../components/ManuellPrisplan";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
@@ -141,9 +142,13 @@ export default function PriceScreen({
         )}
       </section>
 
-      {price?.status === "ok" && price.default !== null && (
+      {price?.status === "ok" && price.default !== null ? (
         <PriceLadderPicker jobId={jobId} price={price} initial={job?.priceLadder ?? null} />
-      )}
+      ) : failed || gaveUp || price?.status === "unavailable" || price?.status === "no_data" ? (
+        // Inget förslag att utgå från: säljaren sätter hela spannet själv, och utan det går möbeln
+        // inte att sälja. Se ManuellPrisplan.
+        <ManuellPrisplan jobId={jobId} initial={job?.priceLadder ?? null} />
+      ) : null}
 
       <button className="btn btn-primary next-step" onClick={onSeeCondition}>
         <span>{conditionFailed ? t("Se vad som hände") : t("Se skickbedömningen")}</span>

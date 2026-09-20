@@ -582,6 +582,16 @@ export interface PriceLadder {
   listingMode: "auction" | "fixed" | null;
 }
 
+/** En bit text i ett annonsstycke. Se adContent.ts, som bygger annonsen av sådana block. */
+export interface AdRun {
+  text: string;
+  strong?: boolean;
+}
+
+export type AdBlock =
+  | { kind: "paragraph"; runs: AdRun[] }
+  | { kind: "list"; ordered: boolean; items: string[] };
+
 /**
  * Var publiceringen till Tradera står. Sätts först när säljaren tryckt på knappen — ett jobb utan
  * `tradera` har aldrig publicerats och ska inte se ut som ett misslyckat försök.
@@ -607,6 +617,12 @@ export interface TraderaPublication {
    */
   approvedAt?: string | null;
   approvedBy?: string | null;
+  /**
+   * Annonstexten som den gick upp, i block (adContent.ts). Texten byggs en gång, vid publiceringen,
+   * och ändras inte på Tradera efteråt — säljarens annonsvy visar därför de här blocken och inte en
+   * nybyggd text, som kan ha glidit isär. Saknas på annonser publicerade innan fältet fanns.
+   */
+  adBlocks?: AdBlock[] | null;
 }
 
 /**

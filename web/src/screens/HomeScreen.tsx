@@ -15,7 +15,7 @@ import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 import { useViewMode } from "../lib/viewMode";
 import { sparadInbjudan } from "../lib/referral";
-import { hamtaInbjudare } from "../api";
+import { hamtaInbjudare, hamtaMinInbjudare } from "../api";
 
 function fold(s: string): string {
   return s.normalize("NFKD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
@@ -90,19 +90,29 @@ export default function HomeScreen({
    * säger vem som bjöd in, och allt som inte leder till att lägga upp en annons — köpvägen,
    * möbelparaden — lämnar plats. Märkesvalet står kvar, för det ÄR första steget i annonsen.
    *
-   * Koden läses en gång, vid första ritningen: anspråket i AuthProvider tömmer den så fort en session
-   * finns, och sidan ska inte byta rubrik under den som just börjat läsa den.
+   * TVÅ KÄLLOR, i den ordningen:
+   *   1. Koden i webbläsaren — för den som ännu inte loggat in. Läses en gång, vid första ritningen:
+   *      anspråket i AuthProvider tömmer den så fort en session finns, och sidan ska inte byta rubrik
+   *      under den som just börjat läsa.
+   *   2. Kontot — för den som redan är inloggad och kopplad till en inbjudare. Utan den försvann
+   *      rubriken så fort den inbjudna gick till profilen och tillbaka, eftersom koden då var tömd.
+   *      Servern svarar så länge inbjudan är öppen, alltså tills den första annonsen är upplagd.
    */
   const [inbjudningskod] = useState(() => sparadInbjudan());
   const [inbjudare, setInbjudare] = useState<{ namn: string | null } | null>(null);
   useEffect(() => {
-    if (!inbjudningskod) return;
     let live = true;
-    hamtaInbjudare(inbjudningskod)
-      .then((svar) => live && setInbjudare(svar))
-      .catch(() => undefined);
+    if (inbjudningskod) {
+      hamtaInbjudare(inbjudningskod)
+        .then((svar) => live && setInbjudare(svar))
+        .catch(() => undefined);
+    } else if (user) {
+      hamtaMinInbjudare()
+        .then((svar) => live && setInbjudare(svar.oppen ? { namn: svar.namn } : null))
+        .catch(() => undefined);
+    }
     return () => { live = false; };
-  }, [inbjudningskod]);
+  }, [inbjudningskod, user]);
   const inbjuden = inbjudare !== null;
 
   /**

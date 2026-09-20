@@ -154,6 +154,79 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
   };
 }
 
+/**
+ * Blocket-annonsen som ett paket för en människa: allt som ska in i Blockets formulär, färdigt att
+ * kopiera, och bilderna i den ordning de ska laddas upp.
+ *
+ * SAMMA ANNONS SOM ROBOTEN LÄGGER. Varje fält byggs av samma funktioner som `planBlocketPublish` och
+ * `buildBlocketDescription` — rubriken kapas lika, priset bär samma hemleverans, beskrivningen är ord
+ * för ord densamma. En annons lagd för hand ska inte gå att skilja från en lagd av roboten, och två
+ * vägar till samma text börjar avvika samma dag den ena ändras.
+ *
+ * FÖRLÅTANDE DÄR PLANEN ÄR STRÄNG. Planen avvisar hela annonsen när ett krav fattas, för en robot
+ * kan inte fylla i ett fält den inte har. En människa kan: saknas postnumret går det att fråga
+ * säljaren. Det som fattas listas därför i `saknas` och resten av paketet står kvar.
+ */
+export interface BlocketPaket {
+  /** Rubriken som den ska stå på Blocket, kapad till 50 tecken. */
+  rubrik: string;
+  /** Rubriken före kapningen, så att den som lägger annonsen ser vad som föll bort. */
+  rubrikHel: string;
+  /** Priset i annonsen: möbeln plus hemleveransen. Null = inget pris att sätta. */
+  pris: number | null;
+  prisMobel: number | null;
+  frakt: number;
+  kategori: BlocketCategory;
+  /** Loopas skicksträng — samma ord som Blockets rullista. */
+  skick: string | null;
+  matt: BlocketMeasurements;
+  marke: string | null;
+  farg: string | null;
+  material: string | null;
+  postnummer: string | null;
+  beskrivning: string;
+  /** Bilderna, omslaget först. Alla som går att visa, även om Blocket bara tar `maxBilder`. */
+  bilder: Array<{ id: string; etikett: string | null }>;
+  maxBilder: number;
+  saknas: string[];
+}
+
+export async function blocketPaket(rajob: ConditionJob): Promise<BlocketPaket | null> {
+  const job = await medRattelser(rajob);
+  if (!job.result?.listing?.result) return null;
+  const product = jobToProduct(job, "draft");
+  const rubrikHel = adTitle(job);
+  const pris = resolveAdPrice(job);
+  const bilder = await adImages(job);
+  const postnummer = await saljarensPostnummer(rajob).catch(() => null);
+  const grade = job.result.grade?.grade ?? null;
+
+  const saknas: string[] = [];
+  if (!rubrikHel) saknas.push("rubrik");
+  if (!pris) saknas.push("pris");
+  if (bilder.length === 0) saknas.push("bilder");
+  if (!postnummer) saknas.push("säljarens postnummer");
+
+  return {
+    rubrik: capTitle(rubrikHel),
+    rubrikHel,
+    pris: pris ? prisMedHemleverans(pris.value) : null,
+    prisMobel: pris?.value ?? null,
+    frakt: SHIPPING_INCLUDED_SEK,
+    kategori: blocketCategoryFor(product?.categorySlug ?? null, rubrikHel),
+    skick: grade ? BLOCKET_CONDITION[grade] : null,
+    matt: measurementsFrom(product?.dimensions),
+    marke: product?.brand ?? null,
+    farg: product?.color ?? null,
+    material: product?.material ?? null,
+    postnummer,
+    beskrivning: buildBlocketDescription(job),
+    bilder: bilder.map((b) => ({ id: b.id, etikett: b.viewLabel })),
+    maxBilder: MAX_BLOCKET_IMAGES,
+    saknas,
+  };
+}
+
 /** Annonsens bilder, kapade till vad Blockets uppladdare tar. Urvalet och ordningen görs i adContent.ts. */
 async function listingImages(job: ConditionJob) {
   return (await adImages(job)).slice(0, MAX_BLOCKET_IMAGES);

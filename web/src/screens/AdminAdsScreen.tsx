@@ -35,6 +35,32 @@ const LAGE_ETIKETT: Record<AnnonsLage, string> = {
 
 type Sortering = "nyast" | "langst-uppe" | "mest-visad" | "sämst-ctr" | "dyrast";
 
+/**
+ * Flikarna över listan: det som lever, det som sålts och det som tagits bort.
+ *
+ * BORTTAGET SKA INTE BLANDAS MED RESTEN. Raderna står kvar för att frågan "vad hände med den möbeln"
+ * ska ha ett svar — men den frågan ställs sällan, och i huvudlistan var en borttagen testannons lika
+ * stor som en möbel som väntar på godkännande. Nu ligger de under en egen flik, och Aktiva är förvald.
+ *
+ * Sålda är såld OCH levererad: båda är en affär som gått i hamn, och skillnaden mellan dem är
+ * budfirmans, inte säljarens. Reserverad och returnerad står kvar bland de aktiva — den ena är en
+ * affär som pågår, den andra en möbel som är till salu igen.
+ */
+type Vy = "vantar" | "aktiva" | "salda" | "borttagna";
+const VY_ETIKETT: Record<Vy, string> = {
+  vantar: "Väntar på godkännande",
+  aktiva: "Aktiva",
+  salda: "Sålda",
+  borttagna: "Borttagna",
+};
+function vyAv(lage: AnnonsLage): Vy {
+  // Kön är det enda i listan någon ska GÖRA något åt, och den drunknade bland hundra rader utan annons.
+  if (lage === "vantar") return "vantar";
+  if (lage === "borttagen") return "borttagna";
+  if (lage === "sald" || lage === "levererad") return "salda";
+  return "aktiva";
+}
+
 export default function AdminAdsScreen({
   onBack,
   onOpenAd,
@@ -55,6 +81,7 @@ export default function AdminAdsScreen({
   const [data, setData] = useState<AdminAnnonser | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [fraga, setFraga] = useState("");
+  const [vy, setVy] = useState<Vy>("aktiva");
   const [lage, setLage] = useState<AnnonsLage | "alla">("alla");
   const [sortering, setSortering] = useState<Sortering>("nyast");
   // Som flik är sidan fortfarande adminpanelen, och sidtiteln ska säga det. `null` hade betytt
@@ -63,17 +90,21 @@ export default function AdminAdsScreen({
 
   useEffect(() => {
     listAnnonser()
-      .then(setData)
+      .then((d) => {
+        setData(d);
+        // Står något i kön öppnar listan där: det är raden någon ska trycka på nu.
+        if (d.rader.some((r) => r.lage === "vantar")) setVy("vantar");
+      })
       .catch((err: unknown) => setError(err instanceof Error ? err.message : "Kunde inte hämta annonserna."));
   }, []);
 
   const rader = useMemo(() => {
     const q = fraga.trim().toLowerCase();
-    let ut = data?.rader ?? [];
+    let ut = (data?.rader ?? []).filter((r) => vyAv(r.lage) === vy);
     if (lage !== "alla") ut = ut.filter((r) => r.lage === lage);
     if (q) {
       ut = ut.filter((r) =>
-        [r.titel, r.id, r.brand, r.model, r.categorySlug].some((f) => f?.toLowerCase().includes(q)),
+        [r.titel, r.id, r.brand, r.model, r.categorySlug, r.ownerEmail].some((f) => f?.toLowerCase().includes(q)),
       );
     }
     const kopia = [...ut];
@@ -100,7 +131,19 @@ export default function AdminAdsScreen({
           return a.createdAt < b.createdAt ? 1 : -1;
         });
     }
-  }, [data, fraga, lage, sortering]);
+  }, [data, fraga, vy, lage, sortering]);
+
+  const antalPerVy = useMemo(() => {
+    const n: Record<Vy, number> = { vantar: 0, aktiva: 0, salda: 0, borttagna: 0 };
+    for (const r of data?.rader ?? []) n[vyAv(r.lage)]++;
+    return n;
+  }, [data]);
+
+  function byttVy(ny: Vy) {
+    setVy(ny);
+    // Ett läge från en annan flik hade gett en tom lista utan förklaring.
+    if (lage !== "alla" && vyAv(lage) !== ny) setLage("alla");
+  }
 
   const s = data?.summering;
 
@@ -127,8 +170,11 @@ export default function AdminAdsScreen({
         </div>
         <button
           type="button"
-          className={`profile-stat admin-stat-knapp${lage === "vantar" ? " aktiv" : ""}`}
-          onClick={() => setLage(lage === "vantar" ? "alla" : "vantar")}
+          className={`profile-stat admin-stat-knapp${vy === "vantar" ? " aktiv" : ""}`}
+          onClick={() => {
+            setVy("vantar");
+            setLage("alla");
+          }}
           title="Visa bara det som väntar på godkännande"
         >
           <div className="profile-stat-value">{s?.vantar ?? "—"}</div>
@@ -170,6 +216,21 @@ export default function AdminAdsScreen({
         </p>
       )}
 
+      <div className="admin-flikar admin-underflikar" role="tablist" aria-label="Annonser efter läge">
+        {(Object.keys(VY_ETIKETT) as Vy[]).map((v) => (
+          <button
+            key={v}
+            type="button"
+            role="tab"
+            aria-selected={vy === v}
+            className={`admin-flik-knapp${vy === v ? " vald" : ""}`}
+            onClick={() => byttVy(v)}
+          >
+            {VY_ETIKETT[v]} <span className="admin-flik-antal">{data ? antalPerVy[v] : "—"}</span>
+          </button>
+        ))}
+      </div>
+
       <div className="admin-verktyg">
         <label className="admin-sok">
           <SearchIcon size={15} />
@@ -183,7 +244,9 @@ export default function AdminAdsScreen({
         </label>
         <select value={lage} onChange={(e) => setLage(e.target.value as AnnonsLage | "alla")} aria-label="Filtrera på läge">
           <option value="alla">Alla lägen</option>
-          {Object.entries(LAGE_ETIKETT).map(([v, etikett]) => (
+          {Object.entries(LAGE_ETIKETT)
+            .filter(([v]) => vyAv(v as AnnonsLage) === vy)
+            .map(([v, etikett]) => (
             <option key={v} value={v}>
               {etikett}
             </option>
@@ -231,6 +294,7 @@ export default function AdminAdsScreen({
                   <span className="card-row-meta">
                     {[
                       r.id,
+                      r.ownerEmail ?? r.ownerId,
                       r.grade ? `Betyg ${r.grade}` : null,
                       prisText(r),
                       r.dagarUppe !== null ? `${r.dagarUppe} d uppe` : null,

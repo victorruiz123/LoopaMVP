@@ -795,6 +795,7 @@ export interface AdminAnnonsRad {
   id: string;
   jobId: string;
   ownerId: string | null;
+  ownerEmail: string | null;
   createdAt: string;
   lage: AnnonsLage;
   state: "draft" | "live" | "reserved" | "sold" | "delivered" | "returned" | null;
@@ -884,7 +885,28 @@ export interface AnnonsProdukt {
   state: string;
 }
 
+/** Spegel av BlocketPaket i server/src/integrations/blocket/publish.ts. */
+export interface BlocketPaket {
+  rubrik: string;
+  rubrikHel: string;
+  pris: number | null;
+  prisMobel: number | null;
+  frakt: number;
+  kategori: { main: string; sub: string | null; product: string | null };
+  skick: string | null;
+  matt: { height: number | null; width: number | null; depth: number | null };
+  marke: string | null;
+  farg: string | null;
+  material: string | null;
+  postnummer: string | null;
+  beskrivning: string;
+  bilder: Array<{ id: string; etikett: string | null }>;
+  maxBilder: number;
+  saknas: string[];
+}
+
 export interface AdminAnnonsDetalj extends AdminAnnonsRad {
+  overstyrdAvEmail: string | null;
   produkt: AnnonsProdukt | null;
   /** Vad besiktningen härledde, före rättelserna. Det panelen jämför mot. */
   harlett: AnnonsProdukt | null;
@@ -895,6 +917,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
   blocket: BlocketPublication | null;
+  /** Annonsen färdig att lägga på Blocket för hand. Null = säljaren har inte tryckt "Sälj med Loopa". */
+  blocketPaket: BlocketPaket | null;
   /** Vad "Godkänn och lägg ut" skulle göra just nu, kanal för kanal. Läst ur serverns miljö. */
   kanaler: ChannelPlan[];
   handelser: AnnonsHandelse[];
@@ -1014,6 +1038,20 @@ export interface CardPrice {
 }
 
 /** Allt kortvyn ritar. Byggs antingen ur ett eget ConditionResult eller ur ett publikt kort. */
+/**
+ * Annonstexten som block — samma form som servern bygger Tradera-annonsen av (server/src/adContent.ts).
+ * Säljarens vy ritar blocken under "Beskrivning", så att det som står där är det som står på Tradera.
+ */
+export type AdBlock =
+  | { kind: "paragraph"; runs: Array<{ text: string; strong?: boolean }> }
+  | { kind: "list"; ordered: boolean; items: string[] };
+
+export interface AdText {
+  blocks: AdBlock[];
+  /** Sant när texten är den som redan gått upp på Tradera; falskt när den är det som skulle gå upp. */
+  published: boolean;
+}
+
 export interface ListingViewData {
   card: GeneratedListing;
   identity: FurnitureIdentity | null;

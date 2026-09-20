@@ -22,20 +22,13 @@ import { presentableImages } from "./pipeline/cover.js";
 import { TYPE_LABELS } from "./damageLabels.js";
 import { loopaIdFor } from "./loopaId.js";
 import { SHIPPING_INCLUDED_SEK } from "./hemleverans.js";
-import type { CapturedImage, ConditionJob, Damage, ListingAttribute, Severity } from "./types.js";
+import type { AdBlock, AdRun, CapturedImage, ConditionJob, Damage, ListingAttribute, Severity } from "./types.js";
 
 /**
- * En bit text i ett stycke. `strong` finns för att skicket och rubrikerna ska gå att se på Tradera,
- * som renderar HTML; i ren text försvinner markeringen och raden står kvar som den är.
+ * Annonsen som block (typerna står i types.ts). `strong` finns för att skicket och rubrikerna ska gå
+ * att se på Tradera, som renderar HTML; i ren text försvinner markeringen och raden står kvar.
  */
-export interface AdRun {
-  text: string;
-  strong?: boolean;
-}
-
-export type AdBlock =
-  | { kind: "paragraph"; runs: AdRun[] }
-  | { kind: "list"; ordered: boolean; items: string[] };
+export type { AdBlock, AdRun } from "./types.js";
 
 /** Vad annonsen ska bära utöver möbeln själv. */
 export interface AdOptions {
@@ -475,8 +468,14 @@ export function renderAdHtml(blocks: AdBlock[]): string {
  * går före varje maskinellt förslag — hela poängen med spannet är att de vet något om sin egen
  * brådska som prismotorn inte kan veta.
  *
- * Därefter besiktningens pris, det enda som räknat AV för skadorna, och sist annonsgeneratorns
- * förslag, som inte sett skadorna men är bättre än inget.
+ * Därefter besiktningens pris, det enda som räknat AV för skadorna.
+ *
+ * ANNONSGENERATORNS FÖRSLAG ANVÄNDS INTE LÄNGRE. Det låg här som en sista utväg, "bättre än inget",
+ * och det var fel: talet är en AI-gissning ur annonsresearchen som säljaren ALDRIG ser — prissidan
+ * visar bara prismotorns svar. En SoffaDirekt Bergholm 2026-09-19 fick "inga data" från motorn och
+ * stod ändå i kön för att läggas ut på 4 000 kr, ett pris ingen människa satt. Utan motorpris måste
+ * säljaren nu sätta sitt eget spann på prissidan (se ManuellPrisplan i webben); tills dess svarar
+ * den här funktionen null och publiceringen stoppas med ett besked om varför.
  */
 export function resolveAdPrice(job: ConditionJob): { value: number; source: "seller" | "condition" | "listing" } | null {
   const ladder = job.priceLadder;
@@ -486,8 +485,6 @@ export function resolveAdPrice(job: ConditionJob): { value: number; source: "sel
   if (price?.status === "ok" && price.default && price.default > 0) {
     return { value: Math.round(price.default), source: "condition" };
   }
-  const suggested = job.result?.listing?.result?.pricing.suggestedPriceSek;
-  if (suggested && suggested > 0) return { value: Math.round(suggested), source: "listing" };
   return null;
 }
 
