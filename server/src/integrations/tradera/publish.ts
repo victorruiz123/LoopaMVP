@@ -11,7 +11,7 @@ import path from "node:path";
 import { readFile } from "node:fs/promises";
 import { getJob, jobDir, persist } from "../../jobStore.js";
 import { resolveCoverImageId } from "../../pipeline/cover.js";
-import { adImages, adTitle, composeAd, renderAdHtml, resolveAdPrice } from "../../adContent.js";
+import { adImages, adTitle, composeAd, renderAdHtml, resolveAdPrice, type AdBlock } from "../../adContent.js";
 import type { CapturedImage, ConditionJob, TraderaPublication } from "../../types.js";
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
 import { armPriceLadder } from "../../priceLadder.js";
@@ -106,7 +106,8 @@ export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishRe
   if (!title) return { ok: false, reason: "Annonsen saknar rubrik." };
 
   const price = resolveAdPrice(job);
-  if (!price) return { ok: false, reason: "Det finns inget pris att sätta som utropspris." };
+  // Säljaren läser beskedet vid knappen, så det säger vad de ska göra och inte vad som saknas.
+  if (!price) return { ok: false, reason: "Sätt ditt pris på prissidan först — vi hittade inget prisförslag för den här möbeln." };
 
   const images = await listingImages(job);
   if (images.length === 0) return { ok: false, reason: "Jobbet har inga bilder kvar på disk." };
@@ -164,13 +165,15 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
     // Samma rättelse en gång till, för texten: `job` nedan skriver publiceringsläget och måste vara
     // det riktiga jobbet, medan beskrivningen ska byggas ur den rättade kopian.
     const annons = await medRattelser(job);
+    // Blocken sparas på publiceringen: säljarens annonsvy visar texten som den faktiskt gick ut.
+    const adBlocks = traderaAdBlocks(annons);
 
     const images = await loadImages(job);
 
     const result = await publishToTradera({
       ownReference: job.id,
       title: plan.title,
-      description: buildDescription(annons),
+      description: renderAdHtml(adBlocks),
       categoryId: plan.categoryId,
       price: plan.price,
       images,
@@ -193,6 +196,7 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       url: result.url,
       error: null,
       publishedAt: new Date().toISOString(),
+      adBlocks,
     }));
     console.info(`[tradera] job ${jobId} publicerat som item ${result.itemId} — ${result.url}`);
 
@@ -342,7 +346,16 @@ async function loadImages(job: ConditionJob): Promise<TraderaImage[]> {
  * renderingsform. Blocket får samma block renderade som ren text (blocket/publish.ts).
  */
 export function buildDescription(job: ConditionJob): string {
-  return renderAdHtml(composeAd(job, { delivery: true, loopaSells: true, infoPage: true }));
+  return renderAdHtml(traderaAdBlocks(job));
+}
+
+/**
+ * Tradera-annonsen som block, före HTML-renderingen. Säljarens annonsvy ritar samma block under
+ * "Beskrivning" (GET /api/jobs/:id/annonstext), så att det säljaren läser är ordagrant det som
+ * går upp på Tradera.
+ */
+export function traderaAdBlocks(job: ConditionJob): AdBlock[] {
+  return composeAd(job, { delivery: true, loopaSells: true, infoPage: true });
 }
 
 export { traderaConfigured };

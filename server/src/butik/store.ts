@@ -58,7 +58,28 @@ export interface ButikRecord {
   /** Vilken kanal som vann. Det är den här raden man läser dagen en köpare hör av sig. */
   soldChannel: "butik" | "tradera" | null;
   traderaItemId: number | null;
+  /**
+   * Utbetalningen till säljaren. Null tills admin markerat möbeln utbetald.
+   *
+   * Frusen när den skrivs: den är kvittot på vad säljaren fick och vad Loopa behöll, och den ändras
+   * aldrig efteråt. Valfri i typen för att poster från före utbetalningarna saknar fältet helt.
+   */
+  utbetalning?: Utbetalning | null;
   updatedAt: string;
+}
+
+/** Se ButikRecord.utbetalning och butik/utbetalning.ts, som är det enda stället som skriver den. */
+export interface Utbetalning {
+  at: string;
+  /** Vad möbeln såldes för, utan frakt. Provisionen räknas på det här. */
+  mobelprisSek: number;
+  /** Andelen som gällde — läst ur möbelns villkor, 0,2 eller 0. */
+  andel: number;
+  loopaSek: number;
+  saljarenSek: number;
+  /** Gratisförsäljningens kredit, när en användes på möbeln. */
+  referralCreditId: string | null;
+  av: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -82,6 +103,11 @@ export interface Store {
     next: ProductState,
     patch: Partial<ButikRecord>,
   ): Promise<ButikRecord | null>;
+  /**
+   * Skriver utbetalningen, villkorat: bara om möbeln är såld eller levererad och INTE redan utbetald.
+   * Null = villkoret höll inte. Två tryck på "utbetald" betalar alltså aldrig ut två gånger.
+   */
+  markeraUtbetald(id: string, utbetalning: Utbetalning): Promise<ButikRecord | null>;
   appendEvent(event: ProductEvent): Promise<void>;
   events(productId: string): Promise<ProductEvent[]>;
 }
@@ -162,6 +188,18 @@ class FileStore implements Store {
     });
   }
 
+  async markeraUtbetald(id: string, utbetalning: Utbetalning): Promise<ButikRecord | null> {
+    return serialize(async () => {
+      const map = await this.load();
+      const current = map.get(id);
+      if (!current || current.utbetalning || (current.state !== "sold" && current.state !== "delivered")) return null;
+      const updated: ButikRecord = { ...current, utbetalning, updatedAt: new Date().toISOString() };
+      map.set(id, updated);
+      await this.flush();
+      return updated;
+    });
+  }
+
   async appendEvent(event: ProductEvent): Promise<void> {
     await mkdir(BUTIK_DIR, { recursive: true });
     await appendFile(EVENTS_FILE, JSON.stringify(event) + "\n", "utf-8");
@@ -207,6 +245,22 @@ function toRow(r: ButikRecord): Record<string, unknown> {
     sold_channel: r.soldChannel,
     tradera_item_id: r.traderaItemId,
     updated_at: r.updatedAt,
+    // BARA NÄR DEN FINNS. Kolumnerna kommer med 003_referral.sql, och en upsert som nämner en
+    // kolumn som saknas fäller hela skrivningen — butiken hade slutat fungera i väntan på en migrering
+    // som bara utbetalningarna behöver. Utelämnade kolumner rör PostgREST inte vid en merge.
+    ...(r.utbetalning ? utbetalningsKolumner(r.utbetalning) : {}),
+  };
+}
+
+function utbetalningsKolumner(u: Utbetalning): Record<string, unknown> {
+  return {
+    paid_out_at: u.at,
+    payout_item_price_sek: u.mobelprisSek,
+    commission_rate: u.andel,
+    loopa_fee_sek: u.loopaSek,
+    seller_payout_sek: u.saljarenSek,
+    referral_credit_id: u.referralCreditId,
+    paid_out_by: u.av,
   };
 }
 
@@ -223,6 +277,17 @@ function fromRow(row: Record<string, any>): ButikRecord {
     soldAt: row.sold_at ?? null,
     soldChannel: row.sold_channel ?? null,
     traderaItemId: row.tradera_item_id ?? null,
+    utbetalning: row.paid_out_at
+      ? {
+          at: row.paid_out_at,
+          mobelprisSek: row.payout_item_price_sek,
+          andel: Number(row.commission_rate),
+          loopaSek: row.loopa_fee_sek,
+          saljarenSek: row.seller_payout_sek,
+          referralCreditId: row.referral_credit_id ?? null,
+          av: row.paid_out_by ?? null,
+        }
+      : null,
     updatedAt: row.updated_at,
   };
 }
@@ -278,6 +343,14 @@ class SupabaseStore implements Store {
       if (v !== undefined && k in patchable) body[k] = v;
     }
     const query = `butik_products?id=eq.${encodeURIComponent(id)}&state=in.(${expected.join(",")})`;
+    const rows = await this.call<Record<string, any>[]>("PATCH", query, body, "return=representation");
+    return rows?.[0] ? fromRow(rows[0]) : null;
+  }
+
+  /** Villkoret i WHERE-satsen, som compareAndSet: `paid_out_at=is.null` gör en andra skrivning till noll rader. */
+  async markeraUtbetald(id: string, utbetalning: Utbetalning): Promise<ButikRecord | null> {
+    const query = `butik_products?id=eq.${encodeURIComponent(id)}&state=in.(sold,delivered)&paid_out_at=is.null`;
+    const body = { ...utbetalningsKolumner(utbetalning), updated_at: new Date().toISOString() };
     const rows = await this.call<Record<string, any>[]>("PATCH", query, body, "return=representation");
     return rows?.[0] ? fromRow(rows[0]) : null;
   }

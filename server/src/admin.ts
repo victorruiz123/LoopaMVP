@@ -191,6 +191,25 @@ async function fetchAuthUsers(serviceKey: string): Promise<DirectoryRow[] | null
   }
 }
 
+let epostCache: { at: number; karta: Map<string, string> } | null = null;
+
+/**
+ * Konto-id → e-postadress, för panelen som ska visa VEM som säljer och inte ett id.
+ *
+ * Jobben bär oftast adressen själva (`ownerEmail`), men de som skapades innan fältet fanns gör det
+ * inte. Kartan fyller den luckan. En minut i minnet: listan öppnas och laddas om i ett svep, och
+ * kontolistan ändras inte på den tiden. Utan servicenyckel blir kartan tom och id:t står kvar.
+ */
+export async function epostPerKonto(): Promise<Map<string, string>> {
+  if (epostCache && Date.now() - epostCache.at < 60_000) return epostCache.karta;
+  const serviceKey = serviceRoleKey();
+  const users = serviceKey ? await fetchAuthUsers(serviceKey) : null;
+  const karta = new Map<string, string>();
+  for (const u of users ?? []) if (u.email) karta.set(u.id, u.email);
+  if (users) epostCache = { at: Date.now(), karta };
+  return karta;
+}
+
 async function fetchDirectory(token: string | null): Promise<{ rows: DirectoryRow[]; source: DirectorySource }> {
   const serviceKey = serviceRoleKey();
   if (serviceKey) {

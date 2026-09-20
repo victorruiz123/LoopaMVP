@@ -5,9 +5,9 @@ import ProcessFeedback from "./ProcessFeedback";
 import LegalLink from "./LegalLink";
 import { useT } from "../lib/i18n";
 import { formatSek } from "../lib/price";
-import { LOOPA_FEE_CAP_SEK, LOOPA_PERCENT, feeIsCapped, loopaFee, sellerPayout } from "../lib/fees";
+import { LOOPA_FEE_CAP_SEK } from "../lib/fees";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
-import type { PriceLadder, TraderaPlan, TraderaState } from "../types";
+import type { PriceLadder, SaljVillkor, TraderaPlan, TraderaState } from "../types";
 
 /**
  * "Sälj med Loopa" — sista steget i annonsen.
@@ -101,11 +101,19 @@ export default function SellWithLoopa({
     };
   }, [refresh]);
 
+  /**
+   * Gratisförsäljningen: ja som förval när säljaren har en. Den som bjudit in en vän som sålt ska se
+   * 0 kr i Loopas del utan att behöva leta efter valet — att spara den till en dyrare möbel är det
+   * aktiva valet. Servern avgör om krediten fortfarande gäller när trycket kommer.
+   */
+  const [anvandGratis, setAnvandGratis] = useState(true);
+
   async function publish() {
     setSending(true);
     setFailure(null);
     try {
-      setState(await publishToTradera(jobId));
+      const gratisErbjuden = !!state?.villkor?.gratis;
+      setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis }));
       setConfirming(false);
       // Först när annonsen faktiskt gått iväg. Ett ja som föll på ett serverfel är inte en avslutad
       // process, och att fråga vad säljaren tyckte om den mitt i felet vore ett hån.
@@ -288,6 +296,9 @@ export default function SellWithLoopa({
           error={failure}
           onCancel={() => setConfirming(false)}
           onConfirm={publish}
+          saljvillkor={state.villkor ?? null}
+          anvandGratis={anvandGratis}
+          onAnvandGratis={setAnvandGratis}
         />
       )}
       {processfragan}
@@ -404,6 +415,9 @@ function SellConfirm({
   error,
   onCancel,
   onConfirm,
+  saljvillkor,
+  anvandGratis,
+  onAnvandGratis,
 }: {
   plan: TraderaPlan;
   coverUrl: string | null;
@@ -412,6 +426,10 @@ function SellConfirm({
   error: string | null;
   onCancel: () => void;
   onConfirm: () => void;
+  /** Uppdelningen, räknad på servern (server/src/provision.ts). Null från en server utan den. */
+  saljvillkor: SaljVillkor | null;
+  anvandGratis: boolean;
+  onAnvandGratis: (v: boolean) => void;
 }) {
   const t = useT();
   const panel = useRef<HTMLDivElement>(null);
@@ -545,27 +563,75 @@ function SellConfirm({
             Taket är utskrivet bara när det faktiskt slagit till. "20 %, högst 1 000 kr" på en möbel
             för 900 kr är en upplysning om ett läge säljaren inte är i.
           */}
-          <dl className="sell-delning">
-            <div>
-              <dt>{t("Möbelns pris")}</dt>
-              <dd>{formatSek(plan.itemPrice)}</dd>
-            </div>
-            <div>
-              <dt>
-                {t("Loopas del")}
+          {/*
+            GRATISFÖRSÄLJNINGEN, när säljaren har en. Valet står FÖRE uppdelningen, och uppdelningen
+            följer valet: "Loopas del 0 kr" är vad säljaren ska se när den används. Valet är låst när
+            möbeln väl tryckts iväg — servern skriver villkoren en gång (ConditionJob.saleTerms).
+          */}
+          {saljvillkor?.gratis && (
+            <fieldset className="sell-gratis">
+              <legend className="sell-gratis-fraga">{t("Använd din gratisförsäljning på den här möbeln?")}</legend>
+              <label>
+                <input type="radio" name="gratis" checked={anvandGratis} onChange={() => onAnvandGratis(true)} disabled={sending} />
                 <span>
-                  {feeIsCapped(plan.itemPrice)
-                    ? t("{andel} %, högst {tak}", { andel: LOOPA_PERCENT, tak: formatSek(LOOPA_FEE_CAP_SEK) })
-                    : t("{andel} % av priset", { andel: LOOPA_PERCENT })}
+                  {t("Ja, använd den här")}
+                  <small>{t("Loopa tar 0 kr – du får hela {pris}", { pris: formatSek(saljvillkor.gratis.saljarenSek) })}</small>
                 </span>
-              </dt>
-              <dd>−{formatSek(loopaFee(plan.itemPrice))}</dd>
-            </div>
-            <div className="sell-delning-sum">
-              <dt>{t("Du får")}</dt>
-              <dd>{formatSek(sellerPayout(plan.itemPrice))}</dd>
-            </div>
-          </dl>
+              </label>
+              <label>
+                <input type="radio" name="gratis" checked={!anvandGratis} onChange={() => onAnvandGratis(false)} disabled={sending} />
+                <span>
+                  {t("Nej, spara den till en annan möbel")}
+                  {saljvillkor.forstaUtgang && (
+                    <small>
+                      {t("Den gäller till {datum}", {
+                        datum: new Date(saljvillkor.forstaUtgang).toLocaleDateString("sv-SE", { day: "numeric", month: "long", year: "numeric" }),
+                      })}
+                    </small>
+                  )}
+                </span>
+              </label>
+            </fieldset>
+          )}
+
+          {(() => {
+            /*
+              VAD SÄLJAREN FÅR UT, uträknat — på SERVERN. Klienten väljer bara vilket av de två
+              utfallen som visas; beloppen är serverns, så det säljaren läser här är samma tal som
+              utbetalningen räknar med.
+
+              Räknat på MÖBELNS pris och inte på annonspriset ovanför: hemleveransens kronor går rakt
+              vidare till budfirman. Taket är utskrivet bara när det faktiskt slagit till.
+            */
+            const d = saljvillkor?.gratis && anvandGratis ? saljvillkor.gratis : saljvillkor?.standard ?? null;
+            if (!d) return null;
+            const gratis = d.andel === 0;
+            return (
+              <dl className="sell-delning">
+                <div>
+                  <dt>{t("Möbelns pris")}</dt>
+                  <dd>{formatSek(d.mobelprisSek)}</dd>
+                </div>
+                <div>
+                  <dt>
+                    {t("Loopas del")}
+                    <span>
+                      {gratis
+                        ? t("gratisförsäljning")
+                        : d.tak
+                          ? t("{andel} %, högst {tak}", { andel: Math.round(d.andel * 100), tak: formatSek(LOOPA_FEE_CAP_SEK) })
+                          : t("{andel} % av priset", { andel: Math.round(d.andel * 100) })}
+                    </span>
+                  </dt>
+                  <dd>{gratis ? formatSek(0) : `−${formatSek(d.loopaSek)}`}</dd>
+                </div>
+                <div className="sell-delning-sum">
+                  <dt>{t("Du får")}</dt>
+                  <dd>{formatSek(d.saljarenSek)}</dd>
+                </div>
+              </dl>
+            );
+          })()}
           <p className="sell-delning-not">
             {t("Hemleveransens {frakt} räknas inte in — de går vidare till budfirman.", {
               frakt: formatSek(plan.shippingSek),

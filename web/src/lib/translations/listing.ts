@@ -317,6 +317,27 @@ export const LISTING: Record<string, Translation> = {
   "Fler dokument": { en: "More documents", fr: "Autres documents" },
   "Till Loopa": { en: "To Loopa", fr: "Vers Loopa" },
 
+  "Sätt ditt pris": { en: "Set your price", fr: "Fixez votre prix" },
+  "Vi har inget prisförslag för den här möbeln, så priset sätter du själv. Annonsen startar på ditt startpris och sänks varje vecka tills den når ditt lägsta pris. Hemleveransen läggs ovanpå och sänks aldrig.": {
+    en: "We have no price suggestion for this piece, so you set the price yourself. The listing starts at your starting price and drops every week until it reaches your lowest price. Home delivery is added on top and never drops.",
+    fr: "Nous n'avons pas de suggestion de prix pour ce meuble : c'est vous qui fixez le prix. L'annonce commence à votre prix de départ et baisse chaque semaine jusqu'à votre prix le plus bas. La livraison à domicile s'ajoute et ne baisse jamais.",
+  },
+  "Startpris (högsta)": { en: "Starting price (highest)", fr: "Prix de départ (le plus haut)" },
+  "Sänkning per vecka": { en: "Drop per week", fr: "Baisse par semaine" },
+  "Startpriset måste vara minst 10 kr.": { en: "The starting price must be at least 10 kr.", fr: "Le prix de départ doit être d'au moins 10 kr." },
+  "Lägsta priset måste vara minst 10 kr.": { en: "The lowest price must be at least 10 kr.", fr: "Le prix le plus bas doit être d'au moins 10 kr." },
+  "Lägsta priset kan inte vara högre än startpriset.": {
+    en: "The lowest price can't be higher than the starting price.",
+    fr: "Le prix le plus bas ne peut pas dépasser le prix de départ.",
+  },
+  "Sänkningen ska vara mellan {min} och {max} % i veckan.": {
+    en: "The drop must be between {min} and {max} % per week.",
+    fr: "La baisse doit être comprise entre {min} et {max} % par semaine.",
+  },
+  "Fyll i alla tre fälten — utan dem går möbeln inte att sälja.": {
+    en: "Fill in all three fields — without them the piece can't be sold.",
+    fr: "Remplissez les trois champs — sans eux, le meuble ne peut pas être vendu.",
+  },
   "Ditt prisspann": { en: "Your price range", fr: "Votre fourchette de prix" },
   "Rensa sökning": { en: "Clear search", fr: "Effacer la recherche" },
   Valt: { en: "Selected", fr: "Sélectionné" },

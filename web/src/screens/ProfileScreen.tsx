@@ -17,6 +17,7 @@ import type { Order } from "../butik/api";
 import type { Product } from "../butik/types";
 import { buyStats, CLOSED_DEAL_STATES, plural, sellStats } from "../profil/stats";
 import { DealRow, OrderRow, StatGrid } from "../profil/TradeSections";
+import { ProfilInbjudan } from "../components/BjudIn";
 
 /**
  * Profilen: allt konto-innehavaren handlar med, sålt som köpt, på ett ställe.
@@ -193,6 +194,10 @@ export default function ProfileScreen({
         </>
       )}
 
+      {/* Inbjudan: länken, gratisförsäljningarna och de inbjudna. Under annonserna, för att det är
+          som säljare man bjuder in — och det är där den som just fått en möbel utbetald tittar. */}
+      <ProfilInbjudan />
+
       {/* ── Affärer där jag är säljaren ───────────────────────────────────
           Egen avdelning och inte blandad med annonserna: en Trygg affär är en köpare som redan
           finns, med ett pris som ska svaras på. Den kan inte ligga i samma lista som en annons som
@@ -339,6 +344,13 @@ function CardList({
                 den" från "många har sett den och ingen köpt". Är den såld visas i stället var köpet
                 står, för då är intresset historia och leveransen det enda som gäller.
               */}
+              {/* Utbetalningen, när den är gjord: det säljaren faktiskt fick, efter Loopas del. */}
+              {j.shop?.utbetalning && (
+                <span className="card-row-meta" style={{ color: "var(--green-dark)" }}>
+                  {t("Utbetalt {belopp}", { belopp: formatSek(j.shop.utbetalning.saljarenSek) })}
+                  {j.shop.utbetalning.andel === 0 ? ` · ${t("gratisförsäljning")}` : ""}
+                </span>
+              )}
               {j.order ? (
                 <span className="card-row-meta" style={{ color: "var(--accent)" }}>
                   {ORDER_STEG[j.order.status]}

@@ -470,6 +470,63 @@ export interface TraderaState {
   blockedReason: string | null;
   /** Säljarens prisspann, när det är satt. Driver både bekräftelsesteget och den publicerade vyn. */
   ladder: PriceLadder | null;
+  /** Vad säljaren får och vad Loopa tar. Räknat på servern (server/src/provision.ts). Saknas i äldre svar. */
+  villkor?: SaljVillkor;
+}
+
+/** Loopas del av ett möbelpris, uträknad av servern. */
+export interface Uppdelning {
+  mobelprisSek: number;
+  andel: number;
+  loopaSek: number;
+  saljarenSek: number;
+  tak: boolean;
+}
+
+/**
+ * Villkoren i "Sälj med Loopa".
+ *
+ * `last` = möbeln har redan tryckts iväg, och valet om gratisförsäljningen står fast. `gratis` finns
+ * bara när säljaren har en kredit att använda och inget val ännu gjorts.
+ */
+export interface SaljVillkor {
+  last: boolean;
+  valdGratis: boolean;
+  standard: Uppdelning | null;
+  gratis: Uppdelning | null;
+  krediter: number;
+  forstaUtgang: string | null;
+}
+
+/** GET /api/salj/inbjudan. */
+export interface MinInbjudan {
+  kod: string;
+  /** Satt när servern har en bestämd bas (loopa.nu i drift, REFERRAL_LINK_BASE lokalt). */
+  lank: string | null;
+  tillgangliga: number;
+  krediter: Array<{ id: string; status: "available" | "used" | "expired"; skapad: string; gar_ut: string; anvand: string | null }>;
+  inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "annons" }>;
+}
+
+/** En rad i adminpanelens utbetalningar. Se server/src/butik/utbetalning.ts. */
+export interface UtbetalningsRad {
+  productId: string;
+  titel: string;
+  kanal: "butik" | "tradera" | null;
+  state: string;
+  soldAt: string | null;
+  sellerEmail: string | null;
+  gratis: boolean;
+  forslag: Uppdelning | null;
+  utbetalning: {
+    at: string;
+    mobelprisSek: number;
+    andel: number;
+    loopaSek: number;
+    saljarenSek: number;
+    referralCreditId: string | null;
+    av: string | null;
+  } | null;
 }
 
 export interface ConditionJob {
@@ -627,6 +684,8 @@ export interface JobShopState {
   soldChannel: "butik" | "tradera" | null;
   /** Priset som gällde när den reserverades. Null tills någon lagt den i kassan. */
   priceSek: number | null;
+  /** Kvittot på utbetalningen. Null tills Loopa betalat ut; saknas i äldre svar. */
+  utbetalning?: { at: string; saljarenSek: number; loopaSek: number; andel: number } | null;
 }
 
 // ---- adminpanelen (GET /api/admin/users) ----
@@ -744,6 +803,7 @@ export interface AdminAnnonsRad {
   id: string;
   jobId: string;
   ownerId: string | null;
+  ownerEmail: string | null;
   createdAt: string;
   lage: AnnonsLage;
   state: "draft" | "live" | "reserved" | "sold" | "delivered" | "returned" | null;
@@ -833,7 +893,28 @@ export interface AnnonsProdukt {
   state: string;
 }
 
+/** Spegel av BlocketPaket i server/src/integrations/blocket/publish.ts. */
+export interface BlocketPaket {
+  rubrik: string;
+  rubrikHel: string;
+  pris: number | null;
+  prisMobel: number | null;
+  frakt: number;
+  kategori: { main: string; sub: string | null; product: string | null };
+  skick: string | null;
+  matt: { height: number | null; width: number | null; depth: number | null };
+  marke: string | null;
+  farg: string | null;
+  material: string | null;
+  postnummer: string | null;
+  beskrivning: string;
+  bilder: Array<{ id: string; etikett: string | null }>;
+  maxBilder: number;
+  saknas: string[];
+}
+
 export interface AdminAnnonsDetalj extends AdminAnnonsRad {
+  overstyrdAvEmail: string | null;
   produkt: AnnonsProdukt | null;
   /** Vad besiktningen härledde, före rättelserna. Det panelen jämför mot. */
   harlett: AnnonsProdukt | null;
@@ -847,6 +928,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   /** Säljarens postnummer, det Blocket-annonsen läggs på, och var det kom ifrån. Null = saknas. */
   postnummer: string | null;
   postnummerKalla: "jobb" | "konto" | null;
+  /** Annonsen färdig att lägga på Blocket för hand. Null = säljaren har inte tryckt "Sälj med Loopa". */
+  blocketPaket: BlocketPaket | null;
   /** Vad "Godkänn och lägg ut" skulle göra just nu, kanal för kanal. Läst ur serverns miljö. */
   kanaler: ChannelPlan[];
   handelser: AnnonsHandelse[];
@@ -968,6 +1051,20 @@ export interface CardPrice {
 }
 
 /** Allt kortvyn ritar. Byggs antingen ur ett eget ConditionResult eller ur ett publikt kort. */
+/**
+ * Annonstexten som block — samma form som servern bygger Tradera-annonsen av (server/src/adContent.ts).
+ * Säljarens vy ritar blocken under "Beskrivning", så att det som står där är det som står på Tradera.
+ */
+export type AdBlock =
+  | { kind: "paragraph"; runs: Array<{ text: string; strong?: boolean }> }
+  | { kind: "list"; ordered: boolean; items: string[] };
+
+export interface AdText {
+  blocks: AdBlock[];
+  /** Sant när texten är den som redan gått upp på Tradera; falskt när den är det som skulle gå upp. */
+  published: boolean;
+}
+
 export interface ListingViewData {
   card: GeneratedListing;
   identity: FurnitureIdentity | null;

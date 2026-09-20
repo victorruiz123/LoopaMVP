@@ -2026,6 +2026,15 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
    är samma fråga, en rad ner: motorn säger vad möbeln är värd, det här säger
    vad DU vill ha för den. Reglagen är iOS-runda och tumstora; det här dras med
    tummen på en telefon, inte med en mus. */
+/* Säljarens eget pris när motorn inget har: tre fält i en kolumn, inga reglage — ett reglage behöver
+   ytterlägen, och ytterlägen är just det vi saknar. */
+.manuell-falt { display: flex; flex-direction: column; margin: 6px 0 4px; }
+.manuell-rad {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0;
+  border-bottom: 1px solid var(--hairline); cursor: text;
+}
+.manuell-rad:last-child { border-bottom: 0; }
+
 .ladder-card {
   background: var(--surface); border-radius: var(--r-lg); padding: 18px 18px 16px;
   box-shadow: var(--shadow-card); display: flex; flex-direction: column; gap: 13px; margin-top: 12px;
@@ -2790,6 +2799,11 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 /* Beskrivningen bär ingen rubrik — se ListingView. Utan den behöver texten inte heller det
    översta mellanrummet en rubrik lämnar efter sig. */
 .listing-about .card-listing-body { margin-top: 0; }
+/* Tradera-annonsens text i säljarens vy: stycken och listor som på Tradera, utan extra luft överst. */
+.annons-text p { margin: 0 0 10px; }
+.annons-text p:last-child { margin-bottom: 0; }
+.annons-text ol, .annons-text ul { margin: 0 0 10px; padding-left: 20px; }
+.annons-text strong { color: var(--ink); }
 
 /* ---- hopfällbara sektioner ----
    Säljarens vy fäller ihop skick, beskrivning och mått till tre rader, så att "Sälj med Loopa"
@@ -3207,6 +3221,23 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .annons-godkann { margin-top: 16px; border: 1.5px solid #E7C89A; background: #FFF8EE; }
 .annons-godkann .profile-section-title { margin-top: 0; }
 .annons-godkann .btn-primary { margin-top: 10px; }
+
+/* Blocket-annonsen för hand: fält att kopiera rad för rad, texten, och bilderna i uppladdningsordning. */
+.blocket-paket-falt { margin: 12px 0; display: flex; flex-direction: column; gap: 6px; }
+.blocket-paket-rad { display: grid; grid-template-columns: 110px 1fr auto; gap: 10px; align-items: center; padding: 6px 0; border-bottom: 1px solid var(--border); }
+.blocket-paket-rad dt { color: var(--muted); font-size: var(--fs-sm); }
+.blocket-paket-rad dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.blocket-paket-rad dd small { display: block; color: var(--muted-soft); font-size: var(--fs-sm); }
+.blocket-paket-tomt { color: var(--muted-soft); }
+.blocket-paket-rubrik { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin: 14px 0 6px; }
+.blocket-paket-text textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--fs-sm); padding: 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--field); resize: vertical; }
+.blocket-paket-bilder { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; }
+.blocket-paket-bilder li { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); }
+.blocket-paket-bilder img { width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: var(--r-sm); background: var(--field); display: block; }
+@media (max-width: 480px) {
+  .blocket-paket-rad { grid-template-columns: 1fr auto; }
+  .blocket-paket-rad dt { grid-column: 1 / -1; }
+}
 .admin-stat-knapp { cursor: pointer; font: inherit; text-align: inherit; border: 1.5px solid transparent; }
 .admin-stat-knapp.aktiv { border-color: #A9722A; background: #FBEEDC; }
 .annons-topp h1 { margin: 0 0 2px; }
@@ -3250,6 +3281,12 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
   display: flex; gap: 4px; margin: 12px 0 4px;
   padding: 4px; border-radius: var(--r-md); background: var(--field);
 }
+/* Flikarna INOM annonslistan — Aktiva, Sålda, Borttagna. Samma knappar som panelens flikrad, men
+   mindre och med antalet utskrivet: det är ett urval av en lista, inte en annan sida. */
+.admin-underflikar { margin: 4px 0 10px; }
+.admin-underflikar .admin-flik-knapp { font-size: var(--fs-sm); }
+.admin-flik-antal { margin-left: 4px; font-weight: 500; color: var(--muted); font-variant-numeric: tabular-nums; }
+
 .admin-flik-knapp {
   flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px;
   padding: 9px 12px; border: none; border-radius: var(--r-sm); cursor: pointer;
@@ -4924,3 +4961,62 @@ body:has(.grind) .consent { display: none; }
 .feedback-text-svar { margin: 0; white-space: pre-wrap; line-height: 1.5; color: var(--ink-soft); }
 .feedback-tom { margin: 0; font-size: var(--fs-sm); color: var(--muted); font-style: italic; }
 .feedback-avsandare { margin: 0; font-size: var(--fs-sm); color: var(--muted); }
+
+/* ── Inbjudan (components/BjudIn.tsx) ──────────────────────────────────────
+   Samma yta som korten i profilen. Rubriken är erbjudandet, noten villkoret — villkoret står
+   alltid med, för det är skillnaden mellan ett löfte och en reklamrad. */
+.bjudin-ruta {
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: var(--shadow-card);
+  padding: 16px; display: flex; flex-direction: column; gap: 8px;
+}
+.bjudin-rubrik { margin: 0; font-size: var(--fs-lg); font-weight: 700; color: var(--ink); line-height: 1.3; }
+.bjudin-not { margin: 0; font-size: var(--fs-md); color: var(--muted); line-height: 1.45; }
+.bjudin-knappar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.bjudin-lank {
+  width: 100%; font: inherit; font-size: var(--fs-md); padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--field); color: var(--ink);
+}
+.bjudin-krediter {
+  margin-top: 8px; padding: 14px 16px; border-radius: var(--r-lg);
+  background: var(--green-light); color: var(--green-dark);
+}
+.bjudin-krediter-antal { margin: 0 0 4px; font-weight: 700; }
+.bjudin-krediter ul { margin: 0 0 6px; padding-left: 18px; font-size: var(--fs-md); }
+.bjudin-inbjudna { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.bjudin-inbjudna li {
+  display: flex; justify-content: space-between; gap: 12px; align-items: center;
+  background: var(--surface); border-radius: var(--r); padding: 10px 14px; font-size: var(--fs-md);
+  box-shadow: var(--shadow-card); min-width: 0;
+}
+.bjudin-inbjudna li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bjudin-status { color: var(--muted); flex: none; }
+.bjudin-status-salt { color: var(--green-dark); font-weight: 600; }
+
+/* Valet i "Sälj med Loopa". Två rader med radioknappar, gratis först — det är därför rutan finns. */
+.sell-gratis { display: grid; gap: 8px; margin: 4px 0 2px; border: 0; padding: 0; min-width: 0; }
+.sell-gratis-fraga { margin: 0 0 8px; padding: 0; font-weight: 700; color: var(--ink); }
+.sell-gratis label {
+  display: flex; gap: 10px; align-items: flex-start; padding: 12px 14px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: var(--r); background: var(--surface);
+}
+.sell-gratis label:has(input:checked) { border-color: var(--green); background: var(--green-light); }
+.sell-gratis input { margin-top: 3px; accent-color: var(--green-dark); }
+.sell-gratis small { display: block; color: var(--muted); font-size: var(--fs-sm); }
+
+/* Popupen till inbjudaren (components/GratisPopup.tsx). Ett kort mitt på skärmen — ett besked och en
+   knapp, inte ett helskärmssteg som "Sälj med Loopa". */
+.gratis-root {
+  position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+}
+.gratis-scrim { position: absolute; inset: 0; background: hsl(var(--scrim) / 0.5); animation: sell-modal-fade var(--t-slow) var(--ease-ui) both; }
+.gratis-popup {
+  position: relative; z-index: 1; width: 100%; max-width: 380px;
+  background: var(--surface); border-radius: var(--r-xl); box-shadow: var(--shadow-raised);
+  text-align: center; padding: 28px 22px 22px; display: flex; flex-direction: column; gap: 10px; align-items: center;
+  animation: sell-modal-rise 380ms var(--ease-sheet) both;
+}
+.gratis-popup h2 { margin: 0; font-size: 22px; line-height: 1.25; color: var(--ink); }
+.gratis-popup p { margin: 0 0 8px; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; max-width: 32ch; }
+.gratis-popup .btn { width: 100%; }
+.gratis-popup-ikon { font-size: 40px; line-height: 1; }
