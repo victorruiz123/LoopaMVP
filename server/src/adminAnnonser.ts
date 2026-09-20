@@ -42,7 +42,8 @@ import * as overrides from "./butik/overrides.js";
 import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
 import { makePriceLadder, nextRung } from "./priceLadder.js";
 import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
-import { markApproved } from "./integrations/tradera/publish.js";
+import { markApproved, traderaAdBlocks } from "./integrations/tradera/publish.js";
+import { renderAdPlain } from "./adContent.js";
 import { markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
@@ -118,6 +119,20 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   /** Adressen till den admin som senast rättade annonsen. */
   overstyrdAvEmail: string | null;
   annonstext: { title: string; description: string; conditionText: string } | null;
+  /**
+   * Den BYGGDA beskrivningen som ren text — hela annonsen, så som besiktningen skriver den.
+   *
+   * Det panelen visar i beskrivningsfältet när ingen skrivit över den, och det en admin utgår ifrån
+   * när de gör det. Utan den var "ändra beskrivningen" att skriva en annons från tomt papper, eller
+   * att kopiera den ur Blocket-paketet längre ner — som bara finns när säljaren beställt.
+   *
+   * TRADERAS VARIANT. Den och Blockets skiljer sig på en enda rad (länken till den köpfria sidan,
+   * se AdOptions.infoPage), och Tradera är den som bär mest. Skrivs beskrivningen över går texten
+   * ut ordagrant på båda, och skillnaden upphör.
+   *
+   * Null = jobbet har ingen färdig annons att bygga av.
+   */
+  harleddBeskrivning: string | null;
   ladder: PriceLadder | null;
   /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
@@ -375,6 +390,19 @@ async function jobbFor(loopaId: string): Promise<ConditionJob | undefined> {
   return (await listRemovedJobs()).find((job) => loopaIdFor(job.id) === wanted);
 }
 
+/**
+ * Annonsen som besiktningen skriver den, oavsett vad någon skrivit över den med.
+ *
+ * `adText` PLOCKAS BORT MED FLIT. Kopian från `medRattelser` bär den handskrivna texten, och
+ * `composeAd` lämnar då tillbaka just den — vilket hade gjort fältets platshållare till en kopia av
+ * fältets eget innehåll. Panelen ska visa det man kommer tillbaka TILL när man trycker ↺, alltså
+ * den byggda texten, med övriga rättelser (rubrik, möbelstycke) pålagda.
+ */
+function harleddBeskrivning(rattad: ConditionJob): string | null {
+  if (!rattad.result?.listing?.result) return null;
+  return renderAdPlain(traderaAdBlocks({ ...rattad, adText: undefined }));
+}
+
 export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj | null> {
   const job = await jobbFor(loopaId);
   if (!job) return null;
@@ -394,6 +422,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     harlett,
     overstyrning: overstyrning ?? null,
     annonstext: overrides.annonstext(job, overstyrning),
+    harleddBeskrivning: harleddBeskrivning(await overrides.medRattelser(job)),
     ladder: job.priceLadder ?? null,
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,

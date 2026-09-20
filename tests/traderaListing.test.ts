@@ -119,12 +119,13 @@ function job(p: { damages?: Damage[]; attributes?: GeneratedListing["attributes"
   };
 }
 
-test("annonsen säger vem som säljer möbeln, vem som skrivit texten, och att det är en AI som tittat", () => {
+test("annonsen upprepar inte vem som säljer, men säger att det är en AI som tittat", () => {
   const html = buildDescription(job());
-  // Säljaren står i första raden. En köpare som tror att de handlar av en privatperson gissar fel
-  // om både frakt och ansvar — och den gissningen görs innan de läst en enda rad om möbeln.
-  assert.match(html, /Säljs av Loopa\. Vi har filmat möbeln, granskat den med AI och skrivit annonsen/);
-  // Vad granskningen bestod i står kvar, men nere vid skicket — se skickstyckets test.
+  // Annonsen ligger på Loopas eget konto, och kanalen visar säljarnamnet ovanför texten. Att säga
+  // det en gång till med annonsens mest lästa rad var att lägga en rad mellan köparen och möbeln.
+  assert.doesNotMatch(html, /Säljs av Loopa/);
+  assert.doesNotMatch(html, /Annonsen är skriven av Loopa/);
+  // Att en AI gjort granskningen står kvar — nere vid skicket, där siffran den kom fram till står.
   assert.match(html, /Loopas AI har granskat möbeln från 2 håll och hittade/);
 });
 
@@ -288,9 +289,9 @@ test("Blocket-annonsen bär samma leveranslöfte som Tradera-annonsen", () => {
   assert.match(text, /Avhämtning erbjuds inte/);
 });
 
-test("Blocket-annonsen säger att Loopa är säljaren, precis som Tradera-annonsen", () => {
-  assert.match(buildBlocketDescription(job()), /Säljs av Loopa/);
-  assert.match(buildDescription(job()), /Säljs av Loopa/);
+test("varken Blocket- eller Tradera-annonsen skriver ut att Loopa är säljaren", () => {
+  assert.doesNotMatch(buildBlocketDescription(job()), /Säljs av Loopa/);
+  assert.doesNotMatch(buildDescription(job()), /Säljs av Loopa/);
 });
 
 /**
@@ -493,4 +494,55 @@ test("ett jobb utan färdig annons är inget publikt kort", () => {
   const unfinished = job();
   unfinished.result!.listing = { status: "unavailable", unavailableReason: "Ingen träff.", result: null, latencyMs: 10 };
   assert.equal(publicCardFor(unfinished), null);
+});
+
+// ─── Den handskrivna annonsen ────────────────────────────────────────────────
+//
+// Adminen kan skriva över HELA beskrivningen (se butik/overrides.ts). Då är den byggda texten inte
+// längre ett underlag att fylla på — den ska inte synas alls. Testet finns för att motsatsen är tyst
+// och dyr: en annons där Loopas leveransstycke står kvar under en handskriven text som säger något
+// annat lovar två saker på samma sida, och köparen får gissa vilken som gäller.
+
+test("en handskriven beskrivning går ut ordagrant, och ingenting byggs runt den", () => {
+  const handskrivet: ConditionJob = { ...job(), adText: "Soffbordet är nytvättat.\n\nRinga oss på 08-123 456." };
+
+  const html = buildDescription(handskrivet);
+  assert.equal(
+    html,
+    "<p>Soffbordet är nytvättat.</p>\n<p>Ringa oss på 08-123 456.</p>",
+    "tomrad ska skilja stycken, och inget annat ska tillkomma",
+  );
+  assert.doesNotMatch(html, /Hemleverans/, "leveransstycket är den byggda textens löfte, inte adminens");
+  assert.doesNotMatch(html, /Loopa-ID/, "står inte ID:t i texten någon skrivit står det inte i annonsen");
+  assert.doesNotMatch(html, /Skick:/, "skicket hör till den byggda texten");
+});
+
+test("samma handskrivna text går till Blocket som till Tradera — bara formen skiljer", () => {
+  const handskrivet: ConditionJob = { ...job(), adText: "Soffbordet är nytvättat.\n\nRinga oss på 08-123 456." };
+  assert.equal(buildBlocketDescription(handskrivet), "Soffbordet är nytvättat.\n\nRinga oss på 08-123 456.");
+});
+
+test("enkelt radbrott håller ihop stycket — det är en rad, inte ett nytt stycke", () => {
+  const handskrivet: ConditionJob = { ...job(), adText: "Mått:\nBredd 180 cm" };
+  assert.equal(buildDescription(handskrivet), "<p>Mått:<br>Bredd 180 cm</p>");
+  assert.equal(buildBlocketDescription(handskrivet), "Mått:\nBredd 180 cm");
+});
+
+test("en tom handskriven text bygger annonsen som vanligt", () => {
+  const tomt: ConditionJob = { ...job(), adText: "  \n " };
+  assert.match(buildDescription(tomt), /Hemleverans ingår i priset/);
+});
+
+test("adminens egna ord filtreras inte — leveranssållet gäller bara generatorns stycke", () => {
+  const handskrivet: ConditionJob = { ...job(), adText: "Vi levererar hem till dörren. Hämtning går också bra." };
+  assert.equal(
+    buildBlocketDescription(handskrivet),
+    "Vi levererar hem till dörren. Hämtning går också bra.",
+    "en mening en människa skrivit får aldrig tas bort tyst",
+  );
+});
+
+test("handskriven text escapas fortfarande på Tradera", () => {
+  const handskrivet: ConditionJob = { ...job(), adText: 'Bord & stol <b>fint</b> "skick"' };
+  assert.equal(buildDescription(handskrivet), "<p>Bord &amp; stol &lt;b&gt;fint&lt;/b&gt; &quot;skick&quot;</p>");
 });

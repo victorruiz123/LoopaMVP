@@ -321,6 +321,37 @@ export default function AdminAdScreen({ loopaId, onBack }: { loopaId: string; on
             placeholder={platshallare(annons, h, "description")}
           />
         </label>
+        {/*
+          Hela beskrivningen, så som den går ut.
+
+          SKILD FRÅN "Annonstext" OVANFÖR, och det är hela poängen med att båda står här. Det fältet
+          byter ut generatorns stycke om möbeln och låter annonsen byggas som vanligt runt det —
+          måtten, skicket, skadorna och leveransen följer besiktningen. Det här fältet är annonsen
+          SJÄLV: skriver man i det byggs ingenting, texten går ut ordagrant på Tradera och Blocket.
+
+          FÄLTET ÄR FÖRIFYLLT med den byggda texten och inte tomt med grå platshållare som de andra.
+          Uppgiften är att ÄNDRA en text man läser, inte att fylla i ett värde man vet — och en
+          beskrivning på tjugo rader går inte att redigera ur en placeholder. Förifyllningen sparas
+          först när någon rör fältet: `utkast.adText` sätts av onChange, och `faltUr` skickar bara
+          det som står där.
+        */}
+        <label className="annons-falt annons-falt-bred">
+          <span>
+            Beskrivning som läggs ut
+            <FaltAterstall falt="adText" etikett="Beskrivningen" annons={annons} sparar={sparar} skicka={skicka} />
+          </span>
+          <textarea
+            rows={18}
+            value={utkast.adText ?? annons.harleddBeskrivning ?? ""}
+            onChange={(e) => setUtkast({ ...utkast, adText: e.target.value })}
+            placeholder={annons.harleddBeskrivning ? "" : "Annonsen är inte klar än — det finns ingen text att bygga av."}
+          />
+          <small className="annons-falt-not">
+            {arRattat(annons.overstyrning, "adText") && !uttryckligenTom(annons.overstyrning, "adText")
+              ? "Handskriven. Den går ut ord för ord på både Tradera och Blocket, och följer inte längre med när en skada rättas eller priset ändras. ↺ lämnar tillbaka annonsen till den byggda texten."
+              : "Byggd av besiktningen och uppdateras med den. Ändrar du här ersätts hela texten på både Tradera och Blocket av det du skriver — också måtten, skicket, skadelistan och leveransstycket."}
+          </small>
+        </label>
         <label className="annons-falt annons-falt-bred">
           <span>Anteckning</span>
           <input

@@ -40,6 +40,21 @@ export interface Overstyrning {
   title?: string | null;
   /** Annonstexten. Syns på Tradera och i säljarens annonsvy; butiksrutnätet visar den inte. */
   description?: string | null;
+  /**
+   * HELA den publicerade beskrivningen, skriven för hand.
+   *
+   * SKILD FRÅN `description` MED FLIT, fast båda är annonstext. `description` byter ut generatorns
+   * stycke om möbeln och låter annonsen byggas som vanligt runt det — måtten, skicket, skadelistan,
+   * leveransstycket och Loopa-ID:t står kvar och följer besiktningen. Det här fältet ersätter allt
+   * det: är det satt bygger `composeAd` ingenting alls, utan texten går ut ordagrant som den står,
+   * på BÅDA kanalerna.
+   *
+   * PRISET ATT BETALA STÅR I SAMMA MENING. En handskriven text följer inte med när en skada rättas,
+   * när betyget räknas om eller när prisstegen sänker priset — den fryser. Därför ska den användas
+   * när annonsen behöver säga något besiktningen inte kan säga, inte som en genväg förbi den, och
+   * ↺ i panelen lämnar alltid tillbaka annonsen till den byggda texten.
+   */
+  adText?: string | null;
   brand?: string | null;
   model?: string | null;
   categorySlug?: string | null;
@@ -70,6 +85,7 @@ export interface Overstyrning {
 export const OVERSTYRBARA = [
   "title",
   "description",
+  "adText",
   "brand",
   "model",
   "categorySlug",
@@ -284,11 +300,22 @@ export function annonstext(
  */
 export async function medRattelser(job: ConditionJob): Promise<ConditionJob> {
   const o = await hamta(loopaIdFor(job.id));
-  if (!o || (!harSatt(o, "title") && !harSatt(o, "description"))) return job;
+  if (!o) return job;
+
+  /**
+   * Den handskrivna annonstexten rider med på kopian, inte inne i annonsunderlaget.
+   *
+   * Den ersätter HELA texten och hör därför inte hemma i `listing.description`, som bara är stycket
+   * om möbeln. Tom sträng räknas som osatt: `composeAd` ska då bygga texten som vanligt, och en
+   * annons utan beskrivning är inte ett beslut någon kan mena.
+   */
+  const adText = harSatt(o, "adText") && o.adText?.trim() ? o.adText : null;
+  if (!adText && !harSatt(o, "title") && !harSatt(o, "description")) return job;
+  const bas = adText ? { ...job, adText } : job;
 
   const platser = ["result", "listing", "pendingListing"] as const;
   for (const plats of platser) {
-    const barare = plats === "result" ? job.result?.listing : job[plats];
+    const barare = plats === "result" ? bas.result?.listing : bas[plats];
     const listing = barare?.result;
     if (!listing) continue;
     const text = {
@@ -298,8 +325,8 @@ export async function medRattelser(job: ConditionJob): Promise<ConditionJob> {
     };
     const rattad = { ...barare, result: { ...listing, listing: text } };
     return plats === "result"
-      ? { ...job, result: { ...job.result!, listing: rattad } }
-      : { ...job, [plats]: rattad };
+      ? { ...bas, result: { ...bas.result!, listing: rattad } }
+      : { ...bas, [plats]: rattad };
   }
-  return job;
+  return bas;
 }

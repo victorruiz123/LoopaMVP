@@ -3271,6 +3271,8 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 }
 /* Knappen ligger i formulärets rutnät men har ingen etikett — den ska stå i linje med fälten. */
 .annons-falt-knapp { justify-content: flex-end; }
+/* Raden UNDER ett fält, för det fältet inte kan visa själv: att texten är handskriven och fryst. */
+.annons-falt-not { font-size: var(--fs-xs); color: var(--muted); line-height: 1.5; }
 
 /* --------------------------------------------------------------------------
    Adminpanelens flikar

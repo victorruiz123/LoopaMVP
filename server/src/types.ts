@@ -848,6 +848,20 @@ export interface ConditionJob {
    */
   sellerDisclosures?: SellerDisclosures | null;
   /**
+   * Adminens egen annonstext — HELA beskrivningen som går ut, i stället för den byggda.
+   *
+   * ALDRIG SPARAD PÅ JOBBET. Fältet sätts bara på den grunda kopia `medRattelser` lämnar ifrån sig
+   * (butik/overrides.ts), av exakt samma skäl som rubrik- och beskrivningsrättelsen ligger bredvid
+   * jobbet och inte i det: annonsen byggs om vid varje publicering, och en text skriven in i
+   * `job.json` hade försvunnit tyst vid nästa omräkning. Det lagrade värdet bor i
+   * `overstyrningar.json`; det här är bara vägen in i `composeAd`, som är synkron och därför inte
+   * kan slå upp rättelsen själv.
+   *
+   * Satt = annonsen är skriven av en människa och byggs inte alls (se composeAd). Osatt eller tom =
+   * besiktningen skriver texten som vanligt.
+   */
+  adText?: string;
+  /**
    * Möbeln är en stol, så frågan om ANTAL ska ställas.
    *
    * Avgörs vid modellvalet och sparas där (se finalizeWithModel), inte när frågorna ställs. Skälet

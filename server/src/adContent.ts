@@ -13,6 +13,12 @@
  * Annonsen byggs ändå som BLOCK och inte som färdig HTML. Renderingen är ett eget steg
  * (`renderAdHtml`), så nästa kanal med ett annat textformat kostar en renderare och inte en andra
  * annonstext som börjar glida isär från den här.
+ *
+ * EN VÄG FÖRBI ALLTIHOP: `job.adText`. Har en admin skrivit beskrivningen för hand i panelen byggs
+ * ingenting — texten blir block rakt av (`textAsAdBlocks`) och går ut ordagrant på båda kanalerna.
+ * Den ligger på jobbets KOPIA och aldrig på jobbet självt; lagret och skälen står i
+ * butik/overrides.ts. Att den går genom samma block är hela poängen: kanalerna fortsätter skilja
+ * sig åt i form och bara i form.
  */
 
 import path from "node:path";
@@ -48,8 +54,9 @@ export interface AdOptions {
    * Om Loopa ska stå som SÄLJARE och inte bara som avsändare för texten.
    *
    * Samma skiljelinje som `delivery` och sant i samma fall: ligger annonsen på Loopas konto går
-   * pengarna till Loopa och det är Loopa som bokar budfirman. Då ska det stå i första raden — en
-   * köpare som tror att de handlar av en privatperson gissar fel om både frakt och ansvar.
+   * pengarna till Loopa och det är Loopa som bokar budfirman. Kanalen visar det redan i säljarnamnet,
+   * så texten upprepar det inte — flaggan styr i stället vem frågor riktas till ("fråga oss" i
+   * stället för "fråga säljaren") och att avsändarraden om vem som skrivit annonsen utelämnas.
    */
   loopaSells: boolean;
   /**
@@ -150,6 +157,20 @@ function utanLeveransloften(text: string): string {
 }
 
 export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
+  /**
+   * Har en människa skrivit annonsen bygger vi ingen.
+   *
+   * FÖRST AV ALLT, och utan att titta på `options`. Flaggorna nedan avgör vad den BYGGDA texten ska
+   * lova — hemleverans, vem som säljer, vilken länk som står sist — och de besluten är redan tagna
+   * av den som skrev texten. Att lägga på leveransstycket under en handskriven annons hade betytt
+   * att panelen visar en text och kanalen publicerar en annan, vilket är precis det fältet finns
+   * för att slippa.
+   *
+   * Texten går ut ordagrant på båda kanalerna. Det enda som skiljer dem är formen (`renderAdHtml`
+   * mot `renderAdPlain`), och den skillnaden bär blocken redan.
+   */
+  if (job.adText?.trim()) return textAsAdBlocks(job.adText);
+
   const result = job.result!;
   const card = result.listing!.result!;
   const loopaId = loopaIdFor(job.id);
@@ -161,25 +182,22 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   const grade = result.grade;
 
   /**
-   * Avsändaren på EN rad, och båda sakerna den måste bära.
+   * Avsändaren på EN rad — men bara när Loopa INTE är säljaren.
    *
-   * Att annonsen är skriven av Loopa säger vem som står bakom orden; att möbeln SÄLJS av Loopa säger
-   * vem köparen gör affär med, vilket är det som avgör vad de kan vänta sig av frakt, betalning och
-   * ansvar. Att granskningen är gjord av en AI står med här och inte bara nere vid skicket, för att
-   * raden annars läser som att en människa tittat — och den som skummar läser bara den här raden.
+   * Står annonsen i någon annans namn säger raden vem som skrivit texten, och att det är en AI som
+   * tittat; utan den läser annonsen som att en människa granskat möbeln, och den som skummar läser
+   * bara den här raden.
    *
-   * Tre meningar blev en. Vad AI:n hittade står i skickstycket, där siffran hör hemma.
+   * LIGGER ANNONSEN PÅ LOOPAS EGET KONTO UTELÄMNAS RADEN. Kanalen visar redan vem säljaren är, och
+   * "Säljs av Loopa" ovanför möbelns egen beskrivning var att säga det en gång till med annonsens
+   * mest lästa rad. Att granskningen är gjord av en AI står kvar i skickstycket, där siffran den
+   * kom fram till också står.
    */
-  blocks.push(
-    paragraph([
-      {
-        text: options.loopaSells
-          ? "Säljs av Loopa. Vi har filmat möbeln, granskat den med AI och skrivit annonsen."
-          : "Annonsen är skriven av Loopa. Vi har filmat möbeln och granskat den med AI.",
-        strong: true,
-      },
-    ]),
-  );
+  if (!options.loopaSells) {
+    blocks.push(
+      paragraph([{ text: "Annonsen är skriven av Loopa. Vi har filmat möbeln och granskat den med AI.", strong: true }]),
+    );
+  }
 
   /**
    * Möbelbeskrivningen — men utan generatorns egna leveranslöften.
@@ -414,6 +432,24 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
   }
 
   return blocks;
+}
+
+/**
+ * En handskriven annonstext som block.
+ *
+ * TOMRAD SKILJER STYCKEN, enkelt radbrott gör det inte. Det är hur en människa skriver i en
+ * textarea, och det är också den enda uppdelning som överlever båda renderarna: ett stycke blir
+ * `<p>` på Tradera och en tomrad på Blocket, medan ett enkelt radbrott inne i stycket blir `<br>`
+ * respektive står kvar som det är. Ingenting är `strong` — fetstil är den byggda textens sätt att
+ * markera rubriker, och en handskriven text markerar sina egna med ord.
+ */
+export function textAsAdBlocks(text: string): AdBlock[] {
+  return text
+    .trim()
+    .split(/\n\s*\n/)
+    .map((stycke) => stycke.trim())
+    .filter(Boolean)
+    .map((stycke) => paragraph([{ text: stycke }]));
 }
 
 /**
