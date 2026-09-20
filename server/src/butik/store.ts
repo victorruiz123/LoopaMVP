@@ -21,6 +21,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../jobStore.js";
 import { supabaseUrl } from "../supabaseAuth.js";
+import { supabaseLagring } from "../datalagring.js";
 import { makeEvent, reservationDeadline } from "./state.js";
 import type { ProductEvent, ProductSource, ProductState, TransitionActor } from "./types.js";
 
@@ -225,9 +226,15 @@ class FileStore implements Store {
 
 const serviceKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
 
-/** Sant när butiken har en riktig databas att ligga i. Annars körs filryggen. */
+/**
+ * Sant när butiken ska ligga i Postgres. Annars körs filryggen.
+ *
+ * BESLUTET ÄR INTE BUTIKENS EGET — det delas med affärerna och inbjudningarna, och bor i
+ * datalagring.ts tillsammans med skälet till att det kräver ett uttryckligt val. Villkoret var förut
+ * "servicenyckeln finns", vilket fällde servern den dag nyckeln lades in för något helt annat.
+ */
 export function usingSupabase(): boolean {
-  return serviceKey() !== null;
+  return supabaseLagring();
 }
 
 /** Kolumnnamnen är snake_case i Postgres och camelCase i TypeScript. Översättningen bor på ett ställe. */

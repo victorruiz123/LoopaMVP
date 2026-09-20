@@ -14,6 +14,7 @@ import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 import { supabaseUrl } from "../supabaseAuth.js";
+import { supabaseLagring } from "../datalagring.js";
 
 /**
  * Motsvarar `users.referral_code` och `users.referred_by` i uppdraget.
@@ -468,7 +469,9 @@ class SupabaseStore implements ReferralStore {
 
 let instance: ReferralStore | null = null;
 export function referralStore(): ReferralStore {
-  if (!instance) instance = serviceKey() ? new SupabaseStore() : new FileStore();
+  // Samma beslut som butiken och affärerna gör, ur samma ställe: att nyckeln FINNS betyder inte att
+  // inbjudningarna ska bo i Postgres. Se datalagring.ts.
+  if (!instance) instance = supabaseLagring() ? new SupabaseStore() : new FileStore();
   return instance;
 }
 

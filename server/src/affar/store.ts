@@ -14,6 +14,7 @@ import { mkdir, readFile, writeFile, appendFile, rm } from "node:fs/promises";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { DATA_DIR } from "../jobStore.js";
+import { supabaseLagring } from "../datalagring.js";
 import { supabaseUrl } from "../supabaseAuth.js";
 import { expiryFor, makeEvent, makeInviteToken } from "./state.js";
 import type { Deal, DealActor, DealEvent, DealState } from "./types.js";
@@ -121,8 +122,12 @@ class FileStore implements Store {
 // ---------------------------------------------------------------------------
 
 const serviceKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
+/**
+ * Sant när affärerna ska ligga i Postgres. Se datalagring.ts — beslutet delas med butiken och
+ * inbjudningarna, och kräver ett uttryckligt val just för att en nyckel inte ska kunna flytta dem.
+ */
 export function usingSupabase(): boolean {
-  return serviceKey() !== null;
+  return supabaseLagring();
 }
 
 function toRow(d: Deal): Record<string, unknown> {
