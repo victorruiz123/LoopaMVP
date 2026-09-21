@@ -21,7 +21,7 @@ process.env.EMAIL_PROVIDER = "none";
 delete process.env.SUPABASE_SERVICE_ROLE_KEY;
 process.on("exit", () => rmSync(rot, { recursive: true, force: true }));
 
-const { nyKod, normaliseraKod, KOD_ALFABET } = await import("../server/src/referral/kod.js");
+const { nyKod, normaliseraKod, inbjudningslank, KOD_ALFABET } = await import("../server/src/referral/kod.js");
 const { emailNyckel, adressNyckel, telefonNyckel } = await import("../server/src/referral/avtryck.js");
 const regler = await import("../server/src/referral/regler.js");
 const { referralStore } = await import("../server/src/referral/store.js");
@@ -87,6 +87,27 @@ test("koden normaliseras förlåtande men rättas aldrig till en annan", () => {
 });
 
 // ─── registreringen ─────────────────────────────────────────────────────────
+
+/**
+ * Länken är en SÖKVÄG, och det är inte kosmetik.
+ *
+ * `/?ref=KOD` ledde i drift till marknadssajtens företagssida: loopa.nu ägs av Cloudflare Pages, och
+ * Workern som håller säljflödet är bunden till rutter som matchar hela URL:en. `loopa.nu/` matchar
+ * roten utan query — läggs något efter `?` matchar ingen rutt alls, och Pages svarar 302 → /company.
+ * Rutten `loopa.nu/?*` går inte att lägga till: Cloudflare avvisar query i ruttmönster (fel 10022).
+ *
+ * Testet låser fast formen så att ingen råkar skriva tillbaka frågetecknet. Går det här testet sönder
+ * är inbjudningslänken trasig i drift, medan allt ser rätt ut lokalt — där ingen Worker står emellan.
+ */
+test("inbjudningslänken är en sökväg och aldrig en query-sträng", () => {
+  process.env.REFERRAL_LINK_BASE = "https://loopa.nu";
+  const lank = inbjudningslank("ABCD-EFGH");
+  delete process.env.REFERRAL_LINK_BASE;
+
+  assert.equal(lank, "https://loopa.nu/i/ABCD-EFGH");
+  assert.ok(!lank.includes("?"), "en query-sträng når aldrig appen på loopa.nu — se wrangler.toml");
+  assert.ok(new URL(lank).pathname.startsWith("/i/"), "sökvägen måste ligga under Workerns rutt /i/*");
+});
 
 test("anspråket skriver referred_by en gång och aldrig igen", async () => {
   const { b, pa } = await paret();

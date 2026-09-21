@@ -40,21 +40,33 @@ function skriv(key: string, value: unknown): void {
 }
 
 /**
- * Läser `?ref=` ur adressen och sparar den. Anropas en gång vid start.
+ * Läser inbjudningskoden ur adressen och sparar den. Anropas en gång vid start.
+ *
+ * TVÅ FORMER, och båda måste läsas:
+ *
+ *   /i/KOD      — den delade länken. En SÖKVÄG, för att Cloudflare kan routa sökvägar men inte
+ *                 query-strängar: `/?ref=KOD` nådde aldrig appen på loopa.nu utan fångades av
+ *                 marknadssajten och skickades till /company. Se inbjudningslank på servern.
+ *   ?ref=KOD    — den gamla formen. Läses kvar: länkar som redan delats ska inte dö, och
+ *                 bekräftelsemejlet bär koden så här (medInbjudan) där ingen Worker står emellan.
  *
  * Den SENASTE länken vinner: har någon fått två inbjudningar är det den de faktiskt klickade sist som
- * fick dem att komma. Parametern tas bort ur adressfältet så att den inte följer med när sidan delas
- * vidare — en delad länk ska bära delarens kod, inte den de själva kom via.
+ * fick dem att komma. Koden tas bort ur adressfältet så att den inte följer med när sidan delas
+ * vidare — en delad länk ska bära delarens kod, inte den de själva kom via. För sökvägen betyder det
+ * att adressen blir roten: `/i/KOD` är en inbjudan att gå in genom, ingen sida att stanna på.
  */
 export function fangaInbjudan(): void {
   try {
     const url = new URL(window.location.href);
-    const ref = url.searchParams.get("ref");
+    const urSokvag = /^\/i\/([^/]+)\/?$/.exec(url.pathname)?.[1];
+    const ref = urSokvag ? decodeURIComponent(urSokvag) : url.searchParams.get("ref");
     if (!ref) return;
     const kod = ref.trim().toUpperCase();
     if (KOD_FORM.test(kod)) skriv(KOD_KEY, { kod, sparad: Date.now() });
     url.searchParams.delete("ref");
-    window.history.replaceState(window.history.state, "", url.pathname + url.search + url.hash);
+    // Sökvägsformen lämnar tillbaka besökaren till roten; query-formen behåller sidan de kom till.
+    const vag = urSokvag ? "/" : url.pathname;
+    window.history.replaceState(window.history.state, "", vag + url.search + url.hash);
   } catch {
     // Ingen adress att läsa, eller ingen historik att skriva. Inget att fånga.
   }

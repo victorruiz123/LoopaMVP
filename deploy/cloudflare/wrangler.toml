@@ -33,17 +33,23 @@ compatibility_date = "2026-01-01"
 pattern = "loopa.nu/"
 zone_name = "loopa.nu"
 
-# ─── Roten MED query-sträng ────────────────────────────────────────────────
+# ─── Inbjudningslänken ─────────────────────────────────────────────────────
 #
-# "loopa.nu/" ovan matchar bara roten utan query. loopa.nu/?ref=KOD (inbjudningslänken) och
-# loopa.nu/?utm_source=… gick därför förbi Workern till Pages, som svarade 302 → /company. Det syns
-# på svarshuvudena: Pages-svaren bär access-control-allow-origin: *, våra bär vary: Origin.
-# "/butik*" har aldrig haft problemet, eftersom stjärnan täcker query-strängen.
+# ROTEN MED QUERY GÅR INTE ATT FÅNGA. "loopa.nu/" ovan matchar roten och ingenting annat: läggs
+# något efter "?" är det en annan URL, den matchar ingen rutt, och förfrågan går till Pages som
+# svarar 302 → /company. Det gäller varje query, inte bara ?ref= — pröva själv med /?foo=1.
 #
-# Mönstret matchar ett bokstavligt "?" direkt efter roten, alltså inte /company eller något annat
-# Pages äger. Verifiera efter deploy: curl -sI "https://loopa.nu/?ref=TEST" ska ge 200 med vary: Origin.
+# Och mönstret "loopa.nu/?*" finns inte att ta till: Cloudflare avvisar rutter med query-sträng
+# ("Route pattern should not have query parameters", fel 10022). Det stod en tid här ändå, med en
+# kommentar om att det fungerade. Det gjorde det aldrig — deployen underkände raden, resten av
+# ändringarna gick igenom, och felet såg ut som en bortglömd rutt i stället för en omöjlig.
+#
+# DÄRFÖR ÄR INBJUDAN EN SÖKVÄG. /i/KOD går att routa, appskalet svarar där, och klienten läser koden
+# ur sökvägen (web/src/lib/referral.ts). Verifiera efter deploy:
+#   curl -s -o /dev/null -D - "https://loopa.nu/i/TEST" | grep -iE "^HTTP|^vary"
+# ska ge 200 och "vary: Origin" — inte en location-rad till /company.
 [[routes]]
-pattern = "loopa.nu/?*"
+pattern = "loopa.nu/i/*"
 zone_name = "loopa.nu"
 
 # ─── /salj: den gamla adressen, som fortfarande måste svara ────────────────

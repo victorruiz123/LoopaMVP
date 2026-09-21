@@ -48,12 +48,21 @@ export function inbjudningsbas(): string | null {
 }
 
 /**
- * Länken som delas: loopa.nu/?ref=KOD.
+ * Länken som delas: loopa.nu/i/KOD.
  *
- * Roten, för att det är dit Workern skickar säljflödet och där klienten fångar koden. Utan en satt
- * bas står den kanoniska domänen här — utbetalningsbrevet har ingen sida att fråga, och en länk i
- * ett brev ska fungera.
+ * EN SÖKVÄG OCH INTE EN QUERY, och det är inte en smaksak. Länken var `/?ref=KOD` och ledde i drift
+ * till marknadssajtens företagssida i stället för till inbjudan. Orsaken sitter i Cloudflare:
+ * loopa.nu ägs av Pages, och Workern som håller säljflödet är bunden till en lista av rutter.
+ * Rutten `loopa.nu/` matchar roten UTAN query — läggs något efter `?` är det en annan URL, den
+ * matchar ingen rutt, och förfrågan går till Pages som skickar den vidare till /company. Att lägga
+ * till rutten `loopa.nu/?*` går inte: Cloudflare avvisar mönster med query-sträng (fel 10022).
+ *
+ * En sökväg går däremot att routa. `loopa.nu/i/*` är Workerns, appskalet svarar där (serveStatic
+ * lämnar index.html för allt som inte är en fil), och klienten läser koden ur sökvägen.
+ *
+ * `?ref=` läses fortfarande av klienten, så länkar som redan delats fungerar överallt där Pages inte
+ * står i vägen — lokalt, på app.loopa.nu och i mejlen.
  */
 export function inbjudningslank(kod: string): string {
-  return `${inbjudningsbas() ?? "https://loopa.nu"}/?ref=${encodeURIComponent(kod)}`;
+  return `${inbjudningsbas() ?? "https://loopa.nu"}/i/${encodeURIComponent(kod)}`;
 }
