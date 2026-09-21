@@ -246,6 +246,27 @@ export async function efterForstaAnnons(input: {
   const delad = delarIdentitet(inbjudare, profil);
   if (delad) return neka("delar_identitet", delad);
 
+  /**
+   * SAMMA PERSON EN GÅNG TILL, under ett nytt konto.
+   *
+   * Skyddet ovan jämför inbjudaren mot den inbjudna, och stoppar den som bjuder in sig själv. Men
+   * det ser inte de inbjudna sinsemellan: fem konton med var sin e-postadress, alla med samma
+   * telefon eller samma adress, gav fem krediter så länge ingen av dem delade uppgift med
+   * inbjudaren. Regeln är en kredit per PERSON, inte en per konto — annars är inbjudan en knapp som
+   * trycker fram gratis provisioner åt den som orkar skapa konton.
+   *
+   * Jämförs mot dem som faktiskt gett en kredit, inte mot alla som någonsin klickat: en nekad
+   * inbjuden ska inte kunna blockera en riktig vän som råkar ha samma avtryck av något skäl vi inte
+   * tänkt på. Listan är kort — taket ovan håller den under tio i praktiken.
+   */
+  for (const tidigare of await krediterFor(inbjudare.userId, nu)) {
+    if (!tidigare.referredUserId || tidigare.referredUserId === profil.userId) continue;
+    const syskon = await store.profil(tidigare.referredUserId);
+    if (!syskon) continue;
+    const samma = delarIdentitet(syskon, profil);
+    if (samma) return neka("delar_identitet", `tidigare_inbjuden_${samma}`);
+  }
+
   if (tillgangliga(await krediterFor(inbjudare.userId, nu), nu).length >= MAX_TILLGANGLIGA) {
     return neka("tak", `max_${MAX_TILLGANGLIGA}_tillgangliga`);
   }

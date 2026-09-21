@@ -732,7 +732,9 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    * Hoppas över vid ett omval: då har säljaren redan svarat, och listan ska inte hämtas på nytt.
    */
   if (job.variantChosen == null) {
-    void hamtaVarianter(brand, model)
+    // Möbeltypen följer med. Utan den blev frågan ställd om hela serien: "Nordviken stol" gav val
+    // mellan matbord, barstol och bänk. Se pipeline/varianter.ts.
+    void hamtaVarianter(brand, model, job.selected?.productType ?? null)
       .then(async (varianter) => {
         const fresh = getJobSync(jobId) ?? (await getJob(jobId));
         if (!fresh || fresh.variantChosen != null) return;

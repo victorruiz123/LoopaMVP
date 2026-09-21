@@ -159,6 +159,40 @@ test("en inbjuden ger högst en kredit, hur många annonser de än lägger upp",
   assert.equal((await krediterFor(a.id, NU)).length, 1);
 });
 
+/**
+ * EN KREDIT PER PERSON, INTE PER KONTO.
+ *
+ * Skyddet mot att bjuda in sig själv jämförde inbjudaren mot den inbjudna, men aldrig de inbjudna
+ * mot varandra. Den som orkade skapa fem konton med var sin e-postadress fick därför fem krediter,
+ * så länge inget av kontona delade uppgift med inbjudaren själv — och inbjudan blev en knapp som
+ * trycker fram gratis provisioner.
+ */
+test("samma person under ett nytt konto ger ingen andra kredit", async () => {
+  const { a, pa } = await paret();
+  // Första vännen: eget konto, egen adress, egen telefon. Ger en kredit.
+  const van = konto({ telefon: "070-111 22 33", adress: { gatuadress: "Vägen 5", postnummer: "11144" } });
+  assert.equal(await gorAnsprak(van, pa.kod, false, NU), "ok");
+  assert.equal((await efterForstaAnnons({ saljarId: van.id, saleId: "LP-10", nu: NU })).utfall, "kredit");
+
+  // Samma person igen: ny adress och ny e-post, men telefonen är densamma.
+  const igen = konto({ telefon: "0701112233", adress: { gatuadress: "Vägen 9", postnummer: "11155" } });
+  assert.equal(await gorAnsprak(igen, pa.kod, false, NU), "ok");
+  const r = await efterForstaAnnons({ saljarId: igen.id, saleId: "LP-11", nu: NU });
+
+  assert.equal(r.utfall, "delar_identitet");
+  assert.equal((await krediterFor(a.id, NU)).length, 1, "inbjudaren ska ha EN kredit, inte två");
+});
+
+test("två riktiga vänner med var sina uppgifter ger var sin kredit", async () => {
+  const { a, pa } = await paret();
+  for (const [i, tel] of [["LP-20", "070-111 00 01"], ["LP-21", "070-222 00 02"]]) {
+    const v = konto({ telefon: tel, adress: { gatuadress: `Egen gata ${i}`, postnummer: `1119${i.slice(-1)}` } });
+    assert.equal(await gorAnsprak(v, pa.kod, false, NU), "ok");
+    assert.equal((await efterForstaAnnons({ saljarId: v.id, saleId: i, nu: NU })).utfall, "kredit");
+  }
+  assert.equal((await krediterFor(a.id, NU)).length, 2, "skyddet får inte fälla riktiga inbjudningar");
+});
+
 test("en säljare utan inbjudare utlöser ingenting", async () => {
   const c = konto();
   await profilFor(c, NU);
