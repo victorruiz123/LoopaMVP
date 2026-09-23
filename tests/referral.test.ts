@@ -31,7 +31,7 @@ const butik = await import("../server/src/butik/store.js");
 const { createJob, persist } = await import("../server/src/jobStore.js");
 const webbFees = await import("../web/src/lib/fees.js");
 
-const { gorAnsprak, profilFor, efterForstaAnnons, anvandKredit, krediterFor, tillgangliga, MAX_TILLGANGLIGA } = regler;
+const { gorAnsprak, profilFor, efterForstaAnnons, anvandKredit, krediterFor, tillgangliga, MAX_TILLGANGLIGA, gava } = regler;
 
 // ─── hjälpare ───────────────────────────────────────────────────────────────
 
@@ -137,6 +137,43 @@ test("anspråket nekas för egna koder och koder som inte finns", async () => {
 test("anspråket i sig ger ingen kredit — först vännens annons gör det", async () => {
   const { a } = await paret();
   assert.equal((await krediterFor(a.id, NU)).length, 0);
+});
+
+// ─── gåvan ─────────────────────────────────────────────────────────────────
+//
+// Kampanjen 2026-09-23: alla som redan var med fick sin nästa försäljning gratis. Krediten är samma
+// sak som en inbjudningskredit i allt utom varifrån den kom — och den ges högst en gång per person,
+// så skriptet som delar ut den kan köras om.
+
+test("gåvan ger en kredit utan inbjuden, och bara en per person", async () => {
+  const a = konto();
+  const forsta = await gava(a, NU);
+  assert.equal(forsta.utfall, "gava");
+  assert.equal(forsta.kredit!.referredUserId, null);
+  assert.equal(forsta.kredit!.kalla, "gava");
+  assert.equal(forsta.kredit!.expiresAt, "2027-09-18T10:00:00.000Z");
+
+  const igen = await gava(a, NU);
+  assert.equal(igen.utfall, "redan_gava");
+  assert.equal(igen.kredit!.id, forsta.kredit!.id, "samma kredit tillbaka, ingen ny");
+  assert.equal((await krediterFor(a.id, NU)).length, 1);
+});
+
+test("gåvan går att använda på nästa möbel, precis som en inbjudningskredit", async () => {
+  const a = konto();
+  await gava(a, NU);
+  const anvand = await anvandKredit(a.id, "LP-GAVA", NU);
+  assert.equal(anvand?.usedOnSaleId, "LP-GAVA");
+  assert.equal(tillgangliga(await krediterFor(a.id, NU), NU).length, 0);
+});
+
+test("gåvan hindrar inte inbjudningarna — de lever sida vid sida", async () => {
+  const { a, b } = await paret();
+  assert.equal((await gava(a, NU)).utfall, "gava");
+  assert.equal((await efterForstaAnnons({ saljarId: b.id, saleId: "LP-20", nu: NU })).utfall, "kredit");
+  const krediter = await krediterFor(a.id, NU);
+  assert.equal(krediter.length, 2);
+  assert.deepEqual(krediter.map((k) => k.kalla).sort(), ["gava", "inbjudan"]);
 });
 
 // ─── triggern ──────────────────────────────────────────────────────────────

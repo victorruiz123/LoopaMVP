@@ -253,7 +253,9 @@ export async function hamtaMinInbjudare(): Promise<{ oppen: boolean; namn: strin
 }
 
 /** En ny gratisförsäljning som inbjudaren inte sett än. Driver popupen. */
-export async function hamtaNyKredit(): Promise<{ kredit: { id: string; van: string | null; garUt: string } | null }> {
+export async function hamtaNyKredit(): Promise<{
+  kredit: { id: string; kalla: "inbjudan" | "gava"; van: string | null; garUt: string } | null;
+}> {
   return json(await authFetch("/api/salj/inbjudan/nytt"));
 }
 

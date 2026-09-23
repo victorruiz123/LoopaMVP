@@ -153,14 +153,16 @@ export async function handleInbjudan(
   }
 
   /**
-   * GET /api/salj/inbjudan/nytt — en ny gratisförsäljning som inbjudaren inte sett än, med vännens
+   * GET /api/salj/inbjudan/nytt — en ny gratisförsäljning som mottagaren inte sett än, med vännens
    * förnamn. Driver popupen "Din nästa försäljning är gratis!". Egen och liten, för att appen frågar
    * vid varje besök och när fliken kommer tillbaka i fokus — hela profilsvaret vore onödigt tungt.
+   *
+   * `kalla` avgör vad popupen säger: en gåva har ingen vän att nämna (regler.ts, gava).
    */
   if (segments.length === 2 && segments[1] === "nytt" && req.method === "GET") {
     const ny = tillgangliga(await krediterFor(konto.id)).find((k) => !k.visadAt) ?? null;
-    const van = ny ? await referralStore().profil(ny.referredUserId) : null;
-    svara(res, 200, { kredit: ny ? { id: ny.id, van: van?.namn ?? null, garUt: ny.expiresAt } : null });
+    const van = ny?.referredUserId ? await referralStore().profil(ny.referredUserId) : null;
+    svara(res, 200, { kredit: ny ? { id: ny.id, kalla: ny.kalla, van: van?.namn ?? null, garUt: ny.expiresAt } : null });
     return true;
   }
 

@@ -57,12 +57,27 @@ export interface ReferralProfil {
 
 export type KreditStatus = "available" | "used" | "expired";
 
+/**
+ * Varifrån krediten kom.
+ *
+ * "inbjudan" är regeln (regler.ts): någon bjöd in någon. "gava" är Loopa som ger bort en försäljning
+ * utan att någon bjudit in någon — kampanjen 2026-09-23, då alla som redan fanns hos oss fick sin
+ * nästa försäljning gratis. Krediterna är i övrigt samma sak: samma giltighetstid, samma val vid
+ * publiceringen, samma nollade andel. Skillnaden syns bara i beskedet.
+ */
+export type KreditKalla = "inbjudan" | "gava";
+
 export interface ReferralKredit {
   id: string;
-  /** Mottagaren — den som bjöd in. */
+  /** Mottagaren — den som bjöd in, eller den vi gav en gåva. */
   userId: string;
-  /** Den inbjudna vars första försäljning gav krediten. UNIK: en kredit per inbjuden person, någonsin. */
-  referredUserId: string;
+  /**
+   * Den inbjudna vars första annons gav krediten. UNIK: en kredit per inbjuden person, någonsin.
+   * NULL för en gåva — den kommer från oss, inte från någon som registrerat sig.
+   */
+  referredUserId: string | null;
+  /** Se KreditKalla. En gåva ges högst en gång per person — det är lagrets garanti, se skapaKredit. */
+  kalla: KreditKalla;
   status: KreditStatus;
   /** Butikens produkt-id (Loopa-ID:t) för möbeln krediten användes på. */
   usedOnSaleId: string | null;
@@ -79,7 +94,9 @@ export type ReferralHandelseNamn =
   | "referral_credit_created"
   | "referral_credit_used"
   /** Inte i uppdragets lista, men utan den går det inte att se i efterhand VARFÖR en kredit uteblev. */
-  | "referral_credit_denied";
+  | "referral_credit_denied"
+  /** Loopa gav bort en försäljning, utan att någon bjudit in någon. Se regler.ts, gavaTill. */
+  | "referral_gift_granted";
 
 /**
  * En rad i huvudboken. Bär user_id och kod — till skillnad från analys/store.ts, som med flit är
@@ -111,7 +128,12 @@ export interface ReferralStore {
 
   krediter(userId: string): Promise<ReferralKredit[]>;
   kreditForInbjuden(referredUserId: string): Promise<ReferralKredit | null>;
-  /** Falskt om den inbjudna redan gett en kredit. Det är lagrets garanti, inte bara reglernas. */
+  /** Personens gåva, om de fått en. Kampanjen körs om utan att någon får två. */
+  gavaFor(userId: string): Promise<ReferralKredit | null>;
+  /**
+   * Falskt om krediten redan finns: den inbjudna har redan gett en, eller personen har redan fått
+   * sin gåva. Det är lagrets garanti, inte bara reglernas.
+   */
   skapaKredit(k: ReferralKredit): Promise<boolean>;
   /** Popupen är visad. Villkorat på mottagaren — ingen kan kvittera någon annans kredit. */
   markeraVisad(id: string, userId: string, at: string): Promise<void>;
@@ -155,7 +177,8 @@ class FileStore implements ReferralStore {
     if (this.kreditMap) return this.kreditMap;
     try {
       const rows = JSON.parse(await readFile(path.join(DIR(), "krediter.json"), "utf-8")) as ReferralKredit[];
-      this.kreditMap = new Map(rows.map((r) => [r.id, r]));
+      // Raderna som skrevs före gåvorna saknar `kalla`. De är allihop inbjudningar.
+      this.kreditMap = new Map(rows.map((r) => [r.id, { ...r, kalla: r.kalla ?? "inbjudan" }]));
     } catch {
       this.kreditMap = new Map();
     }
@@ -222,14 +245,26 @@ class FileStore implements ReferralStore {
   }
 
   async kreditForInbjuden(referredUserId: string) {
-    for (const k of (await this.lasKrediter()).values()) if (k.referredUserId === referredUserId) return k;
+    for (const k of (await this.lasKrediter()).values()) if (k.referredUserId && k.referredUserId === referredUserId) return k;
     return null;
   }
 
+  async gavaFor(userId: string) {
+    for (const k of (await this.lasKrediter()).values()) if (k.kalla === "gava" && k.userId === userId) return k;
+    return null;
+  }
+
+  /** Motsvarar Supabase-ryggens två unika index: en kredit per inbjuden, och en gåva per person. */
   skapaKredit(k: ReferralKredit) {
     return serialize(async () => {
       const map = await this.lasKrediter();
-      for (const q of map.values()) if (q.referredUserId === k.referredUserId) return false;
+      for (const q of map.values()) {
+        const krock =
+          k.kalla === "gava"
+            ? q.kalla === "gava" && q.userId === k.userId
+            : q.referredUserId !== null && q.referredUserId === k.referredUserId;
+        if (krock) return false;
+      }
       map.set(k.id, k);
       await this.sparaKrediter();
       return true;
@@ -335,7 +370,8 @@ function kreditFranRad(r: Record<string, any>): ReferralKredit {
   return {
     id: r.id,
     userId: r.user_id,
-    referredUserId: r.referred_user_id,
+    referredUserId: r.referred_user_id ?? null,
+    kalla: r.source === "gift" ? "gava" : "inbjudan",
     status: r.status,
     usedOnSaleId: r.used_on_sale_id ?? null,
     usedAt: r.used_at ?? null,
@@ -412,12 +448,18 @@ class SupabaseStore implements ReferralStore {
     return rows?.[0] ? kreditFranRad(rows[0]) : null;
   }
 
+  async gavaFor(userId: string) {
+    const rows = await call<Record<string, any>[]>("GET", `referral_credits?user_id=eq.${q(userId)}&source=eq.gift`);
+    return rows?.[0] ? kreditFranRad(rows[0]) : null;
+  }
+
   async skapaKredit(k: ReferralKredit) {
     try {
       await call("POST", "referral_credits", {
         id: k.id,
         user_id: k.userId,
         referred_user_id: k.referredUserId,
+        source: k.kalla === "gava" ? "gift" : "invite",
         status: k.status,
         used_on_sale_id: k.usedOnSaleId,
         used_at: k.usedAt,

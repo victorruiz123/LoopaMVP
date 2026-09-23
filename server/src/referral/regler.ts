@@ -275,6 +275,7 @@ export async function efterForstaAnnons(input: {
     id: randomUUID(),
     userId: inbjudare.userId,
     referredUserId: profil.userId,
+    kalla: "inbjudan",
     status: "available",
     usedOnSaleId: null,
     usedAt: null,
@@ -285,6 +286,54 @@ export async function efterForstaAnnons(input: {
 
   await logga("referral_credit_created", inbjudare.userId, inbjudare.kod, { referred_user_id: profil.userId, sale_id: input.saleId, credit_id: kredit.id }, nu);
   return { utfall: "kredit", kredit };
+}
+
+// ---------------------------------------------------------------------------
+// Gåvan — en kredit utan inbjudan
+// ---------------------------------------------------------------------------
+
+export type GavaUtfall = "gava" | "redan_gava";
+
+/**
+ * Loopa ger bort en försäljning. Ingen har bjudit in någon; vi vill bara ge den som redan är med
+ * något. Kampanjen 2026-09-23 gav den till alla konton som fanns då — se scripts/gratis-till-alla.ts.
+ *
+ * SAMMA KREDIT SOM INBJUDNINGARNAS, i allt som händer sedan: tolv månader, valet vid publiceringen,
+ * andelen 0 på möbeln. Bara två saker skiljer, och båda ligger i `kalla`:
+ *
+ *   - `referredUserId` är null. Det finns ingen inbjuden att peka på.
+ *   - popupen säger "Vi vill ge dig en gratis försäljning!" i stället för "{namn} har lagt upp sin
+ *     första annons." Se web/src/components/GratisPopup.tsx.
+ *
+ * EN GÅVA PER PERSON, någonsin — lagret garanterar det, så skriptet kan köras om utan att någon får
+ * två. Taket (MAX_TILLGANGLIGA) prövas inte här: gåvan är vårt beslut, inte något någon kan trycka
+ * fram, och den som redan har tio krediter ska inte bli den enda som blir utan när vi bjuder alla.
+ * Den räknas däremot MED i taket sedan, precis som alla andra krediter.
+ */
+export async function gava(konto: Konto, nu: Date = new Date()): Promise<{ utfall: GavaUtfall; kredit: ReferralKredit | null }> {
+  const store = referralStore();
+  // Profilen måste finnas innan krediten kan peka på den (referral_credits.user_id → profilen).
+  const profil = await profilFor(konto, nu);
+
+  const redan = await store.gavaFor(konto.id);
+  if (redan) return { utfall: "redan_gava", kredit: redan };
+
+  const kredit: ReferralKredit = {
+    id: randomUUID(),
+    userId: konto.id,
+    referredUserId: null,
+    kalla: "gava",
+    status: "available",
+    usedOnSaleId: null,
+    usedAt: null,
+    createdAt: nu.toISOString(),
+    expiresAt: plusManader(nu, KREDIT_GILTIG_MANADER).toISOString(),
+  };
+  // Falskt = någon annan körning hann före. Gåvan finns, och den finns bara en gång.
+  if (!(await store.skapaKredit(kredit))) return { utfall: "redan_gava", kredit: await store.gavaFor(konto.id) };
+
+  await logga("referral_gift_granted", konto.id, profil.kod, { credit_id: kredit.id }, nu);
+  return { utfall: "gava", kredit };
 }
 
 // ---------------------------------------------------------------------------

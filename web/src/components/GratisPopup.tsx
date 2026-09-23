@@ -6,6 +6,10 @@ import { useT } from "../lib/i18n";
 /**
  * "Din nästa försäljning är gratis!" — till inbjudaren, när vännen lagt upp sin första annons.
  *
+ * TVÅ ANLEDNINGAR, en ruta. `kalla` säger vilken: "inbjudan" är vännens annons, "gava" är vi som gav
+ * bort en försäljning utan att någon bjudit in någon (regler.ts, gava). Det som skiljer är rubriken
+ * och meningen ovanför — löftet under är detsamma, för krediten är det.
+ *
  * EN GÅNG PER KREDIT. Servern håller reda på vad som visats (referral_credits.shown_at), så beskedet
  * kommer på den enhet där inbjudaren råkar vara och inte igen på nästa.
  *
@@ -17,7 +21,7 @@ import { useT } from "../lib/i18n";
 export default function GratisPopup() {
   const t = useT();
   const { user } = useAuth();
-  const [kredit, setKredit] = useState<{ id: string; van: string | null } | null>(null);
+  const [kredit, setKredit] = useState<{ id: string; kalla: "inbjudan" | "gava"; van: string | null } | null>(null);
 
   const kolla = useCallback(() => {
     if (!user) return;
@@ -46,11 +50,15 @@ export default function GratisPopup() {
       <div className="gratis-scrim" onClick={stang} />
       <div className="gratis-popup">
         <div className="gratis-popup-ikon" aria-hidden>🎉</div>
-        <h2 id="gratis-rubrik">{t("Din nästa försäljning är gratis!")}</h2>
+        <h2 id="gratis-rubrik">
+          {kredit.kalla === "gava" ? t("Vi vill ge dig en gratis försäljning!") : t("Din nästa försäljning är gratis!")}
+        </h2>
         <p>
-          {kredit.van
-            ? t("{namn} har lagt upp sin första annons.", { namn: kredit.van })
-            : t("Din vän har lagt upp sin första annons.")}{" "}
+          {kredit.kalla === "gava"
+            ? t("Som tack för att du är med oss bjuder vi dig på en försäljning.")
+            : kredit.van
+              ? t("{namn} har lagt upp sin första annons.", { namn: kredit.van })
+              : t("Din vän har lagt upp sin första annons.")}{" "}
           {t("På nästa möbel du säljer tar Loopa ingen avgift – du får hela priset.")}
         </p>
         <button className="btn btn-primary" onClick={stang} autoFocus>
