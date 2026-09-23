@@ -36,3 +36,10 @@ blocket-session.b64
 # raden ser skriptets egen kontroll i steg 1 mappen som en lokal ändring och avbryter NÄSTA
 # utrullning — en spärr som utlöses av det förra steget i samma skript.
 ms-playwright/
+
+# Utskicket: listor, brev och loggar med personuppgifter. Skapas av scripts/grupper.cjs och
+# scripts/utskick.cjs, och hör hemma på den dator som gjorde utskicket — aldrig i historiken.
+grupper*.csv
+mall*.txt
+utskick-logg.csv
+utskick-forhandsvisning/

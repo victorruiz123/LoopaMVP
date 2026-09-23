@@ -50,6 +50,8 @@ export interface AdminAccount {
   totalValue: number;
   /** Senaste jobbet, som ISO-tid. Null för ett konto som aldrig filmat något. */
   lastActivity: string | null;
+  /** Telefonnumret ur profiltabellen. Null när kontot inte lämnat något. */
+  telefon: string | null;
   /**
    * När kontot registrerades. Null när varken Supabase eller jobben kan säga det — kontot syns ändå,
    * men sist i listan: okänt är inte samma sak som gammalt. Se `jamforSenastRegistrerad`.
@@ -103,12 +105,21 @@ interface DirectoryRow {
   avatarUrl: string | null;
   /** Registreringstillfället, när katalogen kan säga det. */
   createdAt: string | null;
+  /**
+   * Telefonnumret ur `profiles`, inte ur Auth.
+   *
+   * Auth-fältet är tomt på samtliga konton: numren skrevs in i Vips registrering, som sparar dem i
+   * profiltabellen. Panelen läste bara Auth och visade därför "Saknas" för 180 konton som HAR ett
+   * nummer. Katalogen bär det nu hela vägen ut i listan.
+   */
+  telefon?: string | null;
 }
 
 interface ProfileRow {
   user_id: string | null;
   username: string | null;
   full_name: string | null;
+  phone?: string | null;
   avatar_url: string | null;
   email: string | null;
   created_at?: string | null;
@@ -148,7 +159,11 @@ const serviceRoleKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || nu
  * tappar registreringsdatumet och en panel som tappar namnen också.
  */
 async function fetchProfiles(apikey: string, bearer: string): Promise<DirectoryRow[] | null> {
-  const columns = ["user_id,username,full_name,avatar_url,email,created_at", "user_id,username,full_name,avatar_url,email"];
+  const columns = [
+    "user_id,username,full_name,avatar_url,email,phone,created_at",
+    "user_id,username,full_name,avatar_url,email,created_at",
+    "user_id,username,full_name,avatar_url,email",
+  ];
   for (const select of columns) {
     try {
       const url = `${supabaseUrl()}/rest/v1/profiles?select=${select}`;
@@ -164,6 +179,7 @@ async function fetchProfiles(apikey: string, bearer: string): Promise<DirectoryR
           name: r.full_name || r.username || null,
           avatarUrl: r.avatar_url,
           createdAt: r.created_at ?? null,
+          telefon: textOrNull(r.phone),
         }));
     } catch {
       return null;
@@ -245,6 +261,9 @@ async function fetchDirectory(token: string | null): Promise<{ rows: DirectoryRo
             name: u.name ?? p?.name ?? null,
             avatarUrl: u.avatarUrl ?? p?.avatarUrl ?? null,
             createdAt: u.createdAt ?? p?.createdAt ?? null,
+            // Auth har inget telefonnummer på ett enda konto — numren bor i profilen. Utan den här
+            // raden nådde de aldrig listan, hur många profiler som än hade ett.
+            telefon: u.telefon ?? p?.telefon ?? null,
           };
         }),
         source: "service",
@@ -277,6 +296,7 @@ function blank(row: DirectoryRow): AdminAccount {
     cardCount: 0,
     totalValue: 0,
     lastActivity: null,
+    telefon: row.telefon ?? null,
     signedUpAt: row.createdAt,
     signupApproximate: false,
   };
@@ -367,7 +387,12 @@ export interface AdminKontoAdress {
  */
 export interface AdminKontoDetalj extends AdminAccount {
   adress: AdminKontoAdress | null;
-  telefon: string | null;
+  /** Användarnamnet i profiltabellen — namnet kontot har i Vips. */
+  anvandarnamn: string | null;
+  /** Säljarens egen presentation. Finns på ett fåtal konton. */
+  bio: string | null;
+  /** "registrering" = adressen fylldes i hos oss. "profil" = den kommer ur Vips profiltabell. */
+  adressKalla: "registrering" | "profil" | null;
   senastInloggad: string | null;
   /** När e-postadressen bekräftades. Null = obekräftad, vilket är en upplysning i sig. */
   epostBekraftad: string | null;
@@ -404,6 +429,72 @@ function adressUrMetadata(metadata: unknown): AdminKontoAdress | null {
   return Object.values(adress).some(Boolean) ? adress : null;
 }
 
+/** Profilraden som Vips registrering fyller. Varje kolumn läses defensivt — tabellen ägs av dem. */
+interface ProfilDetaljRad {
+  username?: string | null;
+  full_name?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  bio?: string | null;
+  avatar_url?: string | null;
+  street_address?: string | null;
+  postal_code?: string | null;
+  location?: string | null;
+  is_apartment?: boolean | null;
+  apartment_number?: string | number | null;
+  door_code?: string | null;
+}
+
+/**
+ * Profilen för ETT konto.
+ *
+ * Kolumnlistan provas i fallande ordning av samma skäl som `fetchProfiles`: tabellen delas med Vips,
+ * och PostgREST svarar 400 på hela frågan om en enda kolumn saknas. Hellre färre fält än inga.
+ */
+async function fetchProfil(serviceKey: string, id: string): Promise<ProfilDetaljRad | null> {
+  const listor = [
+    "username,full_name,phone,email,bio,avatar_url,street_address,postal_code,location,is_apartment,apartment_number,door_code",
+    "username,full_name,phone,email,street_address,postal_code,location",
+    "username,full_name,phone,email",
+  ];
+  for (const select of listor) {
+    try {
+      const url = `${supabaseUrl()}/rest/v1/profiles?select=${select}&user_id=eq.${encodeURIComponent(id)}&limit=1`;
+      const res = await fetch(url, { headers: { apikey: serviceKey, Authorization: `Bearer ${serviceKey}` } });
+      if (!res.ok) continue;
+      const rader = (await res.json()) as ProfilDetaljRad[];
+      if (Array.isArray(rader) && rader.length > 0) return rader[0];
+      // Tom lista = kontot har ingen profilrad. Fler kolumnlistor ger inte heller någon.
+      return null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Adressen som den står i Vips profil.
+ *
+ * FÄLTEN HETER ANNAT DÄR, och två av dem betyder inte riktigt samma sak: `location` är en fritext
+ * ("Enskede, Stockholm") och inte en ren postort, och `is_apartment` är en boolean där vår egen
+ * registrering har ordet "hus" eller "lagenhet". Översättningen sker här, en gång, i stället för att
+ * varje läsare får gissa.
+ */
+function adressUrProfil(profil: ProfilDetaljRad | null): AdminKontoAdress | null {
+  if (!profil) return null;
+  const vaning = profil.apartment_number;
+  const adress: AdminKontoAdress = {
+    gatuadress: textOrNull(profil.street_address),
+    postnummer: textOrNull(profil.postal_code),
+    ort: textOrNull(profil.location),
+    boende: profil.is_apartment === true ? "lagenhet" : profil.is_apartment === false ? "hus" : null,
+    portkod: textOrNull(profil.door_code),
+    vaning: textOrNull(typeof vaning === "number" ? String(vaning) : vaning),
+  };
+  return Object.values(adress).some(Boolean) ? adress : null;
+}
+
 /**
  * ETT konto ur Supabase Auth, med servicenyckeln.
  *
@@ -435,27 +526,51 @@ async function fetchAuthUser(serviceKey: string, id: string): Promise<AuthUserRo
  */
 export async function kontoDetalj(id: string): Promise<AdminKontoDetalj | null> {
   const serviceKey = serviceRoleKey();
-  const [auth, jobs] = await Promise.all([serviceKey ? fetchAuthUser(serviceKey, id) : null, listJobs()]);
+  /**
+   * AUTH OCH PROFIL ÄR TVÅ HALVOR, och panelen visade länge bara den ena.
+   *
+   * Auth vet när kontot loggade in och om e-posten är bekräftad. Profiltabellen — den Vips
+   * registrering fyller — vet vad personen heter, var de bor och vilket nummer de har. Läser man
+   * bara Auth står det "Saknas" på 180 konton som lämnat både adress och telefon. Båda hämtas nu,
+   * parallellt, och Auth får företräde bara där den faktiskt har något.
+   */
+  const [auth, profil, jobs] = await Promise.all([
+    serviceKey ? fetchAuthUser(serviceKey, id) : null,
+    serviceKey ? fetchProfil(serviceKey, id) : null,
+    listJobs(),
+  ]);
 
   const egna = jobs.filter((job) => ownerIdOf(job) === id);
-  if (!auth && egna.length === 0) return null;
+  if (!auth && !profil && egna.length === 0) return null;
+
+  // Vår egen registrering först: den adressen är lämnad TILL OSS för hämtning och leverans, medan
+  // profilens är lämnad till Vips. Står båda är vår den färskare.
+  const egenAdress = adressUrMetadata(auth?.user_metadata);
+  const profilAdress = adressUrProfil(profil);
 
   const konto: AdminKontoDetalj = {
     ...blank({
       id,
-      email: auth?.email ?? null,
-      name: auth?.user_metadata?.full_name || auth?.user_metadata?.name || null,
-      avatarUrl: auth?.user_metadata?.avatar_url ?? null,
+      email: auth?.email ?? textOrNull(profil?.email),
+      name:
+        auth?.user_metadata?.full_name ||
+        auth?.user_metadata?.name ||
+        textOrNull(profil?.full_name) ||
+        textOrNull(profil?.username),
+      avatarUrl: auth?.user_metadata?.avatar_url ?? textOrNull(profil?.avatar_url),
       createdAt: auth?.created_at ?? null,
     }),
-    adress: adressUrMetadata(auth?.user_metadata),
-    telefon: textOrNull(auth?.phone) ?? textOrNull(auth?.user_metadata?.telefon),
+    adress: egenAdress ?? profilAdress,
+    adressKalla: egenAdress ? "registrering" : profilAdress ? "profil" : null,
+    anvandarnamn: textOrNull(profil?.username),
+    bio: textOrNull(profil?.bio),
+    telefon: textOrNull(auth?.phone) ?? textOrNull(auth?.user_metadata?.telefon) ?? textOrNull(profil?.phone),
     senastInloggad: auth?.last_sign_in_at ?? null,
     epostBekraftad: auth?.email_confirmed_at ?? auth?.confirmed_at ?? null,
     inloggningssatt: Array.isArray(auth?.app_metadata?.providers)
       ? (auth!.app_metadata!.providers as string[]).filter((p): p is string => typeof p === "string")
       : [],
-    kalla: auth ? "auth" : "jobb",
+    kalla: auth || profil ? "auth" : "jobb",
   };
 
   for (const job of egna) {

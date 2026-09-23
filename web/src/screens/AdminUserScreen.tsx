@@ -210,6 +210,7 @@ function tomtKonto(id: string): AdminUser {
     jobCount: 0,
     cardCount: 0,
     totalValue: 0,
+    telefon: null,
     lastActivity: null,
     signedUpAt: null,
     signupApproximate: false,
@@ -265,6 +266,12 @@ function KontoFlik({ konto, fel, userId }: { konto: AdminKontoDetalj | null; fel
           <Fakta etikett={t("Ort")} varde={a.ort} />
           <Fakta etikett={t("Boende")} varde={a.boende === "hus" ? t("Hus") : a.boende === "lagenhet" ? t("Lägenhet") : a.boende} />
           <Fakta etikett={t("Portkod")} varde={a.portkod} />
+          {/* Varifrån adressen kom. En adress ur Vips-profilen är lämnad till någon annan tjänst, och
+              den skillnaden ska synas innan någon kör en budbil dit. */}
+          <Fakta
+            etikett={t("Källa")}
+            varde={konto.adressKalla === "registrering" ? t("Registreringen hos Loopa") : t("Profilen i Vips")}
+          />
           {/* Våningen frågas bara i lägenhet — i ett hus är den inte tom, den finns inte. */}
           {a.boende !== "hus" && <Fakta etikett={t("Våning")} varde={a.vaning} />}
         </dl>
@@ -280,6 +287,7 @@ function KontoFlik({ konto, fel, userId }: { konto: AdminKontoDetalj | null; fel
       <dl className="admin-faktalista">
         <Fakta etikett={t("E-post")} varde={konto.email} />
         <Fakta etikett={t("Telefon")} varde={konto.telefon} />
+        <Fakta etikett={t("Användarnamn")} varde={konto.anvandarnamn} />
         <Fakta
           etikett={t("Registrerad")}
           varde={konto.signedUpAt ? formatDate(konto.signedUpAt) : null}
@@ -295,6 +303,15 @@ function KontoFlik({ konto, fel, userId }: { konto: AdminKontoDetalj | null; fel
         <Fakta etikett={t("Roll")} varde={konto.isAdmin ? t("Admin") : t("Säljare")} />
         <Fakta etikett={t("Konto-id")} varde={userId} />
       </dl>
+
+      {/* Presentationen står som säljarens egna ord och inte som en faktarad: den är skriven av en
+          människa om sig själv, och elva av tvåhundrasjuttio konton har en. */}
+      {konto.bio && (
+        <>
+          <h2 className="profile-section-title">{t("Presentation")}</h2>
+          <p className="admin-bio">{konto.bio}</p>
+        </>
+      )}
 
       <h2 className="profile-section-title">{t("Siffror")}</h2>
       <dl className="admin-faktalista">

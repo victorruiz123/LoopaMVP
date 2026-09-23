@@ -3175,6 +3175,12 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 /* Strecket är inte ett värde. Det står dämpat så att en tom uppgift inte läses som en ifylld. */
 .admin-fakta-tomt { color: var(--muted-soft); }
 .admin-fakta-notis { display: block; font-size: var(--fs-xs); color: var(--muted); }
+/* Säljarens egen presentation: brödtext och inte en faktarad, för det är en människas ord. */
+.admin-bio {
+  margin: 0 0 18px; padding: 12px 14px; border-radius: var(--r); background: var(--field);
+  font-size: var(--fs-sm); line-height: 1.5; color: var(--ink-soft); white-space: pre-wrap;
+}
+
 .admin-tomt { font-size: var(--fs-sm); color: var(--muted); margin: 0 0 20px; }
 .admin-notis {
   font-size: var(--fs-sm); color: var(--muted); margin: 0 0 16px;
@@ -3314,6 +3320,44 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
    --------------------------------------------------------------------------
    Två val, och de ska läsas som två val — inte som en knapp bredvid en rubrik.
    Den valda bär ytan och bläcket, den andra bara texten. */
+/* ---- utskicket ----
+   En kolumn: skriv brevet, se det ifyllt, bocka av listan, tryck. Ordningen är den man arbetar i. */
+.utskick-falt { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+.utskick-falt input, .utskick-brev {
+  width: 100%; border: 1px solid var(--border); border-radius: var(--r); background: var(--surface);
+  color: var(--ink); font-family: inherit; font-size: var(--fs-base); padding: 12px 14px;
+}
+.utskick-falt input[readonly] { background: var(--field); color: var(--muted); }
+.utskick-brev { line-height: 1.55; resize: vertical; min-height: 220px; }
+.utskick-forhands {
+  margin: 4px 0 18px; padding: 14px; border: 1px solid var(--hairline); border-radius: var(--r);
+  background: var(--field);
+}
+.utskick-forhands-amne { margin: 6px 0 10px; font-weight: 700; color: var(--ink); }
+/* Brevet som brev: radbrytningarna är författarens, och en <pre> är det enda som bevarar dem. */
+.utskick-forhands-brev {
+  margin: 0; white-space: pre-wrap; word-break: break-word;
+  font-family: inherit; font-size: var(--fs-sm); line-height: 1.55; color: var(--ink-soft);
+}
+.utskick-lista { margin-bottom: 18px; }
+.utskick-lista-topp { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; flex-wrap: wrap; }
+.utskick-lista-topp .btn-text { padding: 4px 8px; font-size: var(--fs-xs); }
+.utskick-mottagare { list-style: none; margin: 8px 0 0; padding: 0; max-height: 420px; overflow-y: auto; }
+.utskick-mottagare label {
+  display: flex; align-items: center; gap: 10px; padding: 9px 4px; cursor: pointer;
+  border-bottom: 1px solid var(--hairline); font-size: var(--fs-sm);
+}
+.utskick-mottagare input { width: 18px; height: 18px; flex: none; accent-color: var(--green); }
+.utskick-namn { color: var(--ink); }
+.utskick-epost { color: var(--muted); margin-left: auto; font-size: var(--fs-xs); }
+.utskick-lage {
+  display: flex; flex-direction: column; gap: 4px; margin-bottom: 16px; padding: 12px 14px;
+  border-radius: var(--r); background: var(--green-light); color: var(--green-dark); font-size: var(--fs-sm);
+}
+.utskick-lage.pagar { background: var(--field); color: var(--ink-soft); }
+.utskick-problem { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-xs); }
+.utskick-knappar { display: flex; align-items: center; gap: 10px; }
+
 .admin-flikar {
   display: flex; gap: 4px; margin: 12px 0 4px;
   padding: 4px; border-radius: var(--r-md); background: var(--field);

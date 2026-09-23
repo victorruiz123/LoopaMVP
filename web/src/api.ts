@@ -1,6 +1,9 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad } from "./types";
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad,
+  UtskickLista,
+  UtskickLage,
+} from "./types";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -759,4 +762,28 @@ export async function selectVariant(jobId: string, variant: string): Promise<voi
 export async function hamtaKonto(userId: string): Promise<AdminKontoDetalj> {
   const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}`);
   return json<AdminKontoDetalj>(res);
+}
+
+/** Alla som går att skriva till: profiler med både e-post och förnamn. Adminbehörighet krävs. */
+export async function utskickMottagare(): Promise<UtskickLista> {
+  return json(await authFetch("/api/admin/utskick/mottagare"));
+}
+
+/**
+ * Startar utskicket och får tillbaka läget direkt.
+ *
+ * Servern svarar innan breven gått iväg — åttio brev tar minuter, och ett anrop som väntar ut dem
+ * dör på vägen. Följ förloppet med `utskickLage`.
+ */
+export async function startaUtskick(amne: string, brev: string, mottagare: string[]): Promise<UtskickLage> {
+  const res = await authFetch("/api/admin/utskick", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ amne, brev, mottagare }),
+  });
+  return json(res);
+}
+
+export async function utskickLage(): Promise<UtskickLage> {
+  return json(await authFetch("/api/admin/utskick/lage"));
 }

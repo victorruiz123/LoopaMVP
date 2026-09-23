@@ -709,6 +709,8 @@ export interface AdminUser {
   cardCount: number;
   totalValue: number;
   lastActivity: string | null;
+  /** Telefonnumret ur profiltabellen (Vips registrering). Null när kontot inte lämnat något. */
+  telefon: string | null;
   /** När kontot registrerades. Null när varken Supabase eller jobben kan säga det. */
   signedUpAt: string | null;
   /** true = datumet är kontots första jobb och inte registreringen. Panelen skriver ut skillnaden. */
@@ -724,7 +726,7 @@ export interface AdminUser {
  */
 export type AdminDirectory = "service" | "profiles" | "jobs";
 
-/** Säljarens adress som registreringen skrev den. Varje fält kan saknas för sig. */
+/** Säljarens adress, från vår registrering eller ur Vips profil. Varje fält kan saknas för sig. */
 export interface AdminKontoAdress {
   gatuadress: string | null;
   postnummer: string | null;
@@ -743,7 +745,15 @@ export interface AdminKontoAdress {
  */
 export interface AdminKontoDetalj extends AdminUser {
   adress: AdminKontoAdress | null;
-  telefon: string | null;
+  /** Användarnamnet i profilen — det namn kontot har i Vips. */
+  anvandarnamn: string | null;
+  /** Säljarens egen presentation, när den finns. */
+  bio: string | null;
+  /**
+   * Varifrån adressen kom: "registrering" = ifylld hos oss, "profil" = hämtad ur Vips profiltabell.
+   * Skillnaden hör hemma på skärmen — den ena är lämnad till oss, den andra till någon annan.
+   */
+  adressKalla: "registrering" | "profil" | null;
   senastInloggad: string | null;
   /** Null = e-postadressen är obekräftad, vilket är en upplysning och inte ett tomt fält. */
   epostBekraftad: string | null;
@@ -1569,4 +1579,34 @@ export interface AdminFeedbackSvar {
   poster: AdminFeedback[];
   snitt: number | null;
   antalBetyg: number;
+}
+
+// ---- adminpanelen: utskicket (GET/POST /api/admin/utskick) ----
+
+/** En mottagare i utskickslistan. Adressen är nyckeln; förnamnet är det brevet hälsar med. */
+export interface UtskickMottagare {
+  epost: string;
+  fornamn: string;
+  namn: string | null;
+  registrerad: string | null;
+}
+
+export interface UtskickLista {
+  mottagare: UtskickMottagare[];
+  /** Avsändaren som mottagaren ser den, t.ex. "Loopa <info@loopa.nu>". */
+  avsandare: string;
+  /** false = servern saknar SMTP-uppgifter, och då går ingenting att skicka. */
+  konfigurerat: boolean;
+}
+
+/** Hur det går för utskicket just nu. Pollas medan `pagar` är sant. */
+export interface UtskickLage {
+  pagar: boolean;
+  amne: string | null;
+  totalt: number;
+  skickade: number;
+  fel: number;
+  startad: string | null;
+  klar: string | null;
+  problem: Array<{ epost: string; orsak: string }>;
 }

@@ -2132,6 +2132,16 @@ const server = http.createServer(async (req, res) => {
        */
       if (segments[1] === "admin") {
         if (!identity.isAdmin) return sendJson(res, 404, { error: "Not found" });
+        /**
+         * Utskicket: mottagarlistan, körningen och dess läge. Se utskick.ts.
+         *
+         * Kroppen läses med ett eget tak — ett brev är text, inte bilder, och 256 kB räcker för det
+         * längsta någon skriver för hand.
+         */
+        if (segments[2] === "utskick") {
+          const { handleUtskick } = await import("./utskick.js");
+          if (await handleUtskick(segments.slice(3), req, res, () => readJsonBody(req, 256 * 1024))) return;
+        }
         if (segments[2] === "users" && segments.length === 3 && req.method === "GET") {
           return await handleAdminUsers(req, res);
         }

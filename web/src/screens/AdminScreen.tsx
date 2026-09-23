@@ -9,10 +9,11 @@ import AdminOrdrarScreen from "./AdminOrdrarScreen";
 import AdminDataScreen from "./AdminDataScreen";
 import AdminEfterlysningarScreen from "./AdminEfterlysningarScreen";
 import AdminFeedbackScreen from "./AdminFeedbackScreen";
+import AdminUtskickScreen from "./AdminUtskickScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback";
+export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback" | "utskick";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -75,7 +76,9 @@ export default function AdminScreen({
     const q = query.trim().toLowerCase();
     if (!q) return users ?? [];
     return (users ?? []).filter((u) =>
-      [u.email, u.name, u.id].some((field) => field?.toLowerCase().includes(q)),
+      // Telefonnumret är sökbart utan att formen städas: den som söker klistrar in numret som det
+      // står i listan, och det är exakt strängen vi jämför mot.
+      [u.email, u.name, u.id, u.telefon].some((field) => field?.toLowerCase().includes(q)),
     );
   }, [users, query]);
 
@@ -114,6 +117,17 @@ export default function AdminScreen({
           onClick={() => setFlik("anvandare")}
         >
           <UserIcon size={16} /> {t("Användare")}
+        </button>
+        {/* Utskicket sist: det är det enda i panelen som når UTÅT, till riktiga inkorgar, och en
+            flik man råkar trycka på ska inte vara den. */}
+        <button
+          type="button"
+          role="tab"
+          aria-selected={flik === "utskick"}
+          className={`admin-flik-knapp${flik === "utskick" ? " vald" : ""}`}
+          onClick={() => setFlik("utskick")}
+        >
+          <MailIcon size={16} /> {t("Utskick")}
         </button>
         <button
           role="tab"
@@ -184,6 +198,8 @@ export default function AdminScreen({
         <AdminEfterlysningarScreen />
       ) : flik === "feedback" ? (
         <AdminFeedbackScreen />
+      ) : flik === "utskick" ? (
+        <AdminUtskickScreen />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : (
@@ -220,7 +236,7 @@ export default function AdminScreen({
           className="admin-search"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder={t("Sök på e-post eller namn")}
+          placeholder={t("Sök på e-post, namn eller telefon")}
           autoComplete="off"
           aria-label={t("Sök användare")}
         />
@@ -267,7 +283,9 @@ export default function AdminScreen({
                     {u.totalValue > 0 ? ` · ${formatSek(u.totalValue)}` : ""}
                   </span>
                   <span className="card-row-meta admin-row-sub">
-                    {[u.name && u.email ? u.email : null, signupLabel(u)].filter(Boolean).join(" · ")}
+                    {/* Telefonnumret står i listan därför att det är det enda sättet att se VILKA som
+                        går att nå — 180 av 270 har ett, och det syntes inte någonstans förut. */}
+                    {[u.name && u.email ? u.email : null, u.telefon, signupLabel(u)].filter(Boolean).join(" · ")}
                   </span>
                 </span>
                 <span className="card-row-chevron">
