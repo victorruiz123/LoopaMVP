@@ -119,6 +119,25 @@ export async function handleButikRequest(
     return true;
   }
 
+  /**
+   * GET /api/butik/produkter/:id/liknande — "Liknande möbler" på en såld möbels sida.
+   *
+   * Publik, som resten av bläddrandet, och finns för att gamla Facebook-inlägg och Marketplace-annonser
+   * lever kvar efter försäljningen (V1 städar inte bort dem). Den som klickar sig hit ska se vad vi
+   * har i stället för en tom sida. Se butik/similar.ts för ordningen.
+   */
+  if (segments[0] === "produkter" && segments.length === 3 && segments[2] === "liknande") {
+    const { similarFor } = await import("./similar.js");
+    const limit = Math.min(Math.max(num(url.searchParams.get("antal")) ?? 8, 1), 24);
+    const items = await similarFor(segments[1], limit);
+    if (!items) {
+      json(res, 404, { error: "Varan finns inte." });
+      return true;
+    }
+    json(res, 200, { items });
+    return true;
+  }
+
   // GET /api/butik/produkter/:id — produktsidan.
   if (segments[0] === "produkter" && segments.length === 2) {
     const product = await productById(segments[1]);

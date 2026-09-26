@@ -468,8 +468,38 @@ async function move(
   return updated;
 }
 
+/**
+ * Lyssnare på övergången till `live`.
+ *
+ * Det här är den ENDA platsen där "möbeln är godkänd och till salu" faktiskt avgörs — oavsett om det
+ * skedde genom panelens godkännande, en manuell publicering eller en förtur som gick ut. Kanaler som
+ * ska följa med (Facebook-distributionen, integrations/facebook/queue.ts) hakar på här i stället för
+ * att varje anropare ska komma ihåg dem. En lyssnare som faller fäller aldrig publiceringen: möbeln är
+ * live i Loopa när den här raden nås, och det står.
+ */
+type PublishedListener = (record: ButikRecord) => void;
+const publishedListeners: PublishedListener[] = [];
+
+export function onPublished(listener: PublishedListener): () => void {
+  publishedListeners.push(listener);
+  return () => {
+    const i = publishedListeners.indexOf(listener);
+    if (i >= 0) publishedListeners.splice(i, 1);
+  };
+}
+
 export async function publish(id: string, actor: TransitionActor): Promise<ButikRecord | null> {
-  return move(id, ["draft"], "live", {}, actor, "Publicerad i Butik.");
+  const moved = await move(id, ["draft"], "live", {}, actor, "Publicerad i Butik.");
+  if (moved) {
+    for (const listener of publishedListeners) {
+      try {
+        listener(moved);
+      } catch (err) {
+        console.warn(`[butik] en lyssnare på publiceringen av ${id} föll: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    }
+  }
+  return moved;
 }
 
 export async function unpublish(id: string, actor: TransitionActor): Promise<ButikRecord | null> {

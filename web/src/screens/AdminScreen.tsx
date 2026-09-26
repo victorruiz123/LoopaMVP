@@ -10,10 +10,11 @@ import AdminDataScreen from "./AdminDataScreen";
 import AdminEfterlysningarScreen from "./AdminEfterlysningarScreen";
 import AdminFeedbackScreen from "./AdminFeedbackScreen";
 import AdminUtskickScreen from "./AdminUtskickScreen";
+import AdminFacebookScreen from "./AdminFacebookScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback" | "utskick";
+export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback" | "utskick" | "facebook";
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -186,6 +187,18 @@ export default function AdminScreen({
         >
           <MailIcon size={16} /> {t("Tradera-post")}
         </button>
+        {/*
+          Facebook-distributionen: sessionen, grupperna, köerna. En arbetslista och ett register i
+          ett — sist bland flikarna för att den läses av den som sköter kanalen, inte av alla.
+        */}
+        <button
+          role="tab"
+          aria-selected={flik === "facebook"}
+          className={`admin-flik-knapp${flik === "facebook" ? " vald" : ""}`}
+          onClick={() => setFlik("facebook")}
+        >
+          <SparkIcon size={16} /> Facebook
+        </button>
       </div>
 
       {flik === "annonser" ? (
@@ -202,6 +215,8 @@ export default function AdminScreen({
         <AdminUtskickScreen />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
+      ) : flik === "facebook" ? (
+        <AdminFacebookScreen onOpenAd={onOpenAdId} />
       ) : (
         <>
       <p className="admin-lede">

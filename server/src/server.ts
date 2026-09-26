@@ -48,6 +48,8 @@ import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
 import { startTraderaMailWatch } from "./integrations/tradera/mailwatch.js";
 import { startBlocketVakt } from "./integrations/blocket/vakt.js";
+import { onListingLive, startFacebookWorkers } from "./integrations/facebook/queue.js";
+import { onPublished } from "./butik/store.js";
 import { bearerToken } from "./supabaseAuth.js";
 import { avtryck, KLIENTHANDELSER, spara, allStatistik, type AnnonsStatistik } from "./analys/store.js";
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
@@ -2162,6 +2164,77 @@ const server = http.createServer(async (req, res) => {
         }
 
         /**
+         * Facebook-distributionen: sessionen, grupperna, köerna, operatörsprofilen.
+         *
+         * EGEN FLIK I SAMMA PANEL — inte en andra adminapp. Läsningarna går mot Facebook-lagret
+         * (server/data/facebook), aldrig mot Facebook själv; körningarna startas i bakgrunden och
+         * svarar direkt. Se integrations/facebook/admin.ts.
+         */
+        if (segments[2] === "facebook") {
+          const fb = await import("./integrations/facebook/admin.js");
+          try {
+            if (segments.length === 3 && req.method === "GET") return sendJson(res, 200, await fb.facebookOverview());
+            if (segments[3] === "grupper" && segments.length === 4 && req.method === "GET") {
+              const q = url.searchParams;
+              const enabled = q.get("enabled");
+              return sendJson(res, 200, {
+                grupper: await fb.listGroups({
+                  membership: (q.get("membership") as never) || null,
+                  ads: (q.get("ads") as never) || null,
+                  enabled: enabled === "1" ? true : enabled === "0" ? false : null,
+                  q: q.get("q"),
+                }),
+              });
+            }
+            if (segments[3] === "grupper" && segments.length === 5 && req.method === "GET") {
+              const detalj = await fb.groupDetail(decodeURIComponent(segments[4]));
+              if (!detalj) return sendJson(res, 404, { error: "Gruppen finns inte." });
+              return sendJson(res, 200, detalj);
+            }
+            if (segments[3] === "grupper" && segments.length === 5 && req.method === "PATCH") {
+              const patch = await readJsonBody<Parameters<typeof fb.patchGroup>[1]>(req, 16 * 1024);
+              return sendJson(res, 200, { grupp: await fb.patchGroup(decodeURIComponent(segments[4]), patch, identity.id) });
+            }
+            if (segments[3] === "publiceringar" && segments.length === 4 && req.method === "GET") {
+              return sendJson(res, 200, await fb.listPublications());
+            }
+            if (segments[3] === "publiceringar" && segments[4] === "retry" && req.method === "POST") {
+              const body = await readJsonBody<{ kind?: "marketplace" | "group"; listingId?: string; groupId?: string | null; confirmedNoDuplicate?: boolean }>(req, 8 * 1024);
+              if (!body.kind || !body.listingId) return sendJson(res, 400, { error: "kind och listingId krävs." });
+              await fb.retryPublication(body.kind, body.listingId, body.groupId ?? null, { confirmedNoDuplicate: body.confirmedNoDuplicate === true });
+              return sendJson(res, 200, { ok: true });
+            }
+            if (segments[3] === "annons" && segments.length === 5 && req.method === "GET") {
+              return sendJson(res, 200, await fb.listingChannelStatus(decodeURIComponent(segments[4])));
+            }
+            if (segments[3] === "annons" && segments.length === 6 && segments[5] === "koa" && req.method === "POST") {
+              const { jobByLoopaId } = await import("./publicCard.js");
+              const { enqueueForListing } = await import("./integrations/facebook/queue.js");
+              const job = await jobByLoopaId(decodeURIComponent(segments[4]));
+              if (!job) return sendJson(res, 404, { error: "Annonsen finns inte." });
+              return sendJson(res, 200, await enqueueForListing(loopaIdFor(job.id), job.id));
+            }
+            if (segments[3] === "installningar" && segments.length === 4 && req.method === "PATCH") {
+              const patch = await readJsonBody<Parameters<typeof fb.patchSettings>[0]>(req, 32 * 1024);
+              return sendJson(res, 200, { installningar: await fb.patchSettings(patch, identity.id) });
+            }
+            if (segments[3] === "kor" && segments.length === 4 && req.method === "POST") {
+              const body = await readJsonBody<{ kind?: "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep"; groupIds?: string[]; max?: number }>(req, 16 * 1024);
+              if (!body.kind) return sendJson(res, 400, { error: "kind krävs." });
+              return sendJson(res, 200, await fb.startRun(body.kind, { groupIds: body.groupIds, max: body.max }));
+            }
+            if (segments[3] === "atgarder" && segments.length === 6 && segments[5] === "klar" && req.method === "POST") {
+              return sendJson(res, 200, { atgard: await fb.resolveAction(segments[4], identity.id) });
+            }
+          } catch (err) {
+            if (err instanceof fb.FacebookAdminError) return sendJson(res, 400, { error: err.message });
+            if (err instanceof Error && err.name === "MembershipTransitionError") return sendJson(res, 409, { error: err.message });
+            throw err;
+          }
+          return sendJson(res, 404, { error: "Not found" });
+        }
+
+        /**
          * Annonspanelen: allt vi fått in, med läge, priser, tider och mätning.
          *
          * EN RAD PER JOBB och inte per butiksvara — se adminAnnonser.ts. Listan är det enda stället i
@@ -2651,6 +2724,18 @@ startTraderaMailWatch();
 // där panelen läser det, och mejlar adminadresserna när den gått ut — innan en säljare upptäcker
 // det. Av av sig själv när ingen session finns i server/.env.
 startBlocketVakt();
+
+/**
+ * Facebook-distributionen: Marketplace och Stockholms köp/sälj-grupper.
+ *
+ * Utlösaren är butikens övergång till `live` — det enda ställe där "till salu" avgörs — och
+ * ovanpå den en svepning i arbetarna, så att en tappad händelse ändå hamnar i kön. Facebook är en
+ * VALFRI kanal: lyssnaren fångar allt, och ett Facebook-fel kan aldrig hindra att möbeln blir
+ * synlig i Loopa. Av av sig själv tills FACEBOOK_ENABLED=1 står i server/.env, och varje körning
+ * är en torrkörning tills FACEBOOK_DRY_RUN=false står där. Se integrations/facebook/.
+ */
+onPublished((record) => onListingLive(record.id, record.jobId));
+startFacebookWorkers();
 
 /**
  * Efterlysningarna: migrering en gång, sedan sveparen.

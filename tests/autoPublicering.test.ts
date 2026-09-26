@@ -89,7 +89,7 @@ test("en okonfigurerad kanal fäller inte den andra — den rapporterar vad som 
       );
       // Båda kanalerna finns kvar i listan. Att dölja en okonfigurerad kanal hade gjort en möbel som
       // gick ut på ett ställe mindre till något ingen kunde se.
-      assert.deepEqual(plan.channels.map((c) => c.channel), ["tradera", "blocket"]);
+      assert.deepEqual(plan.channels.map((c) => c.channel), ["tradera", "blocket", "facebook"]);
     },
   );
 });
@@ -112,9 +112,11 @@ test("det som redan ligger uppe läggs inte upp igen", async () => {
       }),
     );
 
-    for (const kanal of plan.channels) {
+    for (const kanal of plan.channels.filter((c) => c.channel !== "facebook")) {
       assert.equal(kanal.alreadyRunning, true, `${kanal.channel} ligger uppe och ska hoppas över`);
     }
+    // Facebook är avstängt i den här miljön (FACEBOOK_ENABLED saknas): raden finns, men kör inte.
+    assert.equal(plan.channels.find((c) => c.channel === "facebook")!.configured, false);
     assert.deepEqual(plan.willPublish, [], "ingenting att göra — och då avvisar godkännandet trycket");
   });
 });
@@ -187,6 +189,7 @@ test("beställningen går igenom när Tradera är avstängt men Blocket är konf
       [
         ["tradera", false],
         ["blocket", true],
+        ["facebook", false],
       ],
     );
   });

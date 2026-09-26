@@ -204,7 +204,7 @@ export default function AdminAdScreen({
         /** Säljarens beställning. Utan den finns ingenting att godkänna — se grinden i `godkann`. */
         const bestalld = annons.traderaStatus !== null;
         const kanKora = (annons.kanaler ?? []).filter((k) => k.configured && k.ready && !k.alreadyRunning);
-        const namn: Record<string, string> = { tradera: "Tradera", blocket: "Blocket" };
+        const namn: Record<string, string> = { tradera: "Tradera", blocket: "Blocket", facebook: "Facebook" };
 
         if (!bestalld) {
           return (
@@ -284,6 +284,8 @@ export default function AdminAdScreen({
       )}
       <BlocketRuta blocket={annons.blocket} />
       {annons.blocketPaket && <BlocketPaketRuta paket={annons.blocketPaket} jobId={annons.jobId} loopaId={annons.id} />}
+      <KanalStatus annons={annons} />
+      <FacebookRuta annons={annons} onKoad={() => getAnnons(loopaId).then(ladda).catch(() => undefined)} setFel={setFel} />
 
       {/* ---------------- Läget ---------------- */}
       <h2 className="profile-section-title">Läge</h2>
@@ -493,7 +495,7 @@ function Tal({ etikett, varde }: { etikett: string; varde: string | number }) {
  */
 function Kanallista({ kanaler }: { kanaler: ChannelPlan[] }) {
   if (!kanaler?.length) return null;
-  const namn: Record<ChannelPlan["channel"], string> = { tradera: "Tradera", blocket: "Blocket" };
+  const namn: Record<ChannelPlan["channel"], string> = { tradera: "Tradera", blocket: "Blocket", facebook: "Facebook" };
   return (
     <ul className="admin-kanaler">
       {kanaler.map((k) => {
@@ -714,6 +716,142 @@ function BlocketPaketRuta({ paket, jobId, loopaId }: { paket: BlocketPaket; jobI
           </li>
         ))}
       </ol>
+    </section>
+  );
+}
+
+/**
+ * Kanalerna på en rad var: var möbeln faktiskt ligger just nu.
+ *
+ * Loopa först — det är den kanoniska kanalen, och de andra pekar tillbaka dit. Tradera och Blocket
+ * som förut; Facebook Marketplace med sitt kö-läge och grupperna som "publicerade av köade". Det är
+ * den här raden man läser för att svara en säljare på "var syns min möbel".
+ */
+function KanalStatus({ annons }: { annons: AdminAnnonsDetalj }) {
+  const fb = annons.facebook;
+  const mp = fb?.marketplace ?? null;
+  const pubLabel: Record<string, string> = { QUEUED: "I kö", PREPARING: "Publicerar", WOULD_PUBLISH: "Skulle publiceras (torrkörning)", PUBLISHED: "Publicerad", FAILED: "Föll", NEEDS_MANUAL_ACTION: "Kräver åtgärd" };
+  /** Ett läge i klartext: Facebooks granskning skiljs från "publicerad och synlig". */
+  const text = (p: { status: string; moderation?: "FACEBOOK_REVIEW" | "ADMIN_APPROVAL" | null } | null | undefined) =>
+    !p ? "aldrig köad" : p.status === "PUBLISHED" && p.moderation === "FACEBOOK_REVIEW" ? "Publicerad — granskas av Facebook" : p.status === "PUBLISHED" && p.moderation === "ADMIN_APPROVAL" ? "Publicerad — väntar på gruppens admin" : (pubLabel[p.status] ?? p.status);
+  const grupper = fb?.groups ?? [];
+  const granskas = grupper.filter((g) => g.status === "PUBLISHED" && g.moderation).length;
+  const koade = grupper.filter((g) => g.status === "QUEUED" || g.status === "PREPARING").length;
+  const fallna = grupper.filter((g) => g.status === "FAILED" || g.status === "NEEDS_MANUAL_ACTION").length;
+  return (
+    <section className="card-block">
+      <h2 className="profile-section-title">Kanaler</h2>
+      <ul className="admin-kanaler">
+        <li className={annons.lage === "live" ? "kanal-gar" : "kanal-nej"}><strong>Loopa</strong> — {annons.lage === "live" ? "LIVE" : annons.lage}</li>
+        <li className={annons.traderaStatus === "published" ? "kanal-gar" : "kanal-nej"}><strong>Tradera</strong> — {annons.traderaStatus ?? "aldrig beställd"}</li>
+        <li className={annons.blocketStatus === "published" ? "kanal-gar" : annons.blocketStatus === "dry-run" ? "kanal-torr" : "kanal-nej"}><strong>Blocket</strong> — {annons.blocketStatus ?? "aldrig försökt"}</li>
+        <li className={mp?.status === "PUBLISHED" ? "kanal-gar" : mp?.status === "WOULD_PUBLISH" ? "kanal-torr" : "kanal-nej"}>
+          <strong>Facebook Marketplace</strong> — {text(mp)}
+          {mp?.facebookUrl ? <> · <a href={mp.facebookUrl} target="_blank" rel="noreferrer">annonsen</a></> : ""}
+        </li>
+        <li className={fb && fb.groupsPublished > 0 ? "kanal-gar" : fb && fb.groupsWouldPublish > 0 ? "kanal-torr" : "kanal-nej"}>
+          <strong>Facebook-grupper</strong> —{" "}
+          {fb && fb.groupsTotal > 0
+            ? [
+                `${fb.groupsPublished} / ${fb.groupsTotal} publicerade`,
+                granskas ? `${granskas} granskas` : null,
+                koade ? `${koade} i kö` : null,
+                fallna ? `${fallna} kräver åtgärd` : null,
+                fb.groupsWouldPublish ? `${fb.groupsWouldPublish} torrkörda` : null,
+              ]
+                .filter(Boolean)
+                .join(" · ")
+            : "inga valda"}
+          {grupper.length > 0 && (
+            <ul className="admin-kanaler-grupper">
+              {grupper.map((g) => (
+                <li key={g.groupId}>
+                  {g.groupId} — {text(g)}
+                  {g.facebookPostUrl ? <> · <a href={g.facebookPostUrl} target="_blank" rel="noreferrer">{g.composer === "listing" ? "säljinlägget" : "inlägget"}</a></> : ""}
+                </li>
+              ))}
+            </ul>
+          )}
+        </li>
+      </ul>
+    </section>
+  );
+}
+
+/**
+ * Facebook-kanalerna på annonsen: Marketplace-posten och varje grupp-inlägg, med steg och skäl.
+ *
+ * "Köa till Facebook" finns för annonser som ligger live men aldrig hamnat i kön — t.ex. för att
+ * FACEBOOK_ENABLED slogs på efter att möbeln publicerades. Idempotent på servern: en post som redan
+ * finns skapas inte igen.
+ */
+function FacebookRuta({ annons, onKoad, setFel }: { annons: AdminAnnonsDetalj; onKoad: () => void; setFel: (s: string | null) => void }) {
+  const fb = annons.facebook;
+  const [visaSteg, setVisaSteg] = useState<string | null>(null);
+  const [koar, setKoar] = useState(false);
+  if (!fb) return null;
+  const pubLabel: Record<string, string> = { QUEUED: "I kö", PREPARING: "Pågår", WOULD_PUBLISH: "Skulle publiceras", PUBLISHED: "Publicerad", FAILED: "Föll", NEEDS_MANUAL_ACTION: "Kräver åtgärd" };
+  const koa = async () => {
+    setKoar(true);
+    setFel(null);
+    try {
+      const { koaFacebook } = await import("../api");
+      const r = await koaFacebook(annons.id);
+      if (r.reason) setFel(`Facebook: ${r.reason}`);
+      onKoad();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : "Gick inte att köa.");
+    } finally {
+      setKoar(false);
+    }
+  };
+  const steg = visaSteg === "mp" ? fb.marketplace?.steps ?? [] : fb.groups.find((g) => g.groupId === visaSteg)?.steps ?? [];
+  return (
+    <section className="card-block">
+      <h2 className="profile-section-title">Facebook</h2>
+      {!fb.marketplace && fb.groups.length === 0 ? (
+        <p className="admin-note">Annonsen har inte köats till Facebook. Det sker av sig självt när möbeln blir live och FACEBOOK_ENABLED=1 är satt.</p>
+      ) : (
+        <ul className="annons-logg">
+          {fb.marketplace && (
+            <li>
+              <span className="annons-logg-tid">{datum(fb.marketplace.attemptedAt ?? fb.marketplace.queuedAt)}</span>
+              <span>
+                <strong>Marketplace</strong> · {pubLabel[fb.marketplace.status] ?? fb.marketplace.status}{fb.marketplace.dryRun ? " (torrkörning)" : ""}
+                {fb.marketplace.facebookUrl ? <> · <a href={fb.marketplace.facebookUrl} target="_blank" rel="noreferrer">annonsen</a></> : ""}
+                {fb.marketplace.failureReason ? ` · ${fb.marketplace.failureReason}` : ""}
+                {fb.marketplace.steps.length > 0 && <> · <button className="lank-knapp" onClick={() => setVisaSteg(visaSteg === "mp" ? null : "mp")}>{fb.marketplace.steps.length} steg</button></>}
+              </span>
+            </li>
+          )}
+          {fb.groups.map((g) => (
+            <li key={g.groupId}>
+              <span className="annons-logg-tid">{datum(g.attemptedAt ?? g.queuedAt)}</span>
+              <span>
+                <strong>Grupp {g.groupId}</strong> · {pubLabel[g.status] ?? g.status}{g.dryRun ? " (torrkörning)" : ""}
+                {g.composer === "listing" ? " · säljinlägg" : ""}
+                {g.facebookPostUrl ? <> · <a href={g.facebookPostUrl} target="_blank" rel="noreferrer">{g.composer === "listing" ? "säljinlägget" : "inlägget"}</a></> : ""}
+                {g.failureReason ? ` · ${g.failureReason}` : ""}
+                {g.steps.length > 0 && <> · <button className="lank-knapp" onClick={() => setVisaSteg(visaSteg === g.groupId ? null : g.groupId)}>{g.steps.length} steg</button></>}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {visaSteg && steg.length > 0 && (
+        <ul className="admin-kanaler">
+          {steg.slice(-25).map((s, i) => (
+            <li key={`${s.name}-${i}`} className={s.status === "error" ? "kanal-nej" : s.status === "warning" ? "kanal-torr" : "kanal-gar"}>
+              {datum(s.at)} · {s.name}
+            </li>
+          ))}
+        </ul>
+      )}
+      {annons.lage === "live" && (
+        <div className="annons-knappar">
+          <button className="btn btn-outline btn-small" disabled={koar} onClick={koa}>Köa till Facebook</button>
+        </div>
+      )}
     </section>
   );
 }

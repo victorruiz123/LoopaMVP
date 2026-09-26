@@ -158,17 +158,21 @@ function productJsonLd(p: Product): string {
 }
 
 /**
- * Om möbeln ska ligga i sökresultatet.
+ * Om möbelns sida får ligga i sökresultatet.
  *
- * EN REGEL, TVÅ LÄSARE. Sidhuvudet nedan sätter noindex utifrån den, och sitemap.ts avgör med samma
- * funktion vilka adresser vi ber Google hämta. Skulle de svara olika hade sitemapen pekat på sidor
- * som säger noindex — vilket Search Console rapporterar som fel, och de felen dränker de riktiga.
+ * EN REGEL, TVÅ LÄSARE. Sidhuvudet nedan sätter noindex utifrån den, och sitemap.ts vägrar med samma
+ * funktion att peka på en sida som säger noindex — annars rapporterar Search Console fel som dränker
+ * de riktiga. (Sitemapen listar ändå bara det som går att köpa; se BROWSABLE_STATES där.)
  *
- * En såld möbel finns i ett exemplar och kommer aldrig tillbaka. Sidan svarar fortfarande 200 och
- * går att läsa, men den ska inte vara en träff man klickar på och möts av "såld".
+ * EN SÅLD LOOPA-MÖBEL ÄR INDEXERBAR — beslut 2026-09-26. Sidan lever kvar som landningssida: gamla
+ * Facebook-inlägg, delade länkar och Googles egna träffar leder dit långt efter försäljningen, och
+ * sidan säger "hittat ett nytt hem" och visar det som går att köpa i stället. Det är trafik värd att
+ * ta emot, inte gömma. Utkast och returer är däremot ingen sida alls, och andras (Traderas) varor
+ * indexeras bara medan de går att köpa.
  */
 export function arIndexerbar(p: Product): boolean {
-  return BROWSABLE_STATES.includes(p.state);
+  if (BROWSABLE_STATES.includes(p.state)) return true;
+  return p.source === "loopa" && (p.state === "sold" || p.state === "delivered");
 }
 
 /** Priset som text, med samma "Pris saknas" som produktsidan säger. */
@@ -580,7 +584,8 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
     const marken = [
       ...new Set(
         (await allProducts())
-          .filter((p) => arIndexerbar(p) && p.brand)
+          // Startsidans märkeslista: bara märken som går att köpa just nu — en såld möbel är indexerbar men inget utbud.
+          .filter((p) => BROWSABLE_STATES.includes(p.state) && p.brand)
           .map((p) => p.brand as string),
       ),
     ].sort((a, b) => a.localeCompare(b, "sv"));
@@ -809,11 +814,14 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
     const dims = [product.dimensions.widthMm, product.dimensions.depthMm, product.dimensions.heightMm]
       .map((mm) => (mm === null ? null : Math.round(mm / 10)))
       .filter((v): v is number => v !== null);
+    // Såld: titeln och beskrivningen säger det, inte ett pris som inte längre gäller. Se arIndexerbar.
+    const sald = product.source === "loopa" && !BROWSABLE_STATES.includes(product.state);
     return {
-      title: `${product.title} – ${price} – ${SITE}`,
-      description:
-        `${product.title}, ${price}. ${cond} ${dims.length ? `Mått ${dims.join(" × ")} cm. ` : ""}` +
-        `Besiktigad av Loopa med varje skada utpekad. Hemleverans i Stockholm.`.trim(),
+      title: sald ? `${product.title} – såld – ${SITE}` : `${product.title} – ${price} – ${SITE}`,
+      description: sald
+        ? `${product.title} har hittat ett nytt hem. ${cond} Se liknande begagnade ${categoryLabel(product.categorySlug).toLowerCase()} som finns att köpa hos Loopa just nu, med hemleverans i Stockholm.`.replace(/\s+/g, " ").trim()
+        : `${product.title}, ${price}. ${cond} ${dims.length ? `Mått ${dims.join(" × ")} cm. ` : ""}` +
+          `Besiktigad av Loopa med varje skada utpekad. Hemleverans i Stockholm.`.trim(),
       canonical,
       image: product.imageUrl,
       // Den enda sidan som FAKTISKT är en produkt. Se ogType i SeoHead för varför det står uttryckligen.
@@ -832,7 +840,7 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
         ]),
         product.source === "loopa" ? (JSON.parse(productJsonLd(product)) as Record<string, unknown>) : null,
       ),
-      // En såld möbel ska inte ligga kvar som en träff i sökresultatet.
+      // Såld Loopa-möbel = indexerbar landningssida (se arIndexerbar). Utkast, returer och andras sålda varor inte.
       noindex: !arIndexerbar(product),
       /**
        * Kroppen bär också VÄGEN VIDARE.
@@ -843,7 +851,11 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
        * dessutom en människa som landat på en möbel som just blivit såld.
        */
       body:
-        `<h1>${esc(product.title)}</h1><p>${esc(price)}</p>` +
+        `<h1>${esc(product.title)}</h1>` +
+        // Såld: samma besked som appen ritar, för den som läser utan JavaScript och för sekunden innan den startat.
+        (sald
+          ? `<p><strong>Den här möbeln har redan hittat ett nytt hem.</strong> Men vi har fler alternativ för dig — <a href="/butik/kategori/${product.categorySlug}">fler ${esc(categoryLabel(product.categorySlug).toLowerCase())}</a> finns att köpa just nu.</p>`
+          : `<p>${esc(price)}</p>`) +
         (product.condition ? `<p>Skick: ${esc(product.condition.label)} — ${esc(product.condition.rationale)}</p>` : "") +
         (dims.length ? `<p>Mått: ${dims.join(" × ")} cm</p>` : "") +
         `<p><a href="/butik/kategori/${product.categorySlug}">Fler begagnade ${esc(categoryLabel(product.categorySlug).toLowerCase())} i Stockholm</a>` +

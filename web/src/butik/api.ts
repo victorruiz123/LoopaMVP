@@ -254,3 +254,11 @@ export async function interpret(fraga: string): Promise<Interpretation> {
   if (!res.ok) throw new Error("Kunde inte tolka sökningen.");
   return (await res.json()) as Interpretation;
 }
+
+/**
+ * Liknande möbler — det en såld möbels sida visar i stället för köpknappen. Publik, som produktsidan.
+ * Gamla Facebook-inlägg pekar hit långt efter att möbeln sålts; listan är vad de ska mötas av.
+ */
+export function fetchSimilar(id: string, limit = 8): Promise<{ items: Product[] }> {
+  return getJson(`/api/butik/produkter/${encodeURIComponent(id)}/liknande?antal=${limit}`);
+}

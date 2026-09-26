@@ -55,6 +55,28 @@ Alla i `server/.env`, se `server/.env.example`.
 | `PRICE_ENGINE_TIMEOUT_MS` | nej | Hur länge vi väntar på ett prissvar, standard 45000. |
 | `PRICE_ENGINE_USE_IMAGE` | nej | `1` skickar en bildruta för möbeltypsklassning. Av som standard, se nedan. |
 
+## Facebook-distribution
+
+Varje möbel som blir live i butiken distribueras till Facebook Marketplace och till Stockholms
+köp/sälj-grupper — som en KANAL. Loopa är sanningen: inläggen bär produktsidans titel, pris och skick
+och länkar till `/butik/objekt/<loopaId>`, där köpet sker. En såld möbels sida står kvar som en
+indexerbar landningssida, säger "Den här möbeln har redan hittat ett nytt hem" och visar fler
+alternativ som går att köpa; gamla Facebook-inlägg städas inte i V1.
+
+```bash
+npm run facebook:login                       # engångsinloggning i ett synligt Chromium (ingen inloggning i kod)
+npm run facebook -- status                   # session, grupper, köer
+npm run facebook -- discover                 # sök grupper på riktiga Facebook (läsning)
+npm run facebook -- validate --max 6         # läs regler, medlemskap, skrivruta
+npm run facebook -- join --group <id>        # EN riktig medlemsansökan, uttryckligt utpekad
+npm run facebook -- marketplace-dry-run <LP> # fyll Marketplace-formuläret, stanna före Publicera
+npm run facebook -- group-dry-run <LP> <id>  # fyll gruppens skrivruta, stanna före Publicera
+```
+
+Av tills `FACEBOOK_ENABLED=1`, torrkörning tills `FACEBOOK_DRY_RUN=false`, automatiska ansökningar av
+tills `FACEBOOK_AUTO_JOIN=1`. Panelen har en Facebook-flik med session, grupper (rangordning med skäl,
+regler, medlemskap), köer och operatörsprofilen. Se `server/.env.example` och `docs/facebook.md`.
+
 ## Tester
 
 ```bash

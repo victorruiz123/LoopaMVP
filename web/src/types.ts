@@ -820,7 +820,7 @@ export interface BlocketPublication {
 
 /** Vad ett tryck på knappen skulle göra, kanal för kanal. */
 export interface ChannelPlan {
-  channel: "tradera" | "blocket";
+  channel: "tradera" | "blocket" | "facebook";
   configured: boolean;
   missingEnv: string[];
   ready: boolean;
@@ -877,6 +877,11 @@ export interface AdminAnnonsRad {
   traderaItemId: number | null;
   /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. */
   begardAt: string | null;
+  /** Facebook Marketplace-läget. Null = aldrig köad dit. */
+  facebookMarketplaceStatus: FacebookPublicationStatus | null;
+  /** Grupp-inlägg: publicerade av köade, t.ex. 8 / 11. */
+  facebookGroupsPublished: number;
+  facebookGroupsTotal: number;
   statistik: AnnonsStatistik;
   /** Klick delat med visningar + listvisningar. Null när ingen sett annonsen. */
   ctr: number | null;
@@ -985,6 +990,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   blocketPaket: BlocketPaket | null;
   /** Vad "Godkänn och lägg ut" skulle göra just nu, kanal för kanal. Läst ur serverns miljö. */
   kanaler: ChannelPlan[];
+  /** Facebook-kanalerna: Marketplace-posten och varje grupp-inlägg. */
+  facebook: FacebookListingChannels;
   handelser: AnnonsHandelse[];
   matningar: AnnonsMatning[];
   ordrarRader: Array<{
@@ -1610,3 +1617,228 @@ export interface UtskickLage {
   klar: string | null;
   problem: Array<{ epost: string; orsak: string }>;
 }
+
+// ---- Facebook-distributionen (GET /api/admin/facebook/*) ----
+// Speglar server/src/integrations/facebook/types.ts för hand, som resten av filen speglar serverns modell.
+
+export type FacebookSessionStatus = "CONNECTED" | "DISCONNECTED" | "CHECKPOINT" | "RESTRICTED" | "UNKNOWN";
+export type FacebookAdsStatus = "ALLOWED" | "LIKELY_ALLOWED" | "UNCLEAR" | "PROHIBITED";
+export type FacebookMembershipStatus =
+  | "UNKNOWN"
+  | "NOT_MEMBER"
+  | "JOIN_REQUESTED"
+  | "PENDING_APPROVAL"
+  | "MEMBER"
+  | "QUESTIONS_REQUIRED"
+  | "JOIN_REJECTED"
+  | "JOIN_BLOCKED"
+  | "NEEDS_MANUAL_ACTION";
+export type FacebookPublicationStatus = "QUEUED" | "PREPARING" | "WOULD_PUBLISH" | "PUBLISHED" | "FAILED" | "NEEDS_MANUAL_ACTION";
+export type FacebookGroupCategory = "FURNITURE_BUY_SELL" | "LOCAL_BUY_SELL" | "SECONDHAND" | "BRAND_COMMUNITY" | "GENERAL" | "OTHER";
+export type FacebookWorkerState = "running" | "paused" | "off";
+
+export interface FacebookSessionRecord {
+  status: FacebookSessionStatus;
+  checkedAt: string;
+  url: string | null;
+  detail: string;
+}
+
+export interface FacebookOperatorProfile {
+  displayName: string;
+  city: string;
+  region: string;
+  interests: string;
+  businessAffiliation: string;
+  defaultJoinReason: string;
+}
+
+export interface FacebookSettings {
+  operatorProfile: FacebookOperatorProfile;
+  discoveryPaused: boolean;
+  autoJoinPaused: boolean;
+  marketplacePaused: boolean;
+  groupPublishingPaused: boolean;
+  /** Panelens tak för grupper per annons. Null = miljöns förval. */
+  maxGroupsPerListing: number | null;
+  updatedAt: string | null;
+  updatedBy: string | null;
+}
+
+export interface FacebookMembershipQuestion {
+  text: string;
+  kind: "text" | "choice" | "agree_rules" | "unknown";
+  options?: string[];
+  answer: string | null;
+  answerable: boolean;
+  basis: string;
+  askedAt: string;
+}
+
+export interface FacebookMembershipEvent {
+  at: string;
+  from: FacebookMembershipStatus;
+  to: FacebookMembershipStatus;
+  detail: string;
+  screenshot?: string | null;
+}
+
+export interface FacebookGroup {
+  id: string;
+  facebookGroupId: string;
+  name: string;
+  canonicalUrl: string;
+  category: FacebookGroupCategory;
+  geography: string;
+  visibility: "PUBLIC" | "PRIVATE" | "UNKNOWN";
+  memberCount: number | null;
+  relevanceScore: number;
+  activityScore: number;
+  rankingReasons: string[];
+  rulesText: string | null;
+  aboutText: string | null;
+  rulesLastCheckedAt: string | null;
+  rulesEvidence: string[];
+  adsStatus: FacebookAdsStatus;
+  composerKind: "post" | "listing" | "none" | null;
+  membershipStatus: FacebookMembershipStatus;
+  membershipDetail: string | null;
+  joinEligible: boolean;
+  joinReasons: string[];
+  postEligible: boolean;
+  postReasons: string[];
+  enabledForDistribution: boolean;
+  enabledForDistributionSetBy: "auto" | "admin" | null;
+  joinAttempts: number;
+  joinRequestedAt: string | null;
+  joinedAt: string | null;
+  membershipLastCheckedAt: string | null;
+  lastPostedAt: string | null;
+  lastValidatedAt: string | null;
+  questions: FacebookMembershipQuestion[];
+  history: FacebookMembershipEvent[];
+  discoveredVia: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FacebookGroupRow extends FacebookGroup {
+  publishedCount: number;
+  queuedCount: number;
+}
+
+export interface FacebookPublicationStep {
+  name: string;
+  status: "ok" | "warning" | "error" | "running";
+  at: string;
+  details?: Record<string, unknown>;
+}
+
+export interface FacebookMarketplacePublication {
+  listingId: string;
+  jobId: string;
+  status: FacebookPublicationStatus;
+  phase: "before_publish" | "publish_clicked" | "verified" | null;
+  attempts: number;
+  queuedAt: string;
+  attemptedAt: string | null;
+  publishedAt: string | null;
+  facebookUrl: string | null;
+  facebookListingId: string | null;
+  /** FACEBOOK_REVIEW = "Säljinlägget granskas" hos Facebook; ADMIN_APPROVAL = gruppens admin ska godkänna. */
+  moderation?: "FACEBOOK_REVIEW" | "ADMIN_APPROVAL" | null;
+  failureReason: string | null;
+  screenshot: string | null;
+  contentSnapshot: { title: string; price: number; description: string; category: string; condition: string | null; location: string; imageCount: number; canonicalUrl: string } | null;
+  dryRun: boolean;
+  steps: FacebookPublicationStep[];
+  updatedAt: string;
+}
+
+export interface FacebookGroupPublication {
+  listingId: string;
+  groupId: string;
+  jobId: string;
+  status: FacebookPublicationStatus;
+  phase: "before_publish" | "publish_clicked" | "verified" | null;
+  attempts: number;
+  queuedAt: string;
+  attemptedAt: string | null;
+  publishedAt: string | null;
+  facebookPostUrl: string | null;
+  /** "post" = textinlägg, "listing" = säljinlägg genom Sälj något. Saknas på äldre poster. */
+  composer?: "post" | "listing" | "none" | null;
+  facebookListingId?: string | null;
+  /** FACEBOOK_REVIEW = "Säljinlägget granskas" hos Facebook; ADMIN_APPROVAL = gruppens admin ska godkänna. */
+  moderation?: "FACEBOOK_REVIEW" | "ADMIN_APPROVAL" | null;
+  failureReason: string | null;
+  screenshot: string | null;
+  contentSnapshot: { kind?: "post" | "listing"; text: string; title?: string | null; price?: number | null; imageCount: number; canonicalUrl: string } | null;
+  dryRun: boolean;
+  steps: FacebookPublicationStep[];
+  updatedAt: string;
+}
+
+export interface FacebookManualAction {
+  id: string;
+  at: string;
+  kind: string;
+  reason: string;
+  url: string | null;
+  screenshot: string | null;
+  lastCompletedStep: string | null;
+  context: { worker: string; listingId?: string; groupId?: string };
+  resolvedAt: string | null;
+  resolvedBy: string | null;
+}
+
+export interface FacebookEvent {
+  at: string;
+  worker: string;
+  level: "info" | "ok" | "warning" | "error";
+  action: string;
+  target: string | null;
+  detail: string;
+}
+
+export interface FacebookOverview {
+  enabled: boolean;
+  mode: "live" | "mock";
+  dryRun: boolean;
+  profileDir: string;
+  session: FacebookSessionRecord | null;
+  browserBusyWith: string | null;
+  flags: { autoDiscover: boolean; autoJoin: boolean; marketplaceEnabled: boolean; groupPublishingEnabled: boolean };
+  workers: { discovery: FacebookWorkerState; autoJoin: FacebookWorkerState; marketplace: FacebookWorkerState; groupPublishing: FacebookWorkerState };
+  settings: FacebookSettings;
+  limits: Record<string, number>;
+  groups: { discovered: number; validated: number; joinRequested: number; pending: number; member: number; postEligible: number; enabled: number; prohibited: number };
+  marketplace: Record<FacebookPublicationStatus, number>;
+  groupPosts: Record<FacebookPublicationStatus, number>;
+  manualActionsOpen: number;
+  lastDiscoveryAt: string | null;
+  events: FacebookEvent[];
+}
+
+export interface FacebookGroupDetail {
+  group: FacebookGroup;
+  publications: FacebookGroupPublication[];
+  manualActions: FacebookManualAction[];
+}
+
+export interface FacebookPublications {
+  marketplace: FacebookMarketplacePublication[];
+  groups: FacebookGroupPublication[];
+  manualActions: FacebookManualAction[];
+}
+
+/** Facebook-kanalerna på en annons. Speglar ListingChannelStatus i integrations/facebook/admin.ts. */
+export interface FacebookListingChannels {
+  marketplace: FacebookMarketplacePublication | null;
+  groups: FacebookGroupPublication[];
+  groupsTotal: number;
+  groupsPublished: number;
+  groupsWouldPublish: number;
+}
+
+export type FacebookRunKind = "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep";

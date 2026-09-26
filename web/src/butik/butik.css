@@ -656,3 +656,17 @@
 .butik-crumbs a { color: inherit; text-decoration: none; }
 .butik-crumbs a:hover { text-decoration: underline; }
 .butik-hero-lager { margin-top: 10px !important; font-size: var(--fs-md) !important; color: var(--muted-soft) !important; }
+
+/* ---- den sålda möbelns sida ----
+   Beskedet står ÖVERST och tar köpets plats: den som kommer hit från ett gammalt Facebook-inlägg ska
+   inte behöva leta efter varför köpknappen saknas. Under det "Liknande möbler" — det vi faktiskt har. */
+.butik-sold-banner {
+  display: flex; flex-direction: column; gap: 4px;
+  padding: 16px 18px; margin: 0 0 18px; border-radius: var(--r-lg);
+  background: var(--ink); color: #fff;
+}
+.butik-sold-banner strong { font-size: var(--fs-title); line-height: 1.2; }
+.butik-sold-banner span { color: rgb(255 255 255 / 0.78); font-size: var(--fs-md); line-height: 1.45; }
+.butik-similar { margin-top: 28px; }
+.butik-similar h2 { margin: 0 0 4px; font-size: var(--fs-title); }
+.butik-similar p { margin: 0 0 14px; color: var(--muted); font-size: var(--fs-md); }

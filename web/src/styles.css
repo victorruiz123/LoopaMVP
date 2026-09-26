@@ -2164,6 +2164,8 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 /* ---- kanallistan i adminpanelen ----
    Vad ett tryck på "Godkänn och lägg ut" gör, kanal för kanal. Färgen bär beskedet: grön går ut, gul
    är en torrkörning som inte publicerar något, grå kan inte köras alls. */
+.admin-kanaler-grupper { margin: 6px 0 0 14px; padding: 0; font-size: 0.92em; list-style: disc; }
+.admin-kanaler-grupper li { margin: 2px 0; }
 .admin-kanaler { margin: 8px 0 12px; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
 .admin-kanaler li {
   font-size: var(--fs-md); line-height: 1.45; padding: 6px 10px; border-radius: var(--r-sm);
@@ -5114,3 +5116,21 @@ body:has(.grind) .consent { display: none; }
 .gratis-popup p { margin: 0 0 8px; color: var(--muted); font-size: var(--fs-md); line-height: 1.5; max-width: 32ch; }
 .gratis-popup .btn { width: 100%; }
 .gratis-popup-ikon { font-size: 40px; line-height: 1; }
+
+/* ---- Facebook-fliken i adminpanelen ---- */
+.fb-tabell-wrap { overflow-x: auto; margin: 10px 0 16px; border-radius: var(--r); box-shadow: var(--shadow-card); background: var(--surface); }
+.fb-tabell { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.fb-tabell th, .fb-tabell td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+.fb-tabell th { font-weight: 600; color: var(--muted); white-space: nowrap; background: var(--field); position: sticky; top: 0; }
+.fb-tabell tbody tr { cursor: pointer; }
+.fb-tabell tbody tr:hover { background: var(--field); }
+.fb-tabell tbody tr.vald { background: #FBEEDC; }
+.fb-tabell small { color: var(--muted-soft); }
+.fb-tag { display: inline-block; padding: 2px 7px; border-radius: 999px; font-size: var(--fs-2xs); font-weight: 600; white-space: nowrap; background: var(--field); color: var(--muted); }
+.fb-ads-ALLOWED, .fb-ads-LIKELY_ALLOWED, .fb-medlem-MEMBER, .fb-pub-PUBLISHED { background: #E4F1E8; color: #2F7A50; }
+.fb-ads-UNCLEAR, .fb-medlem-JOIN_REQUESTED, .fb-medlem-PENDING_APPROVAL, .fb-pub-WOULD_PUBLISH, .fb-pub-QUEUED, .fb-pub-PREPARING { background: #FBEEDC; color: #A9722A; }
+.fb-ads-PROHIBITED, .fb-medlem-NEEDS_MANUAL_ACTION, .fb-medlem-QUESTIONS_REQUIRED, .fb-medlem-JOIN_REJECTED, .fb-medlem-JOIN_BLOCKED, .fb-pub-FAILED, .fb-pub-NEEDS_MANUAL_ACTION { background: #F9E3E1; color: #A63A32; }
+.fb-detalj h3 { margin: 16px 0 6px; font-size: var(--fs-md); }
+.fb-regler { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--fs-sm); padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--field); color: var(--ink); resize: vertical; }
+.annons-logg li.fb-rad-fel { background: #F9E3E1; }
+.annons-logg li.fb-rad-varning { background: #FBEEDC; }

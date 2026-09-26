@@ -789,3 +789,93 @@ export async function startaUtskick(amne: string, brev: string, mottagare: strin
 export async function utskickLage(): Promise<UtskickLage> {
   return json(await authFetch("/api/admin/utskick/lage"));
 }
+
+// ---------------------------------------------------------------------------
+// Facebook-distributionen (adminpanelen)
+// ---------------------------------------------------------------------------
+
+import type {
+  FacebookGroup,
+  FacebookGroupDetail,
+  FacebookGroupRow,
+  FacebookListingChannels,
+  FacebookManualAction,
+  FacebookOperatorProfile,
+  FacebookOverview,
+  FacebookPublications,
+  FacebookRunKind,
+  FacebookSettings,
+} from "./types";
+
+export async function getFacebookOverview(): Promise<FacebookOverview> {
+  return json(await authFetch("/api/admin/facebook"));
+}
+
+export async function listFacebookGroups(filter: { membership?: string | null; ads?: string | null; enabled?: boolean | null; q?: string | null } = {}): Promise<{ grupper: FacebookGroupRow[] }> {
+  const p = new URLSearchParams();
+  if (filter.membership) p.set("membership", filter.membership);
+  if (filter.ads) p.set("ads", filter.ads);
+  if (filter.enabled === true) p.set("enabled", "1");
+  if (filter.enabled === false) p.set("enabled", "0");
+  if (filter.q) p.set("q", filter.q);
+  const qs = p.toString();
+  return json(await authFetch(`/api/admin/facebook/grupper${qs ? `?${qs}` : ""}`));
+}
+
+export async function getFacebookGroup(id: string): Promise<FacebookGroupDetail> {
+  return json(await authFetch(`/api/admin/facebook/grupper/${encodeURIComponent(id)}`));
+}
+
+export async function patchFacebookGroup(
+  id: string,
+  patch: { enabledForDistribution?: boolean; resetMembership?: boolean; membershipStatus?: string; note?: string },
+): Promise<{ grupp: FacebookGroup }> {
+  return json(
+    await authFetch(`/api/admin/facebook/grupper/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(patch),
+    }),
+  );
+}
+
+export async function listFacebookPublications(): Promise<FacebookPublications> {
+  return json(await authFetch("/api/admin/facebook/publiceringar"));
+}
+
+export async function retryFacebookPublication(body: { kind: "marketplace" | "group"; listingId: string; groupId?: string | null; confirmedNoDuplicate?: boolean }): Promise<{ ok: true }> {
+  return json(
+    await authFetch("/api/admin/facebook/publiceringar/retry", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) }),
+  );
+}
+
+export async function getFacebookListingChannels(loopaId: string): Promise<FacebookListingChannels> {
+  return json(await authFetch(`/api/admin/facebook/annons/${encodeURIComponent(loopaId)}`));
+}
+
+export async function koaFacebook(loopaId: string): Promise<{ marketplace: string; marketplaceReason: string | null; groupsCreated: number; groupsExisting: number; reason: string | null }> {
+  return json(await authFetch(`/api/admin/facebook/annons/${encodeURIComponent(loopaId)}/koa`, { method: "POST" }));
+}
+
+export async function patchFacebookSettings(patch: {
+  operatorProfile?: Partial<FacebookOperatorProfile>;
+  discoveryPaused?: boolean;
+  autoJoinPaused?: boolean;
+  marketplacePaused?: boolean;
+  groupPublishingPaused?: boolean;
+  maxGroupsPerListing?: number | null;
+}): Promise<{ installningar: FacebookSettings }> {
+  return json(
+    await authFetch("/api/admin/facebook/installningar", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }),
+  );
+}
+
+export async function startFacebookRun(kind: FacebookRunKind, opts: { groupIds?: string[]; max?: number } = {}): Promise<{ started: boolean; reason: string | null }> {
+  return json(
+    await authFetch("/api/admin/facebook/kor", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ kind, ...opts }) }),
+  );
+}
+
+export async function resolveFacebookAction(id: string): Promise<{ atgard: FacebookManualAction }> {
+  return json(await authFetch(`/api/admin/facebook/atgarder/${encodeURIComponent(id)}/klar`, { method: "POST" }));
+}

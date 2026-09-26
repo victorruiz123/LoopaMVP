@@ -47,6 +47,10 @@ import { renderAdPlain } from "./adContent.js";
 import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import { normaliseraPostnummer, saljarensPostnummer } from "./integrations/blocket/saljare.js";
 import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
+import { channelSummaries, listingChannelStatus, type ListingChannelStatus } from "./integrations/facebook/admin.js";
+import { onListingLive } from "./integrations/facebook/queue.js";
+import { prisMedHemleverans } from "./hemleverans.js";
+import type { PublicationStatus as FacebookPublicationStatus } from "./integrations/facebook/types.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
 /** Var i pipelinen jobbet står, i klartext för en människa som läser en lista. */
@@ -103,6 +107,14 @@ export interface AdminAnnonsRad {
   blocketStatus: BlocketPublication["status"] | null;
   /** När säljaren tryckte "Sälj med Loopa". Null = aldrig. Kön sorteras på den. */
   begardAt: string | null;
+  /**
+   * Facebook-distributionen, för listan. Marketplace-läget är null när annonsen aldrig köats dit;
+   * gruppräkningen är "publicerade av köade" — 8/11 betyder att elva grupp-inlägg köats och åtta gått ut.
+   * Se integrations/facebook/.
+   */
+  facebookMarketplaceStatus: FacebookPublicationStatus | null;
+  facebookGroupsPublished: number;
+  facebookGroupsTotal: number;
 
   // --- mätning ---
   statistik: AnnonsStatistik;
@@ -163,6 +175,11 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
    * "går upp på Tradera" för en server där Tradera saknar nycklar och Blocket är det enda som kör.
    */
   kanaler: ChannelPlan[];
+  /**
+   * Facebook-kanalerna i sin helhet: Marketplace-posten och varje grupp-inlägg med läge, adress,
+   * skäl och steg. Det panelen visar under "Facebook" på annonsen.
+   */
+  facebook: ListingChannelStatus;
   /** Butikens huvudbok för möbeln: varje övergång, med vem och varför. */
   handelser: ProductEvent[];
   /** Mätningens råa rader, nyast först. */
@@ -241,6 +258,7 @@ function radAv(
   statistik: AnnonsStatistik,
   ordrar: number,
   epost: Map<string, string>,
+  facebook: { marketplace: FacebookPublicationStatus | null; groupsPublished: number; groupsTotal: number } | undefined,
 ): AdminAnnonsRad {
   const id = loopaIdFor(job.id);
   const ownerId = ownerIdOf(job);
@@ -292,6 +310,9 @@ function radAv(
     traderaItemId: job.tradera?.itemId ?? null,
     blocketStatus: job.blocket?.status ?? null,
     begardAt: job.tradera?.startedAt ?? null,
+    facebookMarketplaceStatus: facebook?.marketplace ?? null,
+    facebookGroupsPublished: facebook?.groupsPublished ?? 0,
+    facebookGroupsTotal: facebook?.groupsTotal ?? 0,
 
     statistik,
     ctr: ctrAv(statistik),
@@ -315,12 +336,14 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
    * ut som vilken annan som helst, med läget "borttagen": vi ska kunna svara på vad som hände med en
    * möbel som låg uppe i en vecka, inte bara på vad som ligger uppe nu.
    */
-  const [aktiva, borttagna, records, overstyrningar, statistik] = await Promise.all([
+  const [aktiva, borttagna, records, overstyrningar, statistik, facebook] = await Promise.all([
     listJobs(),
     listRemovedJobs(),
     butikStore().all(),
     overrides.alla(),
     allStatistik(),
+    // Facebook-lagret läses en gång för hela listan, som ordrarna nedan. Faller det står raderna kvar utan Facebook.
+    channelSummaries().catch(() => new Map()),
   ]);
   const epost = await epostPerKonto();
   const jobs = [...aktiva, ...borttagna].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
@@ -345,7 +368,7 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     const harlett = jobToProduct(job, record?.state ?? "draft");
     const produkt = harlett ? overrides.tillampaPaProdukt(harlett, overstyrning) : null;
     rader.push(
-      radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0, epost),
+      radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0, epost, facebook.get(id)),
     );
   }
 
@@ -425,9 +448,17 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
   const statistik = await statistikFor(id);
   const postnummer = await saljarensPostnummer(job);
   const epost = await epostPerKonto();
+  const facebook = await listingChannelStatus(id).catch(
+    (): ListingChannelStatus => ({ marketplace: null, groups: [], groupsTotal: 0, groupsPublished: 0, groupsWouldPublish: 0 }),
+  );
 
   return {
-    ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length, epost),
+    ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length, epost, {
+      marketplace: facebook.marketplace?.status ?? null,
+      groupsPublished: facebook.groupsPublished,
+      groupsTotal: facebook.groupsTotal,
+    }),
+    facebook,
     overstyrdAvEmail: overstyrning?.updatedBy ? (epost.get(overstyrning.updatedBy) ?? null) : null,
     produkt,
     harlett,
@@ -604,7 +635,10 @@ async function sattPris(job: ConditionJob, pris: number): Promise<void> {
   if (job.tradera?.status === "published" && typeof itemId === "number") {
     try {
       const { traderaConfigured, updateTraderaPrice } = await import("./integrations/tradera/tradera.js");
-      if (traderaConfigured()) await updateTraderaPrice(itemId, belopp, ladder.listingMode ?? "fixed");
+      // Möbeln PLUS hemleveransen, som publiceringen och den veckovisa sänkningen gör (priceLadder.ts
+      // applyDrop). Här gick det bara möbelkronor till Tradera, så ett adminpris på 1 000 kr blev en
+      // annons på 1 000 kr medan samma möbel låg på 1 600 kr på Blocket. Rättat 2026-09-26.
+      if (traderaConfigured()) await updateTraderaPrice(itemId, prisMedHemleverans(belopp), ladder.listingMode ?? "fixed");
     } catch (err) {
       ladder.lastError = err instanceof Error ? err.message : String(err);
       await persist(job);
@@ -726,6 +760,15 @@ async function godkann(id: string, job: ConditionJob, adminId: string | null): P
 
   console.info(`[godkann] ${id} läggs ut på: ${plan.willPublish.join(", ")}`);
   void runAutoPublish(job.id, plan.willPublish);
+
+  /**
+   * Facebook går genom sin egen kö. Live-övergången ovan har redan köat möbeln via `onPublished`
+   * (server.ts); det här täcker fallen där `publish` inte gav någon övergång — möbeln låg redan live
+   * (ett andra tryck, "Lägg ut på Facebook") — och skadar aldrig: kön vägrar dubbletter per möbel och
+   * per möbel × grupp. Fire-and-forget bakom sin egen catch, som allt annat Facebook: ett fel här kan
+   * inte nå godkännandet, som redan är skrivet.
+   */
+  if (plan.willPublish.includes("facebook") && !holl) onListingLive(id, job.id);
 }
 
 /**

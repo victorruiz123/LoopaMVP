@@ -21,12 +21,20 @@
  */
 
 import type { ConditionJob } from "../types.js";
+import { facebookDryRun, facebookEnabled } from "./facebook/config.js";
+import { facebookChannelPlan } from "./facebook/queue.js";
 import { markTraderaPublishing, planTraderaPublish, runTraderaPublish } from "./tradera/publish.js";
 import { missingTraderaEnv, traderaConfigured } from "./tradera/tradera.js";
 import { markBlocketPublishing, planBlocketPublish, runBlocketPublish } from "./blocket/publish.js";
 import { blocketConfigured, blocketLivePublishing, missingBlocketEnv } from "./blocket/blocket.js";
 
-export type Channel = "tradera" | "blocket";
+/**
+ * Facebook är den tredje kanalen sedan 2026-09-26 — men den KÖRS inte härifrån. Marketplace och
+ * grupperna går genom sin egen kö (integrations/facebook/queue.ts), som butikens live-övergång
+ * utlöser och godkännandet knuffar på; planen här säger bara om det finns något att köa. Ett fel i
+ * Facebook kan därför aldrig fälla Tradera, Blocket eller butiken — de delar inte ens en process.
+ */
+export type Channel = "tradera" | "blocket" | "facebook";
 
 export interface ChannelPlan {
   channel: Channel;
@@ -58,6 +66,16 @@ export interface AutoPublishPlan {
 export async function planAutoPublish(job: ConditionJob): Promise<AutoPublishPlan> {
   const traderaReadiness = await planTraderaPublish(job);
   const blocketReadiness = await planBlocketPublish(job);
+  // Facebook-planen får aldrig fälla de andra: ett fel i lagret blir en rad som säger det.
+  const facebook: ChannelPlan = await facebookChannelPlan(job).catch((err) => ({
+    channel: "facebook",
+    configured: facebookEnabled(),
+    missingEnv: facebookEnabled() ? [] : ["FACEBOOK_ENABLED"],
+    ready: false,
+    reason: `Facebook-planen föll: ${err instanceof Error ? err.message : String(err)}`,
+    alreadyRunning: false,
+    dryRun: facebookDryRun(),
+  }));
 
   const channels: ChannelPlan[] = [
     {
@@ -80,6 +98,7 @@ export async function planAutoPublish(job: ConditionJob): Promise<AutoPublishPla
       alreadyRunning: job.blocket?.status === "publishing" || job.blocket?.status === "published",
       dryRun: !blocketLivePublishing(),
     },
+    facebook,
   ];
 
   return {
@@ -97,7 +116,7 @@ export async function planAutoPublish(job: ConditionJob): Promise<AutoPublishPla
  * och två formuleringar av samma lista hade glidit isär.
  */
 export function beskrivKanaler(channels: ChannelPlan[]): string {
-  const namn: Record<Channel, string> = { tradera: "Tradera", blocket: "Blocket" };
+  const namn: Record<Channel, string> = { tradera: "Tradera", blocket: "Blocket", facebook: "Facebook" };
   return channels
     .map((c) => {
       if (c.alreadyRunning) return `${namn[c.channel]}: ligger redan uppe eller håller på att läggas ut.`;
@@ -146,6 +165,8 @@ export async function bestallningsGrind(job: ConditionJob): Promise<Bestallnings
  */
 export async function runAutoPublish(jobId: string, channels: Channel[]): Promise<void> {
   for (const channel of channels) {
+    // Facebook körs av sin egen kö — se kommentaren vid `Channel`.
+    if (channel === "facebook") continue;
     try {
       if (channel === "tradera") await runTraderaPublish(jobId);
       else await runBlocketPublish(jobId);
@@ -170,6 +191,7 @@ export async function markChannelsPublishing(
   adminId: string | null = null,
 ): Promise<void> {
   for (const channel of channels) {
+    if (channel === "facebook") continue; // köns egna poster bär läget
     if (channel === "tradera") await markTraderaPublishing(job, adminId);
     else await markBlocketPublishing(job);
   }

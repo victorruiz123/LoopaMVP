@@ -309,6 +309,9 @@ export default function AdminAdsScreen({
                       `${r.statistik.klick} klick`,
                       r.ctr !== null ? `${(r.ctr * 100).toFixed(1)} % CTR` : null,
                       r.ordrar ? `${r.ordrar} order` : null,
+                      // Facebook: Marketplace-läget och grupperna som "publicerade / köade". Bara när något köats.
+                      r.facebookMarketplaceStatus ? `FB MP ${r.facebookMarketplaceStatus.toLowerCase().replace(/_/g, " ")}` : null,
+                      r.facebookGroupsTotal ? `FB grupper ${r.facebookGroupsPublished}/${r.facebookGroupsTotal}` : null,
                       r.saknas.length ? `saknar ${r.saknas.join(", ")}` : null,
                     ]
                       .filter(Boolean)

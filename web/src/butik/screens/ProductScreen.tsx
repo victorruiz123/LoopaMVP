@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import type { Product } from "../types";
 import type { PublicCard } from "../../types";
-import { fetchProduct } from "../api";
+import { fetchProduct, fetchSimilar } from "../api";
 import { fetchPublicCard } from "../../api";
 import ListingView from "../../components/ListingView";
 import { Link, SellCta, TrustRow, track } from "../components/Bits";
-import { dimensionLabel, timeLeft } from "../components/ProductCard";
+import ProductCard, { dimensionLabel, timeLeft } from "../components/ProductCard";
 import { brandInk, brandLook, brandNameStyle } from "../../lib/brandLook";
 import FitsThrough from "../components/FitsThrough";
 import BuyPanel from "../components/BuyPanel";
@@ -50,11 +50,18 @@ export default function ProductScreen({ id, utanKop = false }: { id: string; uta
   const [product, setProduct] = useState<Product | null>(null);
   const [card, setCard] = useState<PublicCard | null>(null);
   const [error, setError] = useState<string | null>(null);
+  /**
+   * "Liknande möbler" — hämtas BARA för en såld möbel. Gamla Facebook-inlägg och Marketplace-annonser
+   * pekar hit långt efter försäljningen, och den som kommer den vägen ska mötas av det vi har i
+   * stället för en död sida. Null = inte hämtat; tom lista = lagret hade inget att visa.
+   */
+  const [similar, setSimilar] = useState<Product[] | null>(null);
 
   useEffect(() => {
     setProduct(null);
     setCard(null);
     setError(null);
+    setSimilar(null);
     fetchProduct(id)
       .then((r) => {
         setProduct(r.product);
@@ -93,6 +100,18 @@ export default function ProductScreen({ id, utanKop = false }: { id: string; uta
 
   return (
     <>
+      {/*
+        SÅLD: beskedet står FÖRST, före rubriken, och tar köpets plats i läsordningen.
+        Sidan når den som klickat på ett gammalt Facebook-inlägg eller en Marketplace-annons — den
+        städas inte bort när möbeln säljs — och den personen ska på första raden få veta att möbeln är
+        borta, och på nästa att det finns fler. Ingen köpknapp finns kvar någonstans på sidan (se BuyBox).
+      */}
+      {sold && loopa && !utanKop && (
+        <div className="butik-sold-banner" role="status" aria-live="polite">
+          <strong>Den här möbeln har redan hittat ett nytt hem</strong>
+          <span>Men vi har fler alternativ för dig — granskade möbler som finns att köpa just nu står här nedanför.</span>
+        </div>
+      )}
       <header className="butik-pdp-head">
         {/* Samma behandling som på kortet i rutnätet: märkets egen färg och bokstavsform. */}
         {product.brand && (
@@ -106,7 +125,7 @@ export default function ProductScreen({ id, utanKop = false }: { id: string; uta
         <h1>{product.title}</h1>
       </header>
 
-      {sold && (
+      {sold && (utanKop || !loopa) && (
         <div className="butik-notice" role="status">
           <span aria-hidden="true">●</span>
           {/*
@@ -173,6 +192,8 @@ export default function ProductScreen({ id, utanKop = false }: { id: string; uta
         </aside>
       </div>
 
+      {sold && loopa && !utanKop && <SimilarProducts productId={product.id} items={similar} onLoaded={setSimilar} />}
+
       {loopa && <FitsThrough product={product} />}
 
       {/*
@@ -191,6 +212,51 @@ export default function ProductScreen({ id, utanKop = false }: { id: string; uta
       */}
       {!utanKop && <SellCta categorySlug={product.categorySlug} brand={product.brand} />}
     </>
+  );
+}
+
+/**
+ * "Liknande möbler" under en såld möbel.
+ *
+ * Servern rangordnar (butik/similar.ts): samma kategori, samma märke, liknande pris — och alltid
+ * resten av lagret som reserv, så listan är aldrig tom så länge något ligger uppe. Samma kort som i
+ * rutnätet: det som visas här ska gå att köpa på precis samma sätt som allt annat.
+ */
+function SimilarProducts({ productId, items, onLoaded }: { productId: string; items: Product[] | null; onLoaded: (items: Product[]) => void }) {
+  useEffect(() => {
+    if (items !== null) return;
+    fetchSimilar(productId, 8)
+      .then((r) => onLoaded(r.items))
+      .catch(() => onLoaded([]));
+  }, [productId, items, onLoaded]);
+
+  if (items === null) {
+    return (
+      <section className="butik-similar" aria-busy="true">
+        <h2>Fler alternativ för dig</h2>
+        <div className="butik-skeleton" style={{ height: 220 }} />
+      </section>
+    );
+  }
+  return (
+    <section className="butik-similar">
+      <h2>Fler alternativ för dig</h2>
+      {items.length === 0 ? (
+        <>
+          <p>Just nu finns ingen liknande möbel uppe. Titta i hela butiken, eller berätta vad du letar efter så hör vi av oss när något kommer in.</p>
+          <Link to={{ name: "search", q: "" }} className="btn btn-outline btn-small">Se hela butiken</Link>
+        </>
+      ) : (
+        <>
+          <p>Liknande möbler som finns att köpa just nu — granskade av Loopa, med hemleverans i Stockholm.</p>
+          <div className="butik-grid">
+            {items.map((p) => (
+              <ProductCard key={p.id} product={p} />
+            ))}
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 
