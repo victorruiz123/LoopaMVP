@@ -18,8 +18,9 @@ import {
 import { runDiscovery, validateGroups } from "./discovery.js";
 import { recheckMemberships, runAutoJoin } from "./joining.js";
 import { applyMembership, refreshEligibility } from "./membership.js";
+import { facebookListingFor } from "./mapping.js";
 import { compareGroups } from "./ranking.js";
-import { processQueue, sweepLiveListings } from "./queue.js";
+import { profileOf, processQueue, selectForListing, sweepLiveListings } from "./queue.js";
 import { browserBusy, lastKnownSession } from "./session.js";
 import {
   allGroupPublications,
@@ -222,22 +223,51 @@ export async function patchGroup(id: string, patch: GroupPatch, adminId: string 
 // Publiceringarna
 // ---------------------------------------------------------------------------
 
+export interface ListingGroupSelection {
+  /** Grupperna urvalet pekar ut just nu, bäst först — oavsett om de redan har en post. */
+  selected: Array<{ id: string; name: string; score: number; reasons: string[] }>;
+  /** Medlemsgrupper (och kandidater) som INTE valdes, med skälet. Samma lista som köandet räknar ut. */
+  skipped: Array<{ id: string; name: string; reason: string }>;
+}
+
 export interface ListingChannelStatus {
   marketplace: MarketplacePublication | null;
   groups: GroupPublication[];
   groupsTotal: number;
   groupsPublished: number;
   groupsWouldPublish: number;
+  /**
+   * Urvalet räknat om LIVE (inte lagrat) — det panelen annars aldrig ser när `groups` är tom. `godkann`
+   * köar via `onListingLive`, som kör exakt samma uträkning men kastar resultatet (fire-and-forget); det
+   * är samma anledning en möbel kan hamna med noll grupp-poster utan en enda rad som säger varför. Null
+   * när annonsen inte går att slå upp (jobbet saknas, eller Facebook-läsbarheten fallerar).
+   */
+  groupSelection: ListingGroupSelection | null;
 }
 
 export async function listingChannelStatus(loopaId: string): Promise<ListingChannelStatus> {
-  const [marketplace, groups] = await Promise.all([allMarketplace(), groupPublicationsFor(loopaId)]);
+  const [marketplace, groups, groupSelection] = await Promise.all([allMarketplace(), groupPublicationsFor(loopaId), currentGroupSelection(loopaId)]);
   return {
     marketplace: marketplace.find((p) => p.listingId === loopaId) ?? null,
     groups,
     groupsTotal: groups.length,
     groupsPublished: groups.filter((p) => p.status === "PUBLISHED").length,
     groupsWouldPublish: groups.filter((p) => p.status === "WOULD_PUBLISH").length,
+    groupSelection,
+  };
+}
+
+async function currentGroupSelection(loopaId: string): Promise<ListingGroupSelection | null> {
+  const { jobByLoopaId } = await import("../../publicCard.js");
+  const job = await jobByLoopaId(loopaId).catch(() => undefined);
+  if (!job) return null;
+  const readiness = await facebookListingFor(job);
+  if (!readiness.ok) return null;
+  const settings = await readSettings();
+  const result = await selectForListing(profileOf(readiness.listing), settings);
+  return {
+    selected: result.selected.map((x) => ({ id: x.group.id, name: x.group.name, score: x.score, reasons: x.reasons })),
+    skipped: result.skipped,
   };
 }
 
@@ -295,6 +325,8 @@ export interface SettingsPatch {
   groupPublishingPaused?: boolean;
   /** Taket för grupper per annons. Null = miljöns förval. 0 = inga grupper. */
   maxGroupsPerListing?: number | null;
+  /** Taket för grupp-inlägg per dag, totalt. Null = miljöns förval. 0 = inga grupp-inlägg. */
+  maxGroupPostsPerDay?: number | null;
 }
 
 const PROFILE_FIELDS: Array<keyof OperatorProfile> = ["displayName", "city", "region", "interests", "businessAffiliation", "defaultJoinReason"];
@@ -315,6 +347,11 @@ export async function patchSettings(patch: SettingsPatch, adminId: string | null
         ? { maxGroupsPerListing: null }
         : typeof patch.maxGroupsPerListing === "number" && Number.isInteger(patch.maxGroupsPerListing) && patch.maxGroupsPerListing >= 0 && patch.maxGroupsPerListing <= 50
           ? { maxGroupsPerListing: patch.maxGroupsPerListing }
+          : {}),
+      ...(patch.maxGroupPostsPerDay === null
+        ? { maxGroupPostsPerDay: null }
+        : typeof patch.maxGroupPostsPerDay === "number" && Number.isInteger(patch.maxGroupPostsPerDay) && patch.maxGroupPostsPerDay >= 0 && patch.maxGroupPostsPerDay <= 500
+          ? { maxGroupPostsPerDay: patch.maxGroupPostsPerDay }
           : {}),
       operatorProfile: profile,
     },

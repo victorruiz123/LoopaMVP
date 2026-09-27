@@ -7,8 +7,20 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { MEMBERSHIP_TRANSITIONS, canTransition, NON_JOINABLE, applyMembership, MembershipTransitionError, computeJoinEligibility, computePostEligibility, refreshEligibility, distributionTargets, shouldRecheckMembership, autoJoinActive } =
-  await import("../server/src/integrations/facebook/membership.js");
+const {
+  MEMBERSHIP_TRANSITIONS,
+  canTransition,
+  NON_JOINABLE,
+  applyMembership,
+  MembershipTransitionError,
+  computeJoinEligibility,
+  computePostEligibility,
+  refreshEligibility,
+  distributionTargets,
+  selectGroupsForListing,
+  shouldRecheckMembership,
+  autoJoinActive,
+} = await import("../server/src/integrations/facebook/membership.js");
 const { newGroup } = await import("../server/src/integrations/facebook/groups.js");
 const { answerQuestion, answerAll, allAnswerable } = await import("../server/src/integrations/facebook/questions.js");
 const { facebookLimits } = await import("../server/src/integrations/facebook/config.js");
@@ -116,6 +128,38 @@ test("distributionsmålen: medlem + postbar + påslagen, bäst först, högst ma
   const d = refreshEligibility(grupp({ id: "d", membershipStatus: "MEMBER", relevanceScore: 80, enabledForDistribution: false, enabledForDistributionSetBy: "admin" }), limits);
   assert.deepEqual(distributionTargets([a, b, c, d], 10).map((g) => g.id), ["b", "a"]);
   assert.deepEqual(distributionTargets([a, b, c, d], 1).map((g) => g.id), ["b"]);
+});
+
+// ─── urvalet per annons ─────────────────────────────────────────────────────
+//
+// LP-2FJW-W00Y (2026-09-26): urvalet valde noll grupper trots att kontot är medlem i två postbara
+// köp/sälj-grupper. Orsaken var två olösta manuella åtgärder kvar sedan en TIDIGARE annons — och
+// `blockedGroupIds` spärrar en grupp oavsett vilken annons åtgärden en gång gällde. Rätt beteende (en
+// okänd skrivning ska aldrig följas av en till, se store.ts) — men ingenting sa det till panelen.
+
+test("en grupp med en olöst manuell åtgärd väljs aldrig, oavsett vilken annons åtgärden gällde", () => {
+  const limits = facebookLimits();
+  const a = refreshEligibility(grupp({ id: "a", name: "Köp & Sälj Huddinge och Botkyrka", membershipStatus: "MEMBER", relevanceScore: 90 }), limits);
+  const b = refreshEligibility(grupp({ id: "b", name: "Retro möbler Stockholm", membershipStatus: "MEMBER", relevanceScore: 80 }), limits);
+  const listing = { categorySlug: "mobler", brand: null, location: "Stockholm" };
+
+  const utanSpärr = selectGroupsForListing([a, b], listing, { max: 3, defaultCooldownHours: 0 });
+  assert.deepEqual(utanSpärr.selected.map((s) => s.group.id), ["a", "b"]);
+
+  const medSpärr = selectGroupsForListing([a, b], listing, { max: 3, defaultCooldownHours: 0, blockedGroupIds: new Set(["a"]) });
+  assert.deepEqual(medSpärr.selected.map((s) => s.group.id), ["b"], "den spärrade gruppen väljs inte, den andra påverkas inte");
+  assert.deepEqual(medSpärr.skipped.map((s) => s.id), ["a"]);
+  assert.match(medSpärr.skipped[0].reason, /olöst manuell åtgärd/);
+});
+
+test("är hela poolen spärrad blir urvalet tomt med skäl per grupp — aldrig ett fel eller en tyst gissning", () => {
+  const limits = facebookLimits();
+  const a = refreshEligibility(grupp({ id: "a", membershipStatus: "MEMBER" }), limits);
+  const listing = { categorySlug: "mobler", brand: null, location: "Stockholm" };
+  const result = selectGroupsForListing([a], listing, { max: 3, defaultCooldownHours: 0, blockedGroupIds: new Set(["a"]) });
+  assert.deepEqual(result.selected, [], "tomt urval, inte ett kastat fel");
+  assert.equal(result.skipped.length, 1);
+  assert.match(result.skipped[0].reason, /olöst manuell åtgärd/);
 });
 
 test("vakten tittar bara på väntande ansökningar, och inte oftare än intervallet", () => {

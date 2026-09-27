@@ -864,6 +864,7 @@ export async function patchFacebookSettings(patch: {
   marketplacePaused?: boolean;
   groupPublishingPaused?: boolean;
   maxGroupsPerListing?: number | null;
+  maxGroupPostsPerDay?: number | null;
 }): Promise<{ installningar: FacebookSettings }> {
   return json(
     await authFetch("/api/admin/facebook/installningar", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(patch) }),

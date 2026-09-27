@@ -761,7 +761,9 @@ function KanalStatus({ annons }: { annons: AdminAnnonsDetalj }) {
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : "inga valda"}
+            : fb?.groupSelection?.skipped.length
+              ? `inga valda — ${fb.groupSelection.skipped.length} bortvalda (se Facebook nedan)`
+              : "inga valda"}
           {grupper.length > 0 && (
             <ul className="admin-kanaler-grupper">
               {grupper.map((g) => (
@@ -806,6 +808,7 @@ function FacebookRuta({ annons, onKoad, setFel }: { annons: AdminAnnonsDetalj; o
     }
   };
   const steg = visaSteg === "mp" ? fb.marketplace?.steps ?? [] : fb.groups.find((g) => g.groupId === visaSteg)?.steps ?? [];
+  const queuedGroupIds = new Set(fb.groups.map((g) => g.groupId));
   return (
     <section className="card-block">
       <h2 className="profile-section-title">Facebook</h2>
@@ -837,6 +840,21 @@ function FacebookRuta({ annons, onKoad, setFel }: { annons: AdminAnnonsDetalj; o
             </li>
           ))}
         </ul>
+      )}
+      {fb.groupSelection && (fb.groupSelection.selected.length > 0 || fb.groupSelection.skipped.length > 0) && (
+        <details className="admin-note">
+          <summary>Gruppurval just nu ({fb.groupSelection.selected.length} valda, {fb.groupSelection.skipped.length} bortvalda)</summary>
+          <ul className="admin-kanaler">
+            {fb.groupSelection.selected.map((s) => (
+              <li key={s.id} className={queuedGroupIds.has(s.id) ? "kanal-gar" : "kanal-torr"}>
+                {s.name} — valdes ({s.reasons.join(", ")}){queuedGroupIds.has(s.id) ? "" : " · väntar på att köas"}
+              </li>
+            ))}
+            {fb.groupSelection.skipped.map((s) => (
+              <li key={s.id} className="kanal-nej">{s.name} — hoppades över: {s.reason}</li>
+            ))}
+          </ul>
+        </details>
       )}
       {visaSteg && steg.length > 0 && (
         <ul className="admin-kanaler">

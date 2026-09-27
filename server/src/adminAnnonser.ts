@@ -449,7 +449,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
   const postnummer = await saljarensPostnummer(job);
   const epost = await epostPerKonto();
   const facebook = await listingChannelStatus(id).catch(
-    (): ListingChannelStatus => ({ marketplace: null, groups: [], groupsTotal: 0, groupsPublished: 0, groupsWouldPublish: 0 }),
+    (): ListingChannelStatus => ({ marketplace: null, groups: [], groupsTotal: 0, groupsPublished: 0, groupsWouldPublish: 0, groupSelection: null }),
   );
 
   return {

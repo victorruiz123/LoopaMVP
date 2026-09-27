@@ -75,6 +75,37 @@ test("grupp-inlägget öppnar med rubrik och pris, och slutar med Loopa-länken"
   assert.ok(!/\n{3,}/.test(text), "inga tredubbla radbrytningar");
 });
 
+// ─── produktion (2026-09-27): Facebook är distribution ENDAST — köpet sker på Loopa ───────
+//
+// Tradera och Blocket äger sin egen transaktion och länkar därför till den köpfria infosidan
+// (/butik/info/<id>, se adContent.ts). Facebook har ingen kassa alls: annonsen MÅSTE peka på den
+// köpbara produktsidan (/butik/objekt/<id>), annars finns ingen väg från Facebook till ett köp.
+test("Facebook-beskrivningen pekar på den KÖPBARA produktsidan (objekt/<id>) — Marketplace och grupp-säljinlägget likadant, för samma annons", async () => {
+  const job = skrivJobb(JOBS, { id: "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff" });
+  const loopaId = loopaIdFor(job.id);
+  const r = await facebookListingFor(job);
+  assert.equal(r.ok, true);
+  if (!r.ok) return;
+
+  const kanoniskAdress = `https://loopa.nu/butik/objekt/${loopaId}`;
+  assert.equal(r.listing.canonicalUrl, kanoniskAdress);
+
+  const mp = marketplaceCopy(r.listing);
+  assert.ok(mp.description.includes(kanoniskAdress), "Marketplace-beskrivningen bär den exakta produktadressen");
+
+  const grupp = groupPostCopy(r.listing);
+  assert.ok(grupp.includes(kanoniskAdress), "grupp-textinlägget bär SAMMA adress som Marketplace");
+
+  // "Sälj något" i en grupp återanvänder Marketplace-texten rakt av (mapping.ts, groupListingCopy) —
+  // samma skäl som Marketplace: inget textfält, inget köp möjligt utom via länken.
+  const { groupListingCopy } = await import("../server/src/integrations/facebook/mapping.js");
+  assert.deepEqual(groupListingCopy(r.listing), mp, "säljinlägget i grupper är exakt Marketplace-texten");
+
+  // Aldrig Tradera/Blockets infosida (utan köpruta) — den adressen duger inte här, det finns ingen kassa att skicka köparen till.
+  assert.ok(!mp.description.includes("/butik/info/"), "Facebook länkar aldrig till den köpfria infosidan");
+  assert.ok(!grupp.includes("/butik/info/"));
+});
+
 test("uppskattade mått skrivs inte ut, saknat skick skrivs inte ut", async () => {
   const r1 = await facebookListingFor(skrivJobb(JOBS, { id: "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee", estimatedDimensions: true }));
   assert.equal(r1.ok, true);

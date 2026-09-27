@@ -42,6 +42,12 @@ export interface FbAttrappOptions {
   checkpointOn?: "search" | "group" | "marketplace" | null;
   /** Sidan efter Nästa säger att kontot inte får publicera på Marketplace (verifierad Facebook-text). */
   marketplaceRestricted?: boolean;
+  /**
+   * Annonsen hamnar i Facebooks granskning direkt efter Publicera (VERIFIERAT 2026-09-26, LP-2FJW-W00Y):
+   * varken sidan efter klicket eller "Dina annonser" länkar till /marketplace/item/<id>/ än — bara till
+   * /commerce/listing/<id>/, som visar granskningstexten. Se resolveListingUrl i marketplace.ts.
+   */
+  marketplaceUnderReview?: boolean;
   /** Kontots Marketplace-valuta: "kr" (rätt) eller "$" (fel — så såg det riktiga kontot ut 2026-09-25). */
   marketplaceCurrency?: "kr" | "$";
   groups?: Record<string, AttrappGrupp>;
@@ -339,10 +345,12 @@ if (sell) sell.addEventListener("click", () => {
       if (opts.checkpointOn === "marketplace") return html(CHECKPOINT);
       const restricted = opts.marketplaceRestricted === true;
       const currency = opts.marketplaceCurrency ?? "kr";
+      const underReview = opts.marketplaceUnderReview === true;
       const script = `<script>
 function post(path, body) { return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }); }
 const CUR = ${JSON.stringify(currency)};
 const RESTRICTED = ${JSON.stringify(restricted)};
+const UNDER_REVIEW = ${JSON.stringify(underReview)};
 const price = document.getElementById("price");
 price.addEventListener("input", () => { price.dataset.raw = price.value.replace(/[^0-9]/g, ""); });
 price.addEventListener("blur", () => { const raw = price.dataset.raw || price.value.replace(/[^0-9]/g, ""); price.value = CUR === "$" ? "$" + Number(raw).toLocaleString("sv-SE") : Number(raw).toLocaleString("sv-SE") + " kr"; });
@@ -375,7 +383,9 @@ document.getElementById("next").addEventListener("click", () => {
     const fields = { title, price: price.dataset.raw || price.value.replace(/[^0-9]/g, ""), category: document.getElementById("category").dataset.value || "", condition: document.getElementById("condition").dataset.value || "", description: document.getElementById("description").value, location: loc.value };
     const files = Array.from(document.getElementById("file").files || []).map((f) => f.name);
     await post("/attrapp/marketplace", { fields, files });
-    location.href = "/marketplace/item/777/";
+    // Granskningen (VERIFIERAT 2026-09-26): sidan direkt efter Publicera länkar INTE till annonsen än —
+    // bara "Dina annonser" gör det, och då till /commerce/listing/, inte /marketplace/item/.
+    location.href = UNDER_REVIEW ? "/marketplace/you/selling" : "/marketplace/item/777/";
   });
 });
 </script>`;
@@ -402,7 +412,12 @@ document.getElementById("next").addEventListener("click", () => {
       );
     }
     if (url.pathname.startsWith("/marketplace/item/")) return html(sida("Annons", `<div role="main"><h1>Din annons är publicerad</h1><a href="${url.pathname}">Visa annonsen</a></div>`));
-    if (url.pathname === "/marketplace/you/selling") return html(sida("Dina annonser", `<div role="main"><h1>Dina annonser</h1><a href="/marketplace/item/777/">Soffa</a></div>`));
+    if (url.pathname.startsWith("/commerce/listing/")) return html(sida("Säljinlägg", `<div role="main"><h1>Säljinlägget granskas</h1><p>Det här inlägget granskas innan andra ser det (standardgranskning).</p></div>`));
+    if (url.pathname === "/marketplace/you/selling") {
+      const href = opts.marketplaceUnderReview === true ? "/commerce/listing/6543/" : "/marketplace/item/777/";
+      const badge = opts.marketplaceUnderReview === true ? "<p>Det här inlägget granskas.</p>" : "";
+      return html(sida("Dina annonser", `<div role="main"><h1>Dina annonser</h1>${badge}<a href="${href}">Soffa</a></div>`));
+    }
     if (url.pathname.startsWith("/marketplace")) return html(sida("Marketplace", `<div role="main"><h1>Marketplace</h1></div>`));
 
     return html(sida("Saknas", `<div role="main"><h1>Sidan hittades inte</h1></div>`), 404);

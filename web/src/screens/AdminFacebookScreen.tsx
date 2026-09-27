@@ -623,12 +623,14 @@ const PROFIL_FALT: Array<[keyof FacebookOperatorProfile, string, string]> = [
 function Installningar({ overview, ladda }: { overview: FacebookOverview; ladda: () => void }) {
   const [profil, setProfil] = useState<FacebookOperatorProfile>(overview.settings.operatorProfile);
   const [maxGrupper, setMaxGrupper] = useState(overview.settings.maxGroupsPerListing === null ? "" : String(overview.settings.maxGroupsPerListing));
+  const [maxPerDag, setMaxPerDag] = useState(overview.settings.maxGroupPostsPerDay === null ? "" : String(overview.settings.maxGroupPostsPerDay));
   const [sparar, setSparar] = useState(false);
   const [kvitto, setKvitto] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     setProfil(overview.settings.operatorProfile);
     setMaxGrupper(overview.settings.maxGroupsPerListing === null ? "" : String(overview.settings.maxGroupsPerListing));
+    setMaxPerDag(overview.settings.maxGroupPostsPerDay === null ? "" : String(overview.settings.maxGroupPostsPerDay));
   }, [overview]);
 
   const spara = async (patch: Parameters<typeof patchFacebookSettings>[0], text: string) => {
@@ -667,6 +669,15 @@ function Installningar({ overview, ladda }: { overview: FacebookOverview; ladda:
       <div className="annons-knappar">
         <input type="number" min={0} max={50} value={maxGrupper} onChange={(e) => setMaxGrupper(e.target.value)} placeholder={String(overview.limits.maxGroupsPerListing)} style={{ width: 90 }} aria-label="Max grupper per annons" />
         <button className="btn btn-outline btn-small" disabled={sparar} onClick={() => spara({ maxGroupsPerListing: maxGrupper.trim() === "" ? null : Number(maxGrupper) }, "Taket för grupper per annons sparat.")}>Spara taket</button>
+      </div>
+
+      <h2 className="profile-section-title">Gruppinlägg per dag</h2>
+      <p className="admin-note">
+        Taket för hur många grupp-inlägg som SAMMANLAGT får publiceras per dygn, över alla annonser. Tomt = miljöns FACEBOOK_MAX_GROUP_POSTS_PER_DAY ({overview.limits.maxGroupPostsPerDay}).
+      </p>
+      <div className="annons-knappar">
+        <input type="number" min={0} max={500} value={maxPerDag} onChange={(e) => setMaxPerDag(e.target.value)} placeholder={String(overview.limits.maxGroupPostsPerDay)} style={{ width: 90 }} aria-label="Max gruppinlägg per dag" />
+        <button className="btn btn-outline btn-small" disabled={sparar} onClick={() => spara({ maxGroupPostsPerDay: maxPerDag.trim() === "" ? null : Number(maxPerDag) }, "Taket för gruppinlägg per dag sparat.")}>Spara taket</button>
       </div>
 
       <h2 className="profile-section-title">Operatörsprofil</h2>

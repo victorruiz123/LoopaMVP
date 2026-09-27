@@ -283,6 +283,8 @@ export interface FacebookSettings {
   groupPublishingPaused: boolean;
   /** Panelens tak för grupper per annons. Null = miljöns FACEBOOK_MAX_GROUPS_PER_LISTING gäller. */
   maxGroupsPerListing: number | null;
+  /** Panelens tak för grupp-inlägg per dag, totalt. Null = miljöns FACEBOOK_MAX_GROUP_POSTS_PER_DAY gäller. */
+  maxGroupPostsPerDay: number | null;
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -303,6 +305,7 @@ export const DEFAULT_FACEBOOK_SETTINGS: FacebookSettings = {
   marketplacePaused: false,
   groupPublishingPaused: false,
   maxGroupsPerListing: null,
+  maxGroupPostsPerDay: null,
   updatedAt: null,
   updatedBy: null,
 };

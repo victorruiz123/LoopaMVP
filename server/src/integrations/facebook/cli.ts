@@ -10,9 +10,28 @@
  *   npm run facebook -- marketplace-dry-run <loopaId>
  *   npm run facebook -- group-dry-run <loopaId> <groupId>
  *   npm run facebook -- queue [--max 2]
+ *   npm run facebook -- manual-actions [open]
+ *   npm run facebook -- resolve <id> [anteckning]
+ *   npm run facebook -- pause
+ *   npm run facebook -- resume
+ *   npm run facebook -- sync-memberships
  *
  * TORRKÖRNINGSKOMMANDONA TVINGAR FACEBOOK_DRY_RUN=true oavsett miljön. Härifrån publiceras aldrig
  * något. `join` är den enda riktiga skrivningen, och den kräver att grupperna pekas ut uttryckligen.
+ *
+ * SÄKER LOKAL UPPSTART (LÄRDOM 2026-09-27): `sweepLiveListings` känner inte av om en människa tryckt
+ * "Godkänn och lägg ut" — bara att möbeln är live och saknar en Facebook-post — och kön kör i samma
+ * varv som svepningen. En lokalt speglad/iscensatt annons (facebook-spegla-annons.mts) som råkar stå
+ * live när servern startar med FACEBOOK_ENABLED=1 FACEBOOK_DRY_RUN=false kan alltså bli en RIKTIG
+ * skrivning inom några minuter, utan att någon tryckt något — det hände 2026-09-27 (LP-74PJ-NBK8).
+ *
+ * KÖR DÄRFÖR `npm run facebook -- pause` INNAN servern startas, varje gång lokal inspektion eller ett
+ * iscensatt testfall är på gång. Det skriver bara panelens egna pausknappar (marketplacePaused,
+ * groupPublishingPaused, discoveryPaused, autoJoinPaused i settings.json) till disk — ingen server
+ * behöver köra för det, så det finns inget kapplöpningsfönster mot svepningens 3-minutersfördröjning.
+ * `queue.ts` läser samma inställningar för BÅDE att köa (enqueueForListing) och att köra (processQueue),
+ * så en post som redan låg i kö innan pausen rörs inte heller — pausen tar bort ingenting, den bara
+ * stoppar nästa skrivning. Kör `npm run facebook -- resume` när du uttryckligen vill tillåta kön igen.
  */
 
 try {
@@ -150,6 +169,49 @@ switch (kommando) {
   case "queue": {
     const { processQueue, sweepLiveListings } = await import("./queue.js");
     skriv({ sweep: await sweepLiveListings(), run: await processQueue({ max: Number(flagg("max")[0] ?? 2), force: true }) });
+    break;
+  }
+  case "manual-actions": {
+    const { listManualActions } = await import("./store.js");
+    const all = await listManualActions();
+    skriv(positional[0] === "open" ? all.filter((a) => !a.resolvedAt) : all);
+    break;
+  }
+  case "resolve": {
+    /** Samma väg som panelens knapp (admin.ts `resolveAction`) — ingen egen skrivning till lagret här. */
+    const [id, anteckning] = positional;
+    if (!id) {
+      console.error("resolve kräver <id> [anteckning] — id:t från manual-actions.");
+      process.exit(1);
+    }
+    const { resolveAction } = await import("./admin.js");
+    skriv(await resolveAction(id, `operator${anteckning ? `: ${anteckning}` : ""}`));
+    break;
+  }
+  /**
+   * SÄKER UPPSTART. Skriver bara settings.json — kräver ingen körande server, så det finns inget
+   * kapplöpningsfönster mot svepningens fördröjning vid uppstart (se kommentaren överst i filen).
+   * Samma fyra brytare som panelen har var för sig; `pause`/`resume` sätter alla fyra i ett svep,
+   * det som en människa vill ha före/efter en kontrollerad lokal körning.
+   */
+  case "pause": {
+    const { writeSettings } = await import("./store.js");
+    const s = await writeSettings({ marketplacePaused: true, groupPublishingPaused: true, discoveryPaused: true, autoJoinPaused: true }, "cli:pause");
+    console.log("Pausat: marketplace, grupper, upptäckt och auto-ansökan. Inget köas eller körs förrän `npm run facebook -- resume`.");
+    skriv({ marketplacePaused: s.marketplacePaused, groupPublishingPaused: s.groupPublishingPaused, discoveryPaused: s.discoveryPaused, autoJoinPaused: s.autoJoinPaused });
+    break;
+  }
+  case "sync-memberships": {
+    /** Läsning, ingen skrivning: Facebooks egen lista över grupper kontot redan gått med i. */
+    const { syncOwnMemberships } = await import("./discovery.js");
+    skriv(await syncOwnMemberships());
+    break;
+  }
+  case "resume": {
+    const { writeSettings } = await import("./store.js");
+    const s = await writeSettings({ marketplacePaused: false, groupPublishingPaused: false, discoveryPaused: false, autoJoinPaused: false }, "cli:resume");
+    console.log("Återupptaget: nästa varv köar och kör som vanligt.");
+    skriv({ marketplacePaused: s.marketplacePaused, groupPublishingPaused: s.groupPublishingPaused, discoveryPaused: s.discoveryPaused, autoJoinPaused: s.autoJoinPaused });
     break;
   }
   default:

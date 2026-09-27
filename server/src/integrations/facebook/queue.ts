@@ -88,6 +88,11 @@ export function effectiveMaxGroups(settings: FacebookSettings): number {
   return settings.maxGroupsPerListing ?? facebookLimits().maxGroupsPerListing;
 }
 
+/** Taket för grupp-inlägg per dag, totalt: panelens inställning vinner över miljöns förval. */
+export function effectiveMaxGroupPostsPerDay(settings: FacebookSettings): number {
+  return settings.maxGroupPostsPerDay ?? facebookLimits().maxGroupPostsPerDay;
+}
+
 /** Grupper med en olöst manuell åtgärd. Läget där är okänt tills en människa tittat — ingenting köas dit. */
 async function blockedGroupIds(): Promise<Set<string>> {
   const ids = new Set<string>();
@@ -95,7 +100,7 @@ async function blockedGroupIds(): Promise<Set<string>> {
   return ids;
 }
 
-function profileOf(l: { categorySlug: string; brand: string | null; location?: string | null; region?: string | null }): ListingProfile {
+export function profileOf(l: { categorySlug: string; brand: string | null; location?: string | null; region?: string | null }): ListingProfile {
   return { categorySlug: l.categorySlug, brand: l.brand, location: l.location || l.region || "Stockholm" };
 }
 
@@ -341,11 +346,12 @@ export async function processQueue(opts: { max?: number; force?: boolean } = {})
 
   // ── Grupperna ──────────────────────────────────────────────────────────
   if (facebookGroupPublishingEnabled() && !settings.groupPublishingPaused) {
+    const maxGroupPostsPerDay = effectiveMaxGroupPostsPerDay(settings);
     const queued = (await allGroupPublications()).filter((p) => p.status === "QUEUED").sort((a, b) => a.queuedAt.localeCompare(b.queuedAt));
     for (const p of queued) {
       if (budget <= 0) break;
-      if (!dryRun && (await writesSince("group_post", sinceMidnight)) >= limits.maxGroupPostsPerDay) {
-        result.stoppedBy = `Dagsgränsen ${limits.maxGroupPostsPerDay} grupp-inlägg är nådd.`;
+      if (!dryRun && (await writesSince("group_post", sinceMidnight)) >= maxGroupPostsPerDay) {
+        result.stoppedBy = `Dagsgränsen ${maxGroupPostsPerDay} grupp-inlägg är nådd.`;
         break;
       }
       const outcome = await runGroupPost(p, dryRun);

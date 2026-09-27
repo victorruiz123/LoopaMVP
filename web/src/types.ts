@@ -1661,6 +1661,8 @@ export interface FacebookSettings {
   groupPublishingPaused: boolean;
   /** Panelens tak för grupper per annons. Null = miljöns förval. */
   maxGroupsPerListing: number | null;
+  /** Panelens tak för grupp-inlägg per dag, totalt. Null = miljöns förval. */
+  maxGroupPostsPerDay: number | null;
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -1832,6 +1834,12 @@ export interface FacebookPublications {
   manualActions: FacebookManualAction[];
 }
 
+/** Speglar ListingGroupSelection i integrations/facebook/admin.ts. */
+export interface FacebookGroupSelection {
+  selected: Array<{ id: string; name: string; score: number; reasons: string[] }>;
+  skipped: Array<{ id: string; name: string; reason: string }>;
+}
+
 /** Facebook-kanalerna på en annons. Speglar ListingChannelStatus i integrations/facebook/admin.ts. */
 export interface FacebookListingChannels {
   marketplace: FacebookMarketplacePublication | null;
@@ -1839,6 +1847,7 @@ export interface FacebookListingChannels {
   groupsTotal: number;
   groupsPublished: number;
   groupsWouldPublish: number;
+  groupSelection: FacebookGroupSelection | null;
 }
 
 export type FacebookRunKind = "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep";

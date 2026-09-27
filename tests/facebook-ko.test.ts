@@ -145,6 +145,68 @@ test("möbeln blir live i butiken -> Marketplace och varje postbar grupp köas, 
   assert.equal(sweep.enqueued, 0, "svepningen skapar inga dubbletter");
 });
 
+// LP-2FJW-W00Y (2026-09-26): en olöst manuell åtgärd kvar sedan en TIDIGARE annons spärrade båda de
+// enda medlemsgrupperna för en helt annan annons — noll grupp-poster skapades, och ingenting sa varför.
+test("en olöst manuell åtgärd på en grupp spärrar den för varje annons tills den löses — och köandet säger varför", async () => {
+  await medlemsgrupp("555", "Blockerad grupp A Stockholm");
+  await medlemsgrupp("666", "Blockerad grupp B Stockholm");
+  const a1 = await store.recordManualAction({ kind: "OTHER", reason: "Gammal olöst historik från en annan annons.", url: null, screenshot: null, lastCompletedStep: null, context: { worker: "group-post", listingId: "LP-GAMMAL-0001", groupId: "555" } });
+  const a2 = await store.recordManualAction({ kind: "OTHER", reason: "Gammal olöst historik från en annan annons.", url: null, screenshot: null, lastCompletedStep: null, context: { worker: "group-post", listingId: "LP-GAMMAL-0001", groupId: "666" } });
+
+  const job = skrivJobb(JOBS, { id: "99999999-2222-4333-8444-555555555555" });
+  const loopaId = loopaIdFor(job.id);
+  await butik.ensureRecord(loopaId, job.id, "loopa", new Date().toISOString());
+  await butik.publish(loopaId, { kind: "admin", userId: "a" });
+
+  const spärrat = await enqueueForListing(loopaId, job.id);
+  // Andra medlemsgrupper (t.ex. "111" från ett tidigare test i den här filen) kan legitimt väljas också
+  // — det testet handlar bara om att de TVÅ SPÄRRADE aldrig blir det, oavsett resten av poolen.
+  const spärradeSkäl = spärrat.groupsSkipped.filter((s) => s.id === "555" || s.id === "666");
+  assert.deepEqual(spärradeSkäl.map((s) => s.id).sort(), ["555", "666"], "båda spärrade grupperna syns bland de bortvalda");
+  assert.ok(spärradeSkäl.every((s) => /olöst manuell åtgärd/.test(s.reason)), spärradeSkäl.map((s) => s.reason).join(" | "));
+  assert.equal(await store.getGroupPublication(loopaId, "555"), null, "den spärrade gruppen fick ingen post");
+  assert.equal(await store.getGroupPublication(loopaId, "666"), null);
+
+  // Löser en människa åtgärderna (t.ex. efter att ha bekräftat att de gamla annonserna faktiskt gick ut) —
+  // grupperna väljs igen, för en möbel som aldrig var inblandad i den gamla historien.
+  await store.resolveManualAction(a1.id, "test: bekräftat för hand");
+  await store.resolveManualAction(a2.id, "test: bekräftat för hand");
+  await enqueueForListing(loopaId, job.id);
+  assert.ok(await store.getGroupPublication(loopaId, "555"), "sedan åtgärden lösts köas gruppen");
+  assert.ok(await store.getGroupPublication(loopaId, "666"));
+
+  // Städa: en QUEUED post som blir kvar plockas annars upp av ett senare, obesläktat processQueue-varv.
+  for (const p of await store.groupPublicationsFor(loopaId)) {
+    await store.updateGroupPublication(loopaId, p.groupId, (c) => ({ ...c, status: "FAILED" }));
+  }
+});
+
+// Samma LP-2FJW-W00Y-fynd, sett från panelen: `groups`/`groupsTotal` är tomma (ingenting köades), och
+// innan den här ändringen fanns INGENSTANS att se att urvalet faktiskt övervägt och bortvalt en grupp.
+test("panelens listingChannelStatus visar VARFÖR noll grupper valdes — inte bara att det blev noll", async () => {
+  const { listingChannelStatus } = await import("../server/src/integrations/facebook/admin.js");
+  await medlemsgrupp("777", "Ännu en blockerad grupp Stockholm");
+  await store.writeSettings({ maxGroupsPerListing: 50 }, "test");
+  const action = await store.recordManualAction({ kind: "OTHER", reason: "Olöst.", url: null, screenshot: null, lastCompletedStep: null, context: { worker: "group-post", listingId: "LP-ANNAN-0001", groupId: "777" } });
+  const job = skrivJobb(JOBS, { id: "88888888-2222-4333-8444-555555555555" });
+  const loopaId = loopaIdFor(job.id);
+  await butik.ensureRecord(loopaId, job.id, "loopa", new Date().toISOString());
+  await butik.publish(loopaId, { kind: "admin", userId: "a" });
+
+  const status = await listingChannelStatus(loopaId);
+  assert.equal(status.groupsTotal, 0, "inga persisterade grupp-poster — annonsen har aldrig köats");
+  assert.ok(status.groupSelection, "urvalet räknas om live, även utan en enda persisterad post");
+  assert.ok(!status.groupSelection!.selected.some((s) => s.id === "777"), "den spärrade gruppen är inte bland de valda");
+  const skäl777 = status.groupSelection!.skipped.find((s) => s.id === "777");
+  assert.ok(skäl777, "den spärrade gruppen syns bland de bortvalda, inte bara osynlig");
+  assert.match(skäl777!.reason, /olöst manuell åtgärd/);
+
+  await store.resolveManualAction(action.id, "test");
+  const efter = await listingChannelStatus(loopaId);
+  assert.ok(efter.groupSelection!.selected.some((s) => s.id === "777"), "sedan åtgärden lösts väljs gruppen igen, utan att något köats om för hand");
+  await store.writeSettings({ maxGroupsPerListing: null }, "test");
+});
+
 test("servern kopplar utlösaren till butikens live-övergång", () => {
   const src = readFileSync(path.resolve("server/src/server.ts"), "utf-8");
   assert.ok(src.includes("onPublished((record) => onListingLive(record.id, record.jobId))"));
@@ -224,6 +286,42 @@ test("skarpt läge mot attrappen: Publicera trycks, adressen läses, och ett and
     assert.deepEqual(igen.groups, []);
     assert.equal(attrapp.lage.marketplace.length, 1, "aldrig två annonser");
     assert.equal(attrapp.lage.posts.length, 1, "aldrig två inlägg");
+  } finally {
+    process.env.FACEBOOK_DRY_RUN = "true";
+    await attrapp.stang();
+  }
+});
+
+// ─── regression: LP-2FJW-W00Y, 2026-09-26 ──────────────────────────────────
+//
+// Publicera trycktes, annonsen skapades — men gick i Facebooks granskning direkt, och varken sidan
+// efter klicket eller "Dina annonser" länkade till /marketplace/item/<id>/ än, bara till
+// /commerce/listing/<id>/ (samma mönster grupp-säljinlägget redan hade lärt sig, se
+// facebook-saljinlagg.test.ts). Innan fixen i marketplace.ts gav det NEEDS_MANUAL_ACTION trots en
+// lyckad skrivning.
+test("skarpt läge: en annons som går i granskning direkt hittas ändå via /commerce/listing/ (LP-2FJW-W00Y)", async () => {
+  const attrapp = await startaFbAttrapp({ marketplaceUnderReview: true });
+  process.env.FACEBOOK_BASE_URL = attrapp.bas;
+  process.env.FACEBOOK_DRY_RUN = "false";
+  const job = skrivJobb(JOBS, { id: "ffffffff-2222-4333-8444-555555555555" });
+  const loopaId = loopaIdFor(job.id);
+  await butik.ensureRecord(loopaId, job.id, "loopa", new Date().toISOString());
+  await butik.publish(loopaId, { kind: "admin", userId: "a" });
+  await store.enqueueMarketplace(loopaId, job.id, false);
+  try {
+    const r = await processQueue({ max: 5 });
+    assert.equal(r.stoppedBy, null, r.stoppedBy ?? "");
+    const mp = await store.getMarketplace(loopaId);
+    assert.equal(mp?.status, "PUBLISHED", JSON.stringify(mp?.steps.slice(-6)));
+    assert.equal(mp?.phase, "verified", "adressen hittades — ingen NEEDS_MANUAL_ACTION för en lyckad skrivning");
+    assert.match(mp?.facebookUrl ?? "", /\/commerce\/listing\/6543\/$/, "länken under granskning, inte /marketplace/item/");
+    assert.equal(mp?.facebookListingId, "6543", "id:t läses ur commerce/listing-adressen också");
+    assert.equal(mp?.moderation, "FACEBOOK_REVIEW");
+    assert.equal(attrapp.lage.marketplace.length, 1, "skrivningen skedde en gång");
+
+    const igen = await processQueue({ max: 5 });
+    assert.deepEqual(igen.marketplace, [], "redan PUBLISHED — inget nytt varv");
+    assert.equal(attrapp.lage.marketplace.length, 1, "aldrig två annonser");
   } finally {
     process.env.FACEBOOK_DRY_RUN = "true";
     await attrapp.stang();

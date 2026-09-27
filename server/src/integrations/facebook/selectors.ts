@@ -81,6 +81,9 @@ export const FB = {
     publish: '[role="main"] [role="button"][aria-label="Publicera"], [role="main"] [role="button"][aria-label="Publish"]',
     leaveConfirm: '[role="dialog"] [role="button"]:has-text("Lämna"), [role="dialog"] [role="button"]:has-text("Leave"), [role="dialog"] [role="button"]:has-text("Kasta"), [role="dialog"] [role="button"]:has-text("Ta bort"), [role="dialog"] [role="button"]:has-text("Discard")',
     fieldError: '[aria-invalid="true"], [role="alert"]',
+    itemLink: 'a[href*="/marketplace/item/"]',
+    /** Medan annonsen granskas länkar Facebook hit i stället (LÄRDOM 2026-09-26, samma som groupListing.commerceLink). */
+    commerceLink: 'a[href*="/commerce/listing/"]',
   },
 
   /** En dialog som inte är Messenger-panelen — den ligger alltid på sidan och får aldrig stängas eller läsas som vår. */

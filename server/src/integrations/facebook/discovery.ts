@@ -114,6 +114,142 @@ export function rescore(group: FacebookGroup, limits = facebookLimits()): Facebo
   );
 }
 
+// ---------------------------------------------------------------------------
+// Medlemskapen kontot redan har — Facebooks EGEN lista, inte vår gissning
+// ---------------------------------------------------------------------------
+
+/**
+ * Facebooks egen sida över grupperna kontot gått med i. En annan yta än sökningen
+ * (searchGroups): ingen fråga, bara rullning tills inga fler kort laddas. Samma
+ * gruppkorts-mönster som sökresultatet (VERIFIERAT gäller sökningen 2026-09-23; den
+ * här sidan är ANTAGEN tills en riktig körning bekräftat den — se docs/facebook.md).
+ */
+export async function listJoinedGroups(page: Page, opts: { maxScrolls?: number; stableRoundsToStop?: number } = {}): Promise<GroupHit[]> {
+  await goto(page, fbUrl("/groups/joins/"), "dina grupper (medlemslistan)");
+  await assertNoInterrupt(page, "dina grupper");
+
+  const maxScrolls = opts.maxScrolls ?? 60;
+  const stableRoundsToStop = opts.stableRoundsToStop ?? 3;
+  let stableRounds = 0;
+  let lastCount = -1;
+  for (let i = 0; i < maxScrolls; i++) {
+    const count = await page.locator(FB.searchGroupLinks).count().catch(() => 0);
+    if (count === lastCount) {
+      stableRounds += 1;
+      if (stableRounds >= stableRoundsToStop) break;
+    } else {
+      stableRounds = 0;
+      lastCount = count;
+    }
+    await page.mouse.wheel(0, 2400);
+    await page.waitForTimeout(900 + Math.floor(Math.random() * 700));
+    await assertNoInterrupt(page, "dina grupper (rullning)");
+  }
+
+  const raw = await page.evaluate(() => {
+    const out: Array<{ name: string; url: string; snippet: string }> = [];
+    const seen = new Set<string>();
+    const anchors = Array.from(document.querySelectorAll('[role="main"] a[href*="/groups/"]')) as HTMLAnchorElement[];
+    for (const a of anchors) {
+      const m = a.href.match(/\/groups\/([^/?#]+)/);
+      if (!m || !m[1]) continue;
+      const key = m[1].toLowerCase();
+      if (["feed", "discover", "joins", "search", "create", "notifications", "your_groups", "browse", "category", "explore"].includes(key)) continue;
+      const name = (a.textContent ?? "").replace(/\s+/g, " ").trim();
+      if (!name || name.length < 2 || seen.has(key)) continue;
+      seen.add(key);
+      const container = a.closest('[role="article"]') ?? a.parentElement?.parentElement?.parentElement?.parentElement ?? a.parentElement;
+      out.push({ name, url: a.href, snippet: (container?.textContent ?? "").replace(/\s+/g, " ").slice(0, 400) });
+    }
+    return out;
+  });
+
+  return dedupeHits(
+    raw.map((h) => ({
+      url: h.url,
+      name: h.name,
+      memberCount: parseMemberCount(h.snippet),
+      visibility: TEXT.publicGroup.test(h.snippet) ? "PUBLIC" : TEXT.privateGroup.test(h.snippet) ? "PRIVATE" : "UNKNOWN",
+      snippet: h.snippet,
+      query: "dina grupper",
+    })),
+  );
+}
+
+/**
+ * En träff från DINA GRUPPER blir MEDLEM direkt — det är inte en gissning, Facebook visade den i
+ * kontots egen medlemslista. Samma sammanslagning som upsertHit, men medlemskapet sätts genom
+ * tillståndsmaskinen (membership.ts) i stället för att lämnas UNKNOWN till en senare validering.
+ */
+async function upsertOwnMembership(hit: GroupHit, limits = facebookLimits()): Promise<{ group: FacebookGroup; created: boolean; becameMember: boolean }> {
+  const key = groupKeyFromUrl(hit.url);
+  const url = canonicalGroupUrl(hit.url);
+  if (!key || !url) throw new Error(`Inte en gruppadress: ${hit.url}`);
+  const now = new Date().toISOString();
+  const detail = "Kontot är medlem (funnen i Facebooks egen lista över dina grupper).";
+  const existing = await getGroup(key);
+  if (existing) {
+    let merged = mergeObservation(existing, { name: hit.name, memberCount: hit.memberCount, visibility: hit.visibility, discoveredVia: [hit.query] });
+    const wasMember = merged.membershipStatus === "MEMBER";
+    if (!wasMember) {
+      try {
+        merged = applyMembership(merged, "MEMBER", detail, { at: now });
+      } catch {
+        // En övergång tillståndsmaskinen inte tillåter lämnas som den var — syns i loggen som avvikelse.
+      }
+    }
+    const saved = await putGroup(rescore(merged, limits));
+    return { group: saved, created: false, becameMember: !wasMember && saved.membershipStatus === "MEMBER" };
+  }
+  const { category, reasons } = classifyGroup(hit.name, hit.snippet);
+  const geo = detectGeography(hit.name);
+  let fresh = newGroup({ key, name: hit.name, canonicalUrl: url, category, geography: geo.geography, visibility: hit.visibility, memberCount: hit.memberCount, discoveredVia: [hit.query] });
+  fresh.rankingReasons = reasons;
+  fresh = applyMembership(fresh, "MEMBER", detail, { at: now });
+  const saved = await putGroup(rescore(fresh, limits));
+  return { group: saved, created: true, becameMember: true };
+}
+
+export interface MembershipSyncResult {
+  found: number;
+  newGroups: number;
+  updatedGroups: number;
+  markedMember: number;
+  alreadyMember: number;
+  stoppedBy: string | null;
+}
+
+/**
+ * Synkar HELA kontots medlemslista in i lagret — läsning, inget klickas. Det här är svaret på "vilka
+ * grupper är kontot redan med i", oberoende av vad sökningen (runDiscovery) råkat hitta förut.
+ */
+export async function syncOwnMemberships(): Promise<MembershipSyncResult> {
+  const limits = facebookLimits();
+  const result: MembershipSyncResult = { found: 0, newGroups: 0, updatedGroups: 0, markedMember: 0, alreadyMember: 0, stoppedBy: null };
+  await withFacebookBrowser("membership-sync", async ({ page }) => {
+    try {
+      const hits = await listJoinedGroups(page);
+      result.found = hits.length;
+      for (const hit of hits) {
+        const { created, becameMember } = await upsertOwnMembership(hit, limits);
+        if (created) result.newGroups += 1;
+        else result.updatedGroups += 1;
+        if (becameMember) result.markedMember += 1;
+        else result.alreadyMember += 1;
+      }
+      await logEvent({ worker: "membership-sync", level: "ok", action: "SYNKAD", target: null, detail: `${result.found} grupper i Facebooks lista: ${result.newGroups} nya, ${result.markedMember} nya medlemskap.` });
+    } catch (err) {
+      if (err instanceof FacebookInterrupt) {
+        await recordInterrupt(err, { worker: "membership-sync" }, "dina grupper");
+        result.stoppedBy = err.message;
+        return;
+      }
+      throw err;
+    }
+  });
+  return result;
+}
+
 export interface DiscoveryRunResult {
   queries: string[];
   hits: number;

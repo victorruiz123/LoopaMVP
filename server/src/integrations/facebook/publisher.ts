@@ -20,7 +20,7 @@ import { groupListingCopy, groupPostCopy, marketplaceConditionCandidates, type F
 import { FB, TEXT } from "./selectors.js";
 import { assertNoInterrupt, bodyText, goto, screenshot } from "./session.js";
 import { felText, type Logga } from "./steps.js";
-import { FACEBOOK_REVIEW } from "./marketplace.js";
+import { FACEBOOK_REVIEW, listingIdFromUrl } from "./marketplace.js";
 import type { ComposerKind, FacebookGroup, ModerationState, PublicationPhase } from "./types.js";
 
 export interface GroupPostInput {
@@ -425,11 +425,6 @@ async function findInFeed(page: Page, probe: string): Promise<{ visible: boolean
     if (href) return { visible: true, url: new URL(href, page.url()).toString().split("?")[0] };
   }
   return { visible: true, url: null };
-}
-
-/** Facebooks id ur en annons- eller säljinläggsadress. */
-export function listingIdFromUrl(url: string | null): string | null {
-  return url?.match(/\/(?:marketplace\/item|commerce\/listing)\/(\d+)/)?.[1] ?? null;
 }
 
 function failed(composer: ComposerKind | null, reason: string, observations: string[], shot: string | null): GroupPostResult {

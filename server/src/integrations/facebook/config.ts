@@ -124,8 +124,11 @@ export interface FacebookLimits {
   /** Minsta paus mellan två skrivningar (join, post, publicera), i sekunder. */
   minSecondsBetweenWrites: number;
   /**
-   * Hur många grupper en enskild annons som mest distribueras till. Förvalet är lågt med flit — det
-   * här är ratten för utrullningen (3 → 5 → 10) och panelens inställning kan skriva över den.
+   * Taket för hur många grupper en enskild annons SOM MEST distribueras till — en nödbroms, inte
+   * produktmålet. Produktmålet är att posta i VARJE grupp som är relevant och tillåten (se
+   * selectGroupsForListing: medlem, postbar, rätt stad, ingen spärr, ingen paus). Förvalet ska därför
+   * ligga gott över den verkliga gruppoolen (VERIFIERAT 2026-09-27) — panelens inställning kan sätta
+   * ett lägre tak för hand om det någonsin behövs.
    */
   maxGroupsPerListing: number;
   /**
@@ -147,10 +150,10 @@ export interface FacebookLimits {
 export function facebookLimits(): FacebookLimits {
   return {
     maxJoinsPerDay: tal("FACEBOOK_MAX_JOINS_PER_DAY", 3),
-    maxGroupPostsPerDay: tal("FACEBOOK_MAX_GROUP_POSTS_PER_DAY", 10),
+    maxGroupPostsPerDay: tal("FACEBOOK_MAX_GROUP_POSTS_PER_DAY", 100),
     maxMarketplacePerDay: tal("FACEBOOK_MAX_MARKETPLACE_PER_DAY", 5),
     minSecondsBetweenWrites: tal("FACEBOOK_MIN_SECONDS_BETWEEN_WRITES", 120),
-    maxGroupsPerListing: tal("FACEBOOK_MAX_GROUPS_PER_LISTING", 3),
+    maxGroupsPerListing: tal("FACEBOOK_MAX_GROUPS_PER_LISTING", 50),
     groupCooldownHours: tal("FACEBOOK_GROUP_COOLDOWN_HOURS", 24),
     minRelevanceToJoin: tal("FACEBOOK_MIN_RELEVANCE_TO_JOIN", 60),
     minMembersToJoin: tal("FACEBOOK_MIN_MEMBERS_TO_JOIN", 300),

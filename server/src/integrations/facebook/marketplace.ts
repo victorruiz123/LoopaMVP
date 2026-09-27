@@ -273,7 +273,7 @@ export async function driveMarketplaceForm(page: Page, input: MarketplaceRunInpu
   if (url) {
     await input.onPhase("verified");
     logga("Annonsen är publicerad", "ok", { url });
-    return { status: "PUBLISHED", url, listingId: url.match(/\/item\/(\d+)/)?.[1] ?? null, screenshot: after, observations, categoryPicked, conditionPicked, failureReason: null, moderation };
+    return { status: "PUBLISHED", url, listingId: listingIdFromUrl(url), screenshot: after, observations, categoryPicked, conditionPicked, failureReason: null, moderation };
   }
   // Knappen är tryckt men adressen okänd: INTE ett fel som får göras om. Kön läser fasen.
   logga("Publicera tryckt men annonsadressen gick inte att läsa", "warning", { url: page.url() });
@@ -324,11 +324,19 @@ async function leaveWithoutPublishing(page: Page, logga: Logga): Promise<void> {
   }
 }
 
-/** Adressen till den färdiga annonsen, om Facebook visar den. */
+/**
+ * Adressen till den färdiga annonsen, om Facebook visar den.
+ *
+ * BÅDA MÖNSTREN SÖKS (LÄRDOM 2026-09-26, se listingIdFromUrl): en annons som Facebook granskar har
+ * ingen /marketplace/item/<id>/-länk än — varken på sidan direkt efter Publicera eller i "Dina
+ * inlägg" — utan länkas som /commerce/listing/<id>/ tills granskningen släpper. Samma fynd gjordes
+ * samma dag för säljinlägget i grupper (publisher.ts, findInFeed) men portades aldrig hit.
+ */
 async function resolveListingUrl(page: Page): Promise<string | null> {
+  const itemOrCommerce = `${FB.marketplace.itemLink}, ${FB.marketplace.commerceLink}`;
   const now = page.url();
-  if (/\/marketplace\/item\/\d+/.test(now)) return now.split("?")[0];
-  const link = page.locator('a[href*="/marketplace/item/"]').first();
+  if (/\/(?:marketplace\/item|commerce\/listing)\/\d+/.test(now)) return now.split("?")[0];
+  const link = page.locator(itemOrCommerce).first();
   if ((await link.count()) > 0) {
     const href = await link.getAttribute("href").catch(() => null);
     if (href) return new URL(href, facebookBaseUrl()).toString().split("?")[0];
@@ -336,10 +344,15 @@ async function resolveListingUrl(page: Page): Promise<string | null> {
   // Dina annonser: den nyaste överst.
   await page.goto(`${facebookBaseUrl()}/marketplace/you/selling`, { waitUntil: "domcontentloaded", timeout: 20_000 }).catch(() => undefined);
   await page.waitForTimeout(2500);
-  const first = page.locator('a[href*="/marketplace/item/"]').first();
+  const first = page.locator(itemOrCommerce).first();
   if ((await first.count()) > 0) {
     const href = await first.getAttribute("href").catch(() => null);
     if (href) return new URL(href, facebookBaseUrl()).toString().split("?")[0];
   }
   return null;
+}
+
+/** Facebooks id ur en annons- eller säljinläggsadress. Delad med publisher.ts (grupp-säljinlägget). */
+export function listingIdFromUrl(url: string | null): string | null {
+  return url?.match(/\/(?:marketplace\/item|commerce\/listing)\/(\d+)/)?.[1] ?? null;
 }
