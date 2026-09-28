@@ -1850,4 +1850,4 @@ export interface FacebookListingChannels {
   groupSelection: FacebookGroupSelection | null;
 }
 
-export type FacebookRunKind = "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep";
+export type FacebookRunKind = "session" | "discover" | "sync-memberships" | "validate" | "join" | "recheck" | "queue" | "sweep";

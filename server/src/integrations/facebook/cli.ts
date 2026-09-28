@@ -49,6 +49,28 @@ function flagg(namn: string): string[] {
 }
 const positional = rest.filter((a, i) => !a.startsWith("--") && (i === 0 || !rest[i - 1].startsWith("--")));
 
+/**
+ * LAGRET CACHAR PER PROCESS (store.ts). Skriver det här skriptet grupper eller inställningar medan servern
+ * kör, sparar servern sin gamla kopia ovanpå vid nästa skrivning — så försvann 116 synkade medlemsgrupper
+ * 2026-09-28. Kommandon som skriver lagret vägrar därför när servern svarar; kör dem från panelen i
+ * stället, eller stoppa servern. `--trots-servern` går förbi, för den som vet att servern inte skriver.
+ */
+const SKRIVER_LAGRET = new Set(["discover", "validate", "join", "recheck", "queue", "resolve", "pause", "resume", "sync-memberships"]);
+if (kommando && SKRIVER_LAGRET.has(kommando) && !rest.includes("--trots-servern")) {
+  const port = process.env.PORT?.trim() || "8799";
+  const svarar = await fetch(`http://127.0.0.1:${port}/`, { signal: AbortSignal.timeout(1500) }).then(
+    () => true,
+    () => false,
+  );
+  if (svarar) {
+    console.error(
+      `\n  ✗ Servern kör på port ${port}. "${kommando}" skriver Facebook-lagret, och serverns cachade kopia skulle skriva över det.\n` +
+        `    Kör det från panelen (Facebook → Kör nu), eller stoppa servern först. --trots-servern går förbi.\n`,
+    );
+    process.exit(1);
+  }
+}
+
 function skriv(v: unknown): void {
   console.log(JSON.stringify(v, null, 2));
 }

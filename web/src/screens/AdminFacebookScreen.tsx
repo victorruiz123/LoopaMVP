@@ -193,6 +193,7 @@ function Oversikt({ overview: o, kor, ladda, onOpenAd }: { overview: FacebookOve
       <div className="annons-knappar">
         <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("session")}>Kontrollera sessionen</button>
         <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("discover")}>Sök grupper</button>
+        <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("sync-memberships")}>Läs in medlemskap</button>
         <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("validate")}>Validera grupper</button>
         <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("recheck")}>Kontrollera ansökningar</button>
         <button className="btn btn-outline btn-small" disabled={!o.enabled} onClick={() => kor("queue")}>Kör kön</button>

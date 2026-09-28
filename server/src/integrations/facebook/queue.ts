@@ -30,7 +30,7 @@ import {
   facebookMarketplaceEnabled,
 } from "./config.js";
 import { FacebookInterrupt } from "./checkpoint.js";
-import { applySnapshot, inspectGroup, runDiscovery, validateGroups } from "./discovery.js";
+import { applySnapshot, inspectGroup, runDiscovery, syncOwnMemberships, validateGroups } from "./discovery.js";
 import { recheckMemberships, runAutoJoin } from "./joining.js";
 import { facebookListingFor, groupListingSnapshot, groupSnapshot, marketplaceSnapshot } from "./mapping.js";
 import { driveMarketplaceForm } from "./marketplace.js";
@@ -562,7 +562,13 @@ export function startFacebookWorkers(): void {
     await sweepLiveListings();
     await processQueue({ max: 2 });
   });
-  const watch = safe("medlemsvakt", () => recheckMemberships());
+  // Medlemslistan läses HÄR, i serverprocessen. Lagret cachar per process, så en synk från cli.ts medan
+  // servern kör skrevs över av serverns nästa sparning — 116 medlemsgrupper försvann så 2026-09-28.
+  // Vakten går före upptäckten (5 min mot 8), så valideringen ser medlemskapen redan första varvet.
+  const watch = safe("medlemsvakt", async () => {
+    await syncOwnMemberships();
+    await recheckMemberships();
+  });
   const discover = safe("upptäckt", async () => {
     if (!facebookAutoDiscover()) return;
     await runDiscovery();

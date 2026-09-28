@@ -2219,7 +2219,7 @@ const server = http.createServer(async (req, res) => {
               return sendJson(res, 200, { installningar: await fb.patchSettings(patch, identity.id) });
             }
             if (segments[3] === "kor" && segments.length === 4 && req.method === "POST") {
-              const body = await readJsonBody<{ kind?: "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep"; groupIds?: string[]; max?: number }>(req, 16 * 1024);
+              const body = await readJsonBody<{ kind?: import("./integrations/facebook/admin.js").RunKind; groupIds?: string[]; max?: number }>(req, 16 * 1024);
               if (!body.kind) return sendJson(res, 400, { error: "kind krävs." });
               return sendJson(res, 200, await fb.startRun(body.kind, { groupIds: body.groupIds, max: body.max }));
             }

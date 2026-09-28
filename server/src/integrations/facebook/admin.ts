@@ -15,7 +15,7 @@ import {
   facebookProfileDir,
   type FacebookLimits,
 } from "./config.js";
-import { runDiscovery, validateGroups } from "./discovery.js";
+import { runDiscovery, syncOwnMemberships, validateGroups } from "./discovery.js";
 import { recheckMemberships, runAutoJoin } from "./joining.js";
 import { applyMembership, refreshEligibility } from "./membership.js";
 import { facebookListingFor } from "./mapping.js";
@@ -365,7 +365,7 @@ export async function resolveAction(id: string, adminId: string | null): Promise
   return action;
 }
 
-export type RunKind = "session" | "discover" | "validate" | "join" | "recheck" | "queue" | "sweep";
+export type RunKind = "session" | "discover" | "sync-memberships" | "validate" | "join" | "recheck" | "queue" | "sweep";
 
 /**
  * Startar en körning i bakgrunden på begäran från panelen. Svarar direkt — körningen tar minuter och
@@ -384,6 +384,9 @@ export async function startRun(kind: RunKind, opts: { groupIds?: string[]; max?:
       }
       case "discover":
         await runDiscovery({ force: true });
+        return;
+      case "sync-memberships":
+        await syncOwnMemberships();
         return;
       case "validate":
         await validateGroups({ max: opts.max ?? 6, groupIds: opts.groupIds });
