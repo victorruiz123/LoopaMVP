@@ -20,8 +20,8 @@ try {
   // Variablerna kan lika gärna komma ur skalet.
 }
 
-const { facebookBaseUrl, facebookProfileDir, isRealFacebook } = await import("./config.js");
-const { openFacebookBrowser, SESSION_SEL, bodyText } = await import("./session.js");
+const { facebookAccountId, facebookBaseUrl, facebookProfileDir, isRealFacebook } = await import("./config.js");
+const { openFacebookBrowser, loggedInAccountId, SESSION_SEL, bodyText } = await import("./session.js");
 const { detectInterrupt } = await import("./checkpoint.js");
 const { writeSession } = await import("./store.js");
 
@@ -43,7 +43,9 @@ console.log(`  Väntar upp till ${Math.round(TIMEOUT_MS / 60000)} minuter\n`);
  * kollisionsfall — då öppnas fönstret igen, upp till tre gånger.
  */
 const SNABB_STANGNING_MS = 15_000;
-let browser = await openFacebookBrowser({ headful: true });
+// allowLoggedOut: kontoräcket stoppade annars just den tomma profil skriptet ska logga in (2026-09-28,
+// första inloggningen på servern). Kontot kontrolleras i stället när inloggningen upptäckts, nedan.
+let browser = await openFacebookBrowser({ headful: true, allowLoggedOut: true });
 let page = browser.page;
 let oppnat = Date.now();
 let omstarter = 0;
@@ -66,7 +68,7 @@ while (Date.now() < slut) {
       console.log(`  … fönstret stängdes direkt (troligen en tidigare Chromium på samma profil) — öppnar igen (${omstarter}/3)`);
       await browser.close().catch(() => undefined);
       await new Promise((r) => setTimeout(r, 4000));
-      browser = await openFacebookBrowser({ headful: true });
+      browser = await openFacebookBrowser({ headful: true, allowLoggedOut: true });
       page = browser.page;
       oppnat = Date.now();
       await page.goto(`${facebookBaseUrl()}/login/`, { waitUntil: "domcontentloaded" }).catch(() => null);
@@ -87,6 +89,15 @@ while (Date.now() < slut) {
   if (!inloggad) {
     if (varv % 10 === 0) console.log(`  … väntar (${url.slice(0, 70)})`);
     continue;
+  }
+
+  const expected = facebookAccountId();
+  const actual = await loggedInAccountId(page.context());
+  if (expected && actual !== expected) {
+    console.error(`\n  ✗ Inloggad som ${actual ?? "okänt konto"}, men FACEBOOK_ACCOUNT_ID är ${expected}. Ingenting sparades.`);
+    console.error("    Logga ut i fönstret och logga in på rätt konto, eller kör om skriptet.\n");
+    process.exitCode = 1;
+    break;
   }
 
   await writeSession({ status: "CONNECTED", checkedAt: new Date().toISOString(), url, detail: "Inloggad för hand via npm run facebook:login." });

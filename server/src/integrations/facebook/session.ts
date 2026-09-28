@@ -37,8 +37,12 @@ export const SESSION_SEL = {
   main: '[role="main"]',
 } as const;
 
-/** Öppnar den persistenta profilen. `headful` för inloggningen och för att titta på en torrkörning. */
-export async function openFacebookBrowser(opts: { headful?: boolean } = {}): Promise<FacebookBrowser> {
+/**
+ * Öppnar den persistenta profilen. `headful` för inloggningen och för att titta på en torrkörning.
+ * `allowLoggedOut` släpper igenom en profil där INGEN är inloggad — bara för login.ts, som finns till
+ * för att fylla just en sådan profil. Ett annat konto i profilen stoppas fortfarande.
+ */
+export async function openFacebookBrowser(opts: { headful?: boolean; allowLoggedOut?: boolean } = {}): Promise<FacebookBrowser> {
   const dir = facebookProfileDir();
   mkdirSync(dir, { recursive: true });
   const context = await chromium.launchPersistentContext(dir, {
@@ -55,7 +59,7 @@ export async function openFacebookBrowser(opts: { headful?: boolean } = {}): Pro
   const expected = facebookAccountId();
   if (expected && isRealFacebook()) {
     const actual = await loggedInAccountId(context);
-    if (actual !== expected) {
+    if (actual !== expected && !(opts.allowLoggedOut && actual === null)) {
       await context.close().catch(() => undefined);
       throw new Error(`Fel Facebook-konto i webbläsarprofilen: inloggad som ${actual ?? "ingen"}, FACEBOOK_ACCOUNT_ID är ${expected}. Ingenting körs.`);
     }

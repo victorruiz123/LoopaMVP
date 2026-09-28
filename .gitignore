@@ -43,3 +43,8 @@ grupper*.csv
 mall*.txt
 utskick-logg.csv
 utskick-forhandsvisning/
+
+# Kopior av varje mejl servern skickar (puls, granskning, Tradera-frågor) — driftdata med mottagarnas
+# adresser. De som redan är incheckade ligger kvar; nya filer ignoreras. Utan raden ser rulla-ut.sh
+# servern som smutsig och avbryter (2026-09-28).
+outbox/
