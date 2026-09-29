@@ -190,7 +190,10 @@ export async function handleButikRequest(
   }
 
   if (segments[0] === "leverans" && segments.length === 1) {
-    json(res, 200, { ...deliveryQuote(url.searchParams.get("postnummer") ?? ""), checkoutConfigured: checkoutConfigured() });
+    // ?produkt=<id> sätter avgiften efter möbelns kategori — samma tal som kassan sedan tar.
+    const produktId = url.searchParams.get("produkt");
+    const produkt = produktId ? await productById(produktId) : null;
+    json(res, 200, { ...deliveryQuote(url.searchParams.get("postnummer") ?? "", produkt?.categorySlug), checkoutConfigured: checkoutConfigured() });
     return true;
   }
 

@@ -5,7 +5,7 @@
 //   A. Godkännandet köar Marketplace och de VALDA grupperna (per möbel, under taket), aldrig andra.
 //   B. Tradera och Blocket är opåverkade: planen bär dem som förut, Facebook är en tredje rad.
 //   C. Ett Facebook-fel kan inte hindra butiken: möbeln blir live även när Facebook-lagret är trasigt.
-//   D. Priset: Facebook bär produktsidans pris (möbeln) med leveransen utskriven; Tradera bär möbeln + 600.
+//   D. Priset: Facebook bär produktsidans pris (möbeln) med leveransen utskriven; Tradera bär möbeln + frakten.
 //   E/F. Idempotens: ett andra tryck skapar ingenting nytt — varken Marketplace eller grupp.
 //   G. Urvalet respekterar behörighet, länkförbud, geografi, märke, paus, manuella åtgärder och taket.
 //   H–K. Den sålda möbelns adress svarar 200 med "hittat ett nytt hem", utan köp, med bara köpbara alternativ.
@@ -238,18 +238,20 @@ test("D. Facebook bär produktsidans pris; Tradera bär möbeln plus hemleverans
   assert.ok(fb.ok);
   if (!fb.ok) return;
   assert.equal(fb.listing.price, 1000, "prisstegens nuvarande pris, inte prismotorns 2 000");
-  assert.equal(fb.listing.deliveryFeeSek, 600, "kassans fraktavgift — samma tal som produktsidan visar");
+  // Fixturen är en soffa: sofffrakten, 700 kr (delivery.ts fraktFor).
+  assert.equal(fb.listing.deliveryFeeSek, 700, "kassans fraktavgift — samma tal som produktsidan visar");
   const mp = marketplaceCopy(fb.listing);
   assert.match(mp.description, /Pris: 1\s000 kr/);
-  assert.match(mp.description, /Hemleverans i Stockholm: 600 kr \(läggs till i kassan på Loopa\)\./);
-  assert.ok(!/1\s600/.test(mp.description), "aldrig möbeln + frakt i ett tal på Facebook — det talet finns inte på produktsidan");
-  assert.match(groupPostCopy(fb.listing), /Hemleverans i Stockholm: 600 kr/);
+  assert.match(mp.description, /Hemleverans i Stockholm: 700 kr \(läggs till i kassan på Loopa\)\./);
+  assert.ok(!/1\s700/.test(mp.description), "aldrig möbeln + frakt i ett tal på Facebook — det talet finns inte på produktsidan");
+  assert.match(groupPostCopy(fb.listing), /Hemleverans i Stockholm: 700 kr/);
 
   const tradera = await planTraderaPublish(job3);
   assert.ok(tradera.ok, tradera.ok ? "" : tradera.reason);
   if (!tradera.ok) return;
   assert.equal(tradera.plan.itemPrice, 1000);
-  assert.equal(tradera.plan.price, 1600, "Tradera: möbeln + 600 kr hemleverans i ETT tal");
+  assert.equal(tradera.plan.price, 1700, "Tradera: möbeln + 700 kr sofffrakt i ETT tal");
+  assert.equal(tradera.plan.shippingSek, 700);
   const produkt = await productById(loopaIdFor(job3.id));
   // Produktsidan (butik/normalize.ts priceOf) och Facebook läser samma tal.
   assert.equal(produkt?.priceSek ?? fb.listing.price, fb.listing.price);

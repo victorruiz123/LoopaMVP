@@ -35,9 +35,9 @@ export default function BuyPanel({ product }: { product: Product }) {
   useEffect(() => {
     if (digits.length < 5) { setQuote(null); return; }
     let live = true;
-    fetchDelivery(digits).then((q) => { if (live) setQuote(q); }).catch(() => { if (live) setQuote(null); });
+    fetchDelivery(digits, product.id).then((q) => { if (live) setQuote(q); }).catch(() => { if (live) setQuote(null); });
     return () => { live = false; };
-  }, [digits]);
+  }, [digits, product.id]);
 
   // Kassan avstängd: ingen knapp alls hellre än en som leder till ett fel.
   const [configured, setConfigured] = useState<boolean | null>(null);

@@ -44,7 +44,9 @@ test("zonavgifterna kommer ur zonerna, inte ur en lista bredvid", () => {
  */
 test("kassans frakt är samma tal som annonserna lovar, i varje zon", async () => {
   const { SHIPPING_INCLUDED_SEK } = await import("../server/src/hemleverans.js");
-  assert.deepEqual([...new Set(ZONE_FEES)], [SHIPPING_INCLUDED_SEK]);
+  const { fraktFor } = await import("../server/src/butik/delivery.js");
+  // Grundpriset och sofforna — köpsidan skriver "600–700 kr".
+  assert.deepEqual([...new Set(ZONE_FEES)], [SHIPPING_INCLUDED_SEK, fraktFor("soffor")]);
   assert.ok(ZONE_FEES.every((a, i) => i === 0 || ZONE_FEES[i - 1] <= a), "sorterad");
 });
 

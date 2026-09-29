@@ -7,7 +7,7 @@
  * och inte ur en egen tolkning av jobbet. Titeln är produktsidans titel, priset produktsidans pris,
  * skicket produktsidans skicketikett.
  *
- * PRISET ÄR MÖBELNS, inte möbeln plus hemleverans. Tradera- och Blocket-annonserna bär +600 kr för
+ * PRISET ÄR MÖBELNS, inte möbeln plus hemleverans. Tradera- och Blocket-annonserna bär +frakten för
  * att köpet sker DÄR, med leveransen inbakad. Facebook-läsaren köper på Loopa, där produktsidan visar
  * möbelpriset och räknar fram frakten på postnumret i kassan. Ett annat tal på Facebook än på sidan
  * det länkar till är exakt det förtroendetapp den här kanalen inte får skapa.
@@ -21,7 +21,7 @@ import path from "node:path";
 import { adImages, adTitle } from "../../adContent.js";
 import { jobToProduct } from "../../butik/normalize.js";
 import { annonstext, hamta, medRattelser, tillampaPaProdukt } from "../../butik/overrides.js";
-import { ZONE_FEES } from "../../butik/delivery.js";
+import { fraktFor } from "../../butik/delivery.js";
 import { baseUrl } from "../../butik/seo.js";
 import type { Product } from "../../butik/types.js";
 import { jobDir } from "../../jobStore.js";
@@ -73,7 +73,7 @@ export interface FacebookListing {
   /**
    * Hemleveransens pris i Loopas kassa, som det står på produktsidan. INTE inräknat i `price`: på Loopa
    * betalar köparen möbeln och leveransen var för sig (butik/checkout.ts), och Facebook-läsaren köper
-   * på Loopa. Tradera och Blocket bär i stället möbel + 600 kr i ett tal — se hemleverans.ts.
+   * på Loopa. Tradera och Blocket bär i stället möbel + frakt i ett tal — se hemleverans.ts.
    */
   deliveryFeeSek: number | null;
 }
@@ -134,7 +134,8 @@ export async function facebookListingFor(rajob: ConditionJob): Promise<ListingRe
       imagePaths: images.map((image) => path.join(dir, image.path)),
       canonicalUrl: canonicalListingUrl(loopaId),
       location: product.region || "Stockholm",
-      deliveryFeeSek: product.homeDeliveryAvailable && ZONE_FEES.length ? Math.min(...ZONE_FEES) : null,
+      // Samma avgift som kassan tar för just den här möbeln (soffor 700 kr).
+      deliveryFeeSek: product.homeDeliveryAvailable ? fraktFor(product.categorySlug) : null,
     },
   };
 }

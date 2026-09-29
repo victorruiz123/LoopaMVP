@@ -27,7 +27,8 @@ import { jobDir } from "./jobStore.js";
 import { presentableImages } from "./pipeline/cover.js";
 import { TYPE_LABELS } from "./damageLabels.js";
 import { loopaIdFor } from "./loopaId.js";
-import { SHIPPING_INCLUDED_SEK } from "./hemleverans.js";
+import { annonsensFrakt } from "./hemleverans.js";
+import { categorySlugOf } from "./butik/normalize.js";
 import type { AdBlock, AdRun, CapturedImage, ConditionJob, Damage, ListingAttribute, Severity } from "./types.js";
 
 /**
@@ -73,6 +74,11 @@ export interface AdOptions {
    * publika uppslagssidan står kvar i båda.
    */
   infoPage: boolean;
+  /**
+   * Hemleveransen i kronor, som texten skriver ut. Publiceringen skickar in exakt det belopp den bakar
+   * in i priset (med adminens kategorirättelse); utan det räknas det ur jobbet (hemleverans.ts).
+   */
+  shippingSek?: number;
 }
 
 // Allvarsgraden står mitt i en mening i annonstexten och är gemen därför; skadetyperna inleder sin
@@ -376,7 +382,7 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
         {
           text:
             "En budfirma kör möbeln hem till din dörr efter köpet, och du väljer leveranstid via SMS. " +
-            `Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad i priset — ingenting ` +
+            `Hemleveransen kostar ${options.shippingSek ?? annonsensFrakt(job, categorySlugOf(job))} kr och är redan inräknad i priset — ingenting ` +
             "tillkommer i kassan. Avhämtning erbjuds inte.",
         },
       ]),

@@ -35,7 +35,7 @@ test("annonsen byggs ur produktsidans projektion: titel, möbelpris, skick, uppm
   const l = r.listing;
   assert.equal(l.loopaId, loopaIdFor(job.id));
   assert.equal(l.price, 6500, "möbelns pris — produktsidans tal");
-  assert.notEqual(l.price, prisMedHemleverans(6500), "INTE Tradera/Blockets pris med hemleverans");
+  assert.notEqual(l.price, prisMedHemleverans(6500, 700), "INTE Tradera/Blockets pris med hemleverans");
   assert.equal(l.conditionLabel, "Mycket gott skick");
   assert.equal(l.grade, "B");
   assert.equal(l.brand, "Sweef");

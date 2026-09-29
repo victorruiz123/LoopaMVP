@@ -165,8 +165,10 @@ export interface Order {
 }
 
 /** Leveransbeskedet är PUBLIKT — man ska kunna se pris och tid innan man loggar in. */
-export function fetchDelivery(postal: string): Promise<DeliveryQuote> {
-  return getJson(`/api/butik/leverans?postnummer=${encodeURIComponent(postal)}`);
+export function fetchDelivery(postal: string, productId?: string): Promise<DeliveryQuote> {
+  // Med produkten svarar servern med möbelns avgift (soffor kostar mer) — samma tal som kassan tar.
+  const produkt = productId ? `&produkt=${encodeURIComponent(productId)}` : "";
+  return getJson(`/api/butik/leverans?postnummer=${encodeURIComponent(postal)}${produkt}`);
 }
 
 /**

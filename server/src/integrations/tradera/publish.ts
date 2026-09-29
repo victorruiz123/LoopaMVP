@@ -16,8 +16,8 @@ import type { CapturedImage, ConditionJob, TraderaPublication } from "../../type
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
 import { armPriceLadder } from "../../priceLadder.js";
 import { loopaIdFor } from "../../loopaId.js";
-import { medRattelser } from "../../butik/overrides.js";
-import { SHIPPING_INCLUDED_SEK, prisMedHemleverans } from "../../hemleverans.js";
+import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
+import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
 import {
   TRADERA_CONDITION,
   TRADERA_SHIPPING_OTHER_ID,
@@ -116,6 +116,8 @@ export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishRe
     strong: [card.identity.category, job.selected?.productType, title, job.productContext],
     weak: [card.listing.description, card.identity.variant],
   });
+  // Frakten efter butikens kategori (soffor 700 kr), eller det belopp möbeln redan gått ut med.
+  const shipping = annonsensFrakt(job, await kategoriMedRattelse(job));
 
   return {
     ok: true,
@@ -124,9 +126,9 @@ export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishRe
       loopaId: loopaIdFor(job.id),
       categoryId: category.id,
       categoryName: category.name,
-      price: prisMedHemleverans(price.value),
+      price: prisMedHemleverans(price.value, shipping),
       itemPrice: price.value,
-      shippingSek: SHIPPING_INCLUDED_SEK,
+      shippingSek: shipping,
       priceSource: price.source,
       condition: result.grade ? TRADERA_CONDITION[result.grade.grade] : null,
       imageCount: images.length,
@@ -166,7 +168,7 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
     // det riktiga jobbet, medan beskrivningen ska byggas ur den rättade kopian.
     const annons = await medRattelser(job);
     // Blocken sparas på publiceringen: säljarens annonsvy visar texten som den faktiskt gick ut.
-    const adBlocks = traderaAdBlocks(annons);
+    const adBlocks = traderaAdBlocks(annons, plan.shippingSek);
 
     const images = await loadImages(job);
 
@@ -181,7 +183,7 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       conditionAttributeId: TRADERA_SKICK_ATTRIBUTE_ID,
       shippingOptionId: TRADERA_SHIPPING_OTHER_ID,
       // 0 kr, för att frakten redan ligger i priset. Ett belopp här hade lagts PÅ annonspriset i
-      // Traderas kassa och tagit ut de 600 kronorna en andra gång.
+      // Traderas kassa och tagit ut hemleveransen en andra gång.
       shippingCost: 0,
       paymentOptionIds: traderaPaymentOptionIds(),
       durationDays: plan.durationDays ?? undefined,
@@ -197,6 +199,7 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       error: null,
       publishedAt: new Date().toISOString(),
       adBlocks,
+      shippingSek: plan.shippingSek,
     }));
     console.info(`[tradera] job ${jobId} publicerat som item ${result.itemId} — ${result.url}`);
 
@@ -354,8 +357,8 @@ export function buildDescription(job: ConditionJob): string {
  * "Beskrivning" (GET /api/jobs/:id/annonstext), så att det säljaren läser är ordagrant det som
  * går upp på Tradera.
  */
-export function traderaAdBlocks(job: ConditionJob): AdBlock[] {
-  return composeAd(job, { delivery: true, loopaSells: true, infoPage: true });
+export function traderaAdBlocks(job: ConditionJob, shippingSek?: number): AdBlock[] {
+  return composeAd(job, { delivery: true, loopaSells: true, infoPage: true, shippingSek });
 }
 
 export { traderaConfigured };

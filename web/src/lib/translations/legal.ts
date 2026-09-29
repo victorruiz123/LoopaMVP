@@ -167,10 +167,13 @@ export const LEGAL: Record<string, Translation> = {
     en: "The return costs one leg of transport, and you pay for it:",
     fr: "Le retour coûte un trajet de transport, et il est à votre charge :",
   },
-  "600 kr dras från din utbetalning": { en: "SEK 600 is deducted from your payout", fr: "600 SEK sont déduites de votre versement" },
-  "när en möbel kommer tillbaka av det skälet. Har utbetalningen redan gått iväg fakturerar vi beloppet. Det är samma 600 kr som en hemleverans kostar i Stockholms län — returen är en resa till, inte två.": {
-    en: "when a piece comes back for that reason. If the payout has already gone out, we invoice the amount. It is the same SEK 600 that a home delivery costs in Stockholm County — the return is one more journey, not two.",
-    fr: "lorsqu'un meuble revient pour ce motif. Si le versement a déjà été effectué, nous facturons le montant. Ce sont les mêmes 600 SEK que coûte une livraison à domicile dans le comté de Stockholm — le retour est un trajet de plus, pas deux.",
+  "600 kr (700 kr för en soffa) dras från din utbetalning": {
+    en: "SEK 600 (SEK 700 for a sofa) is deducted from your payout",
+    fr: "600 SEK (700 SEK pour un canapé) sont déduites de votre versement",
+  },
+  "när en möbel kommer tillbaka av det skälet. Har utbetalningen redan gått iväg fakturerar vi beloppet. Det är samma belopp som en hemleverans av möbeln kostar i Stockholms län — returen är en resa till, inte två.": {
+    en: "when a piece comes back for that reason. If the payout has already gone out, we invoice the amount. It is the same amount that a home delivery of the piece costs in Stockholm County — the return is one more journey, not two.",
+    fr: "lorsqu'un meuble revient pour ce motif. Si le versement a déjà été effectué, nous facturons le montant. C'est le même montant que coûte la livraison à domicile du meuble dans le comté de Stockholm — le retour est un trajet de plus, pas deux.",
   },
   "Det här är också hela skälet till att förslagen ska redigeras och inte bara godkännas. En skada du lät stå kvar oredigerad i annonstexten är en retur du betalar för.": {
     en: "This is also the whole reason the suggestions are to be edited and not merely approved. Damage you left unedited in the listing text is a return you pay for.",

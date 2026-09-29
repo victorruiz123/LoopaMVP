@@ -7,6 +7,7 @@
  * ha dragit in en säljare i en affär har blivit lurad, oavsett hur rimliga avgifterna är.
  *
  * EN ENDA FRAKTLOGIK I HELA PRODUKTEN. Leveransen prissätts av `deliveryQuote` i butiken — 600 kr
+ * (soffor 700 kr; en affär känner inte möbelns kategori när avgiften visas och får grundpriset)
  * inom Stockholms län — och inte av en egen taxa här. Två fraktpriser för samma sträcka i samma app
  * är två priser användaren kan se samtidigt, och den dagen någon jämför dem har vi ingen bra
  * förklaring.

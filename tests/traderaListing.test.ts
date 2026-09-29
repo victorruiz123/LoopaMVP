@@ -289,6 +289,11 @@ test("Blocket-annonsen bär samma leveranslöfte som Tradera-annonsen", () => {
   assert.match(text, /Avhämtning erbjuds inte/);
 });
 
+test("texten skriver ut exakt den frakt publiceringen bakar in i priset", () => {
+  assert.match(buildBlocketDescription(job(), 700), /Hemleveransen kostar 700 kr och är redan inräknad/);
+  assert.doesNotMatch(buildBlocketDescription(job(), 700), /600 kr/);
+});
+
 test("varken Blocket- eller Tradera-annonsen skriver ut att Loopa är säljaren", () => {
   assert.doesNotMatch(buildBlocketDescription(job()), /Säljs av Loopa/);
   assert.doesNotMatch(buildDescription(job()), /Säljs av Loopa/);
@@ -461,19 +466,20 @@ test("texten är HTML, och säljarens tecken kan inte bryta ut ur den", () => {
 // annonstexten fortsätter påstå att beloppet är inräknat. Ingen av dem syns i något gränssnitt.
 
 test("annonspriset är möbeln plus frakten", () => {
-  assert.equal(prisMedHemleverans(2400), 2400 + SHIPPING_INCLUDED_SEK);
+  assert.equal(prisMedHemleverans(2400, SHIPPING_INCLUDED_SEK), 2400 + SHIPPING_INCLUDED_SEK);
   assert.equal(SHIPPING_INCLUDED_SEK, 600);
-  assert.equal(prisMedHemleverans(2399.6), 2400 + SHIPPING_INCLUDED_SEK, "öretal avrundas, som hos Tradera");
+  assert.equal(prisMedHemleverans(2399.6, SHIPPING_INCLUDED_SEK), 2400 + SHIPPING_INCLUDED_SEK, "öretal avrundas, som hos Tradera");
+  assert.equal(prisMedHemleverans(2400, 700), 3100, "soffans frakt");
 });
 
 test("den veckovisa sänkningen tar bara av möbeln — frakten står stilla hela vägen ner", () => {
   const rungs = ladderRungs(2400, 900, DEFAULT_WEEKLY_DROP);
   assert.ok(rungs.length > 3, "spannet ska ha flera steg att gå igenom");
   for (const rung of rungs) {
-    assert.equal(prisMedHemleverans(rung) - rung, SHIPPING_INCLUDED_SEK, `steget ${rung} tappade frakt`);
+    assert.equal(prisMedHemleverans(rung, SHIPPING_INCLUDED_SEK) - rung, SHIPPING_INCLUDED_SEK, `steget ${rung} tappade frakt`);
   }
   // Golvet i annonsen är säljarens golv plus frakten — aldrig lägre.
-  assert.equal(prisMedHemleverans(rungs.at(-1)!), 900 + SHIPPING_INCLUDED_SEK);
+  assert.equal(prisMedHemleverans(rungs.at(-1)!, SHIPPING_INCLUDED_SEK), 900 + SHIPPING_INCLUDED_SEK);
 });
 
 // ─── Det publika kortet ──────────────────────────────────────────────────────

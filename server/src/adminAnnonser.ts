@@ -49,7 +49,7 @@ import { normaliseraPostnummer, saljarensPostnummer } from "./integrations/block
 import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
 import { channelSummaries, listingChannelStatus, type ListingChannelStatus } from "./integrations/facebook/admin.js";
 import { onListingLive } from "./integrations/facebook/queue.js";
-import { prisMedHemleverans } from "./hemleverans.js";
+import { annonsensFrakt, prisMedHemleverans } from "./hemleverans.js";
 import type { PublicationStatus as FacebookPublicationStatus } from "./integrations/facebook/types.js";
 import type { Product, ProductEvent, ProductState } from "./butik/types.js";
 
@@ -431,9 +431,9 @@ async function jobbFor(loopaId: string): Promise<ConditionJob | undefined> {
  * fältets eget innehåll. Panelen ska visa det man kommer tillbaka TILL när man trycker ↺, alltså
  * den byggda texten, med övriga rättelser (rubrik, möbelstycke) pålagda.
  */
-function harleddBeskrivning(rattad: ConditionJob): string | null {
+function harleddBeskrivning(rattad: ConditionJob, frakt: number): string | null {
   if (!rattad.result?.listing?.result) return null;
-  return renderAdPlain(traderaAdBlocks({ ...rattad, adText: undefined }));
+  return renderAdPlain(traderaAdBlocks({ ...rattad, adText: undefined }, frakt));
 }
 
 export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj | null> {
@@ -464,7 +464,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     harlett,
     overstyrning: overstyrning ?? null,
     annonstext: overrides.annonstext(job, overstyrning),
-    harleddBeskrivning: harleddBeskrivning(await overrides.medRattelser(job)),
+    harleddBeskrivning: harleddBeskrivning(await overrides.medRattelser(job), annonsensFrakt(job, await overrides.kategoriMedRattelse(job))),
     ladder: job.priceLadder ?? null,
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
@@ -638,7 +638,9 @@ async function sattPris(job: ConditionJob, pris: number): Promise<void> {
       // Möbeln PLUS hemleveransen, som publiceringen och den veckovisa sänkningen gör (priceLadder.ts
       // applyDrop). Här gick det bara möbelkronor till Tradera, så ett adminpris på 1 000 kr blev en
       // annons på 1 000 kr medan samma möbel låg på 1 600 kr på Blocket. Rättat 2026-09-26.
-      if (traderaConfigured()) await updateTraderaPrice(itemId, prisMedHemleverans(belopp), ladder.listingMode ?? "fixed");
+      // Frakten annonsen gick ut med — 600 för annonser från före 2026-09-29 (hemleverans.ts).
+      const frakt = annonsensFrakt(job, await overrides.kategoriMedRattelse(job));
+      if (traderaConfigured()) await updateTraderaPrice(itemId, prisMedHemleverans(belopp, frakt), ladder.listingMode ?? "fixed");
     } catch (err) {
       ladder.lastError = err instanceof Error ? err.message : String(err);
       await persist(job);

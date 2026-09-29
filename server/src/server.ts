@@ -1752,8 +1752,11 @@ async function handleGetAdText(jobId: string, res: ServerResponse) {
   if (publicerad) return sendJson(res, 200, { blocks: publicerad, published: true });
 
   const { traderaAdBlocks } = await import("./integrations/tradera/publish.js");
-  const { medRattelser } = await import("./butik/overrides.js");
-  sendJson(res, 200, { blocks: traderaAdBlocks(await medRattelser(job)), published: false });
+  const { kategoriMedRattelse, medRattelser } = await import("./butik/overrides.js");
+  const { annonsensFrakt } = await import("./hemleverans.js");
+  // Samma frakt som publiceringen skulle baka in — med adminens kategorirättelse.
+  const frakt = annonsensFrakt(job, await kategoriMedRattelse(job));
+  sendJson(res, 200, { blocks: traderaAdBlocks(await medRattelser(job), frakt), published: false });
 }
 
 interface ListingEditBody {

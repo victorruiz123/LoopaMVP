@@ -632,6 +632,11 @@ export interface TraderaPublication {
    * nybyggd text, som kan ha glidit isär. Saknas på annonser publicerade innan fältet fanns.
    */
   adBlocks?: AdBlock[] | null;
+  /**
+   * Hemleveransen som är inbakad i annonspriset, i kronor. Prisstegen lägger på samma belopp vid varje
+   * sänkning (hemleverans.ts `annonsensFrakt`). Saknas på annonser från före 2026-09-29 — de bär 600.
+   */
+  shippingSek?: number | null;
 }
 
 /**
@@ -669,6 +674,8 @@ export interface BlocketPublication {
   publishedAt: string | null;
   /** Körningens steg, senast först kapade till de sista 60. */
   steps: BlocketStep[];
+  /** Hemleveransen inbakad i annonspriset. Se `TraderaPublication.shippingSek`. */
+  shippingSek?: number | null;
 }
 
 /** Se ConditionJob.saleTerms. */

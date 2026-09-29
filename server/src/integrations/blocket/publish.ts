@@ -25,8 +25,8 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import type { BrowserContext, Page } from "playwright";
 import { adImages, adTitle, composeAd, renderAdPlain, resolveAdPrice } from "../../adContent.js";
-import { prisMedHemleverans, SHIPPING_INCLUDED_SEK } from "../../hemleverans.js";
-import { medRattelser } from "../../butik/overrides.js";
+import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
+import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
 import { jobToProduct } from "../../butik/normalize.js";
 import { getJob, jobDir, persist } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
@@ -154,6 +154,10 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
     return { ok: false, reason: "Det här jobbet är inte en annons — en affärsskanning läggs inte ut till försäljning." };
   }
 
+  // Frakten efter butikens kategori (soffor 700 kr), eller det belopp möbeln redan gått ut med på
+  // Tradera — samma möbel ska lova samma frakt i båda kanalerna.
+  const shipping = annonsensFrakt(job, await kategoriMedRattelse(job));
+
   return {
     ok: true,
     plan: {
@@ -163,9 +167,9 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
       // Möbeln PLUS hemleveransen, samma tal som Tradera-annonsen bär. Prisstegen räknar i
       // möbelkronor och frakten läggs på vid gränsen — se hemleverans.ts för varför de två aldrig
       // slås ihop tidigare än här.
-      price: prisMedHemleverans(price.value),
+      price: prisMedHemleverans(price.value, shipping),
       itemPrice: price.value,
-      shippingSek: SHIPPING_INCLUDED_SEK,
+      shippingSek: shipping,
       priceSource: price.source,
       condition: result.grade ? BLOCKET_CONDITION[result.grade.grade] : null,
       measurements: measurementsFrom(product.dimensions),
@@ -223,6 +227,7 @@ export async function blocketPaket(rajob: ConditionJob): Promise<BlocketPaket | 
   const bilder = await adImages(job);
   const postnummer = await saljarensPostnummer(rajob).catch(() => null);
   const grade = job.result.grade?.grade ?? null;
+  const frakt = annonsensFrakt(job, await kategoriMedRattelse(job));
 
   const saknas: string[] = [];
   if (!rubrikHel) saknas.push("rubrik");
@@ -233,9 +238,9 @@ export async function blocketPaket(rajob: ConditionJob): Promise<BlocketPaket | 
   return {
     rubrik: capTitle(rubrikHel),
     rubrikHel,
-    pris: pris ? prisMedHemleverans(pris.value) : null,
+    pris: pris ? prisMedHemleverans(pris.value, frakt) : null,
     prisMobel: pris?.value ?? null,
-    frakt: SHIPPING_INCLUDED_SEK,
+    frakt,
     kategori: blocketCategoryFor(product?.categorySlug ?? null, rubrikHel),
     skick: grade ? BLOCKET_CONDITION[grade] : null,
     matt: measurementsFrom(product?.dimensions),
@@ -243,7 +248,7 @@ export async function blocketPaket(rajob: ConditionJob): Promise<BlocketPaket | 
     farg: product?.color ?? null,
     material: product?.material ?? null,
     postnummer,
-    beskrivning: buildBlocketDescription(job),
+    beskrivning: buildBlocketDescription(job, frakt),
     bilder: bilder.map((b) => ({ id: b.id, etikett: b.viewLabel })),
     maxBilder: MAX_BLOCKET_IMAGES,
     saknas,
@@ -582,7 +587,7 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
     // kanalerna — annonsen ligger på ett Loopa-konto, och hemleveransen är redan inräknad i priset
     // (se `prisMedHemleverans`). Två olika löften om samma möbel vore det verkliga felet: en köpare
     // som jämför de två annonserna ska se samma pris och samma leverans.
-    const description = buildBlocketDescription(annons);
+    const description = buildBlocketDescription(annons, plan.shippingSek);
     const files = await imagePaths(job);
 
     logga(plan.dryRun ? "Startar TORRKÖRNING — sista knappen trycks inte" : "Startar SKARP publicering", "running", {
@@ -621,6 +626,7 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
       error: null,
       publishedAt: result.status === "published" ? new Date().toISOString() : null,
       steps: [...steps],
+      shippingSek: result.status === "published" ? plan.shippingSek : (current.shippingSek ?? null),
     }));
     console.info(`[blocket] job ${jobId} ${result.status} — ${result.url ?? result.receiptUrl}`);
   } catch (err) {
@@ -752,8 +758,8 @@ async function pickCondition(page: Page, condition: string | null, logga: Logga)
  * Egen funktion och inte en rad inuti körningen, så att pariteten går att PRÖVA utan att starta en
  * webbläsare (tests/traderaListing.test.ts).
  */
-export function buildBlocketDescription(job: ConditionJob): string {
-  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true, infoPage: false }));
+export function buildBlocketDescription(job: ConditionJob, shippingSek?: number): string {
+  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true, infoPage: false, shippingSek }));
 }
 
 export function isAdUrl(url: string): boolean {

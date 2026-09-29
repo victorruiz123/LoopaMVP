@@ -336,6 +336,21 @@ export function imageUrlOf(job: ConditionJob, loopaId: string): string | null {
 }
 
 /**
+ * Butikens kategori för ett jobb. Egen funktion för att fraktpriset hänger på den (delivery.ts
+ * `fraktFor`), och Tradera-, Blocket- och annonstexten ska välja samma kategori som butiken visar.
+ */
+export function categorySlugOf(job: ConditionJob): string {
+  const listing = job.result?.listing?.result ?? job.listing?.result ?? job.pendingListing?.result ?? null;
+  const model = listing?.identity?.exactProduct ?? job.selected?.model ?? job.identity?.model ?? null;
+  return resolveCategorySlug({
+    type: attr(listing?.attributes ?? [], /^(type|typ|kategori|category)$/i),
+    category: listing?.identity?.category ?? null,
+    title: listing?.listing?.title ?? null,
+    model,
+  });
+}
+
+/**
  * Jobbet som butiksvara. Null när jobbet inte hör hemma i en butik alls.
  *
  * `state` skickas in i stället för att härledas: tillståndet ÄGS av butikslagret (se store.ts) och
@@ -368,12 +383,7 @@ export function jobToProduct(job: ConditionJob, state: ProductState): Product | 
   const model = listing?.identity?.exactProduct ?? job.selected?.model ?? job.identity?.model ?? null;
 
   const typeAttr = attr(attributes, /^(type|typ|kategori|category)$/i);
-  const categorySlug = resolveCategorySlug({
-    type: typeAttr,
-    category: listing?.identity?.category ?? null,
-    title: listing?.listing?.title ?? null,
-    model,
-  });
+  const categorySlug = categorySlugOf(job);
 
   return {
     id: loopaId,

@@ -13,10 +13,10 @@ import { useT } from "../../lib/i18n";
  * av server/src/priceLadder.ts — annonsens pris sänks verkligen, av sig självt, och en säljare som
  * inte fått veta det skulle med rätta bli förvånad.
  *
- * DE 600 KRONORNA ÄR INTE ETT PÅFUNNET TAL. Det är FRAKT_SEK i server/src/butik/delivery.ts, samma
- * hemleveransavgift som köparen betalar och som står i annonstexten. Ändras den avgiften ändras
- * returkostnaden här i samma veva — två olika 600-kronorstal i samma produkt vore ett vi inte kan
- * försvara den dagen någon jämför dem.
+ * 600 OCH 700 KRONOR ÄR INTE PÅFUNNA TAL. Det är FRAKT_SEK och FRAKT_SOFFOR_SEK i
+ * server/src/butik/delivery.ts, samma hemleveransavgift som köparen betalar och som står i
+ * annonstexten. Ändras den avgiften ändras returkostnaden här i samma veva — två olika tal för samma
+ * resa i samma produkt vore ett vi inte kan försvara den dagen någon jämför dem.
  */
 export default function TermsText() {
   const t = useT();
@@ -119,9 +119,9 @@ export default function TermsText() {
       </p>
       <p>
         {t("Returen kostar en fraktsträcka, och den står du för:")}{" "}
-        <strong>{t("600 kr dras från din utbetalning")}</strong>{" "}
+        <strong>{t("600 kr (700 kr för en soffa) dras från din utbetalning")}</strong>{" "}
         {t(
-          "när en möbel kommer tillbaka av det skälet. Har utbetalningen redan gått iväg fakturerar vi beloppet. Det är samma 600 kr som en hemleverans kostar i Stockholms län — returen är en resa till, inte två.",
+          "när en möbel kommer tillbaka av det skälet. Har utbetalningen redan gått iväg fakturerar vi beloppet. Det är samma belopp som en hemleverans av möbeln kostar i Stockholms län — returen är en resa till, inte två.",
         )}
       </p>
       <p>

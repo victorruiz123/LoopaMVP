@@ -24,6 +24,7 @@ import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 import { loopaIdFor } from "../loopaId.js";
 import type { ConditionJob } from "../types.js";
+import { categorySlugOf } from "./normalize.js";
 import type { Dimensions, Product } from "./types.js";
 
 const BUTIK_DIR = () => process.env.BUTIK_DATA_DIR?.trim() || path.join(DATA_DIR, "butik");
@@ -264,6 +265,17 @@ export function tillampaPaProdukt(product: Product, o: Overstyrning | undefined 
     imageUrl: valj(o, "imageUrl", product.imageUrl),
     dimensions,
   };
+}
+
+/**
+ * Butikens kategori för ett jobb, med adminens rättelse pålagd — samma kategori som produktsidan
+ * visar. Fraktpriset hänger på den (delivery.ts `fraktFor`), så en möbel som flyttats till Soffor
+ * ska få sofffrakten i annonsen och inte bara i kassan.
+ */
+export async function kategoriMedRattelse(job: ConditionJob): Promise<string> {
+  const harledd = categorySlugOf(job);
+  const o = await hamta(loopaIdFor(job.id));
+  return (o ? valj(o, "categorySlug", harledd) : harledd) || harledd;
 }
 
 /**

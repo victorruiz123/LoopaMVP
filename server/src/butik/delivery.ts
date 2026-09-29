@@ -39,8 +39,18 @@ export interface DeliverySlot {
  *
  * ZONERNA FINNS KVAR ändå, för de bär också LEVERANSTIDEN: budfirman behöver längre framförhållning
  * längre ut, och det är en operativ sanning som inte försvinner av att priset blev ett.
+ *
+ * SOFFOR KOSTAR 700 kr (från 2026-09-29). Priset varierar fortfarande inte med postnumret — bara med
+ * vad som ska bäras — så annonsen kan skriva ut det redan när den skrivs. Kategorin är butikens
+ * (`categorySlug`, catalog.ts): soffor, bäddsoffor, divaner, hörnsoffor och soffgrupper.
  */
 const FRAKT_SEK = 600;
+const FRAKT_SOFFOR_SEK = 700;
+
+/** Hemleveransen för en möbel i den här kategorin. Okänd kategori får grundpriset. */
+export function fraktFor(categorySlug?: string | null): number {
+  return categorySlug === "soffor" ? FRAKT_SOFFOR_SEK : FRAKT_SEK;
+}
 
 const ZONES: Array<DeliveryZone & { prefixes: string[] }> = [
   {
@@ -71,11 +81,10 @@ const ZONES: Array<DeliveryZone & { prefixes: string[] }> = [
  *
  * Finns som en egen export för att köpsidan skriver ut fraktpriset och den siffran måste komma
  * härifrån. Skriven en gång till i en komponent hade den en dag sagt något annat än kassan gör.
- * Numera är alla zoner lika dyra, så listan är ett tal långt — den står kvar som lista därför att
- * zonpriser är en sak vi kan komma att vilja tillbaka till, och `Math.min`/`Math.max` hos anroparna
- * fortsätter fungera oavsett.
+ * Alla zoner är lika dyra; det som skiljer är kategorin, så listan bär grundpriset och sofforna.
+ * `Math.min`/`Math.max` hos anroparna ger då "600–700 kr".
  */
-export const ZONE_FEES: readonly number[] = ZONES.map((z) => z.feeSek).sort((a, b) => a - b);
+export const ZONE_FEES: readonly number[] = [...new Set([FRAKT_SEK, FRAKT_SOFFOR_SEK, ...ZONES.map((z) => z.feeSek)])].sort((a, b) => a - b);
 
 /** Bara siffrorna. "112 23", "11223" och "112-23" är samma postnummer. */
 export function normalizePostal(raw: string): string {
@@ -87,15 +96,16 @@ export function normalizePostal(raw: string): string {
  *
  * Matchar på de tre första siffrorna. Fem siffror krävs för att svara alls: "11" räcker för att
  * gissa innerstad, men ett halvt postnummer ska inte ge ett helt löfte om en leveransavgift.
+ * `categorySlug` sätter avgiften (se `fraktFor`); utan den gäller grundpriset.
  */
-export function zoneFor(postal: string): DeliveryZone | null {
+export function zoneFor(postal: string, categorySlug?: string | null): DeliveryZone | null {
   const digits = normalizePostal(postal);
   if (digits.length < 5) return null;
   const prefix = digits.slice(0, 3);
   const hit = ZONES.find((z) => z.prefixes.includes(prefix));
   if (!hit) return null;
   const { prefixes, ...zone } = hit;
-  return zone;
+  return { ...zone, feeSek: fraktFor(categorySlug) };
 }
 
 /**
@@ -157,7 +167,7 @@ export function slotsFor(zone: DeliveryZone, from: Date = new Date(), days = DEL
 }
 
 /** Allt klienten behöver för att visa leveransrutan på en produktsida. */
-export function deliveryQuote(postal: string): {
+export function deliveryQuote(postal: string, categorySlug?: string | null): {
   deliverable: boolean;
   zone: DeliveryZone | null;
   slots: DeliverySlot[];
@@ -167,7 +177,7 @@ export function deliveryQuote(postal: string): {
   if (digits.length < 5) {
     return { deliverable: false, zone: null, slots: [], message: "Skriv hela postnumret, fem siffror." };
   }
-  const zone = zoneFor(digits);
+  const zone = zoneFor(digits, categorySlug);
   if (!zone) {
     return {
       deliverable: false,

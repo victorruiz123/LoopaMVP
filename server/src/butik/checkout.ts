@@ -121,7 +121,8 @@ export async function startCheckout(input: {
   if (product.source !== "loopa") throw new CheckoutError("Den här annonsen köps hos Tradera.", 400);
   if (product.priceSek === null) throw new CheckoutError("Varan saknar pris.", 409);
 
-  const quote = deliveryQuote(input.postalCode);
+  // Kategorin sätter avgiften: soffor kostar mer att bära (delivery.ts `fraktFor`).
+  const quote = deliveryQuote(input.postalCode, product.categorySlug);
   const zone = quote.zone;
   // Utanför zonen går köpet ändå igenom, men utan leveransavgift: möbeln hämtas då, och det står i
   // bekräftelsen. Att vägra köpet hade varit att låta en gräns i vår logistik bli ett nej till pengar.
