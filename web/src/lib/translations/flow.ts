@@ -885,4 +885,9 @@ export const FLOW: Record<string, Translation> = {
     fr: "Le lien a expiré. Demandez-en un nouveau depuis la page de connexion.",
   },
   "Något gick fel. Försök igen.": { en: "Something went wrong. Please try again.", fr: "Une erreur s'est produite. Veuillez réessayer." },
+  "Kontrollerar länken…": { en: "Checking the link…", fr: "Vérification du lien…" },
+  "Mejlet kunde inte skickas. Försök igen om en stund.": {
+    en: "The email could not be sent. Please try again shortly.",
+    fr: "L'e-mail n'a pas pu être envoyé. Réessayez dans un instant.",
+  },
 };

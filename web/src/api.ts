@@ -275,6 +275,20 @@ export async function gorInbjudningsansprak(kod: string): Promise<{ utfall: stri
   );
 }
 
+/**
+ * Glömt lösenord: servern mejlar länken (server/src/losenord.ts). Utan inloggning — den som glömt
+ * sitt lösenord har ingen session. Svarar likadant om kontot finns eller inte.
+ */
+export async function begarAterstallning(email: string): Promise<void> {
+  const res = await fetch("/api/losenord/aterstall", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (res.status === 429) throw new Error("rate limit");
+  await json<{ ok: true }>(res);
+}
+
 /** Tyst. En mätning som inte gick fram får aldrig märkas av den som delade länken. */
 export function loggaLankKopierad(kanal: "kopiera" | "dela"): void {
   void authFetch("/api/salj/inbjudan/handelse", {

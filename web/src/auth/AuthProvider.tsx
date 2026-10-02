@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session, User } from "@supabase/supabase-js";
 import { aterstallningsLank, supabase } from "../lib/supabase";
 import { medInbjudan, rensaInbjudan, sparadInbjudan } from "../lib/referral";
-import { gorInbjudningsansprak } from "../api";
+import { begarAterstallning, gorInbjudningsansprak } from "../api";
 
 /**
  * Inloggningen, med samma mekanik som vips-buy-sell-hub.
@@ -50,10 +50,10 @@ interface AuthContextValue {
   signUp: (email: string, password: string, adress: Adress) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
   /**
-   * Återställningen. `losenordslage` är "valj" när besökaren kommit via länken i mejlet och ska välja
-   * ett nytt lösenord, "utgangen" när länken inte längre gällde, annars null.
+   * Återställningen. `losenordslage` är "kontrollerar" medan koden i länken löses in, "valj" när
+   * besökaren ska välja ett nytt lösenord, "utgangen" när länken inte längre gällde, annars null.
    */
-  losenordslage: "valj" | "utgangen" | null;
+  losenordslage: "kontrollerar" | "valj" | "utgangen" | null;
   skickaAterstallning: (email: string) => Promise<{ error: unknown }>;
   bytLosenord: (password: string) => Promise<{ error: unknown }>;
   avslutaAterstallning: () => void;
@@ -97,9 +97,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastLoadedProfileFor = useRef<string | null>(null);
   const vantande = useRef(lasVantande());
   const skriverAdress = useRef(false);
-  const [losenordslage, setLosenordslage] = useState<AuthContextValue["losenordslage"]>(
-    aterstallningsLank === "giltig" ? "valj" : aterstallningsLank === "utgangen" ? "utgangen" : null,
-  );
+  const [losenordslage, setLosenordslage] = useState<AuthContextValue["losenordslage"]>(() => {
+    switch (aterstallningsLank?.typ) {
+      case "kod":
+        return "kontrollerar";
+      case "giltig":
+        return "valj";
+      case "utgangen":
+        return "utgangen";
+      default:
+        return null;
+    }
+  });
+
+  /**
+   * Koden i vår egen länk (#aterstall=…), inlöst mot en session. Adressen töms FÖRST: koden gäller
+   * en gång, och en omladdning som försöker igen ska inte förvandla en lyckad inlösen till "länken
+   * har gått ut". Se server/src/losenord.ts.
+   */
+  const inlost = useRef(false);
+  useEffect(() => {
+    if (aterstallningsLank?.typ !== "kod" || inlost.current) return;
+    inlost.current = true;
+    window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    void supabase.auth
+      .verifyOtp({ token_hash: aterstallningsLank.kod, type: "recovery" })
+      .then(({ error }) => setLosenordslage(error ? "utgangen" : "valj"))
+      .catch(() => setLosenordslage("utgangen"));
+  }, []);
 
   /** Skriver en väntande adress till kontot den skrevs in för. Misslyckas den ligger den kvar till nästa session. */
   const fullfoljAdress = useCallback(async (u: User) => {
@@ -256,20 +281,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const adress = (user?.user_metadata?.adress as Adress | undefined) ?? null;
 
   /**
-   * Mejlet med länken. Supabase skickar det, med projektets mall — samma projekt som Vips.
+   * Mejlet med länken. Skickas av VÅR server och inte av Supabase: projektet har ingen egen
+   * mejlserver i Supabase, och då kommer deras mejl aldrig fram. Se server/src/losenord.ts.
    *
-   * Länken leder tillbaka till appens rot och inte till sidan besökaren stod på: roten är den enda
-   * adressen vi vet att Supabase släpper igenom (samma som registreringens emailRedirectTo), och en
-   * adress som inte står i projektets lista ersätts tyst med Site URL — Vips.
-   *
-   * Ett okänt konto ger INGET fel härifrån. Supabase svarar likadant oavsett, så att formuläret inte
-   * går att använda för att pröva vilka adresser som har konto. Skärmen säger därför "om det finns".
+   * Ett okänt konto ger inget fel — servern svarar likadant oavsett, så att formuläret inte går att
+   * använda för att pröva vilka adresser som har konto. Skärmen säger därför "om det finns".
    */
   const skickaAterstallning = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}/`,
-    });
-    return { error };
+    try {
+      await begarAterstallning(email.trim());
+      return { error: null };
+    } catch (error) {
+      return { error };
+    }
   };
 
   /** Det nya lösenordet. Kräver sessionen som länken i mejlet gav. */

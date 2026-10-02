@@ -2026,6 +2026,15 @@ const server = http.createServer(async (req, res) => {
       }
 
       /**
+       * Glömt lösenord, före grinden: den som glömt sitt lösenord kan inte logga in. Mejlet skickas
+       * härifrån och inte av Supabase — se losenord.ts för varför.
+       */
+      if (segments[1] === "losenord") {
+        const { handleLosenord } = await import("./losenord.js");
+        if (await handleLosenord(segments.slice(2), req, res, () => readJsonBody(req, 4 * 1024))) return;
+      }
+
+      /**
        * Trygg affär, den publika halvan.
        *
        * `tolka` bedömer en annons utan att skapa något — köparen ska få se vad vi kan säga innan de

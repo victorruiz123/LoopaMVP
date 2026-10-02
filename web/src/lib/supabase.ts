@@ -18,23 +18,25 @@ const SUPABASE_PUBLISHABLE_KEY =
 /**
  * Kom besökaren hit via länken i ett återställningsmejl?
  *
- * LÄSES FÖRE createClient, och det är hela poängen. Klienten tolkar adressen när den skapas, sparar
- * sessionen och skickar `PASSWORD_RECOVERY` i en setTimeout — och hinner AuthProvider inte sätta sin
- * lyssnare dessförinnan går händelsen förlorad. Då loggas besökaren in utan att någonsin få välja
- * ett nytt lösenord, vilket var hela ärendet. Adressen ljuger inte, och den läses här innan någon
- * hunnit tömma den.
+ * LÄSES FÖRE createClient. Klienten tolkar och tömmer adressen när den skapas, och det den hittar
+ * meddelas i en setTimeout som AuthProvider inte alltid hinner lyssna på. Adressen ljuger inte.
  *
- * `utgangen` är länken som redan använts eller blivit för gammal: Supabase skickar då tillbaka ett
- * fel i stället för en session.
+ * Tre former:
+ *   - `#aterstall=<kod>`  vår egen länk, mejlad av servern (server/src/losenord.ts). Koden löses in
+ *                         med verifyOtp i AuthProvider. Det är den länken som skickas i dag.
+ *   - `#...&type=recovery` Supabases egen länk, om projektet någon gång skickar mejlet själv.
+ *   - `#error_code=otp_expired` en Supabase-länk som redan använts eller blivit för gammal.
  */
-export type AterstallningsLank = "giltig" | "utgangen" | null;
+export type AterstallningsLank = { typ: "kod"; kod: string } | { typ: "giltig" } | { typ: "utgangen" } | null;
 
 function lasAterstallningsLank(): AterstallningsLank {
   if (typeof window === "undefined") return null;
   const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
-  if (hash.get("type") === "recovery" && hash.get("access_token")) return "giltig";
+  const kod = hash.get("aterstall");
+  if (kod) return { typ: "kod", kod };
+  if (hash.get("type") === "recovery" && hash.get("access_token")) return { typ: "giltig" };
   if (hash.get("error_code") === "otp_expired" || (hash.get("error") && /expired|invalid/i.test(hash.get("error_description") ?? ""))) {
-    return "utgangen";
+    return { typ: "utgangen" };
   }
   return null;
 }

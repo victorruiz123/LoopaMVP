@@ -98,6 +98,7 @@ export default function NyttLosenordScreen() {
   const [fel, setFel] = useState<string | null>(null);
   const [klart, setKlart] = useState(false);
   const utgangen = losenordslage === "utgangen";
+  const kontrollerar = losenordslage === "kontrollerar";
   usePageTitle(utgangen ? "Länken har gått ut" : "Nytt lösenord");
 
   async function submit(e: React.FormEvent) {
@@ -142,7 +143,9 @@ export default function NyttLosenordScreen() {
             )}
           </h1>
           <p className="auth-lede">
-            {utgangen
+            {kontrollerar
+              ? t("Kontrollerar länken…")
+              : utgangen
               ? t("Länken i mejlet gäller en gång och bara en stund. Skriv din e-post så skickar vi en ny.")
               : klart
                 ? t("Du är inloggad. Nästa gång loggar du in med det nya lösenordet.")
@@ -153,7 +156,11 @@ export default function NyttLosenordScreen() {
         </div>
 
         <div className="auth-card">
-          {utgangen ? (
+          {kontrollerar ? (
+            <div className="auth-form" aria-busy="true">
+              <div className="spinner" />
+            </div>
+          ) : utgangen ? (
             <GlomtLosenordForm onTillbaka={avslutaAterstallning} />
           ) : klart ? (
             <div className="auth-form">
@@ -210,6 +217,7 @@ function lasFel(err: unknown): string {
   const raw = err instanceof Error ? err.message : (err as { message?: string })?.message ?? "";
   if (/same.?password|different from the old/i.test(raw)) return translate("Det nya lösenordet måste skilja sig från det gamla.");
   if (/at least|too short|weak/i.test(raw)) return translate("Lösenordet måste vara minst 6 tecken.");
+  if (/kunde inte skickas|kan inte skickas/i.test(raw)) return translate("Mejlet kunde inte skickas. Försök igen om en stund.");
   if (/security purposes|rate limit|too many/i.test(raw)) {
     return translate("Vänta en minut innan du ber om en ny länk.");
   }

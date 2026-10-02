@@ -244,6 +244,16 @@ async function transport() {
   });
 }
 
+/**
+ * Ett enda brev, utanför utskicket — samma one.com-konto och samma avsändare. Används av
+ * lösenordsåterställningen (losenord.ts). Kastar om SMTP saknas eller brevet nekas.
+ */
+export async function skickaEttBrev(brev: { to: string; subject: string; text: string }): Promise<void> {
+  if (!smtpKonfigurerat()) throw new Error("SMTP_USER och SMTP_PASS saknas på servern.");
+  const post = await transport();
+  await post.sendMail({ from: avsandare(), ...brev });
+}
+
 const sov = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
