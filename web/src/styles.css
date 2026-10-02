@@ -3331,6 +3331,7 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 }
 .utskick-falt input[readonly] { background: var(--field); color: var(--muted); }
 .utskick-brev { line-height: 1.55; resize: vertical; min-height: 220px; }
+.utskick-adresser { min-height: 180px; font-size: var(--fs-sm); }
 .utskick-forhands {
   margin: 4px 0 18px; padding: 14px; border: 1px solid var(--hairline); border-radius: var(--r);
   background: var(--field);
