@@ -16,6 +16,11 @@
  *
  * VARJE SKICKAT BREV LOGGAS, en rad JSON per mottagare. Loggen är både kvittot och spärren: samma
  * adress får aldrig samma ämnesrad två gånger, hur många gånger någon än trycker på knappen.
+ *
+ * TVÅ SORTERS MOTTAGARE. "Till användare" är profiltabellen ovan. "Till nya" är en lista adresser som
+ * admin klistrar in — folk som inte har ett konto. Namnet skrivs på samma rad som adressen; brevet får
+ * använda [namn] bara när VARJE rad har ett, hellre avvisat än "Hej ," i en enda inkorg. Spärren och
+ * taket är samma.
  */
 
 import { appendFile, mkdir, readFile } from "node:fs/promises";
@@ -45,7 +50,8 @@ export interface UtskickLage {
   problem: Array<{ epost: string; orsak: string }>;
 }
 
-const LOGG_DIR = () => path.join(DATA_DIR, "utskick");
+/** UTSKICK_DATA_DIR pekar om loggen — testerna ska inte skriva i den skarpa. */
+const LOGG_DIR = () => process.env.UTSKICK_DATA_DIR?.trim() || path.join(DATA_DIR, "utskick");
 const LOGG_FIL = () => path.join(LOGG_DIR(), "logg.jsonl");
 
 /** Paus mellan breven. one.com stryper den som öser iväg hundra brev på en minut. */
@@ -115,6 +121,66 @@ export function fyll(text: string, m: Mottagare): string {
   return text
     .replace(/[[{](namn|förnamn|fornamn)[\]}]/gi, m.fornamn)
     .replace(/[[{](helanamn|fulltnamn)[\]}]/gi, m.namn ?? m.fornamn);
+}
+
+/** Platshållarna som kräver ett namn. Ett brev till nya adresser får inte innehålla någon av dem. */
+export const NAMNPLATSHALLARE = /[[{](namn|förnamn|fornamn|helanamn|fulltnamn)[\]}]/i;
+
+const EPOST = /^[^\s@<>,;"']+@[^\s@<>,;"']+\.[^\s@<>,;"'.]{2,}$/;
+
+/** En rad ur den inklistrade listan: adressen, och namnet när det står bredvid. */
+export interface NyMottagare {
+  epost: string;
+  namn: string | null;
+}
+
+/**
+ * Mottagarna ur en inklistrad lista.
+ *
+ * RAD FÖR RAD. En rad med EN adress och text bredvid ger texten som namn, i vilken form man än
+ * klistrar in den: "Anna Svensson <anna@exempel.se>" ur ett mejlprogram, "Anna Svensson, anna@exempel.se"
+ * ur en CSV, två kolumner ur ett kalkylark (tabb emellan), eller adressen först. Står flera adresser på
+ * samma rad ("a@x.se, b@x.se") vet vi inte vems namnet är, och då får ingen av dem något.
+ *
+ * Ord MED @ som inte är en giltig adress räknas som fel, så att ett stavfel syns i stället för att tyst
+ * falla bort. En rad utan @ hoppas över — det är en rubrikrad ("namn,epost") eller tom. Dubbletter
+ * räknas en gång, oavsett versaler; har den senare raden ett namn som den första saknade tas det.
+ */
+export function tolkaAdresser(text: string): { giltiga: NyMottagare[]; ogiltiga: string[]; dubbletter: number } {
+  const giltiga: NyMottagare[] = [];
+  const ogiltiga: string[] = [];
+  const index = new Map<string, NyMottagare>();
+  let dubbletter = 0;
+  for (const rad of text.split(/\r?\n/)) {
+    const ord = rad.split(/[\s,;]+/).filter(Boolean);
+    const adresser: string[] = [];
+    const namnord: string[] = [];
+    for (const rå of ord) {
+      if (!rå.includes("@")) {
+        namnord.push(rå);
+        continue;
+      }
+      const epost = rå.replace(/^[<("'[]+|[>)"'\].:]+$/g, "").toLowerCase();
+      if (EPOST.test(epost)) adresser.push(epost);
+      else ogiltiga.push(rå);
+    }
+    const namn =
+      adresser.length === 1
+        ? namnord.join(" ").replace(/["'<>()[\]]/g, "").replace(/\s+/g, " ").trim().slice(0, 100) || null
+        : null;
+    for (const epost of adresser) {
+      const forra = index.get(epost);
+      if (forra) {
+        dubbletter += 1;
+        if (!forra.namn && namn) forra.namn = namn;
+        continue;
+      }
+      const m = { epost, namn };
+      index.set(epost, m);
+      giltiga.push(m);
+    }
+  }
+  return { giltiga, ogiltiga, dubbletter };
 }
 
 /** Vad som redan skickats, som "epost|ämne". Spärren mot att samma brev går ut två gånger. */
@@ -214,23 +280,46 @@ export async function handleUtskick(
       return (json(res, 400, { error: "SMTP_USER och SMTP_PASS saknas på servern — inget kan skickas." }), true);
     }
 
-    const kropp = (await body()) as { amne?: unknown; brev?: unknown; mottagare?: unknown };
+    const kropp = (await body()) as { typ?: unknown; amne?: unknown; brev?: unknown; mottagare?: unknown; adresser?: unknown };
+    // Utan typ är det ett utskick till användare — så som panelen alltid skickat.
+    const typ = kropp.typ === "nya" ? "nya" : "anvandare";
     const amne = typeof kropp.amne === "string" ? kropp.amne.trim() : "";
     const brev = typeof kropp.brev === "string" ? kropp.brev.trim() : "";
-    const valda = Array.isArray(kropp.mottagare) ? kropp.mottagare.map((v) => String(v).toLowerCase()) : [];
     if (!amne || amne.length > MAX_AMNE) return (json(res, 400, { error: "Ämnesraden saknas eller är för lång." }), true);
     if (!brev || brev.length > MAX_BREV) return (json(res, 400, { error: "Brevet saknas eller är för långt." }), true);
+
+    let valda: Mottagare[];
+    if (typ === "nya") {
+      // Raderna som de klistrades in: namnet hör till raden, så de tolkas här och inte i klienten.
+      const lista = Array.isArray(kropp.adresser) ? kropp.adresser.map(String).join("\n") : "";
+      const { giltiga, ogiltiga } = tolkaAdresser(lista);
+      if (ogiltiga.length > 0) {
+        return (json(res, 400, { error: `Ogiltiga adresser: ${ogiltiga.slice(0, 5).join(", ")}${ogiltiga.length > 5 ? " …" : ""}` }), true);
+      }
+      // [namn] kräver ett namn på VARJE rad. En enda som saknar det hade fått "Hej ,".
+      if (NAMNPLATSHALLARE.test(amne) || NAMNPLATSHALLARE.test(brev)) {
+        const utan = giltiga.filter((m) => !fornamnAv(m.namn)).map((m) => m.epost);
+        if (utan.length > 0) {
+          return (json(res, 400, { error: `Brevet använder [namn], men ${utan.length} saknar namn: ${utan.slice(0, 5).join(", ")}${utan.length > 5 ? " …" : ""}` }), true);
+        }
+      }
+      valda = giltiga.map((m) => ({ epost: m.epost, fornamn: fornamnAv(m.namn) ?? "", namn: m.namn, registrerad: null }));
+    } else {
+      const adresser = new Set(Array.isArray(kropp.mottagare) ? kropp.mottagare.map((v) => String(v).toLowerCase()) : []);
+      if (adresser.size > MAX_MOTTAGARE) {
+        return (json(res, 400, { error: `Högst ${MAX_MOTTAGARE} mottagare per utskick.` }), true);
+      }
+      // Bara adresser som FINNS i listan: klienten skickar adresser, och en adress som inte kommer ur
+      // profiltabellen har ingen mottagare bakom sig.
+      valda = adresser.size ? (await listaMottagare()).filter((m) => adresser.has(m.epost)) : [];
+    }
     if (valda.length === 0) return (json(res, 400, { error: "Ingen mottagare vald." }), true);
     if (valda.length > MAX_MOTTAGARE) {
       return (json(res, 400, { error: `Högst ${MAX_MOTTAGARE} mottagare per utskick.` }), true);
     }
 
-    const alla = await listaMottagare();
-    const valdSet = new Set(valda);
     const redan = await redanSkickat();
-    // Bara adresser som FINNS i listan: klienten skickar adresser, och en adress som inte kommer ur
-    // profiltabellen har ingen mottagare bakom sig.
-    const mottagare = alla.filter((m) => valdSet.has(m.epost) && !redan.has(`${m.epost}|${amne}`));
+    const mottagare = valda.filter((m) => !redan.has(`${m.epost}|${amne}`));
     if (mottagare.length === 0) {
       return (json(res, 400, { error: "Alla valda har redan fått det här brevet." }), true);
     }

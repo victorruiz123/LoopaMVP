@@ -777,11 +777,17 @@ export async function utskickMottagare(): Promise<UtskickLista> {
  * Servern svarar innan breven gått iväg — åttio brev tar minuter, och ett anrop som väntar ut dem
  * dör på vägen. Följ förloppet med `utskickLage`.
  */
-export async function startaUtskick(amne: string, brev: string, mottagare: string[]): Promise<UtskickLage> {
+export async function startaUtskick(
+  amne: string,
+  brev: string,
+  mottagare: string[],
+  typ: "anvandare" | "nya" = "anvandare",
+): Promise<UtskickLage> {
+  // Till nya går adresserna som `adresser`: servern slår inte upp dem i profiltabellen.
   const res = await authFetch("/api/admin/utskick", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ amne, brev, mottagare }),
+    body: JSON.stringify(typ === "nya" ? { typ, amne, brev, adresser: mottagare } : { typ, amne, brev, mottagare }),
   });
   return json(res);
 }
