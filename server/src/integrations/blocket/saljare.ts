@@ -14,7 +14,8 @@
  *      /auth/v1/user som inloggningen redan frågar.
  *   2. PÅ KONTOT, med servicenyckeln. För jobb som hamnade i kön innan fältet fanns, och för en säljare
  *      som lagt till adressen efteråt. Godkännandet sker i panelen, med ADMINENS token — säljarens
- *      finns inte att tillgå där, så utan nyckeln finns ingen annan väg.
+ *      finns inte att tillgå där, så utan nyckeln finns ingen annan väg. Saknas adressen i kontots
+ *      metadata läses profilradens `postal_code` (Vips registrering).
  *
  * Saknas båda publiceras inget. En annons utan postnummer vägrar Blocket ändå, och ett gissat är
  * värre än inget: det står utåt, under möbeln, som om det vore sant.
@@ -59,19 +60,35 @@ export async function postnummerForToken(token: string): Promise<string | null> 
 /**
  * Postnumret på ett konto, slaget upp med servicenyckeln.
  *
+ * TVÅ STÄLLEN, i den ordningen: kontots `user_metadata.adress` (vår egen registrering), och sedan
+ * profilradens `postal_code`. Profiltabellen delas med Vips, och konton skapade där — eller hos oss
+ * före adressfältet — har postnumret BARA i profilen. Adminpanelen läste det därifrån (admin.ts,
+ * `adressUrProfil`) medan Blocket inte gjorde det, så admin såg ett postnummer och fick ändå skriva
+ * in det för hand.
+ *
  * Utan nyckeln görs inget anrop alls — den publika anon-nyckeln får inte läsa andras konton, och ska
  * inte kunna det.
  */
 export async function postnummerForAnvandare(userId: string): Promise<string | null> {
   const nyckel = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
   if (!nyckel) return null;
+  const headers = { apikey: nyckel, Authorization: `Bearer ${nyckel}` };
   try {
-    const res = await fetch(`${supabaseUrl()}/auth/v1/admin/users/${encodeURIComponent(userId)}`, {
-      headers: { apikey: nyckel, Authorization: `Bearer ${nyckel}` },
-    });
+    const res = await fetch(`${supabaseUrl()}/auth/v1/admin/users/${encodeURIComponent(userId)}`, { headers });
+    if (res.ok) {
+      const body = (await res.json()) as { user_metadata?: unknown };
+      const urMetadata = postnummerUrMetadata(body.user_metadata);
+      if (urMetadata) return urMetadata;
+    }
+  } catch {
+    // Profilen nedan är en egen väg — ett fel här stänger den inte.
+  }
+  try {
+    const url = `${supabaseUrl()}/rest/v1/profiles?select=postal_code&user_id=eq.${encodeURIComponent(userId)}&limit=1`;
+    const res = await fetch(url, { headers });
     if (!res.ok) return null;
-    const body = (await res.json()) as { user_metadata?: unknown };
-    return postnummerUrMetadata(body.user_metadata);
+    const rader = (await res.json()) as Array<{ postal_code?: unknown }>;
+    return Array.isArray(rader) ? normaliseraPostnummer(rader[0]?.postal_code) : null;
   } catch {
     return null;
   }

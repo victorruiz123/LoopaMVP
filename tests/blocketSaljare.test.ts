@@ -104,6 +104,45 @@ test("med servicenyckel slås ägarens konto upp när jobbet saknar postnummer",
   }
 });
 
+test("saknas adressen i kontot läses profilens postnummer — det adminpanelen redan visar", async () => {
+  const fore = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-nyckel";
+  const riktigFetch = globalThis.fetch;
+  const fragor: string[] = [];
+  globalThis.fetch = (async (url: string | URL) => {
+    fragor.push(String(url));
+    return String(url).includes("/rest/v1/profiles")
+      ? new Response(JSON.stringify([{ postal_code: "116 41" }]), { status: 200 })
+      : new Response(JSON.stringify({ user_metadata: { full_name: "Vips-konto" } }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    assert.equal(await saljarensPostnummer(jobb({ ownerId: "agare-7" })), "11641");
+    assert.equal(fragor.length, 2);
+    assert.match(fragor[1], /profiles\?select=postal_code&user_id=eq\.agare-7/);
+  } finally {
+    globalThis.fetch = riktigFetch;
+    if (fore === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = fore;
+  }
+});
+
+test("ett halvt postnummer i profilen gissas inte till ett helt", async () => {
+  const fore = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY = "test-nyckel";
+  const riktigFetch = globalThis.fetch;
+  globalThis.fetch = (async (url: string | URL) =>
+    String(url).includes("/rest/v1/profiles")
+      ? new Response(JSON.stringify([{ postal_code: "1164" }]), { status: 200 })
+      : new Response("nej", { status: 404 })) as typeof fetch;
+  try {
+    assert.equal(await saljarensPostnummer(jobb({ ownerId: "agare-8" })), null);
+  } finally {
+    globalThis.fetch = riktigFetch;
+    if (fore === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY;
+    else process.env.SUPABASE_SERVICE_ROLE_KEY = fore;
+  }
+});
+
 // ─── Skrivningen på jobbet ───────────────────────────────────────────────────
 //
 // Postnumret skrivs när säljaren trycker, medan deras token finns. Raden låg efter Tradera-grinden och
