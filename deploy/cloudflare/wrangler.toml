@@ -225,3 +225,9 @@ zone_name = "loopa.nu"
 [[routes]]
 pattern = "loopa.nu/api/adress/*"
 zone_name = "loopa.nu"
+
+# Glömt lösenord (server/src/losenord.ts). Samma fälla igen: utan raden svarade marknadssajten 405 på
+# "Skicka länk", och rutan sa bara "Något gick fel" — på app.loopa.nu fungerade det hela tiden.
+[[routes]]
+pattern = "loopa.nu/api/losenord/*"
+zone_name = "loopa.nu"
