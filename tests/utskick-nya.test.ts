@@ -103,3 +103,30 @@ test("[namn] går ut när varje rad har ett namn — utan profiltabell", async (
 test("[namn] blir förnamnet", () => {
   assert.equal(fyll("Hej [namn], {helanamn}", { epost: "a@exempel.se", fornamn: "Anna", namn: "Anna Svensson", registrerad: null }), "Hej Anna, Anna Svensson");
 });
+
+test("strypningen från one.com räknas som tillfällig, ett permanent nej gör det inte", async () => {
+  const { tillfalligtFel } = await import("../server/src/utskick.js");
+  const strypt = Object.assign(
+    new Error("Can't send mail - all recipients were rejected: 451 4.7.1 [R2] Too many mails received from x within the last 5 minutes"),
+    { responseCode: 451 },
+  );
+  assert.equal(tillfalligtFel(strypt), true);
+  assert.equal(tillfalligtFel(new Error("all recipients were rejected: 451 4.7.1 Too many mails")), true);
+  assert.equal(tillfalligtFel(Object.assign(new Error("550 5.1.1 User unknown"), { responseCode: 550 })), false);
+  assert.equal(tillfalligtFel(new Error("connect ECONNREFUSED 127.0.0.1:1")), false);
+});
+
+test("skickadeFor listar bara lyckade brev med exakt den ämnesraden", async () => {
+  const { skickadeFor } = await import("../server/src/utskick.js");
+  const { appendFileSync } = await import("node:fs");
+  const fil = path.join(process.env.UTSKICK_DATA_DIR!, "logg.jsonl");
+  appendFileSync(
+    fil,
+    [
+      { epost: "fick@exempel.se", amne: "En gratis försäljning!", status: "ok" },
+      { epost: "foll@exempel.se", amne: "En gratis försäljning!", status: "fel", orsak: "451 4.7.1" },
+      { epost: "annat@exempel.se", amne: "Något annat", status: "ok" },
+    ].map((r) => JSON.stringify(r) + "\n").join(""),
+  );
+  assert.deepEqual(await skickadeFor("En gratis försäljning!"), ["fick@exempel.se"]);
+});

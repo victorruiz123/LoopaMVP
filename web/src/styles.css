@@ -3358,7 +3358,11 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
   border-radius: var(--r); background: var(--green-light); color: var(--green-dark); font-size: var(--fs-sm);
 }
 .utskick-lage.pagar { background: var(--field); color: var(--ink-soft); }
-.utskick-problem { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-xs); }
+.utskick-problem { margin: 6px 0 0; padding-left: 18px; font-size: var(--fs-xs); max-height: 240px; overflow-y: auto; }
+.utskick-fatt {
+  flex: none; padding: 1px 8px; border-radius: 999px; font-size: var(--fs-xs);
+  background: var(--green-light); color: var(--green-dark);
+}
 .utskick-knappar { display: flex; align-items: center; gap: 10px; }
 
 .admin-flikar {

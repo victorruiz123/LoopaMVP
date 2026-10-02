@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { startaUtskick, utskickLage, utskickMottagare } from "../api";
+import { startaUtskick, utskickLage, utskickMottagare, utskickSkickade } from "../api";
 import type { UtskickLage, UtskickMottagare } from "../types";
 import { SearchIcon } from "../components/icons";
 import { usePageTitle } from "../lib/pageTitle";
@@ -103,6 +103,8 @@ export default function AdminUtskickScreen() {
   const [bekraftar, setBekraftar] = useState(false);
   const [lage, setLage] = useState<UtskickLage | null>(null);
   const [skickar, setSkickar] = useState(false);
+  /** Vilka som redan fått brevet med ämnesraden i rutan. Servern hoppar över dem; här syns det i förväg. */
+  const [skickade, setSkickade] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     utskickMottagare()
@@ -134,6 +136,18 @@ export default function AdminUtskickScreen() {
     };
   }, [lage?.pagar]);
 
+  // Hämtas om när ämnesraden ändras (lite fördröjt, inte per tangent) och när ett utskick blir klart.
+  useEffect(() => {
+    const a = amne.trim();
+    if (!a) return setSkickade(new Set());
+    const t = window.setTimeout(() => {
+      utskickSkickade(a)
+        .then((lista) => setSkickade(new Set(lista)))
+        .catch(() => setSkickade(new Set()));
+    }, 400);
+    return () => window.clearTimeout(t);
+  }, [amne, lage?.pagar]);
+
   const valda = useMemo(
     () => (mottagare ?? []).filter((m) => !bortvalda.has(m.epost)),
     [mottagare, bortvalda],
@@ -153,6 +167,7 @@ export default function AdminUtskickScreen() {
     [nya],
   );
   const antal = tillNya ? nyaMottagare.length : valda.length;
+  const harFatt = (tillNya ? nyaMottagare : valda).filter((m) => skickade.has(m.epost)).length;
 
   const anvanderNamn = NAMNPLATSHALLARE.test(`${amne}\n${brev}`);
   /** Nya utan namn — stoppar utskicket bara när brevet faktiskt använder [namn]. */
@@ -248,7 +263,13 @@ export default function AdminUtskickScreen() {
 
       {lage?.startad && (
         <section className={`utskick-lage${lage.pagar ? " pagar" : ""}`}>
-          <strong>{lage.pagar ? "Skickar…" : "Utskicket är klart"}</strong>
+          <strong>
+            {!lage.pagar
+              ? "Utskicket är klart"
+              : lage.vantarTill
+                ? `Mejlservern bromsar – fortsätter ${new Date(lage.vantarTill).toLocaleTimeString("sv-SE", { hour: "2-digit", minute: "2-digit" })}`
+                : "Skickar…"}
+          </strong>
           <span>
             {lage.skickade} av {lage.totalt} skickade
             {lage.fel > 0 ? ` · ${lage.fel} fel` : ""}
@@ -256,7 +277,7 @@ export default function AdminUtskickScreen() {
           </span>
           {lage.problem.length > 0 && (
             <ul className="utskick-problem">
-              {lage.problem.slice(0, 10).map((p) => (
+              {lage.problem.map((p) => (
                 <li key={p.epost}>
                   {p.epost} — {p.orsak}
                 </li>
@@ -398,6 +419,7 @@ export default function AdminUtskickScreen() {
                   <label>
                     <input type="checkbox" checked={!bortvalda.has(m.epost)} onChange={() => vaxla(m.epost)} />
                     <span className="utskick-namn">{m.namn ?? m.fornamn}</span>
+                    {skickade.has(m.epost) && <span className="utskick-fatt">har fått brevet</span>}
                     <span className="utskick-epost">{m.epost}</span>
                   </label>
                 </li>
@@ -407,6 +429,15 @@ export default function AdminUtskickScreen() {
         </section>
       )}
 
+      {harFatt > 0 && (
+        <p className="form-hint">
+          <strong>{harFatt}</strong> av de valda har redan fått brevet med den här ämnesraden och hoppas över.{" "}
+          {antal - harFatt > 0
+            ? `Brevet går till ${antal - harFatt}.`
+            : "Ingen återstår."}
+        </p>
+      )}
+
       <div className="utskick-knappar">
         <button className="btn btn-primary" disabled={!klart || skickar || !!lage?.pagar} onClick={() => void skicka()}>
           {skickar
@@ -414,8 +445,8 @@ export default function AdminUtskickScreen() {
             : lage?.pagar
               ? "Ett utskick pågår"
               : bekraftar
-                ? `Tryck igen för att skicka till ${antal}`
-                : `Skicka till ${antal} ${tillNya ? "nya " : ""}mottagare`}
+                ? `Tryck igen för att skicka till ${antal - harFatt}`
+                : `Skicka till ${antal - harFatt} ${tillNya ? "nya " : ""}mottagare`}
         </button>
         {bekraftar && (
           <button className="btn btn-text" onClick={() => setBekraftar(false)}>

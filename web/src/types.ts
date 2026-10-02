@@ -1616,6 +1616,8 @@ export interface UtskickLage {
   startad: string | null;
   klar: string | null;
   problem: Array<{ epost: string; orsak: string }>;
+  /** Satt medan mejlservern strypt utskicket och det väntar. Saknas från äldre servrar. */
+  vantarTill?: string | null;
 }
 
 // ---- Facebook-distributionen (GET /api/admin/facebook/*) ----

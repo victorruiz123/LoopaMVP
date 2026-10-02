@@ -12,7 +12,8 @@
  *
  * SKICKET KÖR I BAKGRUNDEN med en paus mellan breven. Åttio brev tar över två minuter, och ett
  * HTTP-anrop som står och väntar så länge dör i någon proxy på vägen. Klienten startar körningen och
- * frågar sedan efter läget.
+ * frågar sedan efter läget. one.com stryper dessutom efter ungefär 25 brev på fem minuter; då väntar
+ * körningen ut fönstret och fortsätter (se VANTA_MS), så hundra brev tar en kvart.
  *
  * VARJE SKICKAT BREV LOGGAS, en rad JSON per mottagare. Loggen är både kvittot och spärren: samma
  * adress får aldrig samma ämnesrad två gånger, hur många gånger någon än trycker på knappen.
@@ -48,6 +49,8 @@ export interface UtskickLage {
   klar: string | null;
   /** Adresser som föll, med serverns orsak. Namnges för att kunna skickas om för hand. */
   problem: Array<{ epost: string; orsak: string }>;
+  /** Satt medan one.com strypt oss och körningen väntar ut fönstret. När den fortsätter. */
+  vantarTill: string | null;
 }
 
 /** UTSKICK_DATA_DIR pekar om loggen — testerna ska inte skriva i den skarpa. */
@@ -56,6 +59,13 @@ const LOGG_FIL = () => path.join(LOGG_DIR(), "logg.jsonl");
 
 /** Paus mellan breven. one.com stryper den som öser iväg hundra brev på en minut. */
 const PAUS_MS = Number(process.env.UTSKICK_PAUS_MS ?? 1500);
+/**
+ * Väntan när SMTP-servern svarar med ett tillfälligt nej (4xx). one.com släpper igenom ungefär 25 brev
+ * och svarar sedan "451 4.7.1 Too many mails … within the last 5 minutes" — fönstret är fem minuter,
+ * så vi väntar ut det med lite marginal och försöker samma adress igen.
+ */
+const VANTA_MS = Number(process.env.UTSKICK_VANTA_MS ?? 5.5 * 60_000);
+const MAX_FORSOK = 4;
 const MAX_MOTTAGARE = 500;
 const MAX_AMNE = 200;
 const MAX_BREV = 20_000;
@@ -69,6 +79,7 @@ let lage: UtskickLage = {
   startad: null,
   klar: null,
   problem: [],
+  vantarTill: null,
 };
 
 const serviceRoleKey = () => process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || null;
@@ -199,6 +210,15 @@ async function redanSkickat(): Promise<Set<string>> {
   }
 }
 
+/**
+ * Adresserna som redan fått brevet med den här ämnesraden. Panelen visar dem, så att den som skickar om
+ * efter ett avbrott ser vilka som hoppas över — spärren ovan gör det ändå, men nu syns det i förväg.
+ */
+export async function skickadeFor(amne: string): Promise<string[]> {
+  const suffix = `|${amne}`;
+  return [...(await redanSkickat())].filter((k) => k.endsWith(suffix)).map((k) => k.slice(0, -suffix.length));
+}
+
 async function logga(post: Record<string, unknown>): Promise<void> {
   await mkdir(LOGG_DIR(), { recursive: true });
   await appendFile(LOGG_FIL(), JSON.stringify({ ...post, tid: new Date().toISOString() }) + "\n", "utf-8");
@@ -227,6 +247,16 @@ async function transport() {
 const sov = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
+ * Ett tillfälligt nej: servern säger "inte nu", inte "aldrig". nodemailer lägger SMTP-koden i
+ * `responseCode`; 4xx betyder att samma brev ska gå att skicka senare.
+ */
+export function tillfalligtFel(err: unknown): boolean {
+  const kod = (err as { responseCode?: unknown } | null)?.responseCode;
+  if (typeof kod === "number") return kod >= 400 && kod < 500;
+  return /\b4\d\d\s+4\.\d+\.\d+/.test(err instanceof Error ? err.message : String(err));
+}
+
+/**
  * Kör utskicket. Startas av rutten och lämnas åt sig själv; panelen frågar efter läget.
  *
  * ETT FEL PÅ ETT BREV STOPPAR INTE RESTEN. En adress som studsar är en adress, inte ett utskick, och
@@ -236,15 +266,28 @@ async function kor(amne: string, brev: string, mottagare: Mottagare[]): Promise<
   const from = avsandare();
   const post = await transport();
   for (const [i, m] of mottagare.entries()) {
-    try {
-      await post.sendMail({ from, to: m.epost, subject: fyll(amne, m), text: fyll(brev, m) });
-      lage.skickade += 1;
-      await logga({ epost: m.epost, amne, status: "ok" });
-    } catch (err) {
-      const orsak = (err instanceof Error ? err.message : String(err)).slice(0, 200);
-      lage.fel += 1;
-      lage.problem.push({ epost: m.epost, orsak });
-      await logga({ epost: m.epost, amne, status: "fel", orsak });
+    // Ett tillfälligt nej (strypningen) väntas ut och samma adress provas igen. Ett permanent nej
+    // (5xx, okänd adress) räknas som fel direkt — att vänta ändrar inget.
+    for (let forsok = 1; ; forsok += 1) {
+      try {
+        await post.sendMail({ from, to: m.epost, subject: fyll(amne, m), text: fyll(brev, m) });
+        lage.skickade += 1;
+        await logga({ epost: m.epost, amne, status: "ok" });
+        break;
+      } catch (err) {
+        if (tillfalligtFel(err) && forsok < MAX_FORSOK) {
+          lage.vantarTill = new Date(Date.now() + VANTA_MS).toISOString();
+          console.info(`[utskick] strypt efter ${lage.skickade} brev — väntar ${Math.round(VANTA_MS / 1000)} s.`);
+          await sov(VANTA_MS);
+          lage.vantarTill = null;
+          continue;
+        }
+        const orsak = (err instanceof Error ? err.message : String(err)).slice(0, 200);
+        lage.fel += 1;
+        lage.problem.push({ epost: m.epost, orsak });
+        await logga({ epost: m.epost, amne, status: "fel", orsak });
+        break;
+      }
     }
     if (i < mottagare.length - 1) await sov(PAUS_MS);
   }
@@ -266,6 +309,12 @@ export async function handleUtskick(
     } catch (err) {
       json(res, 502, { error: err instanceof Error ? err.message : "Mottagarna kunde inte hämtas." });
     }
+    return true;
+  }
+
+  if (segments[0] === "skickade" && req.method === "GET") {
+    const amne = new URL(req.url ?? "", "http://x").searchParams.get("amne")?.trim() ?? "";
+    json(res, 200, { amne, skickade: amne ? await skickadeFor(amne) : [] });
     return true;
   }
 
@@ -333,10 +382,12 @@ export async function handleUtskick(
       startad: new Date().toISOString(),
       klar: null,
       problem: [],
+      vantarTill: null,
     };
     json(res, 202, lage);
     void kor(amne, brev, mottagare).catch((err) => {
       lage.pagar = false;
+      lage.vantarTill = null;
       lage.klar = new Date().toISOString();
       console.error("[utskick] körningen föll:", err instanceof Error ? err.message : err);
     });

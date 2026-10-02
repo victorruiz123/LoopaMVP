@@ -796,6 +796,12 @@ export async function utskickLage(): Promise<UtskickLage> {
   return json(await authFetch("/api/admin/utskick/lage"));
 }
 
+/** Adresserna som redan fått brevet med den här ämnesraden. De hoppas över vid nästa utskick. */
+export async function utskickSkickade(amne: string): Promise<string[]> {
+  const d = await json<{ skickade: string[] }>(await authFetch(`/api/admin/utskick/skickade?amne=${encodeURIComponent(amne)}`));
+  return d.skickade;
+}
+
 // ---------------------------------------------------------------------------
 // Facebook-distributionen (adminpanelen)
 // ---------------------------------------------------------------------------
