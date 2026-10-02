@@ -7,6 +7,7 @@ import { ArrowLeftIcon, EyeIcon, EyeOffIcon, LockIcon, MailIcon } from "../compo
 import { usePageTitle } from "../lib/pageTitle";
 import { t as translate, useT } from "../lib/i18n";
 import LegalLink from "../components/LegalLink";
+import { GlomtLosenordForm } from "./LosenordScreen";
 
 /**
  * Inloggningen: ordmärket, två fält, en knapp.
@@ -71,11 +72,13 @@ export default function AuthScreen({
   const [vaning, setVaning] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ tone: "error" | "info"; text: string } | null>(null);
+  /** "Glömt lösenordet?" — formuläret för återställningslänken i stället för inloggningens. */
+  const [glomt, setGlomt] = useState(false);
 
   const t = useT();
   const isSignup = tab === "signup";
   // Inbäddad rör vi inte fliktiteln: sidan bakom arket äger den. Se usePageTitle.
-  usePageTitle(inbaddad ? undefined : isSignup ? "Skapa konto" : "Logga in");
+  usePageTitle(inbaddad ? undefined : glomt ? "Glömt lösenord" : isSignup ? "Skapa konto" : "Logga in");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -163,7 +166,11 @@ export default function AuthScreen({
 
         <div className="auth-hero">
           <h1 className="auth-title">
-            {kop ? (
+            {glomt ? (
+              <>
+                {t("Glömt")} <span className="auth-wordmark-inline">{t("lösenordet?")}</span>
+              </>
+            ) : kop ? (
               isSignup ? (
                 <>
                   {t("Skapa konto och")} <span className="auth-wordmark-inline">{t("betala")}</span>
@@ -195,7 +202,9 @@ export default function AuthScreen({
               steget är det sista före resultatet och att varvet inte ska göras om. Före den är det
               motsatta beskedet som behövs: ingenting är gjort än, och det som väntar är kameran. */}
           <p className="auth-lede">
-            {kop
+            {glomt
+              ? t("Skriv e-postadressen du loggar in med, så skickar vi en länk där du väljer ett nytt lösenord.")
+              : kop
               ? isSignup
                 ? t("Kontot är där ordern, leveranstiden och kvittot hamnar. Möbeln ligger kvar medan du skapar det.")
                 : t("Logga in, så fortsätter vi till betalningen. Möbeln ligger kvar i kassan.")
@@ -213,6 +222,7 @@ export default function AuthScreen({
           </p>
         </div>
 
+        {!glomt && (
         <div className="auth-tabs">
           <div className={`auth-tabs-thumb ${isSignup ? "auth-tabs-thumb-right" : ""}`} aria-hidden />
           <button type="button" className={!isSignup ? "auth-tab auth-tab-active" : "auth-tab"} onClick={() => setTab("signin")}>
@@ -222,8 +232,12 @@ export default function AuthScreen({
             {t("Skapa konto")}
           </button>
         </div>
+        )}
 
         <div className="auth-card">
+          {glomt ? (
+            <GlomtLosenordForm startEpost={email} onTillbaka={() => setGlomt(false)} />
+          ) : (
           <form className="auth-form" onSubmit={submit}>
             <label className="auth-field">
               <span className="auth-label">{t("E-post")}</span>
@@ -267,6 +281,19 @@ export default function AuthScreen({
                 </button>
               </span>
             </label>
+            {/* Utanför etiketten: en knapp inuti en label är klickbart innehåll där det inte hör hemma. */}
+            {!isSignup && (
+              <button
+                type="button"
+                className="btn btn-text auth-lank auth-glomt"
+                onClick={() => {
+                  setMessage(null);
+                  setGlomt(true);
+                }}
+              >
+                {t("Glömt lösenordet?")}
+              </button>
+            )}
 
             {isSignup && (
               <>
@@ -375,6 +402,7 @@ export default function AuthScreen({
                   : t("Logga in")}
             </button>
           </form>
+          )}
 
           <div className="auth-tagline">{t("Secondhand på autopilot")}</div>
         </div>

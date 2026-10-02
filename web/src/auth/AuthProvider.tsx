@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import type { Session, User } from "@supabase/supabase-js";
-import { supabase } from "../lib/supabase";
+import { aterstallningsLank, supabase } from "../lib/supabase";
 import { medInbjudan, rensaInbjudan, sparadInbjudan } from "../lib/referral";
 import { gorInbjudningsansprak } from "../api";
 
@@ -49,6 +49,14 @@ interface AuthContextValue {
   signIn: (email: string, password: string) => Promise<{ error: unknown }>;
   signUp: (email: string, password: string, adress: Adress) => Promise<{ error: unknown }>;
   signOut: () => Promise<void>;
+  /**
+   * Återställningen. `losenordslage` är "valj" när besökaren kommit via länken i mejlet och ska välja
+   * ett nytt lösenord, "utgangen" när länken inte längre gällde, annars null.
+   */
+  losenordslage: "valj" | "utgangen" | null;
+  skickaAterstallning: (email: string) => Promise<{ error: unknown }>;
+  bytLosenord: (password: string) => Promise<{ error: unknown }>;
+  avslutaAterstallning: () => void;
 }
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
@@ -89,6 +97,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const lastLoadedProfileFor = useRef<string | null>(null);
   const vantande = useRef(lasVantande());
   const skriverAdress = useRef(false);
+  const [losenordslage, setLosenordslage] = useState<AuthContextValue["losenordslage"]>(
+    aterstallningsLank === "giltig" ? "valj" : aterstallningsLank === "utgangen" ? "utgangen" : null,
+  );
 
   /** Skriver en väntande adress till kontot den skrevs in för. Misslyckas den ligger den kvar till nästa session. */
   const fullfoljAdress = useCallback(async (u: User) => {
@@ -144,7 +155,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Lyssnaren först.
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, next) => {
+    } = supabase.auth.onAuthStateChange((event, next) => {
+      // Oftast redan satt ur adressen (se aterstallningsLank) — det här är bältet till de hängslena.
+      if (event === "PASSWORD_RECOVERY") setLosenordslage("valj");
       setSession(next);
       setUser(next?.user ?? null);
       setLoading(false);
@@ -242,6 +255,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const adress = (user?.user_metadata?.adress as Adress | undefined) ?? null;
 
+  /**
+   * Mejlet med länken. Supabase skickar det, med projektets mall — samma projekt som Vips.
+   *
+   * Länken leder tillbaka till appens rot och inte till sidan besökaren stod på: roten är den enda
+   * adressen vi vet att Supabase släpper igenom (samma som registreringens emailRedirectTo), och en
+   * adress som inte står i projektets lista ersätts tyst med Site URL — Vips.
+   *
+   * Ett okänt konto ger INGET fel härifrån. Supabase svarar likadant oavsett, så att formuläret inte
+   * går att använda för att pröva vilka adresser som har konto. Skärmen säger därför "om det finns".
+   */
+  const skickaAterstallning = async (email: string) => {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: `${window.location.origin}/`,
+    });
+    return { error };
+  };
+
+  /** Det nya lösenordet. Kräver sessionen som länken i mejlet gav. */
+  const bytLosenord = async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return { error };
+  };
+
+  /** Ut ur återställningen, och adressen tömd så att en omladdning inte öppnar den igen. */
+  const avslutaAterstallning = () => {
+    setLosenordslage(null);
+    if (window.location.hash) window.history.replaceState({}, "", window.location.pathname + window.location.search);
+  };
+
   const signOut = async () => {
     try {
       await supabase.auth.signOut({ scope: "global" });
@@ -256,7 +298,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, adress, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{
+        user,
+        session,
+        profile,
+        adress,
+        loading,
+        signIn,
+        signUp,
+        signOut,
+        losenordslage,
+        skickaAterstallning,
+        bytLosenord,
+        avslutaAterstallning,
+      }}>
       {children}
     </AuthContext.Provider>
   );

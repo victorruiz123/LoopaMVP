@@ -10,6 +10,7 @@ import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
 import ListingScreen from "./screens/ListingScreen";
 import AuthScreen from "./screens/AuthScreen";
+import NyttLosenordScreen from "./screens/LosenordScreen";
 import ProfileScreen from "./screens/ProfileScreen";
 import AdminScreen from "./screens/AdminScreen";
 import AdminUserScreen, { type AdminUserFlik } from "./screens/AdminUserScreen";
@@ -172,9 +173,17 @@ export default function App() {
    */
   const affar = isAffarPath(pathname);
 
+  /**
+   * Länken i återställningsmejlet. Före allt annat: besökaren kom hit för att byta lösenord, och den
+   * session länken gav ska inte släppa in dem någon annanstans förrän det är gjort. Se LosenordScreen.
+   */
+  const { losenordslage } = useAuth();
+
   return (
     <>
-      {affar ? (
+      {losenordslage ? (
+        <NyttLosenordScreen />
+      ) : affar ? (
         <AffarApp />
       ) : kop ? (
         <KopApp />

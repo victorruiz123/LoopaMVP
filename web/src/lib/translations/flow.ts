@@ -831,4 +831,58 @@ export const FLOW: Record<string, Translation> = {
   spegel: { en: "mirror", fr: "miroir" },
   bord: { en: "table", fr: "table" },
   okänd: { en: "unknown", fr: "inconnu" },
+
+  // ---- Glömt lösenord (screens/LosenordScreen.tsx) ----
+  "Glömt lösenordet?": { en: "Forgot your password?", fr: "Mot de passe oublié ?" },
+  Glömt: { en: "Forgot your", fr: "Mot de passe" },
+  "lösenordet?": { en: "password?", fr: "oublié ?" },
+  "Skriv e-postadressen du loggar in med, så skickar vi en länk där du väljer ett nytt lösenord.": {
+    en: "Enter the email you sign in with and we'll send a link where you can choose a new password.",
+    fr: "Saisissez l'e-mail avec lequel vous vous connectez et nous vous enverrons un lien pour choisir un nouveau mot de passe.",
+  },
+  "Om det finns ett konto för {epost} har vi skickat en länk dit. Öppna den för att välja ett nytt lösenord. Hittar du inget mejl, titta i skräpposten.": {
+    en: "If there is an account for {epost}, we've sent a link there. Open it to choose a new password. Can't find the email? Check your spam folder.",
+    fr: "S'il existe un compte pour {epost}, nous y avons envoyé un lien. Ouvrez-le pour choisir un nouveau mot de passe. Pas d'e-mail ? Vérifiez vos spams.",
+  },
+  "Skickar…": { en: "Sending…", fr: "Envoi…" },
+  "Skicka igen": { en: "Send again", fr: "Renvoyer" },
+  "Skicka länk": { en: "Send link", fr: "Envoyer le lien" },
+  "Tillbaka till inloggningen": { en: "Back to sign in", fr: "Retour à la connexion" },
+  "Länken har": { en: "The link has", fr: "Le lien a" },
+  "gått ut": { en: "expired", fr: "expiré" },
+  "Lösenordet är": { en: "Password", fr: "Mot de passe" },
+  bytt: { en: "changed", fr: "modifié" },
+  "Välj ett nytt": { en: "Choose a new", fr: "Choisissez un nouveau" },
+  lösenord: { en: "password", fr: "mot de passe" },
+  "Länken i mejlet gäller en gång och bara en stund. Skriv din e-post så skickar vi en ny.": {
+    en: "The link in the email works once and only for a while. Enter your email and we'll send a new one.",
+    fr: "Le lien de l'e-mail ne fonctionne qu'une fois et pendant peu de temps. Saisissez votre e-mail et nous en enverrons un nouveau.",
+  },
+  "Du är inloggad. Nästa gång loggar du in med det nya lösenordet.": {
+    en: "You're signed in. Next time, sign in with your new password.",
+    fr: "Vous êtes connecté. La prochaine fois, connectez-vous avec le nouveau mot de passe.",
+  },
+  "För {epost}. Du loggas in direkt när det är bytt.": {
+    en: "For {epost}. You'll be signed in as soon as it's changed.",
+    fr: "Pour {epost}. Vous serez connecté dès qu'il sera modifié.",
+  },
+  "Du loggas in direkt när det är bytt.": {
+    en: "You'll be signed in as soon as it's changed.",
+    fr: "Vous serez connecté dès qu'il sera modifié.",
+  },
+  "Nytt lösenord": { en: "New password", fr: "Nouveau mot de passe" },
+  "Spara lösenordet": { en: "Save password", fr: "Enregistrer le mot de passe" },
+  "Det nya lösenordet måste skilja sig från det gamla.": {
+    en: "The new password must be different from the old one.",
+    fr: "Le nouveau mot de passe doit être différent de l'ancien.",
+  },
+  "Vänta en minut innan du ber om en ny länk.": {
+    en: "Wait a minute before requesting a new link.",
+    fr: "Attendez une minute avant de demander un nouveau lien.",
+  },
+  "Länken har gått ut. Be om en ny från inloggningen.": {
+    en: "The link has expired. Request a new one from the sign-in page.",
+    fr: "Le lien a expiré. Demandez-en un nouveau depuis la page de connexion.",
+  },
+  "Något gick fel. Försök igen.": { en: "Something went wrong. Please try again.", fr: "Une erreur s'est produite. Veuillez réessayer." },
 };

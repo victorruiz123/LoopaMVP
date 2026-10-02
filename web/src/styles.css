@@ -403,6 +403,11 @@ body {
 }
 .auth-input-toggle:hover { color: var(--ink); }
 .auth-submit { height: 50px; padding: 0; font-size: var(--fs-lg); }
+/* Sekundära vägar i kortet: "Glömt lösenordet?", "Tillbaka till inloggningen", "Avbryt". */
+.auth-lank { align-self: center; font-size: var(--fs-sm); color: var(--muted); }
+.auth-lank:hover { color: var(--ink); }
+/* Under lösenordsfältet, till höger — där man letar efter den. */
+.auth-glomt { align-self: flex-end; margin-top: -10px; padding: 2px 0; }
 .auth-message { margin: -4px 0 0; font-size: var(--fs-sm); line-height: 1.45; border-radius: var(--r-sm); padding: 10px 12px; }
 .auth-message-error { background: var(--danger-light); color: var(--danger-dark); }
 .auth-message-info { background: var(--green-light); color: var(--green-dark); }

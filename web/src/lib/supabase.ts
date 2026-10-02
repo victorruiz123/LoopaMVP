@@ -15,6 +15,32 @@ const SUPABASE_PUBLISHABLE_KEY =
   import.meta.env.VITE_SUPABASE_ANON_KEY ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR5eHF4b2RuZnl6eHB3ZGd0eXBkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgyOTI1MzcsImV4cCI6MjA3Mzg2ODUzN30.Oql80KZxvtdXEYK_J_7xxGDJAfEvzEPQ7FK1_G7gJqY";
 
+/**
+ * Kom besökaren hit via länken i ett återställningsmejl?
+ *
+ * LÄSES FÖRE createClient, och det är hela poängen. Klienten tolkar adressen när den skapas, sparar
+ * sessionen och skickar `PASSWORD_RECOVERY` i en setTimeout — och hinner AuthProvider inte sätta sin
+ * lyssnare dessförinnan går händelsen förlorad. Då loggas besökaren in utan att någonsin få välja
+ * ett nytt lösenord, vilket var hela ärendet. Adressen ljuger inte, och den läses här innan någon
+ * hunnit tömma den.
+ *
+ * `utgangen` är länken som redan använts eller blivit för gammal: Supabase skickar då tillbaka ett
+ * fel i stället för en session.
+ */
+export type AterstallningsLank = "giltig" | "utgangen" | null;
+
+function lasAterstallningsLank(): AterstallningsLank {
+  if (typeof window === "undefined") return null;
+  const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+  if (hash.get("type") === "recovery" && hash.get("access_token")) return "giltig";
+  if (hash.get("error_code") === "otp_expired" || (hash.get("error") && /expired|invalid/i.test(hash.get("error_description") ?? ""))) {
+    return "utgangen";
+  }
+  return null;
+}
+
+export const aterstallningsLank: AterstallningsLank = lasAterstallningsLank();
+
 export const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
   auth: {
     storage: localStorage,
