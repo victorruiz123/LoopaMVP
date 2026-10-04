@@ -81,6 +81,14 @@ const CATEGORY_RULES: Array<{ pattern: RegExp; id: number; name: string }> = [
   // utanför antikavdelningen. Pallar och barstolar med.
   { pattern: /\bstol\b|stolar|pall\b|barstol|taburett/, id: 302532, name: "Matsal" },
   { pattern: /\bbord\b|sidobord|avlastningsbord|konsolbord/, id: 160402, name: "Övriga möbler" },
+  // Speglar är inte möbler hos Tradera. Ingen egen spegelkategori finns utanför antikavdelningen
+  // (Antikt & Design > Antikviteter > Speglar), och säljarna lägger dem i Övriga inredningsdetaljer:
+  // 32 av 97 skördade spegelannonser, mot 7 i Övriga möbler. Samma skickattribut (121) som
+  // möbelkategorierna — kontrollerat mot /categories/340959/attribute-definitions 2026-10-04.
+  //
+  // SIST, med flit. "Garderob med spegeldörrar", "byrå med spegel" och "spegelskåp" är möbler, och
+  // reglerna ovan ska hinna ta dem först.
+  { pattern: /spegel|speglar/, id: 340959, name: "Inredningsdetaljer > Övriga inredningsdetaljer" },
 ];
 
 /**

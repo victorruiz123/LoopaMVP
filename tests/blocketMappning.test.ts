@@ -128,3 +128,9 @@ test("bara riktiga annonsadresser räknas som annonsadresser", () => {
   assert.ok(!isAdUrl("https://www.blocket.se/order-and-payment/ad-receipt?adId=24720589"));
   assert.ok(!isAdUrl("https://www.blocket.se/mina-annonser"));
 });
+
+test("en spegel hamnar där säljarna på Blocket lägger speglar, med eller utan slug", () => {
+  const ovrigt = { main: "Möbler och inredning", sub: "Övriga möbler och inredning", product: null };
+  assert.deepEqual(blocketCategoryFor("ovrigt", "Stor silvrig väggspegel från Chilli"), ovrigt);
+  assert.deepEqual(blocketCategoryFor(null, "Stor silvrig väggspegel från Chilli"), ovrigt);
+});

@@ -104,7 +104,9 @@ const TITLE_WORDS_UNSORTED: Array<[string, BlocketCategory]> = [
   ["skåp", { main: MAIN, sub: "Garderober och förvaring", product: "Skåp" }],
   ["madrass", { main: MAIN, sub: "Sängar och madrasser", product: "Madrasser" }],
   ["säng", { main: MAIN, sub: "Sängar och madrasser", product: "Sängar" }],
-  ["spegel", { main: MAIN, sub: "Dekoration och prydnader", product: "Övriga prydnader" }],
+  // Inte "Dekoration och prydnader": av 425 skördade spegelannonser låg 174 i Övriga möbler och
+  // inredning och i princip ingen i dekorationsgrenen. Det är där köparna letar.
+  ["spegel", { main: MAIN, sub: "Övriga möbler och inredning", product: null }],
   ["tavla", { main: MAIN, sub: "Dekoration och prydnader", product: "Tavlor och ramar" }],
   ["matta", { main: MAIN, sub: "Mattor och textilier", product: null }],
   ["lampa", { main: MAIN, sub: "Lampor", product: null }],
