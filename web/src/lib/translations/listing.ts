@@ -202,9 +202,9 @@ export const LISTING: Record<string, Translation> = {
   },
   "{antal} sänkning hittills, från {start}.": { en: "{antal} drop so far, from {start}.", fr: "{antal} baisse jusqu'ici, depuis {start}." },
   "{antal} sänkningar hittills, från {start}.": { en: "{antal} drops so far, from {start}.", fr: "{antal} baisses jusqu'ici, depuis {start}." },
-  "Senaste sänkningen gick inte igenom: {fel} Vi försöker igen.": {
-    en: "The last drop didn't go through: {fel} We'll try again.",
-    fr: "La dernière baisse n'a pas abouti : {fel} Nous réessaierons.",
+  "Prisändringen har inte nått alla kanaler än: {fel}": {
+    en: "The price change hasn't reached every marketplace yet: {fel}",
+    fr: "Le nouveau prix n'est pas encore appliqué partout : {fel}",
   },
 
   // ---- publika kortet ----

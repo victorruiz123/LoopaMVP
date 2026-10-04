@@ -297,6 +297,8 @@ export default function AdminAdsScreen({
                       r.ownerEmail ?? r.ownerId,
                       r.grade ? `Betyg ${r.grade}` : null,
                       prisText(r),
+                      // Möbeln är sänkt hos oss men någon marknadsplats ligger kvar — se annonsen.
+                      r.prisUrFas ? "pris ur fas" : null,
                       r.dagarUppe !== null ? `${r.dagarUppe} d uppe` : null,
                     ]
                       .filter(Boolean)

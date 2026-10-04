@@ -590,15 +590,16 @@ async function handleSetDisclosures(id: string, req: IncomingMessage, res: Serve
  * Säljarens prisspann: startpris, golv och den veckovisa sänkningen däremellan.
  *
  * Sätts på prisvyn, långt innan annonsen finns — därför på jobbet och inte på publiceringen. Efter
- * att annonsen gått upp är spannet däremot låst här: priset ligger på Tradera, och ett nytt startpris
- * i efterhand hade beskrivit en annons som inte finns.
+ * att annonsen gått upp är spannet däremot låst här: priset ligger på Tradera eller Blocket, och ett
+ * nytt startpris i efterhand hade beskrivit en annons som inte finns. Panelen kan fortfarande ändra
+ * spannet (adminAnnonser.ts `ladder`), och då behålls priset som ligger uppe.
  */
 async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  if (job.tradera?.status === "published") {
+  if (job.tradera?.status === "published" || job.blocket?.status === "published") {
     return sendJson(res, 409, {
-      error: "Annonsen ligger redan uppe på Tradera, så prisspannet går inte att ändra här.",
+      error: "Annonsen ligger redan uppe, så prisspannet går inte att ändra här.",
       ladder: job.priceLadder ?? null,
     });
   }
@@ -2711,8 +2712,8 @@ void failOrphanedJobs().then((n) => {
   if (n > 0) console.warn(`[condition-grading] ${n} avbrutna jobb märktes som fel vid uppstart`);
 });
 
-// Prisstegen lever i den här processen. Den är avstängd av sig själv när Tradera inte är
-// konfigurerat — utan konto finns ingen annons att sänka priset på.
+// Prisstegen lever i den här processen — alltid. Möbeln sjunker i butiken och på Blocket även på en
+// server utan Tradera-nycklar; en kanal som inte går att nå bokförs på kanalen (priceLadder.ts).
 startPriceLadderScheduler();
 
 /**

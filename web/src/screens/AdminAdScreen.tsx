@@ -3,7 +3,7 @@ import { getAnnons, imageUrl, patchAnnons } from "../api";
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan } from "../types";
+import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan, KanalPrisLage } from "../types";
 
 /**
  * En annons, hela vägen ner — och vägen att ändra den.
@@ -179,9 +179,9 @@ export default function AdminAdScreen({
         <p className="admin-note">
           {annons.sankningar} sänkning{annons.sankningar === 1 ? "" : "ar"} gjorda, {Math.round(annons.ladder.weeklyDropPct * 100)} % i veckan.
           {annons.nextDropAt ? ` Nästa ${datum(annons.nextDropAt)}.` : annons.ladder.floorReachedAt ? " Golvet är nått." : " Stegen är inte startad."}
-          {annons.ladder.lastError ? ` Senaste felet: ${annons.ladder.lastError}` : ""}
         </p>
       )}
+      <PrisKanaler annons={annons} sparar={sparar} skicka={skicka} />
 
       <PrisForm annons={annons} sparar={sparar} skicka={skicka} />
 
@@ -902,6 +902,77 @@ function Lagesknapp({
  * En knapp som gjorde båda hade tvingat den som bara vill sänka ett pris att också ta ställning till
  * golvet.
  */
+/**
+ * Var varje marknadsplats står mot prisstegen.
+ *
+ * Stegen sänker MÖBELNS pris; kanalerna ska följa. Tradera gör det genom API:t, Blocket genom
+ * prisroboten — eller, när roboten är av, genom att en människa ändrar annonsen på Blocket och
+ * trycker "Ändrat för hand" här. Utan den här rutan syntes det inte att Blocket låg kvar på förra
+ * veckans pris: panelen visade stegens pris och såg nöjd ut.
+ *
+ * ANNONSPRISER, inte möbelkronor. Den som ska ändra på Blocket skriver in det tal köparen ser —
+ * möbeln plus hemleveransen — och det är det talet som står här, med möbelpriset i parentes.
+ */
+function PrisKanaler({
+  annons,
+  sparar,
+  skicka,
+}: {
+  annons: AdminAnnonsDetalj;
+  sparar: boolean;
+  skicka: (a: AnnonsAndring, kvitto: string) => void;
+}) {
+  if (!annons.prisKanaler || annons.prisKanaler.length === 0) return null;
+  const VIA: Record<KanalPrisLage["via"], string> = {
+    publicering: "satt vid publiceringen",
+    api: "ändrat via API:t",
+    robot: "ändrat av roboten",
+    manuellt: "ändrat för hand",
+    antaget: "antaget",
+  };
+  return (
+    <ul className="admin-kanaler">
+      {annons.prisKanaler.map((k) => (
+        <li key={k.kanal} className={k.iFas ? "kanal-gar" : "kanal-torr"}>
+          {k.iFas ? (
+            <>
+              {k.namn}: {formatSek(k.bekraftat + k.frakt)} i annonsen ({formatSek(k.bekraftat)} för möbeln) — i fas, {VIA[k.via]}.
+            </>
+          ) : (
+            <>
+              {k.namn} ligger på {formatSek(k.bekraftat + k.frakt)}, ska vara {formatSek(k.borVara + k.frakt)} ({formatSek(k.borVara)} för
+              möbeln).{" "}
+              {k.kraverManuell
+                ? `Servern kan inte ändra det själv: ${k.fel ?? "okänt skäl"}`
+                : k.fel
+                  ? `Senaste försöket: ${k.fel}${k.nastaForsokAt ? ` Nytt försök ${datum(k.nastaForsokAt)}.` : ""}`
+                  : "Flyttas vid nästa varv."}{" "}
+              {k.url && (
+                <a href={k.url} target="_blank" rel="noreferrer">
+                  Öppna annonsen
+                </a>
+              )}{" "}
+              <button
+                type="button"
+                className="btn btn-outline btn-small"
+                disabled={sparar}
+                onClick={() =>
+                  skicka(
+                    { kanalPris: { kanal: k.kanal } },
+                    `${k.namn} är markerad som ändrad för hand till ${formatSek(k.borVara + k.frakt)}.`,
+                  )
+                }
+              >
+                Ändrat för hand
+              </button>
+            </>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function PrisForm({
   annons,
   sparar,
@@ -933,7 +1004,12 @@ function PrisForm({
         <button
           className="btn btn-small"
           disabled={sparar || !pris}
-          onClick={() => skicka({ prisNu: Number(pris) }, "Priset satt. Ligger annonsen på Tradera skrivs det dit också.")}
+          onClick={() =>
+            skicka(
+              { prisNu: Number(pris) },
+              "Priset satt. Tradera följer via API:t och Blocket via roboten — kanaler som inte hängde med står under Tid och pris.",
+            )
+          }
         >
           Sätt priset
         </button>

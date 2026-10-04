@@ -26,6 +26,7 @@ import path from "node:path";
 import type { BrowserContext, Page } from "playwright";
 import { adImages, adTitle, composeAd, renderAdPlain, resolveAdPrice } from "../../adContent.js";
 import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
+import { armPriceLadder, nyttKanalPris } from "../../priceLadder.js";
 import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
 import { jobToProduct } from "../../butik/normalize.js";
 import { getJob, jobDir, persist } from "../../jobStore.js";
@@ -627,8 +628,15 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
       publishedAt: result.status === "published" ? new Date().toISOString() : null,
       steps: [...steps],
       shippingSek: result.status === "published" ? plan.shippingSek : (current.shippingSek ?? null),
+      // Kanalens kvitto: Blocket ligger på möbelpriset annonsen gick ut med. Det är mot det stegen
+      // mäter om Blocket hänger med nästa vecka (priceLadder.ts synkaKanaler, blocket/pris.ts).
+      pris: result.status === "published" ? nyttKanalPris(plan.itemPrice, "publicering") : (current.pris ?? null),
     }));
     console.info(`[blocket] job ${jobId} ${result.status} — ${result.url ?? result.receiptUrl}`);
+
+    // Klockan startar om den inte redan går — samma regel som Tradera-vägen. En annons som bara
+    // ligger på Blocket ska sjunka den också; förut stod stegen stilla så länge Blocket var uppe.
+    if (result.status === "published") await armPriceLadder(jobId, plan.itemPrice);
   } catch (err) {
     const message = felText(err);
     console.warn(`[blocket] job ${jobId} kunde inte publiceras — ${message}`);

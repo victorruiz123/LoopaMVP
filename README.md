@@ -465,6 +465,21 @@ ur betyget men fortfarande dras av från priset finns inte.
 Går prismotorn inte att nå vid en omräkning behålls det gamla priset med en notering. Ett inaktuellt tal
 med en förklaring är bättre än att blanka ut ett tal säljaren redan tittade på.
 
+### Prisstegen och kanalerna
+
+Säljaren sätter ett startpris, ett golv och en sänkning per vecka (1–50 %, förval 15 %) på prisvyn —
+både när prismotorn har ett förslag och när den inte har det. Servern sänker
+**möbelns** pris på schema ([`server/src/priceLadder.ts`](server/src/priceLadder.ts)); butiken läser
+det direkt, och varje marknadsplats ska följa: Tradera genom API:t, Blocket genom prisroboten
+([`integrations/blocket/pris.ts`](server/src/integrations/blocket/pris.ts), direkt i Blockets
+redigeringsformulär, påslagen med `BLOCKET_PRIS_ROBOT=1`) eller genom att en admin ändrar för hand och trycker **Ändrat för hand** i
+panelen. Varje kanal bär ett kvitto på vilket pris den bekräftats ligga på; en kanal som ligger kvar
+är *ur fas* — den syns i panelen, försöks igen var sjätte timme och mejlas till admin — men den
+stoppar aldrig sänkningen. Provskript för att se det hända på en riktig annons:
+`npm run blocket:pris -- --annons <url> --pris <kr> [--skarpt]` respektive
+`npm run tradera:pris -- --item <id> [--pris <kr> --skarpt]` (Tradera-nycklarna finns på servern).
+Planen och mätningarna: [PRISSTEG-PLAN.md](PRISSTEG-PLAN.md), beslutet: DECISIONS.md §20.
+
 ## Inbjudningar och provisionen
 
 **Regeln:** den som bjuder in någon får en försäljning utan Loopas provision (0 % i stället för 20 %,

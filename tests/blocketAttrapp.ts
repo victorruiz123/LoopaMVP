@@ -44,6 +44,12 @@ export interface AttrappLage {
   besokta: string[];
   /** Hur många gånger formuläret hämtats. Driver utkastfällan. */
   formularVisningar: number;
+  /** Redigeringar som SPARATS, i ordning: annons-id, nytt pris, och vad "Lägsta pris"-fältet bar. */
+  redigeringar: Array<{ id: string; pris: string; lagsta: string }>;
+  /** Priset annonsen visar nu, per annons-id, efter sparade redigeringar. */
+  prisNu: Record<string, string>;
+  /** Leveransval som sparats från leveranssidan i redigeringsläge. Prisroboten ska lämna den tom. */
+  leveransSparad: Array<{ id: string; frakt: string }>;
 }
 
 export interface AttrappOptions {
@@ -58,6 +64,21 @@ export interface AttrappOptions {
   utkastRubrik?: string | null;
   /** Sant = utkastet ligger kvar bara första gången, och andra försöket får ett tomt formulär. */
   utkastForsvinner?: boolean;
+  /**
+   * Annonser som redan ligger uppe på kontot — det Mina annonser listar, och det prisroboten
+   * (integrations/blocket/pris.ts) ska hitta och redigera. Tom = "Du har 0 annonser."
+   */
+  annonser?: Array<{ id: string; rubrik: string; pris: number; aktiv?: boolean }>;
+  /**
+   * Sant = direktadressen /recommerce/create/<id> ger 404 utan Referer från Mina annonser, så att
+   * reservvägen (kortets meny → "Ändra annonsen") blir prövad.
+   */
+  redigeringKraverMeny?: boolean;
+  /**
+   * Sant = redigeringsadressen ger det TOMMA skapandeformuläret fast annonsen står som aktiv. Det
+   * fall rubrikvakten finns för, när aktivkontrollen inte räcker.
+   */
+  redigeringTom?: boolean;
 }
 
 export interface Attrapp {
@@ -195,7 +216,11 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
     annonsId: ANNONS_ID,
     besokta: [],
     formularVisningar: 0,
+    redigeringar: [],
+    prisNu: {},
+    leveransSparad: [],
   };
+  const annonser = opts.annonser ?? [];
 
   const server: Server = createServer((req, res) => {
     const url = new URL(req.url ?? "/", "http://x");
@@ -258,6 +283,43 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
              <a class="kort" href="/bil"><h3>Fordon</h3><p>Bil, mc, båt</p></a>
            </section>
            <footer><p>Villkor och Support</p></footer>`,
+        ),
+      );
+    }
+
+    // ── Redigering av en annons som ligger uppe ────────────────────────────
+    // UPPMÄTT 2026-10-02: /recommerce/create/<annons-id> är samma formulär som vid skapandet,
+    // förifyllt, med `w-button[type=submit]` Spara direkt på sidan. FÄLLA: "Lägsta pris" ligger före
+    // "Pris" — en luddig etikettsökning fyller fel fält. Ett id som inte finns på kontot faller
+    // igenom till det TOMMA skapandeformuläret nedan, precis som en gissad adress skulle göra; det
+    // är rubrikvakten i pris.ts som ska stoppa roboten där.
+    const redigera = vag.match(/^\/recommerce\/create\/(\d+)$/);
+    const annonsAttRedigera = redigera && !opts.redigeringTom ? annonser.find((a) => a.id === redigera[1]) : undefined;
+    if (annonsAttRedigera && req.method === "GET") {
+      if (!inloggad) return omdirigera("/email-login");
+      if (opts.redigeringKraverMeny && !/\/(mina-annonser|my-items)/.test(String(req.headers.referer ?? ""))) {
+        res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
+        return res.end(sida("Hittades inte", "<h1>404</h1>"));
+      }
+      const a = annonsAttRedigera;
+      return html(
+        sida(
+          "Skapa annons | Blocket",
+          `<h1>Marknadsplats</h1>
+           <div class="rad"><w-textfield aria-label="Annonsrubrik" name="title" value="${a.rubrik}"></w-textfield></div>
+           <div class="rad"><w-textarea aria-label="Beskrivning"></w-textarea></div>
+           <div class="rad"><w-textfield aria-label="Lägsta pris" name="lagsta" value=""></w-textfield></div>
+           <div class="rad"><label for="pris-falt">Pris</label><input id="pris-falt" type="number" inputmode="numeric" value="${lage.prisNu[a.id] ?? a.pris}"></div>
+           <div class="rad"><w-textfield aria-label="Postnummer" name="postnummer" value="11122"></w-textfield></div>
+           <w-button id="spara" type="submit">Spara</w-button> <w-button id="avbryt">Avbryt</w-button>
+           <script>
+             /* Etiketten "Pris" är ett <label for> till ett vanligt <input>, som uppmätt: getByLabel träffar <input> direkt. */
+             document.getElementById("spara").addEventListener("click", function () {
+               var hamta = function (n) { var el = document.querySelector('w-textfield[name="' + n + '"]'); return el ? el.varde : ""; };
+               fetch("/spara-redigering", { method: "POST", body: JSON.stringify({ id: "${a.id}", pris: document.getElementById("pris-falt").value, lagsta: hamta("lagsta") }) })
+                 .then(function () { location.href = "/recommerce/delivery/${a.id}?editMode=true"; });
+             });
+           </script>`,
         ),
       );
     }
@@ -355,8 +417,83 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
       );
     }
 
+    // En annons som redan låg uppe (opts.annonser) visar sitt pris — det sparade, om det redigerats.
+    // Ligger den i granskning (höjt pris) svarar den publika sidan 404, som på riktiga Blocket.
+    const uppe = annonser.find((a) => vag === `/${a.id}`);
+    if (uppe) {
+      const prisNu = Number(lage.prisNu[uppe.id] ?? uppe.pris);
+      if (lage.prisNu[uppe.id] !== undefined && prisNu > uppe.pris) {
+        res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
+        return res.end(sida("404", "<h1>404</h1>"));
+      }
+      return html(sida("Annonsen", `<h1>${uppe.rubrik}</h1><p>${prisNu} kr</p>`));
+    }
     if (vag === `/${ANNONS_ID}`) {
       return html(sida("Annonsen", `<h1>${lage.formular?.rubrik ?? "Annons"}</h1><p>${lage.formular?.pris ?? ""} kr</p>`));
+    }
+
+    // ── Leveranssidan i redigeringsläge ────────────────────────────────────
+    // UPPMÄTT: formulärets Spara har redan sparat priset och går hit. Sidan har säljarens leverans-
+    // val förvalt och en egen Spara. Roboten ska INTE röra den — ett klick här hade ändrat ett val
+    // som är säljarens, och ett "Jag kan inte skicka varan" från publiceringsflödet hade varit fel.
+    const leverans = vag.match(/^\/recommerce\/delivery\/(\d+)$/);
+    if (leverans && req.method === "GET") {
+      return html(
+        sida(
+          "Frakt och leverans | Blocket",
+          `<h1>Frakt och leverans</h1><h2>Paketets storlek</h2>
+           <div class="rad"><w-radio name="package-size" aria-labelledby="lbl-litet"></w-radio><span id="lbl-litet">Litet</span></div>
+           <div class="rad"><w-radio name="package-size" aria-labelledby="lbl-medium" checked></w-radio><span id="lbl-medium">Medium</span></div>
+           <div class="rad"><w-radio name="package-size" aria-labelledby="lbl-ingen"></w-radio><span id="lbl-ingen">Jag kan inte skicka varan</span></div>
+           <w-button id="spara-leverans" type="submit">Spara</w-button> <w-button>Avbryt</w-button>
+           <script>
+             document.getElementById("spara-leverans").addEventListener("click", function () {
+               var valt = document.querySelector('w-radio[checked]');
+               fetch("/spara-leverans", { method: "POST", body: JSON.stringify({ id: "${leverans[1]}", frakt: valt ? document.getElementById(valt.getAttribute("aria-labelledby")).textContent : "" }) })
+                 .then(function () { location.href = "/my-items/details/${leverans[1]}"; });
+             });
+           </script>`,
+        ),
+      );
+    }
+    if (vag === "/spara-leverans" && req.method === "POST") {
+      return jsonKropp((data) => {
+        lage.leveransSparad.push({ id: String(data.id ?? ""), frakt: String(data.frakt ?? "") });
+      });
+    }
+
+    // ── Ägarsidan för en annons ────────────────────────────────────────────
+    // UPPMÄTT: "Hantera annons … Aktiv|Granskas … Torget säljes 390,−". Priset skrivs med ",−" och
+    // utan "kr" — det är så verifieringen måste läsa det. En sänkning lämnar annonsen Aktiv, en
+    // höjning lägger den i Granskas (och den publika sidan svarar 404 så länge).
+    const detaljer = vag.match(/^\/my-items\/details\/(\d+)$/);
+    if (detaljer && req.method === "GET") {
+      if (!inloggad) return omdirigera("/email-login");
+      const a = annonser.find((x) => x.id === detaljer[1]);
+      if (!a) {
+        res.writeHead(404, { "content-type": "text/html; charset=utf-8" });
+        return res.end(sida("Hittades inte", "<h1>404</h1>"));
+      }
+      const prisNu = Number(lage.prisNu[a.id] ?? a.pris);
+      const annonsLage = lage.prisNu[a.id] !== undefined && prisNu > a.pris ? "Granskas" : "Aktiv";
+      return html(
+        sida(
+          "Blocket – Mina annonser",
+          `<main><h1>Hantera annons</h1><h2>${a.rubrik}</h2><p>${annonsLage}</p><p>331 dagar kvar</p>
+           <p>${a.rubrik}</p><p>Torget säljes ${prisNu},−</p>
+           <w-button>Markera som såld</w-button> <a href="/recommerce/create/${a.id}">Ändra annonsen</a></main>`,
+        ),
+      );
+    }
+
+    // ── Sparad redigering (från redigeringsformuläret ovan) ────────────────
+    if (vag === "/spara-redigering" && req.method === "POST") {
+      return jsonKropp((data) => {
+        const id = String(data.id ?? "");
+        const pris = String(data.pris ?? "");
+        lage.redigeringar.push({ id, pris, lagsta: String(data.lagsta ?? "") });
+        lage.prisNu[id] = pris;
+      });
     }
 
     // ── Riktad provsida: bara kategorifällan ──────────────────────────────
@@ -384,9 +521,48 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
     }
 
     // ── Mina annonser / inloggning ────────────────────────────────────────
+    // UPPMÄTT: /mina-annonser skickar vidare till /my-items, där listan ligger.
     if (vag === "/mina-annonser") {
       if (!inloggad) return omdirigera("/email-login");
-      return html(sida("Mina annonser", `${COOKIE_BANNER}<h1>Mina annonser</h1><p>Du har 0 annonser.</p>`));
+      return omdirigera("/my-items");
+    }
+    if (vag === "/my-items") {
+      if (!inloggad) return omdirigera("/email-login");
+      // UPPMÄTT 2026-10-02: korten har inga klassnamn, och "Ändra annonsen" (→ /recommerce/create/<id>)
+      // ligger i en DOLD kontextmeny bakom w-button "Meny till genvägar för annonsen". Den som
+      // klickar länken utan att öppna menyn får "element is not visible". Listan visar bara AKTIVA
+      // annonser som förval — en utgången eller nekad annons står inte här, fast dess
+      // redigeringsadress fortfarande öppnar formuläret.
+      const kort = annonser
+        .filter((a) => a.aktiv !== false)
+        .map(
+          (a) => `<article data-annons="${a.id}">
+             <h3><a href="/my-items/details/${a.id}">${a.rubrik}</a></h3><p>${lage.prisNu[a.id] ?? a.pris} kr</p>
+             <w-button>Markera som såld</w-button>
+             <w-button data-meny="${a.id}">Meny till genvägar för annonsen</w-button>
+             <div id="meny-${a.id}" style="display:none">
+               <a href="/recommerce/create/${a.id}">Ändra annonsen</a>
+               <a href="/${a.id}">Visa annonsen</a>
+               <a href="/recommerce/statistics/${a.id}">Se statistik</a>
+             </div>
+           </article>`,
+        )
+        .join("");
+      return html(
+        sida(
+          "Mina annonser",
+          `${COOKIE_BANNER}<h1>Mina annonser</h1>
+           ${annonser.length === 0 ? "<p>Du har 0 annonser.</p>" : kort}
+           <script>
+             document.querySelectorAll("w-button[data-meny]").forEach(function (b) {
+               b.addEventListener("click", function () {
+                 var m = document.getElementById("meny-" + b.getAttribute("data-meny"));
+                 m.style.display = m.style.display === "none" ? "block" : "none";
+               });
+             });
+           </script>`,
+        ),
+      );
     }
     if (vag === "/email-login") {
       return html(sida("Logga in", "<h1>Logga in</h1><p>Vi skickar en kod till din e-post.</p>"));

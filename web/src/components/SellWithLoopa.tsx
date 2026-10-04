@@ -722,7 +722,7 @@ function LadderStatus({ ladder, shippingSek }: { ladder: PriceLadder; shippingSe
       </p>
       {ladder.lastError && (
         <p className="sell-error">
-          {t("Senaste sänkningen gick inte igenom: {fel} Vi försöker igen.", { fel: ladder.lastError })}
+          {t("Prisändringen har inte nått alla kanaler än: {fel}", { fel: ladder.lastError })}
         </p>
       )}
     </div>

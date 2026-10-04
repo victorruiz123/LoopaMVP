@@ -381,6 +381,41 @@ export interface PriceDrop {
 }
 
 /**
+ * En kanals kvitto på vilket möbelpris den ligger på, mot stegen. Spegel av server/src/types.ts.
+ * Möbelkronor utan frakt — frakten läggs på vid gränsen, som vid publiceringen.
+ */
+export interface KanalPris {
+  bekraftat: number;
+  bekraftatAt: string;
+  via: "publicering" | "api" | "robot" | "manuellt" | "antaget";
+  fel: string | null;
+  felAt: string | null;
+  forsok: number;
+  nastaForsokAt: string | null;
+  /** Servern kan inte flytta kanalen själv — någon måste ändra för hand och markera det i panelen. */
+  kraverManuell: boolean;
+  larmatAt: string | null;
+}
+
+/** Var en marknadsplats står mot prisstegen, som panelen ritar den. Se server/src/priceLadder.ts. */
+export interface KanalPrisLage {
+  kanal: "tradera" | "blocket";
+  namn: string;
+  /** Möbelpriset kanalen ligger på enligt kvittot. */
+  bekraftat: number;
+  /** Möbelpriset den ska ligga på: stegens. */
+  borVara: number;
+  iFas: boolean;
+  via: KanalPris["via"];
+  fel: string | null;
+  nastaForsokAt: string | null;
+  kraverManuell: boolean;
+  url: string | null;
+  /** Hemleveransen annonsen bär. Annonspriset = möbelpriset + den här. */
+  frakt: number;
+}
+
+/**
  * Prisstegen: säljarens spann, och vandringen ner genom det.
  *
  * Prismotorn svarar med tre tal — säljs snabbt, förslag, säljs långsamt. Vilket av dem som är RÄTT
@@ -398,14 +433,14 @@ export interface PriceLadder {
   floorPrice: number;
   /** Andel av priset som faller varje vecka. 0.15 = 15 %. */
   weeklyDropPct: number;
-  /** Priset som ligger på Tradera nu. Före publiceringen är det startpriset. */
+  /** Möbelns pris nu, utan frakt — det butiken visar och kanalerna ska följa. Före publiceringen startpriset. */
   currentPrice: number;
   /** När nästa sänkning ska ske. null innan annonsen är publicerad och när golvet är nått. */
   nextDropAt: string | null;
   drops: PriceDrop[];
   /** Sätts när golvet nåtts. Då är stegen färdig och priset ligger kvar. */
   floorReachedAt: string | null;
-  /** Senaste sänkningen Tradera avvisade — sparad för att kunna säga varför priset står stilla. */
+  /** Kanaler som inte hunnit med, i klartext: "Blocket ligger kvar på 2 400 kr." Null när alla är i fas. */
   lastError: string | null;
   chosenAt: string;
   /**
@@ -431,6 +466,10 @@ export interface TraderaPublication {
   publishedAt: string | null;
   approvedAt?: string | null;
   approvedBy?: string | null;
+  /** Hemleveransen inbakad i annonspriset. Saknas på äldre annonser. */
+  shippingSek?: number | null;
+  /** Vilket möbelpris Tradera-annonsen bekräftats ligga på, mot stegen. Saknas på äldre annonser. */
+  pris?: KanalPris | null;
 }
 
 /** Vad som KOMMER att publiceras. Visas i bekräftelsesteget så säljaren ser det innan de trycker. */
@@ -816,6 +855,10 @@ export interface BlocketPublication {
   startedAt: string;
   publishedAt: string | null;
   steps: BlocketStep[];
+  /** Vilket möbelpris Blocket-annonsen bekräftats ligga på, mot stegen. Saknas på äldre annonser. */
+  pris?: KanalPris | null;
+  /** Senaste prisändringsrobotens steg. */
+  prisSteg?: BlocketStep[] | null;
 }
 
 /** Vad ett tryck på knappen skulle göra, kanal för kanal. */
@@ -867,6 +910,8 @@ export interface AdminAnnonsRad {
   prisNy: number | null;
   sankningar: number;
   nextDropAt: string | null;
+  /** Någon marknadsplats visar ett annat pris än stegens — se `prisKanaler` på detaljen. */
+  prisUrFas: boolean;
   listedAt: string | null;
   soldAt: string | null;
   soldChannel: "butik" | "tradera" | null;
@@ -979,6 +1024,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   /** Den byggda beskrivningen i sin helhet, som ren text. Det `adText` skrivs över, och återvänder till. */
   harleddBeskrivning: string | null;
   ladder: PriceLadder | null;
+  /** Var varje marknadsplats står mot stegen. Tom när inget ligger uppe. */
+  prisKanaler: KanalPrisLage[];
   /** Publiceringen mot Tradera i sin helhet: länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
@@ -1029,6 +1076,8 @@ export interface AnnonsAndring {
   /** Säljarens postnummer, fem siffror i valfri form. Null tömmer det. */
   postnummer?: string | null;
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
+  /** "Ändrat för hand": kanalen har satts till stegens pris av en människa. Skriver kanalens kvitto. */
+  kanalPris?: { kanal: "tradera" | "blocket" };
   /** `godkann` lägger ut möbeln i Butiken OCH på Tradera. `publicera` är bara butiken. */
   lage?: "godkann" | "publicera" | "ta-ner" | "sald" | "levererad" | "returnerad" | "slapp";
   kanal?: "butik" | "tradera";

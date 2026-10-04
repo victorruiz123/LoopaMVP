@@ -40,10 +40,22 @@ import { invalidate } from "./butik/inventory.js";
 import { allOrders, ordersForProduct, type Order } from "./butik/orders.js";
 import * as overrides from "./butik/overrides.js";
 import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
-import { makePriceLadder, nextRung } from "./priceLadder.js";
+import {
+  armPriceLadder,
+  bekraftaKanalPris,
+  kanalPrisLagen,
+  klockanStartad,
+  makePriceLadder,
+  nextRung,
+  prisUrFas,
+  startaKlockan,
+  synkaKanaler,
+  type KanalPrisLage,
+  type PrisKanal,
+} from "./priceLadder.js";
 import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
 import { markApproved, traderaAdBlocks } from "./integrations/tradera/publish.js";
-import { renderAdPlain } from "./adContent.js";
+import { renderAdPlain, resolveAdPrice } from "./adContent.js";
 import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import { normaliseraPostnummer, saljarensPostnummer } from "./integrations/blocket/saljare.js";
 import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
@@ -91,6 +103,11 @@ export interface AdminAnnonsRad {
   /** Hur många sänkningar stegen redan gjort. */
   sankningar: number;
   nextDropAt: string | null;
+  /**
+   * Någon marknadsplats visar ett annat pris än stegens. Det listan ska kunna flagga: möbeln har
+   * sänkts hos oss, men Blocket (eller Tradera) ligger kvar — se `prisKanaler` på detaljen.
+   */
+  prisUrFas: boolean;
 
   // --- tid ---
   /** När möbeln lades i butiken. Null = aldrig. */
@@ -147,6 +164,12 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
    */
   harleddBeskrivning: string | null;
   ladder: PriceLadder | null;
+  /**
+   * Var varje marknadsplats står mot stegen: vilket möbelpris den bekräftats ligga på, vilket den
+   * ska ligga på, och varför den inte flyttats när den inte är i fas. Tom när inget ligger uppe.
+   * Knappen "Ändrat för hand" (`AndringsPatch.kanalPris`) sätter kvittot när en människa gjort det.
+   */
+  prisKanaler: KanalPrisLage[];
   /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
@@ -300,6 +323,7 @@ function radAv(
     prisNy: produkt?.retailPriceSek ?? null,
     sankningar: ladder?.drops.length ?? 0,
     nextDropAt: ladder?.nextDropAt ?? null,
+    prisUrFas: prisUrFas(job),
 
     listedAt,
     soldAt: record?.soldAt ?? null,
@@ -466,6 +490,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     annonstext: overrides.annonstext(job, overstyrning),
     harleddBeskrivning: harleddBeskrivning(await overrides.medRattelser(job), annonsensFrakt(job, await overrides.kategoriMedRattelse(job))),
     ladder: job.priceLadder ?? null,
+    prisKanaler: kanalPrisLagen(job),
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
     postnummer,
@@ -505,6 +530,13 @@ export interface AndringsPatch {
   postnummer?: string | null;
   /** Nytt spann för prisstegen. Startpris och golv måste följas åt — se makePriceLadder. */
   ladder?: { startPrice: number; floorPrice: number; weeklyDropPct?: number };
+  /**
+   * "Ändrat för hand": en människa har satt stegens pris på kanalen själv — Blocket när roboten är
+   * av, Tradera när nycklarna saknas. Skriver kanalens kvitto (priceLadder.ts bekraftaKanalPris) så
+   * att panelen slutar flagga och stegen slutar försöka. Säger ingenting om vad som faktiskt står på
+   * marknadsplatsen; det är den som trycker som intygar det.
+   */
+  kanalPris?: { kanal: PrisKanal };
   /**
    * Tillståndsbyte: godkänn, publicera, ta ner, markera såld, levererad, returnerad, släpp reservation.
    *
@@ -583,6 +615,15 @@ export async function andraAnnons(
     await sattPris(job, patch.prisNu);
   }
 
+  if (patch.kanalPris) {
+    const kanal = patch.kanalPris.kanal;
+    if (kanal !== "tradera" && kanal !== "blocket") throw new AndringsFel("Okänd kanal.");
+    if (!bekraftaKanalPris(job, kanal)) {
+      throw new AndringsFel("Annonsen ligger inte uppe på den kanalen, eller har ingen prissteg — det finns inget att bekräfta.");
+    }
+    await persist(job);
+  }
+
   if (patch.postnummer !== undefined) {
     // Fem siffror eller ingenting. Ett halvt postnummer står utåt under möbeln som om det vore sant.
     const postnummer = patch.postnummer === null ? null : normaliseraPostnummer(patch.postnummer);
@@ -620,32 +661,28 @@ async function sattPris(job: ConditionJob, pris: number): Promise<void> {
   if (belopp < ladder.floorPrice) throw new AndringsFel("Priset ligger under golvet. Sänk golvet först.");
 
   ladder.currentPrice = belopp;
-  ladder.floorReachedAt = belopp <= ladder.floorPrice ? new Date().toISOString() : null;
   ladder.lastError = null;
+  /**
+   * Klockan följer med. Ett pris på golvet stänger av den; ett pris över golvet på en annons vars
+   * klocka redan gått klart startar den igen — annars hade en höjning från golvet stått stilla för
+   * alltid, och säljaren fått ett pris som "sänks varje vecka" men aldrig gör det. En klocka som
+   * redan går rörs inte: nästa sänkning kommer när den skulle ha kommit.
+   */
+  if (belopp <= ladder.floorPrice || !klockanStartad(ladder) || ladder.floorReachedAt) startaKlockan(ladder);
   await persist(job);
 
   /**
-   * Ligger annonsen uppe på Tradera ska priset dit också.
+   * Ligger annonsen uppe någonstans ska priset dit också — till VARJE kanal.
    *
    * Ett pris som bara ändras hos oss är två priser på samma möbel, och det är köparen som upptäcker
-   * det. Faller anropet skrivs felet på stegen — samma fält som den veckovisa sänkningen använder,
-   * och det panelen läser för att kunna säga varför priset står stilla.
+   * det. Samma synk som den veckovisa sänkningen (priceLadder.ts synkaKanaler): Tradera genom API:t,
+   * Blocket genom roboten eller "Ändrat för hand" i panelen. Här gick förut bara Tradera, och bara
+   * möbelkronor utan frakt (rättat 2026-09-26); Blocket gled isär i tysthet.
+   *
+   * `tvinga`: adminens tryck ska försöka nu, inte vänta ut en omförsökstid från ett tidigare avslag.
+   * Ett fel bokförs på kanalen och syns i panelen — det kastas inte, för priset hos oss är redan satt.
    */
-  const itemId = job.tradera?.itemId;
-  if (job.tradera?.status === "published" && typeof itemId === "number") {
-    try {
-      const { traderaConfigured, updateTraderaPrice } = await import("./integrations/tradera/tradera.js");
-      // Möbeln PLUS hemleveransen, som publiceringen och den veckovisa sänkningen gör (priceLadder.ts
-      // applyDrop). Här gick det bara möbelkronor till Tradera, så ett adminpris på 1 000 kr blev en
-      // annons på 1 000 kr medan samma möbel låg på 1 600 kr på Blocket. Rättat 2026-09-26.
-      // Frakten annonsen gick ut med — 600 för annonser från före 2026-09-29 (hemleverans.ts).
-      const frakt = annonsensFrakt(job, await overrides.kategoriMedRattelse(job));
-      if (traderaConfigured()) await updateTraderaPrice(itemId, prisMedHemleverans(belopp, frakt), ladder.listingMode ?? "fixed");
-    } catch (err) {
-      ladder.lastError = err instanceof Error ? err.message : String(err);
-      await persist(job);
-    }
-  }
+  await synkaKanaler(job, {}, { tvinga: true });
 }
 
 async function bytLage(
@@ -749,6 +786,16 @@ async function godkann(id: string, job: ConditionJob, adminId: string | null): P
   // marknadsplats sedan faller. Det är den butiken läser (`godkand`).
   await markApproved(job, adminId);
   await markChannelsPublishing(job, plan.willPublish, adminId);
+
+  /**
+   * Prisstegens klocka startar HÄR, när möbeln går ut i butiken — inte först när Tradera svarat.
+   *
+   * Butiken är en kanal den också, och den sjönk aldrig förut: klockan startades bara av en lyckad
+   * Tradera-publicering, så en möbel som låg i butiken och på Blocket stod på startpriset i evighet.
+   * Startar en gång; Tradera- och Blocket-vägarna rör den inte om den redan går (armPriceLadder).
+   */
+  const utpris = resolveAdPrice(job);
+  if (utpris) await armPriceLadder(job.id, utpris.value);
 
   await ensureRecord(id, job.id, "loopa", rattat.listedAt);
   const { publishBlocked } = await import("./efterlysning/fortur.js");

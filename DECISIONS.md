@@ -521,3 +521,63 @@ motsatsen: att möbeln är på väg in.
 
 **Följd:** `JOBS_DIR` går att peka om med `LOOPA_JOBS_DIR`, av samma skäl som `BUTIK_DATA_DIR` finns —
 grinden ska gå att testa utan att skapa och ta bort jobb bland de skarpa besiktningarna.
+
+## 20. Priset är möbelns, inte kanalens
+
+**Läget före 2026-10-02.** Prisstegen (`server/src/priceLadder.ts`) sänkte 15 % i veckan — men bara
+genom Traderas API, bara om Tradera var konfigurerat, bara på annonser Tradera tagit emot, och inte
+alls medan Blocket-annonsen låg uppe (`ladderFrozenByBlocket`). Det sista var ett medvetet beslut:
+Blocket har inget API och roboten kunde bara publicera, så utan frysning hade samma möbel glidit isär
+till två priser. Följden, när "Godkänn och lägg ut" började lägga ut på Blocket automatiskt, var att
+nästan ingen möbel sjönk någonstans.
+
+**Beslutet.** `currentPrice` är MÖBELNS pris och flyttas av stegen på schema, oavsett vad
+marknadsplatserna svarar. Varje kanal har ett **kvitto** (`KanalPris` på publiceringen) på vilket
+möbelpris den bekräftats ligga på. En kanal vars kvitto inte stämmer är *ur fas*: den försöks rätta
+varje varv, syns i panelen, och larmas när en människa behövs. Den stoppar aldrig sänkningen.
+
+**Blocket** får en prisrobot (`integrations/blocket/pris.ts`). Uppmätt samma dag på riktiga
+Blocket: "Ändra annonsen" leder till `/recommerce/create/<annons-id>`, skapandeformuläret förifyllt
+med **Spara** direkt på sidan. Roboten går dit direkt, vaktar rubriken (ett okänt id ger ett tomt
+formulär, och Spara där hade skapat en ny annons) och byter priset. Den har en egen brytare
+(`BLOCKET_PRIS_ROBOT`) skild från publiceringens, för en prisändring går att ångra medan en
+publicering inte går att ta ner. När den är av är svaret *"ändra för hand"*: panelen visar vad
+annonsen ligger på och ska ligga på, med knappen **Ändrat för hand**, och ett brev går till admin
+— ett per gång kanalen hamnar ur fas, inte ett per varv. Sparandet verifierades skarpt samma dag
+(tre rundor 400 → 390 → 400 kr på en egen annons, den sista genom hela produktionsvägen med alla
+fält jämförda före/efter): formulärets Spara sparar priset och bara priset, inget BankID; den
+publika sidan är borta 2–5 minuter efter varje ändring, och en höjning märks dessutom "Granskas"
+en stund på ägarsidan — därför läser verifieringen ägarsidan (PRISSTEG-PLAN.md §4).
+
+**Tradera** verifierades skarpt dagen efter från servern: `PUT /listings/items/{id}/price` på en
+riktig Loopa-annons gick igenom på 69 ms och syntes direkt på tradera.com, utan granskning. Traderas
+egen bild visade samtidigt att två av fem annonser gått ut utan att läggas om. Synken läser därför
+annonsens läge före anropet: en utgången annons är "för hand" med brev, inte ett avvisat anrop var
+sjätte timme i evighet. Att lägga om är ett beslut (ny annonstid), och stegen tar det inte själv.
+
+### Varför inte behålla frysningen och bara lägga till roboten
+
+För att frysningen gömde tre andra fel: schemaläggaren var av utan Tradera-nycklar, butiken och
+Blocket räknades aldrig som "uppe", och ett Tradera-avslag höll kvar priset överallt. Alla tre kommer
+ur samma tanke — att stegen var Traderas — och den tanken är det som byts. Med kvitton per kanal blir
+"två priser på samma möbel" ett tillstånd man kan se och rätta, i stället för något man måste
+förhindra genom att låta allt stå.
+
+### Övergången
+
+Arvet skrivs av första varvet: en publicerad kanal utan kvitto antas ligga på stegens pris, FÖRE
+veckans sänkning (annars ser den ut att vara i fas med det nya priset och flyttas aldrig). En steg
+som stod frusen av Blocket startar om klockan från i dag i stället för att ta igen veckorna —
+frysningen var ett beslut då, inte ett driftstopp. En annons som ligger ute med en klocka som aldrig
+startats får den startad; första sänkningen kommer om en vecka.
+
+**Takten är säljarens (2026-10-03).** Servern räknade sedan länge med varje annons egen procent, men
+huvudflödets prisvy låste den till 15 % och skickade inte ens med den — bara reservvyn utan
+prisförslag lät säljaren välja. Nu är takten ett tredje reglage bredvid startpris och golv, med
+samma gränser på båda sidor (1–50 %, förvalt 15 %), och villkorstexten lovar "den takt du valt" i
+stället för ett fast tal. Sänkningen och kanalsynken behövde inte ändras: de använde redan annonsens
+egen takt.
+
+**Följder:** `godkann` armerar klockan när möbeln går ut i butiken; adminens "Sätt priset" går genom
+samma synk som sänkningen, till alla kanaler; säljarens prisplan låses när någon kanal är uppe, inte
+bara Tradera. Facebook-inläggen bär fortfarande priset i texten och uppdateras inte — öppen post.

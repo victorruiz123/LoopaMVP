@@ -14,7 +14,7 @@ import { resolveCoverImageId } from "../../pipeline/cover.js";
 import { adImages, adTitle, composeAd, renderAdHtml, resolveAdPrice, type AdBlock } from "../../adContent.js";
 import type { CapturedImage, ConditionJob, TraderaPublication } from "../../types.js";
 import { publishToTradera, traderaConfigured, type TraderaImage } from "./tradera.js";
-import { armPriceLadder } from "../../priceLadder.js";
+import { armPriceLadder, nyttKanalPris } from "../../priceLadder.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
 import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
@@ -200,12 +200,15 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       publishedAt: new Date().toISOString(),
       adBlocks,
       shippingSek: plan.shippingSek,
+      // Kanalens kvitto: Tradera ligger på möbelpriset annonsen gick ut med. Det är mot det stegen
+      // mäter om Tradera hänger med nästa vecka (priceLadder.ts synkaKanaler).
+      pris: nyttKanalPris(plan.itemPrice, "publicering"),
     }));
     console.info(`[tradera] job ${jobId} publicerat som item ${result.itemId} — ${result.url}`);
 
-    // Först nu börjar veckorna räknas: stegen sänker priset på en annons som ligger uppe, inte på ett
-    // utkast. Efter publiceringen — annonsen är redan live, och ett fel här får inte se ut som att
-    // den inte kom upp.
+    // Klockan startar om den inte redan går (godkännandet startar den när möbeln går ut i butiken):
+    // stegen sänker priset på en annons som ligger uppe, inte på ett utkast. Efter publiceringen —
+    // annonsen är redan live, och ett fel här får inte se ut som att den inte kom upp.
     // MÖBELPRISET, inte annonspriset. Stegen räknar i möbelkronor och frakten läggs på först vid
     // anropet mot Tradera — armeras den med `plan.price` börjar de 15 procenten äta av frakten.
     await armPriceLadder(jobId, plan.itemPrice, plan.mode);

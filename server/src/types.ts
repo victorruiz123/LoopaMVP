@@ -556,6 +556,47 @@ export interface PriceDrop {
 }
 
 /**
+ * En kanals kvitto på vilket pris den ligger på — i förhållande till stegen.
+ *
+ * Priset är MÖBELNS (`PriceLadder.currentPrice`); varje marknadsplats ska följa det. Det här är
+ * kanalens bokföring: vilket möbelpris den senast BEKRÄFTATS ligga på, hur det kom dit, och vad som
+ * hände senast servern försökte flytta den. Möbelkronor utan frakt — frakten läggs på vid gränsen
+ * (hemleverans.ts), precis som vid publiceringen.
+ *
+ * Ligger `bekraftat` under stegens pris är kanalen UR FAS. Det är ett tillstånd panelen visar och
+ * stegen försöker rätta vid varje varv (priceLadder.ts `synkaKanaler`), inte ett skäl att stoppa
+ * sänkningen: butiken och de andra kanalerna ska inte vänta på den som släpar.
+ */
+export interface KanalPris {
+  /** Möbelpriset kanalen bekräftats ligga på. */
+  bekraftat: number;
+  bekraftatAt: string;
+  /**
+   * Hur det bekräftades: satt vid publiceringen, flyttat genom Traderas API, av Blocket-roboten
+   * (integrations/blocket/pris.ts), markerat av en admin som ändrat för hand — eller ANTAGET: en
+   * annons publicerad innan fältet fanns räknas ligga på stegens pris den dag koden först såg den.
+   * Antagandet håller för att stegen dittills bara flyttade priset när Tradera tagit emot det, och
+   * stod helt stilla medan Blocket-annonsen låg uppe.
+   */
+  via: "publicering" | "api" | "robot" | "manuellt" | "antaget";
+  /** Varför senaste försöket att flytta kanalen inte gick. Null när det gick, eller inte behövts. */
+  fel: string | null;
+  felAt: string | null;
+  /** Misslyckanden i rad. Nollas när ett försök går. */
+  forsok: number;
+  /** Tidigast nästa försök. Ett avslag ska prövas igen inom veckan, men inte var kvart. */
+  nastaForsokAt: string | null;
+  /**
+   * Servern kan inte flytta kanalen själv: Blocket utan robot i skarpt läge, Tradera utan nycklar.
+   * Någon måste ändra annonsen för hand och markera det i panelen (adminAnnonser.ts
+   * `AndringsPatch.kanalPris`). Nollas när priset bekräftas.
+   */
+  kraverManuell: boolean;
+  /** När adminbrevet om det gick. Ett per gång kanalen hamnar ur fas, inte ett per varv. */
+  larmatAt: string | null;
+}
+
+/**
  * Prisstegen: säljarens spann, och vandringen ner genom det.
  *
  * Prismotorn svarar med tre tal — säljs snabbt, förslag, säljs långsamt. Vilket av dem som är RÄTT
@@ -563,8 +604,11 @@ export interface PriceDrop {
  * stället. De sätter ett startpris och ett golv, och annonsen går själv ner genom spannet med
  * `weeklyDropPct` i veckan tills den når golvet, där den stannar.
  *
- * `currentPrice` är sanningen om vad som ligger uppe just nu, INTE en härledning ur startpris och
- * antal veckor: en sänkning som Tradera avvisade får inte se ut som om den gick igenom.
+ * `currentPrice` är MÖBELNS pris just nu — det butiken visar (butik/normalize.ts `priceOf`) och det
+ * varje marknadsplats ska följa. Det flyttas av stegen själv, varje vecka, oavsett om Tradera eller
+ * Blocket hann med: en kanal som ligger kvar på ett äldre pris är ett fel PÅ KANALEN, bokfört i
+ * dess `KanalPris`, inte ett skäl att låta möbeln stå. Före 2026-10-02 var det tvärtom — priset
+ * flyttades bara när Tradera sa ja, och inte alls medan Blocket-annonsen låg uppe.
  */
 export interface PriceLadder {
   /** Vad annonsen läggs upp med. */
@@ -573,14 +617,18 @@ export interface PriceLadder {
   floorPrice: number;
   /** Andel av priset som faller varje vecka. 0.15 = 15 %. */
   weeklyDropPct: number;
-  /** Priset som ligger på Tradera nu. Före publiceringen är det startpriset. */
+  /** Möbelns pris nu, utan frakt. Före publiceringen är det startpriset. */
   currentPrice: number;
   /** När nästa sänkning ska ske. null innan annonsen är publicerad och när golvet är nått. */
   nextDropAt: string | null;
   drops: PriceDrop[];
   /** Sätts när golvet nåtts. Då är stegen färdig och priset ligger kvar. */
   floorReachedAt: string | null;
-  /** Senaste sänkningen Tradera avvisade — sparad för att kunna säga varför priset står stilla. */
+  /**
+   * Kanaler som inte hunnit med, i klartext för säljaren: "Blocket ligger kvar på 2 400 kr." Null
+   * när alla kanaler visar stegens pris. Detaljerna (varför, nästa försök) står per kanal i
+   * `TraderaPublication.pris` / `BlocketPublication.pris`.
+   */
   lastError: string | null;
   chosenAt: string;
   /**
@@ -637,6 +685,8 @@ export interface TraderaPublication {
    * sänkning (hemleverans.ts `annonsensFrakt`). Saknas på annonser från före 2026-09-29 — de bär 600.
    */
   shippingSek?: number | null;
+  /** Vilket möbelpris Tradera-annonsen bekräftats ligga på, mot stegen. Saknas på äldre annonser. */
+  pris?: KanalPris | null;
 }
 
 /**
@@ -676,6 +726,10 @@ export interface BlocketPublication {
   steps: BlocketStep[];
   /** Hemleveransen inbakad i annonspriset. Se `TraderaPublication.shippingSek`. */
   shippingSek?: number | null;
+  /** Vilket möbelpris Blocket-annonsen bekräftats ligga på, mot stegen. Saknas på äldre annonser. */
+  pris?: KanalPris | null;
+  /** Senaste prisändringsrobotens steg (integrations/blocket/pris.ts), de sista 30. */
+  prisSteg?: BlocketStep[] | null;
 }
 
 /** Se ConditionJob.saleTerms. */
@@ -790,9 +844,11 @@ export interface ConditionJob {
    * Vid sidan av `tradera` och inte i stället för den: samma möbel ligger på båda kanalerna efter ett
    * tryck på "Godkänn och lägg ut", med SAMMA annons och SAMMA pris — möbeln plus hemleveransen.
    *
-   * Fältet är också det som fryser prisstegen, och det blir viktigare av att priserna är lika: stegen
-   * sänker Tradera-priset med 15 % i veckan, men Blocket-annonsen går inte att redigera i efterhand.
-   * Utan frysning skulle de två annonserna glida isär av sig själva — se `ladderFrozenByBlocket`.
+   * Priserna hålls lika av prisstegen: den sänker MÖBELNS pris varje vecka och flyttar sedan varje
+   * kanal dit — Tradera genom API:t, Blocket genom prisroboten (integrations/blocket/pris.ts) eller
+   * en människa. Fältet frös förut hela stegen (`ladderFrozenByBlocket`, borttagen 2026-10-02) för
+   * att Blocket-annonsen inte gick att redigera i efterhand; nu bär `blocket.pris` i stället kvittot
+   * på var Blocket står, och panelen säger till när det inte är i fas.
    */
   blocket?: BlocketPublication | null;
   /**

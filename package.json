@@ -21,6 +21,8 @@
     "tradera:lookup": "tsx server/src/integrations/tradera/reference-lookup.ts",
     "candidate:path": "tsx tests/candidate-path.ts",
     "blocket:prov": "tsx server/src/integrations/blocket/prov.ts",
+    "blocket:pris": "tsx server/src/integrations/blocket/pris-prov.ts",
+    "tradera:pris": "tsx server/src/integrations/tradera/pris-prov.ts",
     "blocket:logga-in": "tsx server/src/integrations/blocket/logga-in.ts",
     "facebook:login": "tsx server/src/integrations/facebook/login.ts",
     "facebook": "tsx server/src/integrations/facebook/cli.ts"

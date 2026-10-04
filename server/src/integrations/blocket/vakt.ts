@@ -30,6 +30,11 @@ export function markeraUpptagen(varde: boolean): void {
   upptagen = varde;
 }
 
+/** Pågår en Blocket-körning just nu? Prisroboten (pris.ts) frågar innan den startar en egen webbläsare. */
+export function arUpptagen(): boolean {
+  return upptagen;
+}
+
 export type SessionsUtfall = Pick<BlocketHalsa, "ok" | "url" | "fel">;
 
 /** Kontrollen själv. Samma väg som en publicering tar först, och inget mer. */
