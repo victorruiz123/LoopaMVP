@@ -2,7 +2,15 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { PriceEstimate, PriceLadder } from "../types";
 import { savePricePlan } from "../api";
 import { formatSek } from "../lib/price";
-import { WEEKLY_DROP, ladderBounds, ladderRungs, roundToRung } from "../lib/priceLadder";
+import {
+  WEEKLY_DROP,
+  WEEKLY_DROP_MAX_PCT,
+  WEEKLY_DROP_MIN_PCT,
+  clampWeeklyDropPct,
+  ladderBounds,
+  ladderRungs,
+  roundToRung,
+} from "../lib/priceLadder";
 import { useLang, useT } from "../lib/i18n";
 
 /**
@@ -10,8 +18,14 @@ import { useLang, useT } from "../lib/i18n";
  *
  * Prismotorn svarar med tre tal — säljs snabbt, förslag, säljs långsamt — och hittills fick säljaren
  * bara läsa dem. Men vilket av talen som är RÄTT beror på det enda motorn inte kan veta: hur bråttom
- * de har. Här svarar de på det. De sätter ett startpris och ett golv, och annonsen går själv ner genom
- * spannet med 15 % i veckan tills den når golvet, där den stannar.
+ * de har. Här svarar de på det. De sätter ett startpris, ett golv och en takt — hur många procent
+ * annonsen sänks varje vecka — och annonsen går själv ner genom spannet tills den når golvet, där
+ * den stannar.
+ *
+ * TAKTEN VAR LÅST TILL 15 % HÄR fram till 2026-10-03, fast servern räknade med varje annons egen
+ * procent sedan länge och reservvyn utan prisförslag (ManuellPrisplan) redan lät säljaren välja.
+ * Den som har bråttom kunde alltså bara sänka startpriset, inte farten. Nu är takten ett tredje
+ * reglage med samma gränser som servern (1–50 %), förvalt 15 %.
  *
  * Spannet är förifyllt med motorns förslag och sparas direkt, utan att säljaren behöver trycka på
  * något. En tom prisplan hade betytt "priset står stilla för alltid", vilket är sämre än förvalet och
@@ -34,6 +48,7 @@ export default function PriceLadderPicker({
   const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
   const suggested = roundToRung(price.default ?? bounds.min);
   const fastSale = roundToRung(price.low ?? Math.round(suggested * 0.7));
+  const defaultPct = Math.round(WEEKLY_DROP * 100);
 
   const [start, setStart] = useState(() =>
     clamp(roundToRung(initial?.startPrice ?? suggested), bounds.min, bounds.max),
@@ -41,6 +56,8 @@ export default function PriceLadderPicker({
   const [floor, setFloor] = useState(() =>
     clamp(roundToRung(initial?.floorPrice ?? fastSale), bounds.min, bounds.max),
   );
+  /** Takten i hela procent. Ett redan sparat spann bär sin egen; annars förvalet. */
+  const [pct, setPct] = useState(() => clampWeeklyDropPct(initial ? initial.weeklyDropPct * 100 : defaultPct));
 
   const [status, setStatus] = useState<"idle" | "saving" | "saved" | "error">(initial ? "saved" : "idle");
   const [error, setError] = useState<string | null>(null);
@@ -49,7 +66,9 @@ export default function PriceLadderPicker({
    * Vad servern senast fick veta. Ett redan sparat spann ska inte skrivas om vid varje montering —
    * det hade nollställt säljarens egna val till motorns förslag om de kom tillbaka till vyn.
    */
-  const saved = useRef<string | null>(initial ? `${initial.startPrice}:${initial.floorPrice}` : null);
+  const saved = useRef<string | null>(
+    initial ? `${initial.startPrice}:${initial.floorPrice}:${clampWeeklyDropPct(initial.weeklyDropPct * 100)}` : null,
+  );
 
   const setStartPrice = (value: number) => {
     const next = clamp(value, bounds.min, bounds.max);
@@ -60,14 +79,15 @@ export default function PriceLadderPicker({
   };
 
   const setFloorPrice = (value: number) => setFloor(clamp(value, bounds.min, Math.min(start, bounds.max)));
+  const setDropPct = (value: number) => setPct(clampWeeklyDropPct(value));
 
   useEffect(() => {
-    const signature = `${start}:${floor}`;
+    const signature = `${start}:${floor}:${pct}`;
     if (saved.current === signature) return;
     const timer = window.setTimeout(async () => {
       setStatus("saving");
       try {
-        await savePricePlan(jobId, { startPrice: start, floorPrice: floor });
+        await savePricePlan(jobId, { startPrice: start, floorPrice: floor, weeklyDropPct: pct / 100 });
         saved.current = signature;
         setStatus("saved");
         setError(null);
@@ -77,9 +97,9 @@ export default function PriceLadderPicker({
       }
     }, 500);
     return () => window.clearTimeout(timer);
-  }, [jobId, start, floor]);
+  }, [jobId, start, floor, pct]);
 
-  const rungs = ladderRungs(start, floor, WEEKLY_DROP);
+  const rungs = ladderRungs(start, floor, pct / 100);
   const weeks = rungs.length - 1;
   const floorDate = new Date(Date.now() + weeks * 7 * 24 * 60 * 60 * 1000);
 
@@ -92,14 +112,14 @@ export default function PriceLadderPicker({
       <p className="muted small ladder-intro">
         {t(
           "Annonsen startar på ditt pris och sänks {andel} % i veckan tills den når ditt lägsta pris. Där stannar den. Hemleveransen läggs ovanpå i annonsen och sänks aldrig.",
-          { andel: Math.round(WEEKLY_DROP * 100) },
+          { andel: pct },
         )}
       </p>
 
       <div className="ladder-row">
         <div className="ladder-row-head">
           <span className="ladder-row-label">{t("Startpris")}</span>
-          <PriceField label={t("Startpris")} value={start} onCommit={setStartPrice} />
+          <AmountField label={t("Startpris")} value={start} unit="kr" normalize={roundToRung} onCommit={setStartPrice} />
         </div>
         <input
           className="ladder-slider ladder-slider-start"
@@ -117,7 +137,7 @@ export default function PriceLadderPicker({
       <div className="ladder-row">
         <div className="ladder-row-head">
           <span className="ladder-row-label">{t("Lägsta pris")}</span>
-          <PriceField label={t("Lägsta pris")} value={floor} onCommit={setFloorPrice} />
+          <AmountField label={t("Lägsta pris")} value={floor} unit="kr" normalize={roundToRung} onCommit={setFloorPrice} />
         </div>
         <input
           className="ladder-slider ladder-slider-floor"
@@ -130,6 +150,30 @@ export default function PriceLadderPicker({
           onChange={(e) => setFloorPrice(Number(e.target.value))}
         />
         <p className="ladder-hint">{t("Säljs snabbt vid {pris}", { pris: formatSek(fastSale) })}</p>
+      </div>
+
+      {/* Takten. Samma reglage som priserna, så att de tre läses som en och samma plan: var den
+          börjar, var den slutar, och hur fort den går däremellan. Stegen nedanför räknas om direkt. */}
+      <div className="ladder-row">
+        <div className="ladder-row-head">
+          <span className="ladder-row-label">{t("Sänkning per vecka")}</span>
+          <AmountField label={t("Sänkning per vecka")} value={pct} unit="%" normalize={clampWeeklyDropPct} onCommit={setDropPct} />
+        </div>
+        <input
+          className="ladder-slider ladder-slider-pct"
+          type="range"
+          min={WEEKLY_DROP_MIN_PCT}
+          max={WEEKLY_DROP_MAX_PCT}
+          step={1}
+          value={pct}
+          aria-label={t("Sänkning per vecka")}
+          onChange={(e) => setDropPct(Number(e.target.value))}
+        />
+        <p className="ladder-hint">
+          {pct === defaultPct
+            ? t("Förvalet. Lägre takt ger varje pris mer tid, högre når golvet fortare.")
+            : t("Förvalet är {andel} %. Lägre takt ger varje pris mer tid, högre når golvet fortare.", { andel: defaultPct })}
+        </p>
       </div>
 
       <ol className="ladder-steps">
@@ -170,7 +214,7 @@ export default function PriceLadderPicker({
             ? t("Prisspannet kunde inte sparas: {fel}", { fel: error ?? "" })
             : status === "saved"
               ? t("Prisspannet är sparat och används när annonsen läggs upp.")
-              : " "}
+              : " "}
       </p>
     </section>
   );
@@ -189,16 +233,22 @@ function visibleRungs(rungs: number[]): Array<{ week: number; price: number } | 
 }
 
 /**
- * Beloppsfältet. Håller ett eget utkast medan man skriver — utan det går sista siffran inte att radera,
- * eftersom en tom ruta annars läses som noll och genast klampas tillbaka till lägsta tillåtna pris.
+ * Talfältet — kronor eller procent. Håller ett eget utkast medan man skriver: utan det går sista
+ * siffran inte att radera, eftersom en tom ruta annars läses som noll och genast klampas tillbaka
+ * till lägsta tillåtna värde. `normalize` är det som gör talet till ett giltigt värde när man
+ * lämnar fältet (jämna tior för priser, 1–50 för takten).
  */
-function PriceField({
+function AmountField({
   label,
   value,
+  unit,
+  normalize,
   onCommit,
 }: {
   label: string;
   value: number;
+  unit: string;
+  normalize: (value: number) => number;
   onCommit: (value: number) => void;
 }) {
   const [draft, setDraft] = useState<string | null>(null);
@@ -206,7 +256,7 @@ function PriceField({
   const commit = () => {
     if (draft !== null && draft !== "") {
       const parsed = Number(draft);
-      if (Number.isFinite(parsed)) onCommit(roundToRung(parsed));
+      if (Number.isFinite(parsed)) onCommit(normalize(parsed));
     }
     setDraft(null);
   };
@@ -225,7 +275,7 @@ function PriceField({
           if (e.key === "Enter") e.currentTarget.blur();
         }}
       />
-      <span className="ladder-amount-unit">kr</span>
+      <span className="ladder-amount-unit">{unit}</span>
     </span>
   );
 }

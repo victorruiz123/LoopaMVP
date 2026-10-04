@@ -639,6 +639,14 @@ export const FLOW: Record<string, Translation> = {
   "Säljs snabbt vid {pris}": { en: "Sells quickly at {pris}", fr: "Vente rapide à {pris}" },
   Nu: { en: "Now", fr: "Auj." },
   "v. {vecka}": { en: "wk {vecka}", fr: "sem. {vecka}" },
+  "Förvalet. Lägre takt ger varje pris mer tid, högre når golvet fortare.": {
+    en: "The default. A slower pace gives each price more time; a faster one reaches the floor sooner.",
+    fr: "La valeur par défaut. Un rythme plus lent laisse plus de temps à chaque prix ; un rythme plus rapide atteint le plancher plus tôt.",
+  },
+  "Förvalet är {andel} %. Lägre takt ger varje pris mer tid, högre når golvet fortare.": {
+    en: "The default is {andel}%. A slower pace gives each price more time; a faster one reaches the floor sooner.",
+    fr: "La valeur par défaut est {andel} %. Un rythme plus lent laisse plus de temps à chaque prix ; un rythme plus rapide atteint le plancher plus tôt.",
+  },
   "Startpriset är redan ditt lägsta — annonsen sänks inte.": {
     en: "The starting price is already your lowest — the listing won't drop.",
     fr: "Le prix de départ est déjà votre plancher — l'annonce ne baissera pas.",

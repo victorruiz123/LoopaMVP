@@ -11,8 +11,21 @@ import type { PriceEstimate } from "../types";
  * beslut.
  */
 
-/** 15 % i veckan — förvalet hela funktionen är byggd kring. */
+/** 15 % i veckan — förvalet hela funktionen är byggd kring. Säljaren kan välja en annan takt per annons. */
 export const WEEKLY_DROP = 0.15;
+
+/**
+ * Takten säljaren får välja, i hela procent per vecka. Samma gränser som servern (makePriceLadder):
+ * under 1 % står priset i praktiken stilla, över 50 % är ett ras ingen menar.
+ */
+export const WEEKLY_DROP_MIN_PCT = 1;
+export const WEEKLY_DROP_MAX_PCT = 50;
+
+/** En takt i hela procent inom gränserna. Allt annat läser som förvalet. */
+export function clampWeeklyDropPct(value: number): number {
+  if (!Number.isFinite(value)) return Math.round(WEEKLY_DROP * 100);
+  return Math.min(WEEKLY_DROP_MAX_PCT, Math.max(WEEKLY_DROP_MIN_PCT, Math.round(value)));
+}
 
 const ROUNDING = 10;
 

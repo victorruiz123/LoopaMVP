@@ -130,14 +130,14 @@ export const LEGAL: Record<string, Translation> = {
     fr: "Vous êtes donc tenu de relire chaque proposition générée automatiquement et de corriger ce qui est inexact avant de publier l'annonce. Si un dommage manque à la liste, ajoutez-le ; si un dommage inexistant y figure, retirez-le ; si le modèle ou les dimensions sont erronés, modifiez-les. Publier l'annonce vaut attestation de sa conformité au meuble que vous vendez — le fait que la proposition vienne de nous n'est pas une excuse après coup.",
   },
   "Priset sänks automatiskt": { en: "The price drops automatically", fr: "Le prix baisse automatiquement" },
-  "Lägger du ut en möbel sätter du ett startpris och ett lägsta pris. Ligger annonsen osåld sänks priset därefter automatiskt med": {
-    en: "When you list a piece you set a starting price and a lowest price. If the listing stays unsold, the price is then lowered automatically by",
-    fr: "En mettant un meuble en vente, vous fixez un prix de départ et un prix plancher. Si l'annonce reste invendue, le prix baisse ensuite automatiquement de",
+  "Lägger du ut en möbel sätter du ett startpris, ett lägsta pris och en takt. Ligger annonsen osåld sänks priset därefter automatiskt med": {
+    en: "When you list a piece you set a starting price, a lowest price and a pace. If the listing stays unsold, the price is then lowered automatically by",
+    fr: "En mettant un meuble en vente, vous fixez un prix de départ, un prix plancher et un rythme. Si l'annonce reste invendue, le prix baisse ensuite automatiquement",
   },
-  "15 % i veckan": { en: "15% a week", fr: "15 % par semaine" },
-  "tills ditt lägsta pris är nått — sedan står det stilla. Du väljer golvet, så du bestämmer var det slutar; sänkningen däremellan sköter sig själv och kräver ingen bekräftelse från dig.": {
-    en: "until your lowest price is reached — then it stands still. You choose the floor, so you decide where it ends; the drops in between look after themselves and need no confirmation from you.",
-    fr: "jusqu'à atteindre votre prix plancher — puis il n'évolue plus. Vous choisissez le plancher, donc vous décidez où cela s'arrête ; les baisses intermédiaires se font seules et ne requièrent aucune confirmation.",
+  "den takt du valt, förvalt 15 % i veckan,": { en: "the pace you chose, 15% a week by default,", fr: "au rythme que vous avez choisi, 15 % par semaine par défaut," },
+  "tills ditt lägsta pris är nått — sedan står det stilla. Du väljer golvet och takten, så du bestämmer var det slutar och hur fort det går dit; sänkningen däremellan sköter sig själv och kräver ingen bekräftelse från dig.": {
+    en: "until your lowest price is reached — then it stands still. You choose the floor and the pace, so you decide where it ends and how fast it gets there; the drops in between look after themselves and need no confirmation from you.",
+    fr: "jusqu'à atteindre votre prix plancher — puis il n'évolue plus. Vous choisissez le plancher et le rythme, donc vous décidez où cela s'arrête et à quelle vitesse ; les baisses intermédiaires se font seules et ne requièrent aucune confirmation.",
   },
   "När annonsen väl ligger uppe går prisspannet inte längre att ändra i appen. Vill du ändra det behöver annonsen tas ned.": {
     en: "Once the listing is up, the price range can no longer be changed in the app. To change it, the listing has to be taken down.",

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { PriceLadder } from "../types";
 import { savePricePlan } from "../api";
 import { formatSek } from "../lib/price";
-import { ladderRungs, roundToRung } from "../lib/priceLadder";
+import { WEEKLY_DROP_MAX_PCT, WEEKLY_DROP_MIN_PCT, ladderRungs, roundToRung } from "../lib/priceLadder";
 import { useLang, useT } from "../lib/i18n";
 
 /**
@@ -19,8 +19,9 @@ import { useLang, useT } from "../lib/i18n";
  * jämföra med vet bäst hur fort den vill gå ner.
  */
 
-const MIN_PCT = 1;
-const MAX_PCT = 50;
+// Samma gränser som PriceLadderPicker och servern — se lib/priceLadder.ts.
+const MIN_PCT = WEEKLY_DROP_MIN_PCT;
+const MAX_PCT = WEEKLY_DROP_MAX_PCT;
 
 function heltal(v: string): number | null {
   const siffror = v.replace(/[^\d]/g, "");

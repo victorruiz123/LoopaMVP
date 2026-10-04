@@ -79,10 +79,10 @@ export default function TermsText() {
 
       <h2>{t("Priset sänks automatiskt")}</h2>
       <p>
-        {t("Lägger du ut en möbel sätter du ett startpris och ett lägsta pris. Ligger annonsen osåld sänks priset därefter automatiskt med")}{" "}
-        <strong>{t("15 % i veckan")}</strong>{" "}
+        {t("Lägger du ut en möbel sätter du ett startpris, ett lägsta pris och en takt. Ligger annonsen osåld sänks priset därefter automatiskt med")}{" "}
+        <strong>{t("den takt du valt, förvalt 15 % i veckan,")}</strong>{" "}
         {t(
-          "tills ditt lägsta pris är nått — sedan står det stilla. Du väljer golvet, så du bestämmer var det slutar; sänkningen däremellan sköter sig själv och kräver ingen bekräftelse från dig.",
+          "tills ditt lägsta pris är nått — sedan står det stilla. Du väljer golvet och takten, så du bestämmer var det slutar och hur fort det går dit; sänkningen däremellan sköter sig själv och kräver ingen bekräftelse från dig.",
         )}
       </p>
       <p>
