@@ -145,6 +145,11 @@ export interface Product {
   model: string | null;
   /** Nyckeln ur CATEGORIES, aldrig generatorns fritext. Se normalize.ts. */
   categorySlug: string;
+  /**
+   * Sant när kategorin är KÄND — ett nyckelord träffade, eller admin valde den. Falskt eller saknat när
+   * Övrigt bara är reserven för "vi vet inte". Avgör om Övrigt räknas som saknad kategori (state.ts).
+   */
+  categoryRecognized?: boolean;
   color: string | null;
   material: string | null;
   dimensions: Dimensions;

@@ -19,7 +19,7 @@ import type { ConditionJob, ConditionResult, GeneratedListing, ListingAttribute 
 import { damageStands } from "../pipeline/grade.js";
 import { loopaIdFor } from "../loopaId.js";
 import { cutoutOf, harPubliktKort } from "../publicCard.js";
-import { brandSlug, fold, resolveCategorySlug } from "./catalog.js";
+import { brandSlug, fold, matchCategorySlug, resolveCategorySlug } from "./catalog.js";
 import type { Dimensions, Product, ProductCondition, ProductState } from "./types.js";
 import { harGodkantOmslag } from "../pipeline/bild/omslag.js";
 
@@ -340,14 +340,26 @@ export function imageUrlOf(job: ConditionJob, loopaId: string): string | null {
  * `fraktFor`), och Tradera-, Blocket- och annonstexten ska välja samma kategori som butiken visar.
  */
 export function categorySlugOf(job: ConditionJob): string {
+  return resolveCategorySlug(kategoriSignaler(job));
+}
+
+/**
+ * Kände vi igen vad möbeln är? Falskt när kategorin blev Övrigt för att INGET ord träffade — sant för
+ * en spegel, en matta eller en tavla, som hör hemma i Övrigt med flit. Se shopReadiness.
+ */
+export function kategoriIgenkand(job: ConditionJob): boolean {
+  return matchCategorySlug(kategoriSignaler(job)) !== null;
+}
+
+function kategoriSignaler(job: ConditionJob) {
   const listing = job.result?.listing?.result ?? job.listing?.result ?? job.pendingListing?.result ?? null;
   const model = listing?.identity?.exactProduct ?? job.selected?.model ?? job.identity?.model ?? null;
-  return resolveCategorySlug({
+  return {
     type: attr(listing?.attributes ?? [], /^(type|typ|kategori|category)$/i),
     category: listing?.identity?.category ?? null,
     title: listing?.listing?.title ?? null,
     model,
-  });
+  };
 }
 
 /**
@@ -392,6 +404,7 @@ export function jobToProduct(job: ConditionJob, state: ProductState): Product | 
     brand,
     model,
     categorySlug,
+    categoryRecognized: kategoriIgenkand(job),
     color: normalizeColor(attr(attributes, COLOR_KEY)),
     material: normalizeMaterial(attr(attributes, MATERIAL_KEY)),
     dimensions: parseDimensionsMm(attributes, categorySlug),

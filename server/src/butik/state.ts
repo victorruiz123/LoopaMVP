@@ -60,7 +60,9 @@ export function shopReadiness(product: Product): { ready: boolean; missing: stri
   if (!product.condition) missing.push("skickbetyg");
   if (product.priceSek === null) missing.push("pris");
   if (!product.brand && !product.model) missing.push("märke eller modell");
-  if (product.categorySlug === "ovrigt") missing.push("kategori");
+  // Övrigt är en riktig kategori — speglar, mattor, tavlor — så länge vi VET att möbeln hör hemma
+  // där. Det som saknas är bara den Övrigt som blev kvar när inget ord träffade.
+  if (product.categorySlug === "ovrigt" && !product.categoryRecognized) missing.push("kategori");
   // Bild ELLER mått: utan foto ritas möbeln ur måtten, samma stand-in som sanningskortet visar
   // (web/src/lib/furnitureModel.ts). Utan båda finns ingenting att visa i rutnätet.
   const renderable = product.dimensions.widthMm !== null || product.dimensions.heightMm !== null;

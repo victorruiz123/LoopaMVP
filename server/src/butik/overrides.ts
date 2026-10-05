@@ -259,6 +259,8 @@ export function tillampaPaProdukt(product: Product, o: Overstyrning | undefined 
     brand: valj(o, "brand", product.brand),
     model: valj(o, "model", product.model),
     categorySlug: valj(o, "categorySlug", product.categorySlug) || product.categorySlug,
+    // Admin som väljer en kategori — även Övrigt — har bestämt vad möbeln är.
+    categoryRecognized: (harSatt(o, "categorySlug") && !!o.categorySlug) || product.categoryRecognized,
     color: valj(o, "color", product.color),
     material: valj(o, "material", product.material),
     retailPriceSek: valj(o, "retailPriceSek", product.retailPriceSek),

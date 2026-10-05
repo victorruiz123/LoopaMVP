@@ -156,18 +156,30 @@ export function fold(text: string): string {
  * utvägen. Ett modellnamn som "NORDVIKEN" eller "Lamino" matchar inget nyckelord alls och faller
  * därför igenom till nästa signal i stället för att bli en egen kategori.
  */
-export function resolveCategorySlug(signals: {
+export function resolveCategorySlug(signals: CategorySignals): string {
+  return matchCategorySlug(signals) ?? "ovrigt";
+}
+
+type CategorySignals = {
   type?: string | null;
   category?: string | null;
   title?: string | null;
   model?: string | null;
-}): string {
+};
+
+/**
+ * Samma val, men null när INGEN signal träffade ett nyckelord.
+ *
+ * Skillnaden mellan "vi vet att det är en spegel, och speglar ligger i Övrigt" och "vi vet inte vad
+ * det är, så det fick bli Övrigt". Den första är en kategori; den andra saknar en. Se shopReadiness.
+ */
+export function matchCategorySlug(signals: CategorySignals): string | null {
   for (const raw of [signals.type, signals.category, signals.title, signals.model]) {
     if (!raw) continue;
     const hit = matchKeyword(fold(raw));
     if (hit) return hit;
   }
-  return "ovrigt";
+  return null;
 }
 
 function matchKeyword(folded: string): string | null {

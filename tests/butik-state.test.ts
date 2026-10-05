@@ -192,6 +192,13 @@ test("de 67 jobben utan annons hålls utanför rutnätet, med skälet utskrivet"
   assert.deepEqual(r.missing, ["pris", "märke eller modell", "kategori", "bild eller mått"]);
 });
 
+test("en spegel i Övrigt har en kategori — det är Övrigt utan igenkänning som saknar en", () => {
+  const spegel = { ...baseProduct, categorySlug: "ovrigt", categoryRecognized: true };
+  assert.deepEqual(shopReadiness(spegel), { ready: true, missing: [] });
+  const okand = { ...baseProduct, categorySlug: "ovrigt", categoryRecognized: false };
+  assert.deepEqual(shopReadiness(okand).missing, ["kategori"]);
+});
+
 test("utan foto räcker måtten — möbeln ritas ur dem", () => {
   const noPhoto = { ...baseProduct, imageUrl: null };
   assert.equal(shopReadiness(noPhoto).ready, true);
