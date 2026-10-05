@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
-import { getAnnons, imageUrl, patchAnnons } from "../api";
+import { getAnnons, imageUrl, patchAnnons, startaGranskning } from "../api";
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan, KanalPrisLage } from "../types";
+import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsGranskning, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan, KanalPrisLage } from "../types";
 
 /**
  * En annons, hela vägen ner — och vägen att ändra den.
@@ -184,6 +184,9 @@ export default function AdminAdScreen({
       <PrisKanaler annons={annons} sparar={sparar} skicka={skicka} />
 
       <PrisForm annons={annons} sparar={sparar} skicka={skicka} />
+
+      {/* ---------------- AI-granskningen ---------------- */}
+      <AiGranskning loopaId={annons.id} forsta={annons.granskningDetalj ?? null} />
 
       {/* ---------------- Publiceringen ---------------- */}
       {/*
@@ -1220,5 +1223,122 @@ function PostnummerFalt({
         </p>
       )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// AI-granskningen
+// ---------------------------------------------------------------------------
+
+const OMRADE: Record<AnnonsGranskning["problem"][number]["omrade"], string> = {
+  beskrivning: "Beskrivning",
+  rubrik: "Rubrik",
+  kategori: "Kategori",
+  bilder: "Bilder",
+  postnummer: "Postnummer",
+  ovrigt: "Övrigt",
+};
+
+const VERKTYGSNAMN: Record<string, string> = {
+  las_annonsen: "Läste annonsen",
+  visa_bilder: "Tittade på bilder",
+  lista_kategorier: "Jämförde kategorierna",
+  kontrollera_postnummer: "Kontrollerade postnumret",
+  lamna_rekommendation: "Lämnade rekommendation",
+};
+
+/**
+ * Annonsgranskarens besked: borde annonsen godkännas, och i så fall inte — varför.
+ *
+ * EN REKOMMENDATION, INGET BESLUT. Rutan har ingen godkänn-knapp; den står ovanför publiceringen så
+ * att den läses innan någon trycker där. Stegen agenten tog ligger hopfällda under, för den som vill
+ * se varför den kom fram till det den kom fram till.
+ *
+ * Följer en pågående körning på egen hand, utan att ladda om resten av sidan — ett formulär som någon
+ * håller på att fylla i ska inte skrivas över av en granskning som blev klar.
+ */
+function AiGranskning({ loopaId, forsta }: { loopaId: string; forsta: AnnonsGranskning | null }) {
+  const [g, setG] = useState<AnnonsGranskning | null>(forsta);
+  const [startar, setStartar] = useState(false);
+  const [fel, setFel] = useState<string | null>(null);
+  const pagar = startar || g?.status === "pagar";
+
+  useEffect(() => setG(forsta), [forsta]);
+
+  useEffect(() => {
+    if (!pagar) return;
+    const t = window.setInterval(() => {
+      getAnnons(loopaId)
+        .then((a) => {
+          const ny = a.granskningDetalj ?? null;
+          setG(ny);
+          if (ny && ny.status !== "pagar") setStartar(false);
+        })
+        .catch(() => {});
+    }, 3000);
+    return () => window.clearInterval(t);
+  }, [pagar, loopaId]);
+
+  const starta = async () => {
+    setFel(null);
+    setStartar(true);
+    try {
+      await startaGranskning(loopaId);
+    } catch (err) {
+      setStartar(false);
+      setFel(err instanceof Error ? err.message : "Granskningen kunde inte startas.");
+    }
+  };
+
+  const klar = g?.status === "klar";
+  const godkann = klar && g?.beslut === "godkann";
+
+  return (
+    <section className={`card-block ai-granskning${klar ? (godkann ? " ai-ok" : " ai-nej") : ""}`}>
+      <h2 className="profile-section-title">AI-granskning</h2>
+      {pagar ? (
+        <p className="admin-note">
+          Agenten läser annonsen… {g?.steg.length ? `${g.steg.length} steg hittills, senast: ${VERKTYGSNAMN[g.steg[g.steg.length - 1].verktyg] ?? g.steg[g.steg.length - 1].verktyg}.` : ""}
+        </p>
+      ) : !g ? (
+        <p className="admin-note">Ingen granskning än. Agenten läser annonsen som en människa och rekommenderar om den borde godkännas — den publicerar ingenting själv.</p>
+      ) : g.status === "fel" ? (
+        <p className="public-card-error">Granskningen blev inte klar: {g.fel}</p>
+      ) : (
+        <>
+          <p className="ai-beslut">{godkann ? "✓ Borde godkännas" : "✗ Borde inte godkännas"}</p>
+          {g.sammanfattning && <p>{g.sammanfattning}</p>}
+          {g.problem.length > 0 && (
+            <ul className="ai-problem">
+              {g.problem.map((p, i) => (
+                <li key={i}>
+                  <strong>{OMRADE[p.omrade] ?? p.omrade}:</strong> {p.vad}
+                  {p.forslag && <span className="ai-forslag"> → {p.forslag}</span>}
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+      {g && g.steg.length > 0 && !pagar && (
+        <details className="ai-steg">
+          <summary>
+            Så kom agenten fram till det ({g.steg.length} steg, {datum(g.klar ?? g.startad)}
+            {g.startadAv === "auto" ? ", startad automatiskt" : ""})
+          </summary>
+          <ol>
+            {g.steg.map((s, i) => (
+              <li key={i}>
+                {VERKTYGSNAMN[s.verktyg] ?? s.verktyg} — {s.resultat}
+              </li>
+            ))}
+          </ol>
+        </details>
+      )}
+      {fel && <p className="public-card-error">{fel}</p>}
+      <button className="btn btn-outline" disabled={pagar} onClick={() => void starta()}>
+        {pagar ? "Granskar…" : g ? "Granska igen" : "Låt AI granska annonsen"}
+      </button>
+    </section>
   );
 }

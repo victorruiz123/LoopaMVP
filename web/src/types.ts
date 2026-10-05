@@ -886,6 +886,22 @@ export type AnnonsLage =
   /** Säljaren har tagit bort annonsen. Möbeln finns inte utåt längre — raden är historik. */
   | "borttagen";
 
+/** Annonsgranskaren (server/src/granskning/). Speglar store.ts för hand. */
+export interface AnnonsGranskning {
+  loopaId: string;
+  status: "pagar" | "klar" | "fel";
+  beslut: "godkann" | "godkann_inte" | null;
+  sammanfattning: string | null;
+  problem: Array<{ omrade: "beskrivning" | "rubrik" | "kategori" | "bilder" | "postnummer" | "ovrigt"; vad: string; forslag: string }>;
+  steg: Array<{ verktyg: string; argument: Record<string, unknown>; resultat: string; tid: string }>;
+  fel: string | null;
+  modell: string;
+  tokens: number;
+  startad: string;
+  klar: string | null;
+  startadAv: string;
+}
+
 export interface AdminAnnonsRad {
   id: string;
   jobId: string;
@@ -931,6 +947,8 @@ export interface AdminAnnonsRad {
   /** Klick delat med visningar + listvisningar. Null när ingen sett annonsen. */
   ctr: number | null;
   ordrar: number;
+  /** AI-granskningens senaste besked. Null = aldrig granskad. */
+  granskning?: { status: AnnonsGranskning["status"]; beslut: AnnonsGranskning["beslut"] } | null;
 }
 
 export interface AnnonsOverstyrning {
@@ -1052,6 +1070,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   }>;
   progress: { stage: string; pct?: number } | null;
   error: string | null;
+  /** Annonsgranskarens senaste körning. Saknas från äldre servrar. */
+  granskningDetalj?: AnnonsGranskning | null;
 }
 
 export interface AdminAnnonser {

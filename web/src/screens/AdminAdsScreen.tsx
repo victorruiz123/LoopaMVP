@@ -290,6 +290,13 @@ export default function AdminAdsScreen({
                     {r.titel}
                     <span className={`annons-lage annons-lage-${r.lage}`}>{LAGE_ETIKETT[r.lage]}</span>
                     {r.overstyrd && <span className="admin-tag">Rättad</span>}
+                    {/* AI-granskningens besked, så att kön går att läsa utan att öppna varje annons. */}
+                    {r.granskning?.status === "klar" && (
+                      <span className={`admin-tag ${r.granskning.beslut === "godkann" ? "ai-tag-ok" : "ai-tag-nej"}`}>
+                        {r.granskning.beslut === "godkann" ? "AI: godkänn" : "AI: godkänn inte"}
+                      </span>
+                    )}
+                    {r.granskning?.status === "pagar" && <span className="admin-tag">AI granskar…</span>}
                   </span>
                   <span className="card-row-meta">
                     {[

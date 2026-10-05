@@ -58,6 +58,7 @@ import { markApproved, traderaAdBlocks } from "./integrations/tradera/publish.js
 import { renderAdPlain, resolveAdPrice } from "./adContent.js";
 import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
 import { normaliseraPostnummer, saljarensPostnummer } from "./integrations/blocket/saljare.js";
+import { allaGranskningar, hamtaGranskning, type AnnonsGranskning } from "./granskning/store.js";
 import { blocketPaket, type BlocketPaket } from "./integrations/blocket/publish.js";
 import { channelSummaries, listingChannelStatus, type ListingChannelStatus } from "./integrations/facebook/admin.js";
 import { onListingLive } from "./integrations/facebook/queue.js";
@@ -138,6 +139,8 @@ export interface AdminAnnonsRad {
   /** Klick delat med visningar. Null när ingen sett annonsen — noll vore en påstådd nolla. */
   ctr: number | null;
   ordrar: number;
+  /** AI-granskningens senaste besked, för märket i listan. Null = aldrig granskad. Se granskning/agent.ts. */
+  granskning: { status: AnnonsGranskning["status"]; beslut: AnnonsGranskning["beslut"] } | null;
 }
 
 export interface AdminAnnonsDetalj extends AdminAnnonsRad {
@@ -210,6 +213,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   ordrarRader: Order[];
   progress: { stage: string; pct?: number } | null;
   error: string | null;
+  /** Annonsgranskarens senaste körning i sin helhet: beslutet, problemen och stegen den tog. */
+  granskningDetalj: AnnonsGranskning | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -341,6 +346,7 @@ function radAv(
     statistik,
     ctr: ctrAv(statistik),
     ordrar,
+    granskning: null,
   };
 }
 
@@ -369,6 +375,7 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     // Facebook-lagret läses en gång för hela listan, som ordrarna nedan. Faller det står raderna kvar utan Facebook.
     channelSummaries().catch(() => new Map()),
   ]);
+  const granskningar = await allaGranskningar();
   const epost = await epostPerKonto();
   const jobs = [...aktiva, ...borttagna].sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
   const byId = new Map(records.map((r) => [r.id, r]));
@@ -391,9 +398,11 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     const overstyrning = overstyrningar.get(id);
     const harlett = jobToProduct(job, record?.state ?? "draft");
     const produkt = harlett ? overrides.tillampaPaProdukt(harlett, overstyrning) : null;
-    rader.push(
-      radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0, epost, facebook.get(id)),
-    );
+    const g = granskningar.get(id);
+    rader.push({
+      ...radAv(job, record, overstyrning, produkt, statistik.get(id) ?? tomStatistik(), ordrarPerId.get(id) ?? 0, epost, facebook.get(id)),
+      granskning: g ? { status: g.status, beslut: g.beslut } : null,
+    });
   }
 
   return { rader, summering: summera(rader) };
@@ -476,7 +485,9 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     (): ListingChannelStatus => ({ marketplace: null, groups: [], groupsTotal: 0, groupsPublished: 0, groupsWouldPublish: 0, groupSelection: null }),
   );
 
+  const granskningDetalj = await hamtaGranskning(id);
   return {
+    granskningDetalj,
     ...radAv(job, record, overstyrning, produkt, statistik, ordrarRader.length, epost, {
       marketplace: facebook.marketplace?.status ?? null,
       groupsPublished: facebook.groupsPublished,
@@ -502,6 +513,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     ordrarRader,
     progress: job.progress ? { stage: job.progress.stage, pct: (job.progress as { pct?: number }).pct } : null,
     error: job.error,
+    granskning: granskningDetalj ? { status: granskningDetalj.status, beslut: granskningDetalj.beslut } : null,
   };
 }
 

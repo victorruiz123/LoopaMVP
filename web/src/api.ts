@@ -450,6 +450,11 @@ export async function getAnnons(loopaId: string): Promise<AdminAnnonsDetalj> {
  * PATCH: kroppen är en delmängd. Ett fält som inte nämns lämnas i fred, och `null` betyder
  * uttryckligen tomt — skillnaden är hela överstyrningslagret (server/src/butik/overrides.ts).
  */
+/** Startar annonsgranskaren. Kör i bakgrunden; resultatet läses ur annonsens detalj. */
+export async function startaGranskning(loopaId: string): Promise<void> {
+  await json(await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}/granska`, { method: "POST" }));
+}
+
 export async function patchAnnons(loopaId: string, andring: AnnonsAndring): Promise<AdminAnnonsDetalj> {
   return json(
     await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}`, {

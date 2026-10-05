@@ -833,6 +833,11 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
       .catch((err) => console.warn(`[referral] inbjudan kunde inte belönas för ${jobId}:`, err instanceof Error ? err.message : err));
   }
   console.info(`[tradera] job ${jobId} väntar på godkännande — ${readiness.plan.loopaId} "${readiness.plan.title}"`);
+  // Annonsgranskaren läser annonsen medan den står i kön, så att rekommendationen finns när admin
+  // öppnar den. Bara en rekommendation — se granskning/agent.ts. Får aldrig fälla säljarens svar.
+  void import("./granskning/agent.js")
+    .then(({ granskaAnnons }) => granskaAnnons(readiness.plan.loopaId, "auto"))
+    .catch((err) => console.warn(`[granskning] kunde inte starta för ${jobId}:`, err instanceof Error ? err.message : err));
   void notifyAdminsOfPending(readiness.plan.loopaId, readiness.plan.title, readiness.plan.price);
   sendJson(res, 202, await traderaState(job));
 }
@@ -2267,6 +2272,18 @@ const server = http.createServer(async (req, res) => {
          * Ändringen. PATCH och inte PUT: kroppen är en delmängd, och ett fält som inte nämns ska
          * lämnas i fred — skillnaden mellan "rör inte" och "sätt till tomt" är hela överstyrningen.
          */
+        /**
+         * Annonsgranskaren, startad för hand. Kör i bakgrunden — en granskning tar en halv minut eller
+         * mer — och svaret är läget just nu. Panelen läser resultatet ur annonsens detalj.
+         */
+        if (segments[2] === "annonser" && segments.length === 5 && segments[4] === "granska" && req.method === "POST") {
+          const { annonsDetalj } = await import("./adminAnnonser.js");
+          const detalj = await annonsDetalj(segments[3]);
+          if (!detalj) return sendJson(res, 404, { error: "Annonsen finns inte." });
+          const { granskaAnnons, granskningPagar } = await import("./granskning/agent.js");
+          if (!granskningPagar(detalj.id)) void granskaAnnons(detalj.id, identity.id);
+          return sendJson(res, 202, { status: "pagar" });
+        }
         if (segments[2] === "annonser" && segments.length === 4 && req.method === "PATCH") {
           const { andraAnnons, AndringsFel } = await import("./adminAnnonser.js");
           try {

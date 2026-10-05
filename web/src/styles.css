@@ -5202,3 +5202,18 @@ body:has(.grind) .consent { display: none; }
 .fb-regler { width: 100%; box-sizing: border-box; font: inherit; font-size: var(--fs-sm); padding: 8px 10px; border: 1px solid var(--border); border-radius: var(--r-sm); background: var(--field); color: var(--ink); resize: vertical; }
 .annons-logg li.fb-rad-fel { background: #F9E3E1; }
 .annons-logg li.fb-rad-varning { background: #FBEEDC; }
+
+/* AI-granskningen på annonssidan (AdminAdScreen, AiGranskning). Färgen säger beskedet innan texten läses. */
+.ai-granskning { border-left: 4px solid var(--hairline); }
+.ai-granskning.ai-ok { border-left-color: var(--green); }
+.ai-granskning.ai-nej { border-left-color: var(--danger); }
+.ai-beslut { margin: 0 0 6px; font-weight: 700; font-size: var(--fs-lg); }
+.ai-ok .ai-beslut { color: var(--green-dark); }
+.ai-nej .ai-beslut { color: var(--danger-dark); }
+.ai-problem { margin: 8px 0; padding-left: 18px; display: grid; gap: 6px; }
+.ai-forslag { color: var(--muted); }
+.ai-steg { margin: 8px 0 12px; font-size: var(--fs-sm); color: var(--muted); }
+.ai-steg summary { cursor: pointer; }
+.ai-steg ol { margin: 6px 0 0; padding-left: 20px; }
+.admin-tag.ai-tag-ok { background: var(--green-light); color: var(--green-dark); }
+.admin-tag.ai-tag-nej { background: var(--danger-light); color: var(--danger-dark); }
