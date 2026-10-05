@@ -69,7 +69,7 @@ test("grupp-inlägget öppnar med rubrik och pris, och slutar med Loopa-länken"
   const text = groupPostCopy(r.listing);
   const rader = text.split("\n");
   // Produktsidans titel (butik/normalize.ts titleOf), inte annonsgeneratorns rubrik: det är den sidan länken leder till.
-  assert.match(rader[0], /^Sweef Cloud 3-sits soffa säljes – 6.500 kr$/);
+  assert.match(rader[0], /^Sweef Cloud 3-sits soffa i grå sammet säljes – 6.500 kr$/);
   assert.match(text, /Skick: Mycket gott skick/);
   assert.match(text, /Fler bilder och köp via Loopa:\nhttps:\/\/loopa\.nu\/butik\/objekt\//);
   assert.ok(!/\n{3,}/.test(text), "inga tredubbla radbrytningar");

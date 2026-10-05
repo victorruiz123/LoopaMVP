@@ -268,7 +268,7 @@ export async function driveMarketplaceForm(page: Page, input: MarketplaceRunInpu
   const moderation: ModerationState | null = FACEBOOK_REVIEW.test(await bodyText(page)) ? "FACEBOOK_REVIEW" : null;
   if (moderation) observations.push("Facebook: annonsen granskas innan andra ser den (standardgranskning).");
 
-  const url = await resolveListingUrl(page);
+  const url = await resolveListingUrl(page, copy.title);
   const after = await screenshot(page, "mp_efter_publicera");
   if (url) {
     await input.onPhase("verified");
@@ -332,7 +332,7 @@ async function leaveWithoutPublishing(page: Page, logga: Logga): Promise<void> {
  * inlägg" — utan länkas som /commerce/listing/<id>/ tills granskningen släpper. Samma fynd gjordes
  * samma dag för säljinlägget i grupper (publisher.ts, findInFeed) men portades aldrig hit.
  */
-async function resolveListingUrl(page: Page): Promise<string | null> {
+async function resolveListingUrl(page: Page, title: string): Promise<string | null> {
   const itemOrCommerce = `${FB.marketplace.itemLink}, ${FB.marketplace.commerceLink}`;
   const now = page.url();
   if (/\/(?:marketplace\/item|commerce\/listing)\/\d+/.test(now)) return now.split("?")[0];
@@ -343,13 +343,46 @@ async function resolveListingUrl(page: Page): Promise<string | null> {
   }
   // Dina annonser: den nyaste överst.
   await page.goto(`${facebookBaseUrl()}/marketplace/you/selling`, { waitUntil: "domcontentloaded", timeout: 20_000 }).catch(() => undefined);
-  await page.waitForTimeout(2500);
+  await page.waitForTimeout(4000);
   const first = page.locator(itemOrCommerce).first();
   if ((await first.count()) > 0) {
     const href = await first.getAttribute("href").catch(() => null);
     if (href) return new URL(href, facebookBaseUrl()).toString().split("?")[0];
   }
-  return null;
+  return await openOwnListingCard(page, title);
+}
+
+/**
+ * Korten i "Dina inlägg" bär INGEN länk (läst 2026-10-05): de är klickbara rutor, och adressen syns
+ * först i rutan som öppnas när rubriken klickas. Alla tre Marketplace-annonser servern publicerat
+ * hamnade därför i "kontrollera för hand" fast de låg ute. Klicket är navigering, ingen skrivning.
+ *
+ * DET NYASTE KORTET med vår rubrik OCH "Publicerad på Marketplace": samma möbel har också kort per
+ * grupp ("Publicerad i <grupp>"), och en äldre annons med samma rubrik ligger längre ner.
+ */
+async function openOwnListingCard(page: Page, title: string): Promise<string | null> {
+  const index = await page
+    .locator("div[role='main'] span[dir='auto']")
+    // Ingen namngiven hjälpfunktion här inne: tsx lindar den i __name(), som inte finns i webbläsaren,
+    // och då kastar hela funktionen — tyst, via catch nedan.
+    .evaluateAll((spans: Element[], want: string) => {
+      for (let i = 0; i < spans.length; i++) {
+        if ((spans[i].textContent ?? "").replace(/\s+/g, " ").trim() !== want) continue;
+        // Upp till kortet: närmaste förälder som också bär statusraden.
+        let el: Element | null = spans[i];
+        while (el && !/Publicerad/.test(el.textContent ?? "")) el = el.parentElement;
+        if (el && /Publicerad på Marketplace/.test(el.textContent ?? "")) return i;
+      }
+      return -1;
+    }, title.replace(/\s+/g, " ").trim())
+    .catch(() => -1);
+  if (index < 0) return null;
+  await page.locator("div[role='main'] span[dir='auto']").nth(index).click({ timeout: 5000 }).catch(() => undefined);
+  await page.waitForTimeout(4000);
+  const link = page.locator(`[role="dialog"] ${FB.marketplace.itemLink}, [role="dialog"] ${FB.marketplace.commerceLink}`).last();
+  const href = (await link.count()) > 0 ? await link.getAttribute("href").catch(() => null) : null;
+  await page.keyboard.press("Escape").catch(() => undefined);
+  return href ? new URL(href, facebookBaseUrl()).toString().split("?")[0] : null;
 }
 
 /** Facebooks id ur en annons- eller säljinläggsadress. Delad med publisher.ts (grupp-säljinlägget). */

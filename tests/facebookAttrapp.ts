@@ -48,6 +48,12 @@ export interface FbAttrappOptions {
    * /commerce/listing/<id>/, som visar granskningstexten. Se resolveListingUrl i marketplace.ts.
    */
   marketplaceUnderReview?: boolean;
+  /**
+   * "Dina inlägg" som den såg ut 2026-10-05: korten bär INGEN länk. Adressen syns först i rutan som
+   * öppnas när rubriken klickas. Samma möbel har ett kort per grupp ("Publicerad i …") och en äldre
+   * annons med samma rubrik ligger längre ner — bara det nyaste Marketplace-kortet är vårt.
+   */
+  marketplaceCardsOnly?: boolean;
   /** Kontots Marketplace-valuta: "kr" (rätt) eller "$" (fel — så såg det riktiga kontot ut 2026-09-25). */
   marketplaceCurrency?: "kr" | "$";
   groups?: Record<string, AttrappGrupp>;
@@ -345,7 +351,7 @@ if (sell) sell.addEventListener("click", () => {
       if (opts.checkpointOn === "marketplace") return html(CHECKPOINT);
       const restricted = opts.marketplaceRestricted === true;
       const currency = opts.marketplaceCurrency ?? "kr";
-      const underReview = opts.marketplaceUnderReview === true;
+      const underReview = opts.marketplaceUnderReview === true || opts.marketplaceCardsOnly === true;
       const script = `<script>
 function post(path, body) { return fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) }); }
 const CUR = ${JSON.stringify(currency)};
@@ -413,6 +419,26 @@ document.getElementById("next").addEventListener("click", () => {
     }
     if (url.pathname.startsWith("/marketplace/item/")) return html(sida("Annons", `<div role="main"><h1>Din annons är publicerad</h1><a href="${url.pathname}">Visa annonsen</a></div>`));
     if (url.pathname.startsWith("/commerce/listing/")) return html(sida("Säljinlägg", `<div role="main"><h1>Säljinlägget granskas</h1><p>Det här inlägget granskas innan andra ser det (standardgranskning).</p></div>`));
+    if (url.pathname === "/marketplace/you/selling" && opts.marketplaceCardsOnly === true) {
+      const titel = lage.marketplace.at(-1)?.fields.title ?? "Soffa";
+      const kort = (status: string, id: string) =>
+        `<div class="kort"><div><span dir="auto"><span>${titel}</span></span><span dir="auto">6 500 kr</span></div><div><span dir="auto">Aktiv · Publicerad 5/10</span></div><div><span dir="auto">${status}</span></div><template data-id="${id}"></template></div>`;
+      const script = `<script>
+for (const k of document.querySelectorAll(".kort")) {
+  k.querySelector("span[dir=auto] span").addEventListener("click", () => {
+    const id = k.querySelector("template").dataset.id;
+    document.body.insertAdjacentHTML("beforeend", '<div role="dialog"><a href="/marketplace/item/' + id + '/?ref=selling">Visa</a></div>');
+  });
+}
+</script>`;
+      return html(
+        sida(
+          "Dina inlägg",
+          `<div role="main"><h1>Dina inlägg</h1>${kort("Publicerad i Secondhand Stockholm", "9999")}${kort("Publicerad på Marketplace · 0 klick på säljinlägg", "4242")}${kort("Publicerad på Marketplace · 2 klick på säljinlägg", "1111")}</div>`,
+          script,
+        ),
+      );
+    }
     if (url.pathname === "/marketplace/you/selling") {
       const href = opts.marketplaceUnderReview === true ? "/commerce/listing/6543/" : "/marketplace/item/777/";
       const badge = opts.marketplaceUnderReview === true ? "<p>Det här inlägget granskas.</p>" : "";

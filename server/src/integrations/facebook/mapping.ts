@@ -97,7 +97,13 @@ export async function facebookListingFor(rajob: ConditionJob): Promise<ListingRe
   const overstyrning = await hamta(loopaId);
   const product: Product = tillampaPaProdukt(harlett, overstyrning);
 
-  const title = (product.title || adTitle(job)).replace(/\s+/g, " ").trim();
+  /**
+   * ANNONSRUBRIKEN, samma som Tradera och Blocket får ("Brun läderfåtölj från Mio") — med adminens
+   * rättelse, som medRattelser lagt på kopian. Butikens kortrubrik (märke + modell) är byggd för ett
+   * rutnät där kategorin står bredvid; ensam i ett Marketplace-flöde blev den "Mio ." och Facebook
+   * bad själv om en längre rubrik. Kortrubriken är reserven när annonsen saknar rubrik.
+   */
+  const title = (adTitle(job) || product.title).replace(/\s+/g, " ").trim();
   if (!title) return { ok: false, reason: "Annonsen saknar rubrik." };
 
   const price = product.priceSek;

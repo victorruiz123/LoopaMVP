@@ -132,6 +132,13 @@ test("titeln hittar aldrig på ett möbelord ur kategorin", () => {
   assert.equal(titleOf("IKEA", "Jules", null, "x"), "IKEA Jules");
 });
 
+test("en modell utan bokstäver eller siffror är ingen modell", () => {
+  // Mio-fåtöljen 2026-09-27: modelletningen sparade "." och rubriken blev "Mio ." på Facebook.
+  assert.equal(titleOf("Mio", ".", null, "x"), "Mio");
+  assert.equal(titleOf("Mio", " - ", "fåtölj", "x"), "Mio fåtölj");
+  assert.equal(titleOf(".", ".", null, "Brun läderfåtölj"), "Brun läderfåtölj");
+});
+
 test("ett mått som värdet självt kallar bänkhöjd är inte möbelns höjd", () => {
   // NORDVIKEN barstol kom in som height = "62 cm (bänkhöjd)". Nyckeln säger höjd, värdet säger
   // bänkhöjd. Läses den rakt av blir barstolen 62 cm hög.

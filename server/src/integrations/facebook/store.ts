@@ -279,6 +279,39 @@ export async function updateGroupPublication(
   });
 }
 
+/**
+ * Tar en köpost för en körning: QUEUED -> PREPARING i ETT steg inne i låskedjan. Null när posten inte
+ * står i kö längre — någon annan har tagit den, eller den är redan publicerad.
+ *
+ * VARFÖR (2026-10-02–04): ett kövarv tar minuter (skrivpausen är 120 s) men startas varje minut. Varv
+ * två läste samma QUEUED-poster som varv ett, väntade på webbläsaren och körde dem igen — fem möbler
+ * hamnade två gånger i samma grupp, och en post som stod i "kontrollera för hand" skrevs över med
+ * "misslyckad" av varvet efter. Ett anspråk som kontrollerar läget i samma lås som det ändrar det gör
+ * att en post bara kan köras en gång, hur många varv som än läste den.
+ */
+export async function claimMarketplace(listingId: string): Promise<MarketplacePublication | null> {
+  return serialize(async () => {
+    const list = await las<MarketplacePublication[]>(FILES.marketplace, []);
+    const i = list.findIndex((p) => p.listingId === listingId);
+    if (i < 0 || list[i].status !== "QUEUED") return null;
+    list[i] = { ...list[i], status: "PREPARING", phase: "before_publish", attempts: list[i].attempts + 1, attemptedAt: nu(), updatedAt: nu() };
+    await skriv(FILES.marketplace, list);
+    return list[i];
+  });
+}
+
+/** Se `claimMarketplace`. */
+export async function claimGroupPublication(listingId: string, groupId: string): Promise<GroupPublication | null> {
+  return serialize(async () => {
+    const list = await las<GroupPublication[]>(FILES.groupPublications, []);
+    const i = list.findIndex((p) => p.listingId === listingId && p.groupId === groupId);
+    if (i < 0 || list[i].status !== "QUEUED") return null;
+    list[i] = { ...list[i], status: "PREPARING", phase: "before_publish", attempts: list[i].attempts + 1, attemptedAt: nu(), updatedAt: nu() };
+    await skriv(FILES.groupPublications, list);
+    return list[i];
+  });
+}
+
 /** Lägen som räknas som "väntar på en körning". */
 export const RUNNABLE_STATUSES: readonly PublicationStatus[] = ["QUEUED"];
 

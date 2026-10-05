@@ -43,6 +43,8 @@ import {
   allGroupPublications,
   allGroups,
   allMarketplace,
+  claimGroupPublication,
+  claimMarketplace,
   enqueueGroupPublication,
   enqueueMarketplace,
   getGroup,
@@ -312,6 +314,24 @@ async function stillForSale(loopaId: string): Promise<string | null> {
  * per varv. Stannar vid första avbrott — resten ligger kvar i kö.
  */
 export async function processQueue(opts: { max?: number; force?: boolean } = {}): Promise<ProcessResult> {
+  // Ett varv i taget. Varvet tar minuter (skrivpausen) men startas varje minut, och panelens "Kör kön"
+  // kan komma när som helst. Anspråket i lagret (claim*) är det som hindrar dubbletter; det här
+  // hindrar att varv staplas på varandra och väntar på samma webbläsare.
+  if (queueRunning) return { marketplace: [], groups: [], stoppedBy: "Ett kövarv pågår redan." };
+  queueRunning = true;
+  try {
+    return await processQueueOnce(opts);
+  } finally {
+    queueRunning = false;
+  }
+}
+
+let queueRunning = false;
+
+/** Posten stod inte i kö när varvet nådde den — ett annat varv tog den. Räknas inte mot budgeten. */
+const NOT_QUEUED = "Inte i kö längre — redan hanterad.";
+
+async function processQueueOnce(opts: { max?: number; force?: boolean }): Promise<ProcessResult> {
   const result: ProcessResult = { marketplace: [], groups: [], stoppedBy: null };
   if (!facebookEnabled() && !opts.force) return { ...result, stoppedBy: "FACEBOOK_ENABLED är inte satt." };
   const blocked = await sessionBlocks();
@@ -335,6 +355,7 @@ export async function processQueue(opts: { max?: number; force?: boolean } = {})
         break;
       }
       const outcome = await runMarketplace(p, dryRun);
+      if (outcome.detail === NOT_QUEUED) continue;
       result.marketplace.push(outcome);
       budget -= 1;
       if (outcome.status === "NEEDS_MANUAL_ACTION" && /avbrott|checkpoint|captcha|inloggning|begräns/i.test(outcome.detail ?? "")) {
@@ -355,6 +376,7 @@ export async function processQueue(opts: { max?: number; force?: boolean } = {})
         break;
       }
       const outcome = await runGroupPost(p, dryRun);
+      if (outcome.detail === NOT_QUEUED) continue;
       result.groups.push(outcome);
       budget -= 1;
       if (outcome.status === "NEEDS_MANUAL_ACTION" && /avbrott|checkpoint|captcha|inloggning|begräns/i.test(outcome.detail ?? "")) {
@@ -366,7 +388,10 @@ export async function processQueue(opts: { max?: number; force?: boolean } = {})
   return result;
 }
 
-async function runMarketplace(p: MarketplacePublication, dryRun: boolean): Promise<ProcessResult["marketplace"][number]> {
+async function runMarketplace(queued: MarketplacePublication, dryRun: boolean): Promise<ProcessResult["marketplace"][number]> {
+  // Anspråket först: står posten inte i kö längre har ett annat varv redan tagit den.
+  const p = await claimMarketplace(queued.listingId);
+  if (!p) return { listingId: queued.listingId, status: queued.status, detail: NOT_QUEUED };
   const notForSale = await stillForSale(p.listingId);
   if (notForSale) {
     await updateMarketplace(p.listingId, (c) => ({ ...c, status: "FAILED", failureReason: notForSale }));
@@ -381,7 +406,7 @@ async function runMarketplace(p: MarketplacePublication, dryRun: boolean): Promi
   const listing = readiness.listing;
 
   const { logga, steps, flush } = stegLogg(`marketplace ${p.listingId}`, (s) => updateMarketplace(p.listingId, (c) => ({ ...c, steps: s })).then(() => undefined));
-  await updateMarketplace(p.listingId, (c) => ({ ...c, status: "PREPARING", phase: "before_publish", attempts: c.attempts + 1, attemptedAt: new Date().toISOString(), dryRun, failureReason: null, contentSnapshot: marketplaceSnapshot(listing, "") }));
+  await updateMarketplace(p.listingId, (c) => ({ ...c, dryRun, failureReason: null, contentSnapshot: marketplaceSnapshot(listing, "") }));
   logga(dryRun ? "Startar TORRKÖRNING — Publicera trycks inte" : "Startar SKARP publicering", "running", { rubrik: listing.title, pris: listing.price, bilder: listing.imagePaths.length });
 
   const onPhase = async (phase: PublicationPhase) => {
@@ -439,7 +464,10 @@ async function runMarketplace(p: MarketplacePublication, dryRun: boolean): Promi
   }
 }
 
-async function runGroupPost(p: GroupPublication, dryRun: boolean): Promise<ProcessResult["groups"][number]> {
+async function runGroupPost(queued: GroupPublication, dryRun: boolean): Promise<ProcessResult["groups"][number]> {
+  // Anspråket först — se claimGroupPublication. Utan det publicerades samma möbel två gånger i samma grupp.
+  const p = await claimGroupPublication(queued.listingId, queued.groupId);
+  if (!p) return { listingId: queued.listingId, groupId: queued.groupId, status: queued.status, detail: NOT_QUEUED };
   const notForSale = await stillForSale(p.listingId);
   if (notForSale) {
     await updateGroupPublication(p.listingId, p.groupId, (c) => ({ ...c, status: "FAILED", failureReason: notForSale }));
@@ -459,7 +487,7 @@ async function runGroupPost(p: GroupPublication, dryRun: boolean): Promise<Proce
   const listing = readiness.listing;
 
   const { logga, steps, flush } = stegLogg(`grupp ${p.groupId} ${p.listingId}`, (s) => updateGroupPublication(p.listingId, p.groupId, (c) => ({ ...c, steps: s })).then(() => undefined));
-  await updateGroupPublication(p.listingId, p.groupId, (c) => ({ ...c, status: "PREPARING", phase: "before_publish", attempts: c.attempts + 1, attemptedAt: new Date().toISOString(), dryRun, failureReason: null, composer: group.composerKind, contentSnapshot: group.composerKind === "listing" ? groupListingSnapshot(listing) : groupSnapshot(listing) }));
+  await updateGroupPublication(p.listingId, p.groupId, (c) => ({ ...c, dryRun, failureReason: null, composer: group.composerKind, contentSnapshot: group.composerKind === "listing" ? groupListingSnapshot(listing) : groupSnapshot(listing) }));
   const onPhase = async (phase: PublicationPhase) => {
     await updateGroupPublication(p.listingId, p.groupId, (c) => ({ ...c, phase }));
   };

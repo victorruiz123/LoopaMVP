@@ -73,12 +73,12 @@ test("säljinläggets text är Marketplace-texten: egen rubrik, eget pris, Loopa
   assert.ok(r.ok);
   if (!r.ok) return;
   const copy = groupListingCopy(r.listing);
-  assert.equal(copy.title, "Sweef Cloud 3-sits soffa");
+  assert.equal(copy.title, "Sweef Cloud 3-sits soffa i grå sammet");
   assert.match(copy.description, /Pris: 6\s500 kr/, "Intl skriver tusentalsavgränsaren som hårt mellanslag");
   assert.ok(copy.description.trimEnd().endsWith(r.listing.canonicalUrl), "adressen står sist");
   const snap = groupListingSnapshot(r.listing);
   assert.equal(snap.kind, "listing");
-  assert.equal(snap.title, "Sweef Cloud 3-sits soffa");
+  assert.equal(snap.title, "Sweef Cloud 3-sits soffa i grå sammet");
   assert.equal(snap.price, 6500);
 });
 
@@ -102,7 +102,7 @@ test("torrkörningen fyller Sälj något-dialogen, begränsar målgruppen och st
     assert.equal(gp?.status, "WOULD_PUBLISH", JSON.stringify(gp?.steps.slice(-6)));
     assert.equal(gp?.composer, "listing");
     assert.equal(gp?.contentSnapshot?.kind, "listing");
-    assert.equal(gp?.contentSnapshot?.title, "Sweef Cloud 3-sits soffa");
+    assert.equal(gp?.contentSnapshot?.title, "Sweef Cloud 3-sits soffa i grå sammet");
     assert.equal(attrapp.lage.listings.length, 0, "inget säljinlägg publicerades");
     const namn = gp?.steps.map((s) => s.name) ?? [];
     assert.ok(namn.some((n) => /Vara till salu valt/.test(n)), namn.join(" | "));
@@ -142,7 +142,7 @@ test("skarpt läge: Publicera trycks en gång, bara målgruppen får säljinläg
     assert.equal(attrapp.lage.listings.length, 1);
     const [l] = attrapp.lage.listings;
     assert.equal(l.groupId, "444");
-    assert.equal(l.fields.title, "Sweef Cloud 3-sits soffa", "produktsidans titel");
+    assert.equal(l.fields.title, "Sweef Cloud 3-sits soffa i grå sammet", "annonsrubriken, samma som Tradera och Blocket");
     assert.equal(l.fields.price, "6500");
     assert.equal(l.fields.condition, "Använd – i gott skick");
     assert.match(l.fields.description, /https:\/\/loopa\.nu\/butik\/objekt\//);
@@ -159,6 +159,47 @@ test("skarpt läge: Publicera trycks en gång, bara målgruppen får säljinläg
     process.env.FACEBOOK_DRY_RUN = "true";
     await attrapp.stang();
   }
+});
+
+// Dubbletterna 2026-10-02–04: ett kövarv tar minuter men startas varje minut, och varv två körde samma
+// köpost igen. Fem möbler hamnade två gånger i samma grupp.
+test("två kövarv samtidigt: säljinlägget publiceras EN gång", async () => {
+  const attrapp = await startaFbAttrapp();
+  attrapp.groups["444"].member = true;
+  attrapp.groups["444"].name = "Secondhand Stockholm";
+  process.env.FACEBOOK_BASE_URL = attrapp.bas;
+  process.env.FACEBOOK_DRY_RUN = "false";
+  const job = skrivJobb(JOBS, { id: "22222222-3333-4444-8555-666666666666" });
+  const loopaId = loopaIdFor(job.id);
+  await store.putGroup(saljgrupp(attrapp.bas));
+  await butik.ensureRecord(loopaId, job.id, "loopa", new Date().toISOString());
+  await butik.publish(loopaId, { kind: "admin", userId: "a" });
+  await store.enqueueGroupPublication(loopaId, "444", job.id, false);
+  const fore = attrapp.lage.listings.length;
+  try {
+    const [a, b] = await Promise.all([processQueue({ max: 5 }), processQueue({ max: 5 })]);
+    assert.ok([a.stoppedBy, b.stoppedBy].includes("Ett kövarv pågår redan."), "det andra varvet väntar inte in det första");
+    assert.equal(attrapp.lage.listings.length - fore, 1, "aldrig två säljinlägg i samma grupp");
+    assert.equal((await store.getGroupPublication(loopaId, "444"))?.status, "PUBLISHED");
+  } finally {
+    process.env.FACEBOOK_DRY_RUN = "true";
+    await attrapp.stang();
+  }
+});
+
+test("anspråket: en köpost kan bara tas en gång, och aldrig ur något annat läge än kö", async () => {
+  const id = "LP-TEST-CLAIM";
+  await store.enqueueGroupPublication(id, "444", "jobb", false);
+  const tagna = await Promise.all([store.claimGroupPublication(id, "444"), store.claimGroupPublication(id, "444")]);
+  assert.equal(tagna.filter(Boolean).length, 1, "exakt ett anspråk lyckas");
+  assert.equal(tagna.find(Boolean)?.status, "PREPARING");
+  assert.equal(tagna.find(Boolean)?.attempts, 1);
+  await store.updateGroupPublication(id, "444", (c) => ({ ...c, status: "NEEDS_MANUAL_ACTION", phase: "publish_clicked" }));
+  assert.equal(await store.claimGroupPublication(id, "444"), null, "en post som väntar på en människa körs aldrig om");
+
+  await store.enqueueMarketplace(id, "jobb", false);
+  const mp = await Promise.all([store.claimMarketplace(id), store.claimMarketplace(id)]);
+  assert.equal(mp.filter(Boolean).length, 1);
 });
 
 test("går Marketplace-brytaren inte att stänga av publiceras ingenting", async () => {

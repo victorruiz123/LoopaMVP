@@ -257,7 +257,9 @@ function retailOf(listing: GeneratedListing | null): number | null {
  * titel som också påstår "fint skick" säger det två gånger med två olika auktoriteter.
  */
 export function titleOf(brand: string | null, model: string | null, typeNoun: string | null, fallback: string): string {
-  const parts = [brand, model].filter((p): p is string => !!p && p.trim().length > 0);
+  // Minst en bokstav eller siffra: modelletningen sparade "." när den gav upp (Mio-fåtöljen 2026-09-27),
+  // och "Mio ." gick ut som rubrik på Facebook.
+  const parts = [brand, model].filter((p): p is string => !!p && /[\p{L}\p{N}]/u.test(p));
   if (parts.length === 0) return fallback;
   const head = parts.join(" ");
 

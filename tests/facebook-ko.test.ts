@@ -266,7 +266,7 @@ test("skarpt läge mot attrappen: Publicera trycks, adressen läses, och ett and
     assert.equal(mp?.facebookListingId, "777");
     assert.equal(attrapp.lage.marketplace.length, 1);
     const fält = attrapp.lage.marketplace[0].fields;
-    assert.equal(fält.title, "Sweef Cloud 3-sits soffa", "produktsidans titel");
+    assert.equal(fält.title, "Sweef Cloud 3-sits soffa i grå sammet", "annonsrubriken, samma som Tradera och Blocket");
     assert.equal(fält.price, "6500");
     assert.equal(fält.category, "Möbler");
     assert.equal(fält.condition, "Använd – i gott skick");
@@ -277,7 +277,7 @@ test("skarpt läge mot attrappen: Publicera trycks, adressen läses, och ett and
     assert.equal(gp?.status, "PUBLISHED", JSON.stringify(gp?.steps.slice(-5)));
     assert.match(gp?.facebookPostUrl ?? "", /\/groups\/111\/posts\/9999/);
     assert.equal(attrapp.lage.posts.length, 1);
-    assert.ok(attrapp.lage.posts[0].text.startsWith("Sweef Cloud 3-sits soffa säljes"), attrapp.lage.posts[0].text.slice(0, 80));
+    assert.ok(attrapp.lage.posts[0].text.startsWith("Sweef Cloud 3-sits soffa i grå sammet säljes"), attrapp.lage.posts[0].text.slice(0, 80));
     assert.deepEqual(attrapp.lage.posts[0].files, ["img_0.jpg", "img_1.jpg"]);
     assert.ok((await store.getGroup("111"))?.lastPostedAt, "gruppens senast-postat sattes");
 
@@ -322,6 +322,34 @@ test("skarpt läge: en annons som går i granskning direkt hittas ändå via /co
     const igen = await processQueue({ max: 5 });
     assert.deepEqual(igen.marketplace, [], "redan PUBLISHED — inget nytt varv");
     assert.equal(attrapp.lage.marketplace.length, 1, "aldrig två annonser");
+  } finally {
+    process.env.FACEBOOK_DRY_RUN = "true";
+    await attrapp.stang();
+  }
+});
+
+// ─── regression: Mio, Jysk, Piranha, 2026-09-29–10-04 ───────────────────────
+//
+// Alla tre Marketplace-annonser servern publicerade låg ute, men hamnade i "kontrollera för hand":
+// korten i "Dina inlägg" bär ingen länk, och adressen syns först när kortet öppnas.
+test("skarpt läge: adressen hittas genom att öppna det nyaste Marketplace-kortet med vår rubrik", async () => {
+  const attrapp = await startaFbAttrapp({ marketplaceCardsOnly: true });
+  process.env.FACEBOOK_BASE_URL = attrapp.bas;
+  process.env.FACEBOOK_DRY_RUN = "false";
+  const job = skrivJobb(JOBS, { id: "eeeeeeee-2222-4333-8444-555555555555" });
+  const loopaId = loopaIdFor(job.id);
+  await butik.ensureRecord(loopaId, job.id, "loopa", new Date().toISOString());
+  await butik.publish(loopaId, { kind: "admin", userId: "a" });
+  await store.enqueueMarketplace(loopaId, job.id, false);
+  try {
+    const r = await processQueue({ max: 5 });
+    assert.equal(r.stoppedBy, null, r.stoppedBy ?? "");
+    const mp = await store.getMarketplace(loopaId);
+    assert.equal(mp?.status, "PUBLISHED", JSON.stringify(mp?.steps.slice(-6)));
+    assert.equal(mp?.phase, "verified");
+    assert.match(mp?.facebookUrl ?? "", /\/marketplace\/item\/4242\/$/, "Marketplace-kortet, inte gruppkortet (9999) eller den äldre annonsen (1111)");
+    assert.equal(mp?.facebookListingId, "4242");
+    assert.equal(attrapp.lage.marketplace.length, 1);
   } finally {
     process.env.FACEBOOK_DRY_RUN = "true";
     await attrapp.stang();
