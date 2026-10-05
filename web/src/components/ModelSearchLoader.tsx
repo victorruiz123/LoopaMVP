@@ -1,54 +1,28 @@
-import { useEffect, useState } from "react";
-import { SofaIcon } from "./icons";
-import { useT } from "../lib/i18n";
-
 /**
- * Väntan medan modellerna letas fram.
+ * Laddaren i modelletningen: en båge som går runt en rundad ruta, och soffan stilla i plattan.
  *
- * Steget tar tio-tjugo sekunder och gav tidigare bara en snurra — samma tecken som appen visar för
- * varje kort paus, vilket inte skiljer "arbetar hårt" från "hänger sig". Här sker tre saker i stället:
- * möbeln studsar (något LEVER), ringen fylls (det går FRAMÅT), och orden växlar (det görs NÅGOT).
- *
- * Ringen mäter inte riktig progress — servern rapporterar ingen under identifieringen. Den fylls i
- * stället snabbt i början och kryper mot slutet, så den aldrig hinner slå i taket och stå still och
- * ljuga om att sökningen är klar. Skärmen byts när kandidaterna kommer, inte när ringen är full.
+ * Formen följer skissen "Granskar 2a". Här studsade förut en soffa medan en ring fylldes på 24
+ * sekunder och ett ord byttes var 1,5 sekund. Det är borta för att skärmen runt laddaren numera
+ * säger vad som händer (se ModelSearchWait) — tre rörliga saker ovanför en text som växlar hade
+ * tävlat om blicken. Bågen mäter ingen progress, servern rapporterar ingen under identifieringen;
+ * den säger bara att något pågår. Skärmen byts när kandidaterna kommer.
  */
-const WORDS = ["Granskar", "Inspekterar", "Kikar", "Jämför", "Mäter", "Letar"];
-const WORD_MS = 1500;
-
-/** Ruta med rundade hörn, ritad medurs från toppens mitt så fyllningen börjar där blicken är. */
-const RING =
-  "M76 3h42a31 31 0 0 1 31 31v84a31 31 0 0 1-31 31H34a31 31 0 0 1-31-31V34A31 31 0 0 1 34 3Z";
-
 export default function ModelSearchLoader() {
-  const t = useT();
-  const [step, setStep] = useState(0);
-
-  useEffect(() => {
-    const id = setInterval(() => setStep((n) => n + 1), WORD_MS);
-    return () => clearInterval(id);
-  }, []);
-
   return (
-    // Rent dekorativt: skärmens egen text ("Letar upp modellen…") är det som läses upp, och ett ord
-    // som byts var 1,5 sekund i en aria-live-region hade avbrutit uppläsningen om och om igen.
-    <div className="model-search" aria-hidden="true">
-      <div className="model-search-frame">
-        <svg className="model-search-ring" viewBox="0 0 152 152">
-          <path className="model-search-ring-track" d={RING} />
-          <path className="model-search-ring-fill" d={RING} pathLength={100} />
+    // Rent dekorativt: statusraden under laddaren är det som läses upp.
+    <div className="vanta-loader" aria-hidden="true">
+      <svg viewBox="0 0 140 140">
+        <rect className="vanta-ring-track" x="1.5" y="1.5" width="137" height="137" rx="33.6" />
+        {/* pathLength=100 gör dasharray till procent av varvet, oavsett rutans verkliga omkrets. */}
+        <rect className="vanta-ring-arc" x="1.5" y="1.5" width="137" height="137" rx="33.6" pathLength={100} />
+      </svg>
+      <div className="vanta-tile">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M5 11V8a3 3 0 0 1 3-3h8a3 3 0 0 1 3 3v3" />
+          <path d="M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v4H3z" />
+          <path d="M6 17v2M18 17v2" />
         </svg>
-        <div className="model-search-box">
-          <span className="model-search-shadow" />
-          <span className="model-search-icon">
-            <SofaIcon size={44} />
-          </span>
-        </div>
       </div>
-      {/* Nyckeln gör varje ord till ett nytt element, vilket startar om intoningen. */}
-      <p className="wait-word" key={step}>
-        {t(WORDS[step % WORDS.length])}…
-      </p>
     </div>
   );
 }

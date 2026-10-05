@@ -164,6 +164,12 @@ export const LISTING: Record<string, Translation> = {
   "Auktion, {dagar} dagar": { en: "Auction, {dagar} days", fr: "Enchère, {dagar} jours" },
   Bilder: { en: "Photos", fr: "Photos" },
   "Läggs ut på": { en: "Published on", fr: "Publiée sur" },
+  // ---- utbetalningen intill knappen ----
+  "hela möbelpriset — din gratisförsäljning": {
+    en: "the whole price — your free sale",
+    fr: "tout le prix du meuble — votre vente gratuite",
+  },
+  "av {pris} — Loopa tar {del}": { en: "of {pris} — Loopa takes {del}", fr: "sur {pris} — Loopa prend {del}" },
   "på Loopas konto, du behöver inget eget": {
     en: "on Loopa's account, you don't need one of your own",
     fr: "sur le compte de Loopa, vous n'avez pas besoin du vôtre",

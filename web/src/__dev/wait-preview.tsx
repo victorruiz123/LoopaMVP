@@ -1,21 +1,21 @@
-// Utvecklingsvy: de två väntorna bredvid varandra. De ligger sekunder isär i flödet men aldrig på
-// samma skärm, så det enda sättet att se om de är TILLRÄCKLIGT olika är att ställa dem sida vid
-// sida. Ingår inte i appen.
+// Utvecklingsvy: modelletningens hela väntskärm (ModelSearchWait) och annonsbyggets laddare under.
+// I appen ligger väntan bakom inloggning och uppladdning; här ritas den direkt, med exakt samma
+// komponent som säljaren ser. Ingår inte i appen.
 import { createRoot } from "react-dom/client";
-import ModelSearchLoader from "../components/ModelSearchLoader";
-import ListingBuildLoader from "../components/ListingBuildLoader";
+import ModelSearchWait from "../components/ModelSearchWait";
+import ListingBuildWait from "../components/ListingBuildWait";
+import { initViewMode } from "../lib/viewMode";
 
-const el = document.getElementById("root")!;
-el.style.cssText = "display:flex;flex-wrap:wrap;gap:56px;justify-content:center;padding:64px 16px";
-createRoot(el).render(
+// Samma dator/telefon-växling som appen (data-view på <html>), så att ett brett fönster får
+// datorvyn och telefonramen i mobil.html får telefonvyn — annars ritas alltid telefonens stilar.
+initViewMode();
+
+createRoot(document.getElementById("root")!).render(
   <>
-    <div className="center-column" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <ModelSearchLoader />
-      <p className="wait-title">Letar upp modellen…</p>
-    </div>
-    <div className="center-column" style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      <ListingBuildLoader />
-      <p className="wait-title">Bygger annonsen…</p>
+    <ModelSearchWait brand="IKEA" again={false} />
+    {/* Ankaret gör att mobil.html kan öppna rakt på den andra väntan. */}
+    <div id="bygger">
+      <ListingBuildWait identity={{ brand: "IKEA", model: "Söderhamn" }} />
     </div>
   </>,
 );

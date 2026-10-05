@@ -28,8 +28,8 @@ import LegalScreen from "./screens/LegalScreen";
 import CookieConsent from "./components/CookieConsent";
 import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
-import ModelSearchLoader from "./components/ModelSearchLoader";
-import ListingBuildLoader from "./components/ListingBuildLoader";
+import ModelSearchWait from "./components/ModelSearchWait";
+import ListingBuildWait from "./components/ListingBuildWait";
 import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
@@ -580,16 +580,13 @@ function FlowApp() {
  * en gång direkt efter modellvalet, medan servern arbetar vidare i bakgrunden, och en gång i
  * specifikationsgrinden som pollar in samma annons. Två skärmar som menar samma sak ska inte kunna
  * glida isär.
+ *
+ * `identity` är möbeln när grinden vet vilken den är — modellen valdes nyss, så skärmen kan säga
+ * "Bygger annonsen för IKEA Söderhamn…". Grindar som ännu inte läst jobbet skickar null och får den
+ * allmänna raden. Skärmen själv bor i ListingBuildWait, så att förhandsvyn (wait.html) ritar samma.
  */
-function BuildingListing() {
-  const t = useT();
-  return (
-    <div className="screen screen-light center-column">
-      <ListingBuildLoader />
-      <p className="wait-title">{t("Bygger annonsen…")}</p>
-      <p className="muted small">{t("Hämtar mått, material och specifikationer")}</p>
-    </div>
-  );
+function BuildingListing({ identity }: { identity?: FurnitureIdentity | null }) {
+  return <ListingBuildWait identity={identity ?? null} />;
 }
 
 /**
@@ -695,6 +692,8 @@ function IdentifyGate({
 }) {
   const t = useT();
   const [sent, setSent] = useState(false);
+  /** Modellen säljaren just valde, så att väntan efter valet kan säga vilken möbel annonsen gäller. */
+  const [vald, setVald] = useState<string | null>(null);
   /**
    * Ett omval startar om pollningen.
    *
@@ -740,6 +739,7 @@ function IdentifyGate({
   }
 
   async function choose(choice: { candidate?: ModelCandidate; manualModel?: string }) {
+    setVald(choice.candidate?.model ?? choice.manualModel ?? null);
     setSent(true);
     // Servern svarar 202 och arbetar vidare i bakgrunden; specifikationsskärmen pollar själv. Att
     // vänta in hela annonsen här hade gjort valet till en tyst paus på tjugo sekunder.
@@ -748,29 +748,19 @@ function IdentifyGate({
   }
 
   if (sent || job?.identityStatus === "resolved") {
-    return <BuildingListing />;
+    return <BuildingListing identity={{ brand: identity.brand, model: vald ?? job?.identity?.model ?? identity.model }} />;
   }
   // Ö.6: identifieringen får aldrig sluta i en återvändsgränd. Faller den — eller dör jobbet, eller
   // ger klienten upp — landar säljaren på samma skärm med noll kandidater och kan skriva namnet själv.
   // En misslyckad identifiering ska kosta ett handgrepp, inte en omstart.
   const stalled = gaveUp || failed || job?.identityStatus === "unavailable";
   const round = job?.candidateRound ?? 0;
-  const brandModels = identity.brand ? t("{märke}-modeller", { märke: identity.brand }) : t("modeller");
   if (starting || (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus))) {
     // Samma väntan, annan mening: första gången letas modellen upp, sedan letas den vidare bland de
-    // som blir kvar. Att säga "Letar upp modellen…" en andra gång hade sett ut som att inget hänt.
+    // som blir kvar. Skärmen — laddaren, rubriken och jämförelsen "Sälja själv / Med Loopa" — bor i
+    // ModelSearchWait, så att förhandsvyn (wait.html) kan rita exakt det säljaren ser.
     const again = starting || round > 0;
-    return (
-      <div className="screen screen-light center-column">
-        <ModelSearchLoader />
-        <p className="wait-title">{again ? t("Letar efter andra modeller…") : t("Letar upp modellen…")}</p>
-        <p className="muted small">
-          {again
-            ? t("Söker vidare bland {modeller} — de du sagt nej till räknas bort", { modeller: brandModels })
-            : t("Söker efter {modeller} som stämmer med bilderna", { modeller: brandModels })}
-        </p>
-      </div>
-    );
+    return <ModelSearchWait brand={identity.brand} again={again} />;
   }
   // Ett fallet omval säger det med en rad, inte med en tom skärm: säljaren ska veta varför de inte
   // fick några nya förslag.
@@ -886,7 +876,7 @@ function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }
     }
   }
 
-  if (!klar) return <BuildingListing />;
+  if (!klar) return <BuildingListing identity={job?.identity ?? null} />;
   const varianter = job?.variantOptions ?? [];
   if (svarat || job?.variantChosen != null || varianter.length < 2) return <>{children}</>;
   return (
@@ -945,7 +935,7 @@ function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNo
 
   // Tills jobbet lästs vet vi inte om frågorna redan är ställda, och en skärm som blinkar förbi är
   // värre än en kort väntan. Bygget pågår ändå bakom.
-  if (!loaded) return <BuildingListing />;
+  if (!loaded) return <BuildingListing identity={job?.identity ?? null} />;
   if (answered || job?.sellerDisclosures) return <>{children}</>;
   return <DisclosuresScreen onDone={done} saving={saving} error={error} chairLike={!!job?.chairLike} />;
 }
@@ -980,7 +970,7 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
     );
   }
   if (!listing || listing.status === "pending") {
-    return <BuildingListing />;
+    return <BuildingListing identity={job?.identity ?? null} />;
   }
   if (!listing.result) {
     return (

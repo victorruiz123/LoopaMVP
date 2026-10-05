@@ -7,7 +7,25 @@ import { useT } from "../lib/i18n";
 import { formatSek } from "../lib/price";
 import { LOOPA_FEE_CAP_SEK } from "../lib/fees";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
-import type { PriceLadder, SaljVillkor, TraderaPlan, TraderaState } from "../types";
+import type { ChannelPlan, PriceLadder, SaljVillkor, TraderaPlan, TraderaState } from "../types";
+import blocketMark from "../assets/kanaler/blocket.png";
+import traderaMark from "../assets/kanaler/tradera.png";
+import facebookMark from "../assets/kanaler/facebook.png";
+
+/**
+ * Kanalerna som de står under knappen: namn och märke. Loopa Butik ligger inte här — den är ingen
+ * kanalplan på servern utan dit varje godkänd annons går, och den står alltid först.
+ *
+ * Märkena är marknadsplatsernas egna appikoner, beskurna till en genomskinlig kvadrat (96 px, ritas
+ * i 20). De importeras som moduler så att Vite lägger dem under /app-assets med resten av bygget —
+ * en fil i public/ hade hamnat på sajtens rot, där marknadssajten också ligger.
+ */
+const KANALER: Record<ChannelPlan["channel"], { namn: string; mark: string }> = {
+  tradera: { namn: "Tradera", mark: traderaMark },
+  blocket: { namn: "Blocket", mark: blocketMark },
+  // Bara "Marketplace": märket bredvid säger redan Facebook, och hela namnet bröt raden på telefon.
+  facebook: { namn: "Marketplace", mark: facebookMark },
+};
 
 /**
  * "Sälj med Loopa" — sista steget i annonsen.
@@ -245,6 +263,26 @@ export default function SellWithLoopa({
       : null;
   const error = failure ?? publication?.error ?? null;
 
+  /**
+   * Utfallet intill knappen: samma val som bekräftelsen öppnar på. Har säljaren en gratisförsäljning
+   * är ja förvalet där (se `anvandGratis`), och då är det det utfallet ett ja utan ändrat val ger.
+   */
+  const villkor = state.villkor;
+  const utfall = villkor?.gratis && anvandGratis ? villkor.gratis : (villkor?.standard ?? null);
+  /**
+   * Kanalerna, lästa ur serverns plan och aldrig skrivna här: en avstängd kanal (Facebook utan
+   * FACEBOOK_ENABLED, Blocket i torrkörning) får inte lovas under knappen. Loopa Butik står alltid
+   * först — dit går varje godkänd annons. En äldre server utan `channels` bar bara Traderas läge.
+   */
+  const kanalrad = [
+    { namn: "Loopa Butik", mark: null as string | null },
+    ...(kanaler.length > 0
+      ? kanaler.filter((c) => c.configured && !c.dryRun).map((c) => KANALER[c.channel])
+      : state.configured
+        ? [KANALER.tradera]
+        : []),
+  ];
+
   return (
     <>
       <section className="card-block sell-block">
@@ -266,6 +304,28 @@ export default function SellWithLoopa({
             <p className="muted small">
               {t("Vi lägger ut möbeln, sköter annonsen och hör av oss så fort den är såld.")}
             </p>
+            {/*
+              VAD SÄLJAREN FÅR, intill knappen och inte bara inne i bekräftelsen.
+
+              Beloppet är serverns (villkor, provision.ts) — samma tal som bekräftelsen visar och
+              utbetalningen räknar med. Här står det FÖRE trycket: det är det sista talet man vill se
+              innan man bestämmer sig, och en knapp utan belopp bredvid sig ber om ett ja i blindo.
+              Taket och frakten förklaras i bekräftelsen; här står bara talet och vad det är del av.
+            */}
+            {utfall && (
+              <p className="sell-utfall">
+                <span className="sell-utfall-etikett">{t("Du får")}</span>
+                <strong className="sell-utfall-belopp">{formatSek(utfall.saljarenSek)}</strong>
+                <span className="sell-utfall-not">
+                  {utfall.andel === 0
+                    ? t("hela möbelpriset — din gratisförsäljning")
+                    : t("av {pris} — Loopa tar {del}", {
+                        pris: formatSek(utfall.mobelprisSek),
+                        del: formatSek(utfall.loopaSek),
+                      })}
+                </span>
+              </p>
+            )}
             {/* Knappen öppnar granskningen, den lägger inte ut något. Ordet är detsamma som i rutans
                 rubrik med flit: man trycker på erbjudandet och får se det i sin helhet. */}
             <button
@@ -283,6 +343,18 @@ export default function SellWithLoopa({
                 </>
               )}
             </button>
+            {/* Var möbeln hamnar, under knappen: märke och namn per marknadsplats. Märkena är dekor —
+                namnet bredvid är det som läses upp. Loopa Butik står utan märke, med flit: det är
+                vår egen butik, inte en främmande plats som behöver kännas igen. */}
+            <p className="sell-kanaler">
+              <span className="sell-kanaler-etikett">{t("Läggs ut på")}</span>
+              {kanalrad.map((k) => (
+                <span className="sell-kanal" key={k.namn}>
+                  {k.mark && <img className="sell-kanal-mark" src={k.mark} alt="" />}
+                  <b>{t(k.namn)}</b>
+                </span>
+              ))}
+            </p>
           </>
         )}
       </section>

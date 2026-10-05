@@ -1571,133 +1571,177 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 /* ==========================================================================
-   Modelletningen — möbeln studsar i rutan medan ringen fylls
+   Modelletningen — bågen går runt plattan, och under står vad Loopa tar hand om
    ==========================================================================
-   Ringen är avsiktligt trög på slutet: den har ingen riktig progress att mäta,
-   så den ska antyda framsteg utan att någonsin bli full och stå och ljuga. */
-.model-search { display: flex; flex-direction: column; align-items: center; gap: 20px; }
-.model-search-frame { position: relative; width: 144px; height: 144px; display: grid; place-items: center; }
+   Formen följer skissen "Granskar 2a" (ModelSearchWait): laddare, statusrad,
+   rubrik, två rutor som växlar var 2,6 s och prickar under. Bågen mäter ingen
+   progress — servern rapporterar ingen under identifieringen — den säger bara
+   att något pågår. */
+/* Allt står i mitten av skärmen, lodrätt och vågrätt. Det inre blocket centreras med auto-marginal
+   och inte med justify-content: se ModelSearchWait för varför. */
+.vanta-modell { justify-content: flex-start; }
+.vanta-inner {
+  margin: auto 0; width: 100%; max-width: 480px;
+  display: flex; flex-direction: column; align-items: center; gap: 24px;
+}
 
-.model-search-ring { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; }
-.model-search-ring-track { stroke: var(--border); stroke-width: 3; }
-.model-search-ring-fill {
+.vanta-loader { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+.vanta-loader > svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; fill: none; }
+.vanta-ring-track { stroke: var(--border); stroke-width: 3; }
+.vanta-ring-arc {
   stroke: var(--accent); stroke-width: 3; stroke-linecap: round;
-  stroke-dasharray: 100; stroke-dashoffset: 100;
-  animation: model-ring-fill 24s cubic-bezier(0.05, 0.7, 0.2, 1) forwards;
+  stroke-dasharray: 35 65; animation: vanta-dash 1.6s linear infinite;
 }
-@keyframes model-ring-fill { to { stroke-dashoffset: 6; } }
+@keyframes vanta-dash { to { stroke-dashoffset: -100; } }
+.vanta-tile {
+  position: absolute; inset: 17px; border-radius: 20px; background: var(--surface);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06); color: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+}
+.vanta-tile svg { display: block; }
 
-.model-search-box {
-  position: relative; width: 106px; height: 106px; border-radius: var(--r-lg); overflow: hidden;
-  background: var(--surface); box-shadow: var(--shadow-card);
-  display: flex; align-items: flex-end; justify-content: center; padding-bottom: 24px;
+.vanta-status { display: flex; flex-direction: column; gap: 6px; }
+.vanta-status b { font-size: 20px; font-weight: 600; }
+.vanta-status span { font-size: var(--fs-md); color: var(--muted); }
+
+/* Rubriken centrerad som allt annat på skärmen; texten i rutorna står vänster eftersom varje rad
+   börjar med ett tecken (– eller ✓) som ska stå i linje. */
+.vanta-head {
+  width: 100%; max-width: 480px; text-align: center;
+  display: flex; flex-direction: column; gap: 6px; padding-top: 4px;
 }
-.model-search-icon {
-  display: block; color: var(--accent); transform-origin: 50% 100%;
-  animation: furniture-bounce 1s infinite;
+.vanta-head h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; text-wrap: balance; }
+.vanta-head p { margin: 0; font-size: var(--fs-base); color: var(--muted); line-height: 1.5; }
+
+.jamfor {
+  width: 100%; max-width: 480px; text-align: left; min-height: 130px;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px;
 }
-.model-search-icon svg { display: block; }
-/* Skuggan bär tyngden: den breder ut sig i nedslaget och krymper när möbeln är i luften.
-   Utan den ser studsen ut som ett föremål som glider upp och ner, inte ett som landar. */
-.model-search-shadow {
-  position: absolute; bottom: 19px; width: 42px; height: 6px; border-radius: 999px;
-  background: var(--ink); animation: furniture-shadow 1s infinite;
+.jamfor-anim { animation: jamfor-in 0.45s ease-out; }
+@keyframes jamfor-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.jamfor-box {
+  display: flex; flex-direction: column; gap: 10px;
+  border-radius: var(--r-lg); padding: 18px; border: 1.5px solid transparent;
+}
+.jamfor-sjalv { background: var(--field); }
+.jamfor-loopa { background: var(--surface); border-color: var(--accent); }
+.jamfor-etikett { font-size: var(--fs-sm); font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; }
+.jamfor-sjalv .jamfor-etikett { color: var(--muted); }
+.jamfor-loopa .jamfor-etikett { color: var(--accent); }
+.jamfor-rad { display: flex; gap: 8px; font-size: var(--fs-base); line-height: 1.4; }
+.jamfor-rad b { font-weight: 700; flex-shrink: 0; }
+/* Det man slipper står överstruket och dämpat; det Loopa gör står rakt. */
+.jamfor-sjalv .jamfor-rad { color: var(--muted); }
+.jamfor-sjalv .jamfor-rad span { text-decoration: line-through; text-decoration-color: #c2b8ae; }
+.jamfor-sjalv .jamfor-rad b { color: #b3a99f; }
+.jamfor-loopa .jamfor-rad { font-weight: 500; }
+.jamfor-loopa .jamfor-rad b { color: var(--accent); }
+
+.vanta-dots { display: flex; justify-content: center; gap: 6px; }
+.vanta-dots i { width: 6px; height: 6px; border-radius: 3px; background: var(--border); transition: all 0.3s; }
+.vanta-dots i.on { width: 18px; background: var(--accent); }
+
+/* TELEFONEN. Två rutor bredvid varandra blir 160 px var, och den längsta Loopa-raden bröts på fem
+   rader. Rutorna staplas i stället, "Sälja själv" överst, och får samma minsta höjd så att skärmen
+   inte hoppar när ett kort par följer på ett långt. */
+@media (max-width: 480px) {
+  .vanta-inner { gap: 20px; }
+  .bygg-inner { gap: 28px; }
+  .vanta-head h2 { font-size: 23px; }
+  .jamfor { grid-template-columns: minmax(0, 1fr); gap: 10px; min-height: 0; }
+  .jamfor-box { padding: 14px 16px; gap: 6px; min-height: 94px; justify-content: center; }
 }
 
-/* Tidsfunktionen sätts per kurva: fallet accelererar, studsen bromsar. En enda easing
-   över hela varvet hade gett ett jämnt guppande i stället för tyngd. */
-@keyframes furniture-bounce {
-  0% { transform: translateY(-22px) scale(0.94, 1.06) rotate(-5deg); animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.35); }
-  44% { transform: translateY(0) scale(1, 1) rotate(0deg); animation-timing-function: linear; }
-  52% { transform: translateY(3px) scale(1.16, 0.84) rotate(0deg); animation-timing-function: linear; }
-  60% { transform: translateY(0) scale(1, 1) rotate(2deg); animation-timing-function: cubic-bezier(0.2, 0.6, 0.4, 1); }
-  100% { transform: translateY(-22px) scale(0.94, 1.06) rotate(-5deg); }
-}
-@keyframes furniture-shadow {
-  0%, 100% { transform: scale(0.62); opacity: 0.1; }
-  52% { transform: scale(1.06); opacity: 0.26; }
-}
-
-/* Delas av båda väntorna: samma rubrik och samma ordbyte, för att det är samma sorts paus. */
+/* Rubriken i de små väntorna: uppladdningen och resultatet. */
 .wait-title { margin: 4px 0 0; font-size: var(--fs-base); font-weight: 600; }
 
-.wait-word {
-  margin: 0; font-size: var(--fs-lg); font-weight: 600; letter-spacing: -0.01em; color: var(--ink-soft);
-  animation: wait-word-in 0.4s var(--ease-ui);
-}
-@keyframes wait-word-in { from { opacity: 0; transform: translateY(7px); } to { opacity: 1; transform: none; } }
-
 /* ==========================================================================
-   Annonsbygget — luppen synar möbeln medan måttbandet dras ut
+   Annonsbygget — plattan, linjalen och det folk brukar undra
    ==========================================================================
-   Väntan direkt efter modellvalet, och med flit inte modelletningens studs: två
-   likadana väntor i rad läser som EN vänta som hängt sig. Bandet har lika lite
-   riktig progress att mäta som ringen ovan, och är lika trögt på slutet. */
-.listing-build { display: flex; flex-direction: column; align-items: center; gap: 16px; }
-.listing-build-frame { position: relative; width: 144px; height: 144px; display: grid; place-items: center; }
-
-.listing-build-box {
-  width: 106px; height: 106px; border-radius: var(--r-lg); overflow: hidden;
-  background: var(--surface); box-shadow: var(--shadow-card);
-  display: grid; place-items: center;
+   Formen följer skissen "Vanliga frågor 4c" (ListingBuildWait): soffan med
+   luppen på en platta, en linjal vars linje fylls om och om igen, verbet och
+   statusraden, och under det ett kort med en vanlig fråga som byts var 2,6 s.
+   Linjalen mäter ingen progress — servern rapporterar ingen under bygget. */
+.bygg-inner { max-width: 420px; gap: 36px; }
+.bygg-scan { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+.bygg-tile {
+  width: 168px; height: 168px; border-radius: 32px; background: var(--surface);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06); display: flex; align-items: center; justify-content: center;
 }
-/* Möbeln är föremålet som synas, inte huvudpersonen: accentfärgen bär luppen och märkena. */
-.listing-build-piece {
-  display: block; color: var(--ink-soft); transform-origin: 50% 100%;
-  animation: listing-build-flinch 7s infinite;
+.bygg-tile svg { display: block; }
+/* LUPPEN RÖR SIG, som i den gamla laddaren: glider över soffan, stannar där den hittar något, märket
+   poppar och soffan rycker till. Måtten är vyrutans (40 × 40), inte bildpunkter — px på ett
+   SVG-element räknas i dess eget koordinatsystem. Pauserna är halva poängen: en lupp i ständig
+   rörelse letar, en som stannar har SETT något. Vilopunkten (27, 25) är där skissen ritade den. */
+.bygg-tile-sofa { transform-box: fill-box; transform-origin: 50% 100%; animation: bygg-flinch 7s infinite; }
+.bygg-loupe { animation: bygg-loupe 7s ease-in-out infinite; }
+/* Glaset lättar upp det som ligger under i stället för att skyla det. */
+.bygg-loupe-glass { fill: var(--surface); fill-opacity: 0.35; }
+.bygg-mark { transform-box: fill-box; transform-origin: center; }
+.bygg-mark-a { animation: bygg-mark-a 7s infinite; }
+.bygg-mark-b { animation: bygg-mark-b 7s infinite; }
+@keyframes bygg-loupe {
+  0%, 5% { transform: translate(27px, 25px); }
+  26%, 36% { transform: translate(14px, 16px); }
+  57%, 67% { transform: translate(21px, 24px); }
+  90%, 100% { transform: translate(27px, 25px); }
 }
-.listing-build-piece svg { display: block; }
-
-.listing-build-scan { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; }
-.listing-build-loupe { animation: listing-build-loupe 7s ease-in-out infinite; }
-/* Glaset lättar upp det som ligger under i stället för att skyla det. En lupp man inte ser
-   igenom är bara en cirkel som åker omkring. */
-.listing-build-loupe-glass { fill: var(--surface); fill-opacity: 0.3; stroke: var(--accent); stroke-width: 2.5; }
-.listing-build-loupe-grip { stroke: var(--accent); stroke-width: 3; stroke-linecap: round; }
-
-.listing-build-mark { fill: var(--accent); transform-box: fill-box; transform-origin: center; }
-.listing-build-mark-a { animation: listing-build-mark-a 7s infinite; }
-.listing-build-mark-b { animation: listing-build-mark-b 7s infinite; }
-
-/* Pauserna är halva poängen: en lupp i ständig rörelse letar, en som stannar har SETT något. */
-@keyframes listing-build-loupe {
-  0% { transform: translate(48px, 92px); opacity: 0; }
-  7% { transform: translate(51px, 88px); opacity: 1; }
-  26%, 36% { transform: translate(63px, 63px); opacity: 1; }
-  57%, 67% { transform: translate(86px, 79px); opacity: 1; }
-  90% { transform: translate(98px, 94px); opacity: 1; }
-  /* Tonas ut FÖRE återhoppet till startpunkten, annars syns luppen dra sig baklänges. */
-  97%, 100% { transform: translate(98px, 94px); opacity: 0; }
-}
-@keyframes listing-build-mark-a {
+@keyframes bygg-mark-a {
   0%, 24% { opacity: 0; transform: scale(0.3); }
   30% { opacity: 1; transform: scale(1.35); }
   35%, 92% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1); }
 }
-@keyframes listing-build-mark-b {
+@keyframes bygg-mark-b {
   0%, 55% { opacity: 0; transform: scale(0.3); }
   61% { opacity: 1; transform: scale(1.35); }
   66%, 92% { opacity: 1; transform: scale(1); }
   100% { opacity: 0; transform: scale(1); }
 }
 /* Ryckningen kommer på fyndet, inte före det: möbeln reagerar på att bli påkommen. */
-@keyframes listing-build-flinch {
+@keyframes bygg-flinch {
   0%, 26%, 34%, 57%, 65%, 100% { transform: translateY(0) rotate(0deg); }
-  29% { transform: translateY(-3px) rotate(-2deg); }
-  60% { transform: translateY(-3px) rotate(2deg); }
+  29% { transform: translateY(-1px) rotate(-2deg); }
+  60% { transform: translateY(-1px) rotate(2deg); }
 }
+/* Linjalen är ritad med gradienter: ett kort streck var 6:e pixel, ett längre var 30:e. */
+.bygg-ruler {
+  position: relative; width: 200px; height: 12px; margin-top: 6px;
+  background:
+    repeating-linear-gradient(90deg, #d9d1c7 0 1px, transparent 1px 6px) left top / 100% 6px no-repeat,
+    repeating-linear-gradient(90deg, #c2b8ae 0 1px, transparent 1px 30px) left top / 100% 10px no-repeat;
+}
+.bygg-fill {
+  position: absolute; left: 0; bottom: 0; height: 2px; width: 0; border-radius: 1px;
+  background: var(--accent); animation: bygg-prog 2.6s ease-in-out infinite;
+}
+@keyframes bygg-prog { 0% { width: 0; } 80%, 100% { width: 100%; } }
+.bygg-verb { margin: 0; padding-top: 6px; font-size: 20px; color: var(--ink-soft); animation: bygg-fade 0.4s ease-out; }
+.bygg-status { margin: 0; font-size: var(--fs-base); font-weight: 600; }
 
-/* Måttbandet mäter väntan, inte möbeln — samma tröga kurva som ringen i modelletningen. */
-.listing-build-tape { width: 144px; height: 22px; fill: none; }
-.listing-build-tape-tick { stroke: var(--border); stroke-width: 2; stroke-linecap: round; }
-.listing-build-tape-track { stroke: var(--border); stroke-width: 3; stroke-linecap: round; }
-.listing-build-tape-fill {
-  stroke: var(--accent); stroke-width: 3; stroke-linecap: round;
-  stroke-dasharray: 100; stroke-dashoffset: 100;
-  animation: listing-build-tape 24s cubic-bezier(0.05, 0.7, 0.2, 1) forwards;
+@keyframes bygg-fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+/* Stegen står vänster i den centrerade spalten: det är löpande text, som i skissen. Det aktiva
+   steget lyser upp — ett steg i det som KOMMER, inte ett som blivit klart; listan går runt. */
+.bygg-why { width: 100%; display: flex; flex-direction: column; gap: 14px; margin-top: 12px; text-align: left; }
+.bygg-why h2 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.2; text-wrap: balance; }
+.bygg-list {
+  list-style: none; margin: 0; padding: 8px; display: flex; flex-direction: column;
+  background: var(--surface); border-radius: var(--r-lg); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-@keyframes listing-build-tape { to { stroke-dashoffset: 6; } }
+.bygg-item { display: flex; gap: 12px; padding: 12px; border-radius: 10px; transition: background 0.3s var(--ease-ui); }
+.bygg-n {
+  width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+  background: var(--field); color: var(--muted-soft); font-size: var(--fs-xs); font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.3s var(--ease-ui), color 0.3s var(--ease-ui);
+}
+.bygg-t { font-size: 16px; font-weight: 600; color: var(--muted); transition: color 0.3s var(--ease-ui); }
+.bygg-b { margin-top: 2px; font-size: var(--fs-md); line-height: 1.4; color: var(--muted); }
+/* Tonen är skissens: accentfärgen utspädd till nästan vitt, så raden lyser utan att skrika. */
+.bygg-item.on { background: #fdf1ec; }
+.bygg-item.on .bygg-n { background: var(--accent); color: #fff; }
+.bygg-item.on .bygg-t { color: var(--ink); }
 
 /* ==========================================================================
    Analys — checklistan medan pipelinen kör
@@ -2210,6 +2254,21 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .ordmark-vit { color: #ffffff; }
 .sell-block .btn-primary .ordmark { font-size: 1.06em; }
 .sell-block p { margin: 0; }
+/* UTBETALNINGEN INTILL KNAPPEN. Det sista talet man vill se innan man säger ja, och det stod förut
+   bara inne i bekräftelsen. Etiketten och talet på en rad, vad det är del av på raden under. */
+.sell-utfall { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; margin: 2px 0 0; }
+.sell-utfall-etikett { font-size: var(--fs-md); color: var(--muted); }
+.sell-utfall-belopp { font-size: var(--fs-title); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.sell-utfall-not { flex-basis: 100%; font-size: var(--fs-sm); line-height: 1.4; color: var(--muted); }
+/* KANALERNA UNDER KNAPPEN. Lästa ur serverns kanalplan. Varje kanal är märke + namn på en rad;
+   raden bryter mellan kanaler, aldrig mellan ett märke och dess namn. */
+.sell-kanaler {
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 14px;
+  font-size: var(--fs-sm); line-height: 1.4; color: var(--muted);
+}
+.sell-kanal { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.sell-kanal b { font-weight: 600; color: var(--ink-soft); }
+.sell-kanal-mark { width: 20px; height: 20px; border-radius: 5px; display: block; flex-shrink: 0; }
 .sell-waiting { display: flex; align-items: center; gap: 12px; }
 .sell-confirm-actions { display: flex; gap: 10px; align-items: center; }
 .sell-confirm-actions .btn-text { flex: 1; }
@@ -2501,15 +2560,14 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
   }
   .sell-modal-panel, .sell-modal-scrim { animation-duration: 1ms; }
   .price-skeleton, .review-spinner, .candidate-photo-empty.is-searching { animation-duration: 3s; }
-  /* Möbeln slutar studsa; ringen får stå kvar som stillbild med lite fyllning. */
-  .model-search-icon, .model-search-shadow, .wait-word { animation: none; }
-  .model-search-shadow { opacity: 0.16; }
-  .model-search-ring-fill { animation: none; stroke-dashoffset: 72; }
-  /* Luppen slutar vandra och blir liggande över möbeln med båda fynden redan utpekade;
-     måttbandet står kvar som stillbild med lite utdraget. */
-  .listing-build-piece, .listing-build-loupe, .listing-build-mark { animation: none; }
-  .listing-build-loupe { transform: translate(75px, 70px); }
-  .listing-build-tape-fill { animation: none; stroke-dashoffset: 72; }
+  /* Bågen står stilla som en stillbild; jämförelsen byter par utan intoning. */
+  .vanta-ring-arc, .jamfor-anim { animation: none; }
+  /* Linjalens linje står still, mer än halvvägs; stegen byter utan övergång. Luppen ligger i sin
+     vilopunkt med båda fynden redan utpekade. */
+  .bygg-fill { animation: none; width: 70%; }
+  .bygg-verb, .bygg-tile-sofa, .bygg-loupe, .bygg-mark { animation: none; }
+  .bygg-loupe { transform: translate(27px, 25px); }
+  .bygg-item, .bygg-n, .bygg-t { transition: none; }
 }
 
 

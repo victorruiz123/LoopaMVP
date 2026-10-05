@@ -247,9 +247,33 @@ export const FLOW: Record<string, Translation> = {
     en: "Searching on among {modeller} — the ones you rejected are left out",
     fr: "Recherche parmi les {modeller} — ceux que vous avez refusés sont écartés",
   },
-  "Söker efter {modeller} som stämmer med bilderna": {
-    en: "Searching for {modeller} that match the photos",
-    fr: "Recherche de {modeller} correspondant aux photos",
+  "Jämför med {modeller} som matchar bilderna": {
+    en: "Comparing with {modeller} that match the photos",
+    fr: "Comparaison avec les {modeller} qui correspondent aux photos",
+  },
+  // ---- väntan under modelletningen (ModelSearchWait) ----
+  "Det svåra är redan gjort. Du har tagit bilderna.": {
+    en: "The hard part is done. You've taken the photos.",
+    fr: "Le plus dur est fait. Vous avez pris les photos.",
+  },
+  "Resten av försäljningen sköter Loopa.": { en: "Loopa takes care of the rest of the sale.", fr: "Loopa s'occupe du reste de la vente." },
+  "Sälja själv": { en: "Selling it yourself", fr: "Vendre soi-même" },
+  "Med Loopa": { en: "With Loopa", fr: "Avec Loopa" },
+  "Skriva annons och sätta pris": { en: "Writing the ad and setting a price", fr: "Rédiger l'annonce et fixer le prix" },
+  "AI skriver annonsen och sätter priset från verkliga försäljningar": {
+    en: "AI writes the ad and sets the price from real sales",
+    fr: "L'IA rédige l'annonce et fixe le prix d'après de vraies ventes",
+  },
+  "Svara på ”finns den kvar?”": { en: "Answering “is it still available?”", fr: "Répondre à « est-il toujours disponible ? »" },
+  "Loopa hanterar alla köpare åt dig": { en: "Loopa handles every buyer for you", fr: "Loopa gère tous les acheteurs pour vous" },
+  "Prutare och no-shows": { en: "Hagglers and no-shows", fr: "Négociateurs et lapins" },
+  "Köparen har redan betalat innan hämtning": { en: "The buyer has already paid before pickup", fr: "L'acheteur a déjà payé avant l'enlèvement" },
+  "Bära ner till köparens bil": { en: "Carrying it down to the buyer's car", fr: "Porter le meuble jusqu'à la voiture de l'acheteur" },
+  "Möbeln hämtas utanför din dörr": { en: "The furniture is collected at your door", fr: "Le meuble est récupéré devant votre porte" },
+  "Hoppas att swishen går igenom": { en: "Hoping the payment goes through", fr: "Espérer que le paiement passe" },
+  "Pengarna ligger säkert hos Loopa tills affären är klar": {
+    en: "The money is held safely by Loopa until the deal is done",
+    fr: "L'argent est conservé en sécurité chez Loopa jusqu'à la fin de la vente",
   },
   "Vi kunde inte söka fram några modeller just nu.": {
     en: "We couldn't find any models right now.",
@@ -262,6 +286,28 @@ export const FLOW: Record<string, Translation> = {
   },
   "Fortsätt till priset ändå": { en: "Continue to the price anyway", fr: "Passer au prix quand même" },
   "Bygger annonsen…": { en: "Building the listing…", fr: "Création de l'annonce…" },
+  // ---- väntan medan annonsen byggs (ListingBuildWait) ----
+  "Bygger annonsen för {möbel}…": { en: "Building the listing for {möbel}…", fr: "Création de l'annonce pour {möbel}…" },
+  "Slår upp": { en: "Looking up", fr: "Recherche" },
+  Prissätter: { en: "Pricing", fr: "Tarification" },
+  "När den är publicerad kan du luta dig tillbaka.": {
+    en: "Once it's published you can sit back.",
+    fr: "Une fois publiée, vous pouvez vous détendre.",
+  },
+  "Annonsen publiceras": { en: "The listing goes live", fr: "L'annonce est publiée" },
+  "Med rätt rubrik och ett pris som säljer.": { en: "With the right title and a price that sells.", fr: "Avec le bon titre et un prix qui vend." },
+  "Loopa sköter köparna": { en: "Loopa handles the buyers", fr: "Loopa gère les acheteurs" },
+  "Inga frågor, ingen prutning, inga no-shows för dig.": {
+    en: "No questions, no haggling, no no-shows for you.",
+    fr: "Pas de questions, pas de marchandage, pas de lapins pour vous.",
+  },
+  "Köparen betalar till Loopa": { en: "The buyer pays Loopa", fr: "L'acheteur paie Loopa" },
+  "Pengarna ligger säkert tills affären är klar.": {
+    en: "The money is held safely until the deal is done.",
+    fr: "L'argent est conservé en sécurité jusqu'à la fin de la vente.",
+  },
+  "Hämtas — du får betalt": { en: "Collected — you get paid", fr: "Enlevé — vous êtes payé" },
+  "Utanför din dörr. Inga tunga lyft.": { en: "At your door. No heavy lifting.", fr: "Devant votre porte. Aucun port de charge." },
 
   // ---- de två frågorna: pälsdjur och lukt ----
   // Ställs medan annonsen byggs. Svaren står i annonsen som säljarens ord, inte som AI:ns — därför

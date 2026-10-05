@@ -135,6 +135,23 @@ const galleri = [
 const traderaState: TraderaState = {
   configured: true,
   missingEnv: [],
+  // Kanalerna som de står under knappen, alla tre på. Samma form som serverns planAutoPublish ger,
+  // så raden ritas ur samma fält som i appen. I drift följer raden serverns miljö: en avstängd kanal
+  // (Facebook utan FACEBOOK_ENABLED) står inte med. Här är alla på för att formen ska gå att granska.
+  channels: [
+    { channel: "tradera", configured: true, missingEnv: [], ready: true, reason: null, alreadyRunning: false, dryRun: false },
+    { channel: "blocket", configured: true, missingEnv: [], ready: true, reason: null, alreadyRunning: false, dryRun: false },
+    { channel: "facebook", configured: true, missingEnv: [], ready: true, reason: null, alreadyRunning: false, dryRun: false },
+  ],
+  // Utbetalningen intill knappen. Talen följer lib/fees: 20 % av 8 400 kr slår i taket på 1 000 kr.
+  villkor: {
+    last: false,
+    valdGratis: false,
+    standard: { mobelprisSek: 8400, andel: 0.2, loopaSek: 1000, saljarenSek: 7400, tak: true },
+    gratis: null,
+    krediter: 0,
+    forstaUtgang: null,
+  },
   publication: null,
   blockedReason: null,
   plan: {
