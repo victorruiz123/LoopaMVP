@@ -5387,3 +5387,9 @@ body:has(.grind) .consent { display: none; }
 }
 .v2-kort-fraga { text-shadow: 0 1px 8px rgba(0, 0, 0, 0.35); }
 .v2-kort-botten { background: linear-gradient(180deg, rgba(20, 17, 13, 0.42), rgba(20, 17, 13, 0.58)); }
+
+/* v5: frågan på en rad även på en riktig telefon (393 pt bred), där kortet blir smalare. */
+.v2-kort-topp { font-size: 17px; padding: 11px 14px; }
+.v2-kort-fraga { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.v2-kort-topp .v2-prickar { flex: none; gap: 5px; }
+.v2-kort-topp .v2-prick { width: 8px; height: 8px; }
