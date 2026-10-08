@@ -4,6 +4,7 @@ import App from "./App";
 import { AuthProvider } from "./auth/AuthProvider";
 import { initViewMode } from "./lib/viewMode";
 import { fangaInbjudan } from "./lib/referral";
+import { fangaAffiliate } from "./lib/affiliate";
 import { LanguageProvider } from "./lib/i18n";
 import "./styles.css";
 
@@ -13,6 +14,8 @@ initViewMode();
 // Inbjudningskoden ur ?ref=, sparad i 30 dagar. Före render, så att ingen vy hinner läsa adressen med
 // koden kvar i. Se lib/referral.ts.
 fangaInbjudan();
+// Affiliate-koden ur /p/KOD, i en cookie i 30 dagar. Se lib/affiliate.ts.
+fangaAffiliate();
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>

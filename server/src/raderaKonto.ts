@@ -279,6 +279,15 @@ export async function raderaKonto(userId: string, bekraftelse: unknown, adminId:
     if (k.status === "available" && (await referral.bytStatus(k.id, "available", "expired"))) raderat.krediterAvslutade += 1;
   }
 
+  // 5b. Affiliate: e-posten bort. Koden, värvningen och provisionerna står kvar — de är bokföring,
+  //     och en provision som väntar på utbetalning syns i orderfliken utan adress.
+  const { affiliateStore } = await import("./affiliate/store.js");
+  const affiliate = affiliateStore();
+  if (await affiliate.profil(userId)) {
+    await affiliate.rensaEmail(userId);
+    raderat.affiliateprofil = 1;
+  }
+
   // 6. Loggarna som bär personen: omdömen, chattar, flödet, utskicken, sparade brev.
   raderat.omdomen = await (await import("./feedback.js")).glomKonto(userId, jobIds);
   raderat.chattsamtal = await (await import("./data/samtal.js")).glomKonto(userId);

@@ -581,7 +581,18 @@ export async function markDelivered(id: string, actor: TransitionActor): Promise
 }
 
 export async function markReturned(id: string, actor: TransitionActor): Promise<ButikRecord | null> {
-  return move(id, ["delivered"], "returned", {}, actor, "Returnerad.");
+  const moved = await move(id, ["delivered"], "returned", {}, actor, "Returnerad.");
+  if (moved) {
+    // Köparen fick pengarna tillbaka: en affiliate-provision som inte betalats ut gäller inte längre.
+    // Får aldrig fälla returen — den står när den här raden nås.
+    try {
+      const { annulleraVidRetur } = await import("../affiliate/regler.js");
+      await annulleraVidRetur(id);
+    } catch (err) {
+      console.warn(`[butik] affiliate-provisionen för ${id} kunde inte annulleras: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return moved;
 }
 
 /**

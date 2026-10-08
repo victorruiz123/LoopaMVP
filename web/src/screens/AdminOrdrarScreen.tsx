@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useState } from "react";
-import { andraOrder, getOrderDetalj, listaOrdrar, listaUtbetalningar, markeraUtbetald } from "../api";
+import { andraOrder, getOrderDetalj, listaAffiliateProvisioner, listaOrdrar, listaUtbetalningar, markeraAffiliateUtbetalda, markeraUtbetald } from "../api";
+import { formatOre } from "../components/Affiliate";
 import { TruckIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { useT } from "../lib/i18n";
-import type { AdminOrderDetalj, AdminOrderRad, AdminOrdrar, UtbetalningsRad } from "../types";
+import type { AdminAffiliateRad, AdminOrderDetalj, AdminOrderRad, AdminOrdrar, UtbetalningsRad } from "../types";
 
 /**
  * Orderfliken: alla köp, och framför allt det som väntar på oss.
@@ -122,6 +123,7 @@ export default function AdminOrdrarScreen({ onOpenAd }: { onOpenAd?: (loopaId: s
       )}
 
       <Utbetalningar />
+      <AffiliateUtbetalningar />
     </div>
   );
 }
@@ -428,4 +430,94 @@ function statusFarg(status: AdminOrderRad["status"]): string {
 
 function datum(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", { weekday: "short", day: "numeric", month: "short" });
+}
+
+/**
+ * Affiliate-provisionerna: vad varje affiliate har intjänat och inte fått, och trycket som säger att
+ * det är betalt.
+ *
+ * SAMMA PRINCIP SOM SÄLJARNAS UTBETALNINGAR OVAN: pengarna skickas för hand (Swish eller bank), och
+ * "Markera utbetalt" trycks efteråt. Provisionerna skapas av säljarens utbetalning — se
+ * server/src/affiliate/regler.ts — så en möbel syns här först när säljaren har fått sina pengar.
+ */
+function AffiliateUtbetalningar() {
+  const t = useT();
+  const [rader, setRader] = useState<AdminAffiliateRad[] | null>(null);
+  const [fel, setFel] = useState<string | null>(null);
+  const [skickar, setSkickar] = useState<string | null>(null);
+
+  const ladda = useCallback(() => {
+    listaAffiliateProvisioner()
+      .then((d) => setRader(d.rader))
+      .catch((err: unknown) => setFel(err instanceof Error ? err.message : "Kunde inte hämta affiliate-provisionerna."));
+  }, []);
+  useEffect(ladda, [ladda]);
+
+  async function markera(rad: AdminAffiliateRad) {
+    const vantande = rad.provisioner.filter((p) => p.status === "pending");
+    const text = t("Har du betalat ut {belopp} till {vem}?", {
+      belopp: formatOre(rad.vantandeOre),
+      vem: rad.email ?? t("affiliate utan e-post"),
+    });
+    if (!window.confirm(text)) return;
+    setSkickar(rad.userId);
+    setFel(null);
+    try {
+      await markeraAffiliateUtbetalda(vantande.map((p) => p.id));
+      ladda();
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : "Kunde inte markera utbetalt.");
+    } finally {
+      setSkickar(null);
+    }
+  }
+
+  const vantar = (rader ?? []).filter((r) => r.vantandeOre > 0);
+
+  return (
+    <>
+      <h2 className="profile-section-title">
+        {t("Affiliate")} {rader ? `· ${vantar.length} ${t("väntar")}` : ""}
+      </h2>
+      {fel && <p className="public-card-error">{fel}</p>}
+      {rader === null && !fel ? (
+        <div className="profile-loading"><div className="spinner" /></div>
+      ) : rader && rader.length === 0 ? (
+        <p className="card-row-meta">{t("Inga affiliate-provisioner än.")}</p>
+      ) : (
+        <ul className="card-list">
+          {(rader ?? []).map((rad) => (
+            <li key={rad.userId} className="card-row" style={{ cursor: "default", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
+              <span className="card-row-title">{rad.email ?? t("affiliate utan e-post")}</span>
+              <span className="card-row-meta">
+                {rad.kod ?? "—"} · {t("Väntande {vantande}, utbetalt {utbetalt}", {
+                  vantande: formatOre(rad.vantandeOre),
+                  utbetalt: formatOre(rad.utbetaltOre),
+                })}
+              </span>
+              <ul className="card-row-meta" style={{ margin: 0, paddingLeft: 18 }}>
+                {rad.provisioner.map((p) => (
+                  <li key={p.id}>
+                    {p.productId} · {formatOre(p.amountOre)} ({t("5 % av {pris}", { pris: formatOre(p.salePriceOre) })}) ·{" "}
+                    {p.status === "pending"
+                      ? t("väntar")
+                      : p.status === "paid"
+                        ? t("utbetald {datum}", { datum: (p.paidAt ?? "").slice(0, 10) })
+                        : t("annullerad – {orsak}", { orsak: p.cancelReason ?? "" })}
+                  </li>
+                ))}
+              </ul>
+              {rad.vantandeOre > 0 && (
+                <span>
+                  <button className="btn btn-small btn-primary" onClick={() => void markera(rad)} disabled={skickar === rad.userId}>
+                    {skickar === rad.userId ? t("Sparar…") : t("Markera {belopp} utbetalt", { belopp: formatOre(rad.vantandeOre) })}
+                  </button>
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </>
+  );
 }

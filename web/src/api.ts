@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad,
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, AdminAffiliateRad, UtbetalningsRad,
   UtskickLista,
   UtskickLage,
 } from "./types";
@@ -271,6 +271,39 @@ export async function gorInbjudningsansprak(kod: string): Promise<{ utfall: stri
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ kod }),
+    }),
+  );
+}
+
+// ---- affiliate (/api/salj/affiliate, /api/admin/affiliate) ----
+
+/** Användarens affiliate-länk och vad den gett. Skapar koden första gången. */
+export async function getMinAffiliate(): Promise<MinAffiliate> {
+  return json(await authFetch("/api/salj/affiliate"));
+}
+
+/** Den nyss registrerade kom via en affiliate-länk. Koden töms oavsett utfall. */
+export async function gorAffiliateAnsprak(kod: string): Promise<{ utfall: string }> {
+  return json(
+    await authFetch("/api/salj/affiliate/ansprak", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ kod }),
+    }),
+  );
+}
+
+export async function listaAffiliateProvisioner(): Promise<{ rader: AdminAffiliateRad[] }> {
+  return json(await authFetch("/api/admin/affiliate"));
+}
+
+/** Admin har betalat ut provisionerna för hand. Svaret är hur många som byttes till utbetalda. */
+export async function markeraAffiliateUtbetalda(ids: string[]): Promise<{ antal: number }> {
+  return json(
+    await authFetch("/api/admin/affiliate/utbetald", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ids }),
     }),
   );
 }

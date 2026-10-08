@@ -147,6 +147,21 @@ export async function markeraUtbetald(
     .catch(() => undefined);
 
   const saljarId = job ? ownerIdOf(job) : null;
+
+  /**
+   * Affären är slutförd — säljarens pengar har gått ut. Nu, och inte vid försäljningen, får den som
+   * värvade säljaren sin provision (affiliate/regler.ts). Väntas in men får aldrig fälla utbetalningen:
+   * beloppen är redan frysta, och en provision som föll syns i loggen.
+   */
+  if (saljarId) {
+    try {
+      const { provisionVidUtbetalning } = await import("../affiliate/regler.js");
+      await provisionVidUtbetalning({ productId, sellerUserId: saljarId, mobelprisSek: delning.mobelprisSek });
+    } catch (err) {
+      console.warn(`[utbetalning] affiliate-provisionen för ${productId} föll:`, err instanceof Error ? err.message : err);
+    }
+  }
+
   // Brevet får aldrig fälla utbetalningen — den är gjord, och kvittot står.
   if (saljarId && job?.ownerEmail) void skrivTillSaljaren(job, saljarId, updated, delning);
 

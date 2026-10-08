@@ -591,6 +591,7 @@ const RADERAT_ETIKETT: Record<string, string> = {
   affarerAvidentifierade: "Affärer avidentifierade",
   inbjudningsprofil: "Inbjudningsprofil rensad",
   krediterAvslutade: "Krediter avslutade",
+  affiliateprofil: "Affiliate-profil rensad",
   omdomen: "Omdömen",
   chattsamtal: "Chattsamtal",
   flodessessioner: "Flödesloggar",

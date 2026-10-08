@@ -2,7 +2,8 @@ import { createContext, useCallback, useContext, useEffect, useRef, useState, ty
 import type { Session, User } from "@supabase/supabase-js";
 import { aterstallningsLank, supabase } from "../lib/supabase";
 import { medInbjudan, rensaInbjudan, sparadInbjudan } from "../lib/referral";
-import { begarAterstallning, gorInbjudningsansprak } from "../api";
+import { medAffiliate, rensaAffiliate, sparadAffiliate } from "../lib/affiliate";
+import { begarAterstallning, gorAffiliateAnsprak, gorInbjudningsansprak } from "../api";
 
 /**
  * Inloggningen, med samma mekanik som vips-buy-sell-hub.
@@ -165,6 +166,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /**
+   * Affiliate-koden, lämnad till servern vid första sessionen efter att länken öppnats. Samma mekanik
+   * som inbjudan ovan, men ett eget program med egen kod. Se lib/affiliate.ts.
+   */
+  const skickarAffiliate = useRef(false);
+  const skickaAffiliate = useCallback(async () => {
+    const kod = sparadAffiliate();
+    if (!kod || skickarAffiliate.current) return;
+    skickarAffiliate.current = true;
+    try {
+      await gorAffiliateAnsprak(kod);
+      rensaAffiliate();
+    } catch {
+      // Ligger kvar till nästa gång.
+    } finally {
+      skickarAffiliate.current = false;
+    }
+  }, []);
+
   const loadProfile = useCallback(async (userId: string) => {
     if (lastLoadedProfileFor.current === userId) return;
     lastLoadedProfileFor.current = userId;
@@ -193,6 +213,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const u = next.user;
         setTimeout(() => void fullfoljAdress(u), 0);
         setTimeout(() => void skickaAnsprak(), 0);
+        setTimeout(() => void skickaAffiliate(), 0);
       } else {
         setProfile(null);
         lastLoadedProfileFor.current = null;
@@ -208,6 +229,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         void loadProfile(existing.user.id);
         void fullfoljAdress(existing.user);
         void skickaAnsprak();
+        void skickaAffiliate();
       }
     });
 
@@ -227,7 +249,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       subscription.unsubscribe();
       clearInterval(refresh);
     };
-  }, [loadProfile, fullfoljAdress, skickaAnsprak]);
+  }, [loadProfile, fullfoljAdress, skickaAnsprak, skickaAffiliate]);
 
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
@@ -262,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const registrera = async (email: string, password: string, adress: Adress) => {
     try {
       const { error } = await supabase.functions.invoke("handle-signup", {
-        body: { email, password, redirectUrl: medInbjudan(`${window.location.origin}/`) },
+        body: { email, password, redirectUrl: medAffiliate(medInbjudan(`${window.location.origin}/`)) },
       });
       if (!error) return { error: null };
       const detail = await readFunctionError(error);
@@ -273,7 +295,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { error } = await supabase.auth.signUp({
       email,
       password,
-      options: { emailRedirectTo: medInbjudan(`${window.location.origin}/`), data: { email_confirm: true, adress } },
+      options: { emailRedirectTo: medAffiliate(medInbjudan(`${window.location.origin}/`)), data: { email_confirm: true, adress } },
     });
     return { error };
   };

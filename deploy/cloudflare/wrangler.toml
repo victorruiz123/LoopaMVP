@@ -98,6 +98,12 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/c/*"
 zone_name = "loopa.nu"
 
+# Affiliate-länken: loopa.nu/p/KOD. En sökväg, för att `/?ref=` inte går att routa — se
+# server/src/affiliate/regler.ts, affiliateLank.
+[[routes]]
+pattern = "loopa.nu/p/*"
+zone_name = "loopa.nu"
+
 # De juridiska sidorna. Också de Merchant Center kommer att kräva.
 [[routes]]
 pattern = "loopa.nu/villkor"

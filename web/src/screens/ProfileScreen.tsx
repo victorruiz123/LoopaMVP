@@ -18,6 +18,7 @@ import type { Product } from "../butik/types";
 import { buyStats, CLOSED_DEAL_STATES, plural, sellStats } from "../profil/stats";
 import { DealRow, OrderRow, StatGrid } from "../profil/TradeSections";
 import { ProfilInbjudan } from "../components/BjudIn";
+import { ProfilAffiliate } from "../components/Affiliate";
 
 /**
  * Profilen: allt konto-innehavaren handlar med, sålt som köpt, på ett ställe.
@@ -197,6 +198,9 @@ export default function ProfileScreen({
       {/* Inbjudan: länken, gratisförsäljningarna och de inbjudna. Under annonserna, för att det är
           som säljare man bjuder in — och det är där den som just fått en möbel utbetald tittar. */}
       <ProfilInbjudan />
+
+      {/* Affiliate: den personliga länken och provisionerna. Eget program, egen ruta — se Affiliate.tsx. */}
+      <ProfilAffiliate />
 
       {/* ── Affärer där jag är säljaren ───────────────────────────────────
           Egen avdelning och inte blandad med annonserna: en Trygg affär är en köpare som redan

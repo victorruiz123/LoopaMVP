@@ -2059,6 +2059,13 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Not found" });
       }
 
+      /** Affiliate-länken: koden, vad den gett, anspråket efter registreringen. Se affiliate/routes.ts. */
+      if (segments[1] === "salj" && segments[2] === "affiliate") {
+        const { handleAffiliate } = await import("./affiliate/routes.js");
+        if (await handleAffiliate(segments.slice(2), req, res, sendJson, (r) => readJsonBody(r, 4 * 1024))) return;
+        return sendJson(res, 404, { error: "Not found" });
+      }
+
       /** Inbjudningarna: koden, krediterna, anspråket efter registreringen. Se referral/routes.ts. */
       if (segments[1] === "salj" && segments[2] === "inbjudan") {
         const { handleInbjudan } = await import("./referral/routes.js");
@@ -2311,6 +2318,12 @@ const server = http.createServer(async (req, res) => {
          * Pengarna går för hand (Swish/bank). Trycket fryser beloppen och är det som räknas som
          * "utbetald" — se butik/utbetalning.ts, och referral/regler.ts för vad det utlöser.
          */
+        /** Affiliate-provisionerna och den manuella utbetalningen. Se affiliate/routes.ts. */
+        if (segments[2] === "affiliate") {
+          const { handleAdminAffiliate } = await import("./affiliate/routes.js");
+          if (await handleAdminAffiliate(segments.slice(2), req, res, sendJson, (r) => readJsonBody(r, 64 * 1024), identity.id)) return;
+          return sendJson(res, 404, { error: "Not found" });
+        }
         if (segments[2] === "utbetalningar" && segments.length === 3 && req.method === "GET") {
           const { listaUtbetalningar } = await import("./butik/utbetalning.js");
           return sendJson(res, 200, { rader: await listaUtbetalningar() });

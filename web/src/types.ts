@@ -549,6 +549,42 @@ export interface MinInbjudan {
   inbjudna: Array<{ email: string | null; registrerad: string | null; status: "registrerad" | "annons" }>;
 }
 
+/** Affiliate-länken och vad den gett. Belopp i öre. Se server/src/affiliate/regler.ts, oversikt. */
+export interface MinAffiliate {
+  kod: string;
+  lank: string;
+  registreringar: number;
+  annonser: number;
+  salda: number;
+  vantandeOre: number;
+  utbetaltOre: number;
+}
+
+export interface AffiliateProvision {
+  id: string;
+  affiliateUserId: string;
+  sellerUserId: string;
+  productId: string;
+  salePriceOre: number;
+  rate: number;
+  amountOre: number;
+  status: "pending" | "paid" | "cancelled";
+  createdAt: string;
+  paidAt: string | null;
+  cancelledAt: string | null;
+  cancelReason: string | null;
+}
+
+/** En affiliate i adminpanelen, med provisionerna. Se server/src/affiliate/regler.ts, adminOversikt. */
+export interface AdminAffiliateRad {
+  userId: string;
+  email: string | null;
+  kod: string | null;
+  vantandeOre: number;
+  utbetaltOre: number;
+  provisioner: AffiliateProvision[];
+}
+
 /** En rad i adminpanelens utbetalningar. Se server/src/butik/utbetalning.ts. */
 export interface UtbetalningsRad {
   productId: string;
