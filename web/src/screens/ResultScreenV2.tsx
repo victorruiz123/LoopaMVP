@@ -220,7 +220,6 @@ export default function ResultScreenV2({
   // Steg 2: helheten
   // -------------------------------------------------------------------------------------------
   const godkanda = skador.filter((d) => d.sellerAction !== "rejected");
-  const omslag = result.coverImageId ?? result.images[0]?.id ?? null;
 
   /*
     HELHETEN, så lite text som möjligt. Betyget och skickets namn — inget mer om det. Skadorna som
@@ -235,46 +234,49 @@ export default function ResultScreenV2({
       <FlowSteps current={4} />
 
       {/*
-        SKICKKORTET. Möbelns eget foto, suddigt och tonat, bär betyget: en ring som fylls efter hur
-        bra skicket är, skickets namn och möbelns. Under kortet skadorna som bildkort — ett tryck
-        öppnar skadan igen.
+        HELHETEN, så stilla som möjligt: betyget i en tunn ring som fylls efter skicket, skickets namn,
+        och skadorna som små runda bilder utan text. Ett tryck på en bild öppnar den skadan igen.
       */}
       <section
-        className="v2-k"
+        className="v2-m"
         style={{
-          ["--omslag" as string]: omslag ? `url("${imageUrl(jobId, omslag)}")` : "none",
           ["--betygsfarg" as string]: result.grade ? BETYGSFARG[result.grade.grade] : "#c9922e",
           ["--fyllnad" as string]: result.grade ? `${FYLLNAD[result.grade.grade]}%` : "0%",
         }}
       >
         {result.grade && (
           <>
-            <div className="v2-k-ring" aria-hidden="true">
+            <div className="v2-m-ring" aria-hidden="true">
               <span>{result.grade.grade}</span>
             </div>
             <h2>{result.grade.label}</h2>
-            {rubrik && <p className="v2-k-mobel">{rubrik}</p>}
           </>
         )}
-      </section>
 
-      {godkanda.length > 0 ? (
-        <div className="v2-k-skador" role="list" aria-label={t("Skador i annonsen")}>
-          {godkanda.map((d) => (
-            <button
-              key={d.id}
-              role="listitem"
-              className="v2-k-skada"
-              onClick={() => setLage({ steg: "granska", index: skador.indexOf(d) })}
-            >
-              <Lins jobId={jobId} skada={d} bilder={result.images} storlek={76} className="v2-k-bild" />
-              <span>{typeLabel(d.type)}</span>
-            </button>
-          ))}
-        </div>
-      ) : (
-        <p className="v2-h-inga">{t("Inga skador")}</p>
-      )}
+        {godkanda.length > 0 ? (
+          <>
+            <div className="v2-m-skador" role="list" aria-label={t("Skador i annonsen")}>
+              {godkanda.map((d) => (
+                <button
+                  key={d.id}
+                  role="listitem"
+                  className="v2-m-skada"
+                  title={typeLabel(d.type)}
+                  aria-label={typeLabel(d.type)}
+                  onClick={() => setLage({ steg: "granska", index: skador.indexOf(d) })}
+                >
+                  <Lins jobId={jobId} skada={d} bilder={result.images} storlek={46} className="v2-m-bild" />
+                </button>
+              ))}
+            </div>
+            <p className="v2-m-antal">
+              {godkanda.length === 1 ? t("1 skada") : t("{antal} skador", { antal: godkanda.length })}
+            </p>
+          </>
+        ) : (
+          <p className="v2-m-antal">{t("Inga skador")}</p>
+        )}
+      </section>
 
       {result.coverage === "NOT_SUFFICIENTLY_VISIBLE" && (
         <p className="v2-h-varning">

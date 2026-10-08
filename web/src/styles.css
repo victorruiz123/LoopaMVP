@@ -5663,3 +5663,26 @@ body:has(.grind) .consent { display: none; }
   .v2-k-bild { width: 66px; height: 66px; border-radius: 18px; }
   .v2-h .v2-h-knappar { padding-top: 16px; }
 }
+
+/* ---- skick v13: helheten, minimalistisk ------------------------------------------------------- */
+.v2-m { display: grid; justify-items: center; text-align: center; margin-top: auto; }
+.v2-m-ring {
+  width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: conic-gradient(var(--betygsfarg) var(--fyllnad), var(--hairline) 0);
+}
+.v2-m-ring::before { content: ""; position: absolute; inset: 4px; border-radius: 50%; background: var(--bg); }
+.v2-m-ring span { position: relative; font-size: 50px; font-weight: 700; letter-spacing: -0.04em; line-height: 1; color: var(--betygsfarg); }
+.v2-m h2 { margin: 18px 0 0; font-size: 26px; font-weight: 700; letter-spacing: -0.03em; line-height: 1.15; }
+
+.v2-m-skador { display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; margin-top: 28px; }
+.v2-m-skada { padding: 0; border: 0; background: none; cursor: pointer; border-radius: 50%; }
+.v2-m-bild {
+  display: block; width: 46px; height: 46px; border-radius: 50%; background-color: #1b1712; background-repeat: no-repeat;
+  box-shadow: 0 0 0 2px var(--bg), 0 0 0 3px var(--hairline); transition: transform .12s ease;
+}
+.v2-m-skada:active .v2-m-bild { transform: scale(.94); }
+.v2-m-antal { margin: 10px 0 0; font-size: 14px; font-weight: 600; color: var(--muted); }
+
+/* Knapparna lättare: huvudknappen bär, de två andra är bara en tunn kant. */
+.v2-h .v2-h-knappar { padding-top: 34px; }
+.v2-h .v2-h-knapp { box-shadow: none; background: transparent; border-color: rgba(20, 17, 13, 0.14); font-weight: 600; }
