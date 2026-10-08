@@ -12,10 +12,9 @@
  * Jämförs sida vid sida på /jamfor.html i den lokala förhandsvisningen.
  */
 import { useEffect, useRef, useState } from "react";
-import { actOnDamage, addDamageFromPhoto, getJob } from "../api";
+import { actOnDamage, addDamageFromPhoto, getJob, imageUrl } from "../api";
 import type { ConditionResult, Damage } from "../types";
 import GradeBadge from "../components/GradeBadge";
-import MarkedThumb from "../components/MarkedThumb";
 import EvidenceViewer from "../components/EvidenceViewer";
 import { AlertIcon, ArrowLeftIcon, ChevronRight } from "../components/icons";
 import FlowSteps from "../components/FlowSteps";
@@ -131,56 +130,83 @@ export default function ResultScreenV2({
         </button>
         <FlowSteps current={4} />
 
-        <div className="v2-topp">
-          <p className="v2-fraga">{t("Stämmer det här?")}</p>
-          {/* Prickarna är också vägen tillbaka: en tryckt prick öppnar den skadan igen. */}
-          <div className="v2-prickar" aria-label={t("Skada {nr} av {antal}", { nr: lage.index + 1, antal: skador.length })}>
-            {skador.map((s, i) => (
-              <button
-                key={s.id}
-                className={`v2-prick${i === lage.index ? " nu" : ""}${s.sellerAction === "rejected" ? " nej" : s.sellerAction ? " ja" : ""}`}
-                onClick={() => {
-                  setRedigerar(false);
-                  setLage({ steg: "granska", index: i });
-                }}
-                aria-label={t("Skada {nr}", { nr: i + 1 })}
-              />
-            ))}
+        {/*
+          KORTET. Bilden i sina egna proportioner, så stor som skärmen tillåter, och frågan och svaren
+          ovanpå den på en glasyta. Resten av bilden mörknar lätt så att blicken går till skadan —
+          markeringen är det enda som är fullt upplyst. `key` gör varje skada till ett nytt kort, som
+          glider in när föregående är besvarad.
+        */}
+        <div
+          key={d.id}
+          className={`v2-kort${redigerar ? " v2-kort-liten" : ""}`}
+          style={{ ["--ratio" as string]: bildMeta ? bildMeta.width / bildMeta.height : 0.75 }}
+        >
+          {bild ? (
+            <button className="v2-kort-bild" onClick={() => setViewer(d)} aria-label={t("Visa bilden större")}>
+              <img src={imageUrl(jobId, bild.imageId)} alt="" />
+              {bild.mark.kind === "box" ? (
+                <span
+                  className="v2-strålkastare"
+                  style={{
+                    left: `${bild.mark.x * 100}%`,
+                    top: `${bild.mark.y * 100}%`,
+                    width: `${(bild.mark.w ?? 0.1) * 100}%`,
+                    height: `${(bild.mark.h ?? 0.1) * 100}%`,
+                  }}
+                />
+              ) : (
+                <svg className="v2-linje" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+                  <line x1={bild.mark.x * 100} y1={bild.mark.y * 100} x2={(bild.mark.x2 ?? bild.mark.x) * 100} y2={(bild.mark.y2 ?? bild.mark.y) * 100} />
+                </svg>
+              )}
+            </button>
+          ) : (
+            <div className="v2-kort-bild v2-kort-tom">{t("Ingen bild på den här skadan")}</div>
+          )}
+
+          {/* Överst: frågan och var i högen man är. Prickarna leder tillbaka till en tidigare skada. */}
+          <div className="v2-glas v2-kort-topp">
+            <span>{t("Stämmer det här?")}</span>
+            <span className="v2-prickar" aria-label={t("Skada {nr} av {antal}", { nr: lage.index + 1, antal: skador.length })}>
+              {skador.map((s, i) => (
+                <button
+                  key={s.id}
+                  className={`v2-prick${i === lage.index ? " nu" : ""}${s.sellerAction === "rejected" ? " nej" : s.sellerAction ? " ja" : ""}`}
+                  onClick={() => {
+                    setRedigerar(false);
+                    setLage({ steg: "granska", index: i });
+                  }}
+                  aria-label={t("Skada {nr}", { nr: i + 1 })}
+                />
+              ))}
+            </span>
           </div>
+
+          {!redigerar && (
+            <div className="v2-glas v2-kort-botten">
+              <h2 className="v2-namn">{typeLabel(d.type)}</h2>
+              <div className="v2-knappar">
+                <button className="v2-knapp v2-knapp-nej" disabled={sparar} onClick={() => void svara(d, "reject")}>
+                  {t("Ingen skada")}
+                </button>
+                <button className="v2-knapp v2-knapp-ja" disabled={sparar} onClick={() => void svara(d, "confirm")}>
+                  {t("Ja, det stämmer")}
+                </button>
+              </div>
+              <button className="v2-redigera-lank" disabled={sparar} onClick={() => setRedigerar(true)}>
+                {t("Redigera")}
+              </button>
+            </div>
+          )}
         </div>
 
-        {bild ? (
-          <button className={`v2-bild${redigerar ? " v2-bild-liten" : ""}`} onClick={() => setViewer(d)} aria-label={t("Visa bilden större")}>
-            <MarkedThumb jobId={jobId} evidence={bild} image={bildMeta} size="lg" />
-          </button>
-        ) : (
-          <div className="v2-bild v2-bild-tom">{t("Ingen bild på den här skadan")}</div>
-        )}
-
-        {redigerar ? (
+        {redigerar && (
           <Redigera
             skada={d}
             sparar={sparar}
             onAvbryt={() => setRedigerar(false)}
             onSpara={(patch) => void svara(d, "edit", patch)}
           />
-        ) : (
-          <>
-            {/* Bara namnet. Var skadan sitter syns i bilden, och resten finns under "Redigera". */}
-            <h2 className="v2-namn">{typeLabel(d.type)}</h2>
-
-            <div className="v2-svar">
-              <button className="btn btn-primary" disabled={sparar} onClick={() => void svara(d, "confirm")}>
-                {t("Ja, det stämmer")}
-              </button>
-              <button className="btn btn-outline" disabled={sparar} onClick={() => void svara(d, "reject")}>
-                {t("Ingen skada")}
-              </button>
-              <button className="btn btn-text v2-lank" disabled={sparar} onClick={() => setRedigerar(true)}>
-                {t("Redigera")}
-              </button>
-            </div>
-          </>
         )}
 
         {viewer && (

@@ -5249,8 +5249,6 @@ body:has(.grind) .consent { display: none; }
    Luft, en stor bild, en fråga och tre svar. Inget annat på skärmen tävlar om uppmärksamheten.
    ========================================================================== */
 .v2 { display: flex; flex-direction: column; gap: 18px; }
-.v2-topp { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 4px; }
-.v2-fraga { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .v2-prickar { display: flex; gap: 6px; }
 .v2-prick {
   width: 9px; height: 9px; padding: 0; border-radius: 50%; border: 0; cursor: pointer;
@@ -5260,23 +5258,7 @@ body:has(.grind) .consent { display: none; }
 .v2-prick.nej { background: var(--muted); opacity: .45; }
 .v2-prick.nu { background: var(--accent); transform: scale(1.35); }
 
-/* Bilden i sina egna proportioner, centrerad. Den får aldrig tvingas till både full bredd och en
-   maxhöjd — då trycks den ihop, och markeringen hamnar fel. Bilden själv bestämmer storleken, och
-   markeringen ligger i procent av just den. */
-.v2-bild {
-  display: flex; justify-content: center; align-items: center; width: 100%; padding: 0; border: 0;
-  background: transparent; cursor: zoom-in;
-}
-.v2-bild .marked-thumb { width: auto; height: auto; padding: 0; border: 0; background: none; pointer-events: none; }
-.v2-bild .marked-thumb-inner {
-  display: inline-block; width: auto !important; height: auto; aspect-ratio: auto !important;
-  border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-raised);
-}
-.v2-bild .marked-thumb-inner img { width: auto; height: auto; max-width: 100%; max-height: 50vh; }
-.v2-bild-liten .marked-thumb-inner img { max-height: 22vh; }
 .v2-namn { margin: 6px 0 0; text-align: center; font-size: 26px; letter-spacing: -0.02em; }
-.v2-bild-tom { padding: 48px 16px; text-align: center; color: var(--muted); cursor: default; }
-
 .v2-skada h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 24px; letter-spacing: -0.02em; }
 .v2-var { margin: 4px 0 0; color: var(--muted); font-size: var(--fs-md, 16px); }
 .v2-text { margin: 10px 0 0; line-height: 1.5; color: var(--ink); }
@@ -5323,3 +5305,77 @@ body:has(.grind) .consent { display: none; }
 .v2-varning { display: flex; gap: 8px; align-items: flex-start; margin: 0; color: var(--amber-ink); font-size: var(--fs-sm); }
 .v2-besked { text-align: center; }
 .v2-sekundara { display: flex; justify-content: center; gap: 18px; flex-wrap: wrap; }
+
+/* ---- v3: kortet ----------------------------------------------------------------------------------
+   Bilden ÄR kortet. Bredden räknas ur proportionerna (--ratio = bredd/höjd) så att kortet blir så
+   stort som skärmen tillåter utan att bilden någonsin sträcks: full bredd när den får plats på
+   höjden, annars så bred som 74 % av skärmhöjden medger. */
+.v2-kort {
+  position: relative; align-self: center;
+  width: min(100%, calc(74dvh * var(--ratio)));
+  aspect-ratio: var(--ratio);
+  border-radius: 28px; overflow: hidden;
+  box-shadow: 0 30px 60px -28px rgba(20, 17, 13, 0.55), 0 2px 6px rgba(20, 17, 13, 0.08);
+  background: #1b1712;
+  animation: v2-in 0.38s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.v2-kort-liten { width: min(100%, calc(30dvh * var(--ratio))); }
+@keyframes v2-in {
+  from { opacity: 0; transform: translateX(28px) scale(0.97) rotate(0.6deg); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) { .v2-kort { animation: none; } }
+
+.v2-kort-bild { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: zoom-in; display: block; }
+.v2-kort-bild img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.v2-kort-tom { display: grid; place-items: center; color: rgba(255,255,255,.7); cursor: default; }
+
+/* Strålkastaren: allt utom skadan mörknar, och kanten runt skadan andas. */
+.v2-strålkastare {
+  position: absolute; border-radius: 10px;
+  box-shadow: 0 0 0 9999px rgba(10, 8, 6, 0.42);
+  outline: 2px solid rgba(255, 255, 255, 0.95); outline-offset: 0;
+  animation: v2-andas 2.4s ease-in-out infinite;
+}
+@keyframes v2-andas {
+  0%, 100% { outline-offset: 0; outline-color: rgba(255,255,255,.95); }
+  50% { outline-offset: 5px; outline-color: rgba(255,255,255,.35); }
+}
+@media (prefers-reduced-motion: reduce) { .v2-strålkastare { animation: none; } }
+.v2-linje { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.v2-linje line { stroke: #fff; stroke-width: 1.2; stroke-linecap: round; filter: drop-shadow(0 0 2px rgba(0,0,0,.6)); }
+
+/* Glaset. */
+.v2-glas {
+  position: absolute; left: 12px; right: 12px; color: #fff;
+  background: linear-gradient(180deg, rgba(28, 24, 20, 0.30), rgba(28, 24, 20, 0.46));
+  -webkit-backdrop-filter: blur(20px) saturate(1.5); backdrop-filter: blur(20px) saturate(1.5);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+}
+.v2-kort-topp {
+  top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: 999px; font-weight: 700; font-size: 15px; letter-spacing: -0.01em;
+}
+.v2-kort-topp .v2-prick { background: rgba(255,255,255,.35); }
+.v2-kort-topp .v2-prick.ja { background: #7be0a0; }
+.v2-kort-topp .v2-prick.nej { background: rgba(255,255,255,.15); opacity: 1; }
+.v2-kort-topp .v2-prick.nu { background: #fff; }
+.v2-kort-liten .v2-kort-topp { display: none; }
+
+.v2-kort-botten { bottom: 12px; padding: 16px 14px 10px; border-radius: 22px; display: grid; gap: 12px; }
+.v2-kort-botten .v2-namn { margin: 0; color: #fff; font-size: 24px; text-align: center; text-shadow: 0 1px 12px rgba(0,0,0,.25); }
+.v2-knappar { display: grid; grid-template-columns: 1fr 1.25fr; gap: 8px; }
+.v2-knapp {
+  font: inherit; font-weight: 700; font-size: 16px; height: 50px; border-radius: 16px; cursor: pointer;
+  transition: transform .12s ease, background .15s ease;
+}
+.v2-knapp:active { transform: scale(0.97); }
+.v2-knapp:disabled { opacity: .6; cursor: default; }
+.v2-knapp-nej { color: #fff; background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); }
+.v2-knapp-ja { color: var(--ink); background: #fff; border: 0; box-shadow: 0 6px 18px -8px rgba(0,0,0,.5); }
+.v2-redigera-lank {
+  justify-self: center; font: inherit; font-size: 14px; font-weight: 600; padding: 2px 8px;
+  color: rgba(255,255,255,.8); background: none; border: 0; cursor: pointer; text-decoration: underline;
+  text-underline-offset: 3px; text-decoration-color: rgba(255,255,255,.35);
+}
