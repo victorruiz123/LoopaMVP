@@ -5594,3 +5594,72 @@ body:has(.grind) .consent { display: none; }
    skadorna och knapparna — centreras i höjdled, så att avstånden är jämna oavsett skärmhöjd. */
 .v2-h-betyg { margin-top: auto; margin-bottom: 22px; }
 .v2-h-knappar { margin-top: 0; padding-top: 30px; margin-bottom: auto; }
+
+/* ---- skick v12: skickkortet ------------------------------------------------------------------- */
+.v2-k {
+  position: relative; overflow: hidden; isolation: isolate;
+  margin: 18px calc(-1 * var(--safe-right)) 0 calc(-1 * var(--safe-left));
+  padding: 44px 24px 34px; border-radius: 0 0 34px 34px;
+  display: grid; justify-items: center; text-align: center; gap: 8px; color: #fff;
+  background: #1b1712;
+  box-shadow: 0 30px 50px -34px rgba(20,17,13,.6);
+}
+.v2-k::before {
+  content: ""; position: absolute; inset: -60px; z-index: -2;
+  background: var(--omslag) center / cover no-repeat;
+  filter: blur(26px) saturate(1.3) brightness(.62);
+}
+.v2-k::after {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(120% 80% at 50% 30%, rgba(0,0,0,0) 0%, rgba(14,12,10,.55) 100%);
+}
+.v2-k-ring {
+  --tjocklek: 9px;
+  width: 132px; height: 132px; border-radius: 50%; display: grid; place-items: center; position: relative;
+  background: conic-gradient(var(--betygsfarg) var(--fyllnad), rgba(255,255,255,.14) 0);
+  box-shadow: 0 0 46px -6px var(--betygsfarg);
+  animation: v2-ring-in .9s cubic-bezier(.2,.8,.2,1) both;
+}
+.v2-k-ring::before {
+  content: ""; position: absolute; inset: var(--tjocklek); border-radius: 50%;
+  background: rgba(20,17,13,.55); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+}
+.v2-k-ring span { position: relative; font-size: 58px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+@keyframes v2-ring-in { from { opacity: 0; transform: scale(.85) rotate(-25deg); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .v2-k-ring { animation: none; } }
+.v2-k h2 { margin: 14px 0 0; font-size: 28px; letter-spacing: -0.03em; line-height: 1.1; color: #fff; }
+.v2-k-mobel {
+  margin: 6px 0 0; padding: 5px 12px; border-radius: 999px; font-size: 12px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: rgba(255,255,255,.85);
+  background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.18);
+}
+
+.v2-k-skador {
+  display: flex; gap: 10px; overflow-x: auto; scrollbar-width: none; scroll-snap-type: x proximity;
+  margin: 22px calc(-1 * var(--safe-right)) 0 calc(-1 * var(--safe-left)); padding: 4px var(--safe-left) 8px;
+  justify-content: safe center;
+}
+.v2-k-skador::-webkit-scrollbar { display: none; }
+.v2-k-skada {
+  flex: none; display: grid; justify-items: center; gap: 7px; padding: 0; border: 0; background: none; cursor: pointer;
+  font: inherit; font-size: 12.5px; font-weight: 700; color: var(--ink); scroll-snap-align: start; width: 76px;
+}
+.v2-k-skada span:last-child { max-width: 76px; line-height: 1.2; text-align: center; }
+.v2-k-bild { width: 76px; height: 76px; border-radius: 20px; background-color: #1b1712; background-repeat: no-repeat; box-shadow: 0 10px 20px -12px rgba(20,17,13,.55); transition: transform .12s ease; }
+.v2-k-skada:active .v2-k-bild { transform: scale(.95); }
+.v2-h .v2-h-knappar { padding-top: 24px; }
+.v2-h:has(.v2-k) .v2-h-knappar { margin-bottom: auto; }
+
+/* v12b: ringen som en ren ring — den inre cirkeln är tät, så fyllnaden bara syns i kanten. */
+.v2-k-ring::before { background: #221d18; -webkit-backdrop-filter: none; backdrop-filter: none; box-shadow: inset 0 2px 10px rgba(0,0,0,.45); }
+/* Lägre skärmar: kortet krymper så att knapparna ryms utan scroll. */
+@media (max-height: 740px) {
+  .v2-k { padding: 28px 20px 24px; margin-top: 10px; }
+  .v2-k-ring { width: 104px; height: 104px; --tjocklek: 8px; }
+  .v2-k-ring span { font-size: 46px; }
+  .v2-k h2 { margin-top: 10px; font-size: 24px; }
+  .v2-k-skador { margin-top: 16px; }
+  .v2-k-skada, .v2-k-skada span:last-child { width: 66px; max-width: 66px; }
+  .v2-k-bild { width: 66px; height: 66px; border-radius: 18px; }
+  .v2-h .v2-h-knappar { padding-top: 16px; }
+}

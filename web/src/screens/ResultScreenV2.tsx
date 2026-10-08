@@ -220,6 +220,7 @@ export default function ResultScreenV2({
   // Steg 2: helheten
   // -------------------------------------------------------------------------------------------
   const godkanda = skador.filter((d) => d.sellerAction !== "rejected");
+  const omslag = result.coverImageId ?? result.images[0]?.id ?? null;
 
   /*
     HELHETEN, så lite text som möjligt. Betyget och skickets namn — inget mer om det. Skadorna som
@@ -233,25 +234,41 @@ export default function ResultScreenV2({
       </button>
       <FlowSteps current={4} />
 
-      {result.grade && (
-        <section className="v2-h-betyg">
-          <GradeBadge grade={result.grade.grade} size={104} />
-          <h2>{result.grade.label}</h2>
-          {rubrik && <p>{rubrik}</p>}
-        </section>
-      )}
+      {/*
+        SKICKKORTET. Möbelns eget foto, suddigt och tonat, bär betyget: en ring som fylls efter hur
+        bra skicket är, skickets namn och möbelns. Under kortet skadorna som bildkort — ett tryck
+        öppnar skadan igen.
+      */}
+      <section
+        className="v2-k"
+        style={{
+          ["--omslag" as string]: omslag ? `url("${imageUrl(jobId, omslag)}")` : "none",
+          ["--betygsfarg" as string]: result.grade ? BETYGSFARG[result.grade.grade] : "#c9922e",
+          ["--fyllnad" as string]: result.grade ? `${FYLLNAD[result.grade.grade]}%` : "0%",
+        }}
+      >
+        {result.grade && (
+          <>
+            <div className="v2-k-ring" aria-hidden="true">
+              <span>{result.grade.grade}</span>
+            </div>
+            <h2>{result.grade.label}</h2>
+            {rubrik && <p className="v2-k-mobel">{rubrik}</p>}
+          </>
+        )}
+      </section>
 
       {godkanda.length > 0 ? (
-        <div className="v2-h-skador" role="list" aria-label={t("Skador i annonsen")}>
+        <div className="v2-k-skador" role="list" aria-label={t("Skador i annonsen")}>
           {godkanda.map((d) => (
             <button
               key={d.id}
               role="listitem"
-              className="v2-h-skada"
+              className="v2-k-skada"
               onClick={() => setLage({ steg: "granska", index: skador.indexOf(d) })}
             >
-              <Lins jobId={jobId} skada={d} bilder={result.images} />
-              {typeLabel(d.type)}
+              <Lins jobId={jobId} skada={d} bilder={result.images} storlek={76} className="v2-k-bild" />
+              <span>{typeLabel(d.type)}</span>
             </button>
           ))}
         </div>
@@ -353,15 +370,32 @@ function Kort({
   );
 }
 
+/** Betygets färg — samma som GradeBadge (components/GradeBadge.tsx), som inte exporterar sin tabell. */
+const BETYGSFARG: Record<string, string> = { A: "#2F7A50", B: "#62A15C", C: "#C9922E", D: "#E07B2C", E: "#C4442E", F: "#96271C" };
+/** Hur långt ringen fylls: A nästan hel, F en bit. */
+const FYLLNAD: Record<string, number> = { A: 96, B: 84, C: 70, D: 55, E: 40, F: 24 };
+
 /**
  * En rund bild inzoomad på skadan — skadans eget utsnitt ur bevisfotot, utan ram eller markering.
  * Zoomen räknas så att markeringens största sida fyller ungefär rundeln, och utsnittet centreras på
  * skadans mitt.
  */
-function Lins({ jobId, skada, bilder }: { jobId: string; skada: Damage; bilder: ConditionResult["images"] }) {
+function Lins({
+  jobId,
+  skada,
+  bilder,
+  storlek = 36,
+  className = "v2-lins",
+}: {
+  jobId: string;
+  skada: Damage;
+  bilder: ConditionResult["images"];
+  storlek?: number;
+  className?: string;
+}) {
   const ev = skada.evidence[0];
-  const STORLEK = 36;
-  if (!ev) return <span className={`v2-lins v2-lins-tom v2-grad-${skada.severity}`} aria-hidden="true" />;
+  const STORLEK = storlek;
+  if (!ev) return <span className={`${className} v2-lins-tom v2-grad-${skada.severity}`} aria-hidden="true" />;
   const bild = bilder.find((b) => b.id === ev.imageId);
   const kvot = bild ? bild.width / bild.height : 0.75;
   const m = ev.mark;
@@ -369,18 +403,20 @@ function Lins({ jobId, skada, bilder }: { jobId: string; skada: Damage; bilder: 
   const h = m.kind === "box" ? (m.h ?? 0.1) : Math.abs((m.y2 ?? m.y) - m.y) || 0.1;
   const cx = m.kind === "box" ? m.x + w / 2 : (m.x + (m.x2 ?? m.x)) / 2;
   const cy = m.kind === "box" ? m.y + h / 2 : (m.y + (m.y2 ?? m.y)) / 2;
-  // Bildens bredd i rundeln: så att skadans största sida (i rundelns mått) blir ~1,4 rundel.
-  const zoom = Math.min(8, Math.max(1.4, 1 / Math.max(w, (h / kvot) * 1) / 1.4));
-  const bredd = STORLEK * zoom;
-  const hojd = bredd / kvot;
+  // Zoomen: bildens bredd som en multipel av rutans, så att skadan fyller rutan. Utsnittet räknas i
+  // procent, så det blir rätt vilken storlek rutan än får (den krymper på låga skärmar).
+  const zoom = Math.min(9, Math.max(1.6, 1 / Math.max(w, h / kvot) / 1.05));
+  const zh = zoom / kvot; // bildens höjd som multipel av rutans
+  const pos = (c: number, z: number) => (z === 1 ? 50 : ((0.5 - c * z) / (1 - z)) * 100);
+  void STORLEK;
   return (
     <span
-      className="v2-lins"
+      className={className}
       aria-hidden="true"
       style={{
         backgroundImage: `url("${imageUrl(jobId, ev.imageId)}")`,
-        backgroundSize: `${bredd}px ${hojd}px`,
-        backgroundPosition: `${STORLEK / 2 - cx * bredd}px ${STORLEK / 2 - cy * hojd}px`,
+        backgroundSize: `${zoom * 100}% ${zh * 100}%`,
+        backgroundPosition: `${Math.min(100, Math.max(0, pos(cx, zoom)))}% ${Math.min(100, Math.max(0, pos(cy, zh)))}%`,
       }}
     />
   );
