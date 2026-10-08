@@ -5393,3 +5393,17 @@ body:has(.grind) .consent { display: none; }
 .v2-kort-fraga { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .v2-kort-topp .v2-prickar { flex: none; gap: 5px; }
 .v2-kort-topp .v2-prick { width: 8px; height: 8px; }
+
+/* v6: kortet täcker skärmen — kant till kant under stegen, ner till skärmens nederkant. Bilden
+   beskärs i Kort (ResultScreenV2.tsx) så att den fyller ytan utan att sträckas. */
+.v2-kort {
+  align-self: stretch; width: auto; aspect-ratio: auto;
+  flex: 1 0 auto; min-height: 64dvh;
+  margin: 0 calc(-1 * var(--safe-right)) calc(-40px - env(safe-area-inset-bottom)) calc(-1 * var(--safe-left));
+  border-radius: 30px 30px 0 0;
+}
+.v2-kort.v2-kort-liten { flex: none; min-height: 0; height: 32dvh; margin-bottom: 0; border-radius: 0 0 24px 24px; }
+.v2-beskarning { position: absolute; }
+.v2-beskarning .v2-kort-bild { position: absolute; inset: 0; }
+.v2-kort-topp { top: 14px; left: 14px; right: 14px; }
+.v2-kort-botten { left: 14px; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); }

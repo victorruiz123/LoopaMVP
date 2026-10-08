@@ -136,12 +136,12 @@ export default function ResultScreenV2({
           markeringen är det enda som är fullt upplyst. `key` gör varje skada till ett nytt kort, som
           glider in när föregående är besvarad.
         */}
-        <div
+        <Kort
           key={d.id}
-          className={`v2-kort${redigerar ? " v2-kort-liten" : ""}`}
-          style={{ ["--ratio" as string]: bildMeta ? bildMeta.width / bildMeta.height : 0.75 }}
-        >
-          {bild ? (
+          liten={redigerar}
+          bildMeta={bildMeta}
+          mark={bild?.mark ?? null}
+          bild={bild ? (
             <button className="v2-kort-bild" onClick={() => setViewer(d)} aria-label={t("Visa bilden större")}>
               <img src={imageUrl(jobId, bild.imageId)} alt="" />
               {bild.mark.kind === "box" ? (
@@ -163,7 +163,7 @@ export default function ResultScreenV2({
           ) : (
             <div className="v2-kort-bild v2-kort-tom">{t("Ingen bild på den här skadan")}</div>
           )}
-
+        >
           {/* Överst: frågan och var i högen man är. Prickarna leder tillbaka till en tidigare skada. */}
           <div className="v2-glas v2-kort-topp">
             <span className="v2-kort-fraga">{t("Stämmer denna skada?")}</span>
@@ -198,7 +198,7 @@ export default function ResultScreenV2({
               </button>
             </div>
           )}
-        </div>
+        </Kort>
 
         {redigerar && (
           <Redigera
@@ -290,6 +290,66 @@ export default function ResultScreenV2({
       </div>
 
       <input ref={fotoRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={fotoValt} />
+    </div>
+  );
+}
+
+/**
+ * Kortet fyller skärmen, men bilden har sina egna proportioner — de två stämmer nästan aldrig.
+ *
+ * Bilden får därför fylla kortet som `object-fit: cover`, men beskärningen räknas här och inte av
+ * webbläsaren: lagret med bilden OCH markeringen är exakt bildens proportioner, så markeringen följer
+ * med i procent och hamnar alltid rätt. Beskärningen centreras på skadan — den hamnar mitt i bredd
+ * och strax ovanför mitten i höjd, ovanför glaset med svaren — och skjuts aldrig så långt att en kant
+ * av kortet blir tom.
+ */
+function Kort({
+  liten,
+  bildMeta,
+  mark,
+  bild,
+  children,
+}: {
+  liten: boolean;
+  bildMeta: { width: number; height: number } | undefined;
+  mark: { kind: "box" | "line"; x: number; y: number; w?: number; h?: number; x2?: number; y2?: number } | null;
+  bild: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [yta, setYta] = useState<{ b: number; h: number } | null>(null);
+
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const ro = new ResizeObserver(([e]) => setYta({ b: e.contentRect.width, h: e.contentRect.height }));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  let lager: React.CSSProperties = { inset: 0 };
+  if (yta && bildMeta) {
+    const kvot = bildMeta.width / bildMeta.height;
+    const b = yta.b / yta.h > kvot ? yta.b : yta.h * kvot;
+    const h = b / kvot;
+    // Skadans mittpunkt, i bråkdelar av bilden.
+    const mx = mark ? (mark.kind === "box" ? mark.x + (mark.w ?? 0.1) / 2 : (mark.x + (mark.x2 ?? mark.x)) / 2) : 0.5;
+    const my = mark ? (mark.kind === "box" ? mark.y + (mark.h ?? 0.1) / 2 : (mark.y + (mark.y2 ?? mark.y)) / 2) : 0.5;
+    const klamp = (v: number, min: number) => Math.min(0, Math.max(min, v));
+    lager = {
+      width: b,
+      height: h,
+      left: klamp(yta.b * 0.5 - mx * b, yta.b - b),
+      top: klamp(yta.h * (liten ? 0.5 : 0.4) - my * h, yta.h - h),
+    };
+  }
+
+  return (
+    <div ref={ref} className={`v2-kort${liten ? " v2-kort-liten" : ""}`}>
+      <div className="v2-beskarning" style={lager}>
+        {bild}
+      </div>
+      {children}
     </div>
   );
 }
