@@ -220,75 +220,72 @@ export default function ResultScreenV2({
   // Steg 2: helheten
   // -------------------------------------------------------------------------------------------
   const godkanda = skador.filter((d) => d.sellerAction !== "rejected");
-  const bortvalda = skador.length - godkanda.length;
 
+  /*
+    HELHETEN, så lite text som möjligt. Betyget och skickets namn — inget mer om det. Skadorna som
+    knappar: en rund bild inzoomad på just den skadan och namnet, och ett tryck öppnar den igen. Allt
+    man kan göra står samlat nederst, där tummen är.
+  */
   return (
-    <div className="screen screen-light v2 v2-helhet-skarm">
+    <div className="screen screen-light v2 v2-helhet-skarm v2-h">
       <button className="btn btn-text btn-back" onClick={onHome}>
         <ArrowLeftIcon /> {t("Startsidan")}
       </button>
       <FlowSteps current={4} />
 
-      {rubrik && <p className="v2-mobel">{rubrik}</p>}
-
       {result.grade && (
-        <section className="v2-helhet">
-          <GradeBadge grade={result.grade.grade} size={64} />
+        <section className="v2-h-betyg">
+          <GradeBadge grade={result.grade.grade} size={104} />
           <h2>{result.grade.label}</h2>
-          <p>{result.grade.rationale}</p>
+          {rubrik && <p>{rubrik}</p>}
         </section>
       )}
 
-      <section className="v2-sammanfattning">
-        <h3>
-          {godkanda.length === 0
-            ? t("Inga skador i annonsen")
-            : godkanda.length === 1
-              ? t("1 skada visas i annonsen")
-              : t("{antal} skador visas i annonsen", { antal: godkanda.length })}
-        </h3>
-        {godkanda.length > 0 && (
-          <ul className="v2-lista">
-            {godkanda.map((d) => (
-              <li key={d.id}>
-                <span className={`v2-punkt v2-grad-${d.severity}`} aria-hidden="true" />
-                <span>
-                  <strong>{typeLabel(d.type)}</strong> <span className="v2-dampad">{d.part}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        )}
-        {bortvalda > 0 && (
-          <p className="v2-dampad">
-            {bortvalda === 1 ? t("1 markerad som ingen skada.") : t("{antal} markerade som ingen skada.", { antal: bortvalda })}
-          </p>
-        )}
-      </section>
+      {godkanda.length > 0 ? (
+        <div className="v2-h-skador" role="list" aria-label={t("Skador i annonsen")}>
+          {godkanda.map((d) => (
+            <button
+              key={d.id}
+              role="listitem"
+              className="v2-h-skada"
+              onClick={() => setLage({ steg: "granska", index: skador.indexOf(d) })}
+            >
+              <Lins jobId={jobId} skada={d} bilder={result.images} />
+              {typeLabel(d.type)}
+            </button>
+          ))}
+        </div>
+      ) : (
+        <p className="v2-h-inga">{t("Inga skador")}</p>
+      )}
 
       {result.coverage === "NOT_SUFFICIENTLY_VISIBLE" && (
-        <p className="v2-varning">
-          <AlertIcon size={16} /> {t("Bedömningen är preliminär — inte hela möbeln syntes tydligt i bilderna.")}
+        <p className="v2-h-varning">
+          <AlertIcon size={15} /> {t("Preliminär bedömning")}
         </p>
       )}
       {besked && <p className="v2-dampad v2-besked">{besked}</p>}
 
-      <div className="v2-avslut">
+      <div className="v2-h-knappar">
         <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
           <span>{t("Till annonsen")}</span>
           <ChevronRight size={18} />
         </button>
-        {/* En riktig knapp och inte en länk: en missad skada är det enda säljaren kan behöva göra här,
-            och den ska synas utan att man scrollar. */}
-        <button className="btn btn-outline v2-missade" disabled={laggerTill} onClick={() => fotoRef.current?.click()}>
-          <CameraIcon size={18} />
-          {laggerTill ? t("Bedömer bilden…") : t("Vi missade en skada")}
-        </button>
-        {skador.length > 0 && (
-          <button className="btn btn-text v2-lank" onClick={() => setLage({ steg: "granska", index: 0 })}>
-            {t("Granska skadorna igen")}
+        <div className="v2-h-par">
+          <button className="v2-h-knapp" disabled={laggerTill} onClick={() => fotoRef.current?.click()}>
+            <CameraIcon size={18} />
+            {laggerTill ? t("Bedömer…") : t("Missad skada")}
           </button>
-        )}
+          {skador.length > 0 && (
+            <button className="v2-h-knapp" onClick={() => setLage({ steg: "granska", index: 0 })}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M3 12a9 9 0 1 0 3-6.7" />
+                <path d="M3 4v5h5" />
+              </svg>
+              {t("Granska igen")}
+            </button>
+          )}
+        </div>
       </div>
 
       <input ref={fotoRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={fotoValt} />
@@ -353,6 +350,39 @@ function Kort({
       </div>
       {children}
     </div>
+  );
+}
+
+/**
+ * En rund bild inzoomad på skadan — skadans eget utsnitt ur bevisfotot, utan ram eller markering.
+ * Zoomen räknas så att markeringens största sida fyller ungefär rundeln, och utsnittet centreras på
+ * skadans mitt.
+ */
+function Lins({ jobId, skada, bilder }: { jobId: string; skada: Damage; bilder: ConditionResult["images"] }) {
+  const ev = skada.evidence[0];
+  const STORLEK = 36;
+  if (!ev) return <span className={`v2-lins v2-lins-tom v2-grad-${skada.severity}`} aria-hidden="true" />;
+  const bild = bilder.find((b) => b.id === ev.imageId);
+  const kvot = bild ? bild.width / bild.height : 0.75;
+  const m = ev.mark;
+  const w = m.kind === "box" ? (m.w ?? 0.1) : Math.abs((m.x2 ?? m.x) - m.x) || 0.1;
+  const h = m.kind === "box" ? (m.h ?? 0.1) : Math.abs((m.y2 ?? m.y) - m.y) || 0.1;
+  const cx = m.kind === "box" ? m.x + w / 2 : (m.x + (m.x2 ?? m.x)) / 2;
+  const cy = m.kind === "box" ? m.y + h / 2 : (m.y + (m.y2 ?? m.y)) / 2;
+  // Bildens bredd i rundeln: så att skadans största sida (i rundelns mått) blir ~1,4 rundel.
+  const zoom = Math.min(8, Math.max(1.4, 1 / Math.max(w, (h / kvot) * 1) / 1.4));
+  const bredd = STORLEK * zoom;
+  const hojd = bredd / kvot;
+  return (
+    <span
+      className="v2-lins"
+      aria-hidden="true"
+      style={{
+        backgroundImage: `url("${imageUrl(jobId, ev.imageId)}")`,
+        backgroundSize: `${bredd}px ${hojd}px`,
+        backgroundPosition: `${STORLEK / 2 - cx * bredd}px ${STORLEK / 2 - cy * hojd}px`,
+      }}
+    />
   );
 }
 
