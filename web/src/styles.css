@@ -5260,13 +5260,21 @@ body:has(.grind) .consent { display: none; }
 .v2-prick.nej { background: var(--muted); opacity: .45; }
 .v2-prick.nu { background: var(--accent); transform: scale(1.35); }
 
+/* Bilden i sina egna proportioner, centrerad. Den får aldrig tvingas till både full bredd och en
+   maxhöjd — då trycks den ihop, och markeringen hamnar fel. Bilden själv bestämmer storleken, och
+   markeringen ligger i procent av just den. */
 .v2-bild {
-  display: block; width: 100%; padding: 0; border: 0; background: var(--surface); cursor: zoom-in;
-  border-radius: 20px; overflow: hidden; box-shadow: var(--shadow-card);
+  display: flex; justify-content: center; align-items: center; width: 100%; padding: 0; border: 0;
+  background: transparent; cursor: zoom-in;
 }
-.v2-bild .marked-thumb { width: 100%; height: auto; max-height: 46vh; border-radius: 0; pointer-events: none; }
-.v2-bild .marked-thumb-inner { max-height: 46vh; margin: 0 auto; }
-.v2-bild-liten .marked-thumb, .v2-bild-liten .marked-thumb-inner { max-height: 22vh; }
+.v2-bild .marked-thumb { width: auto; height: auto; padding: 0; border: 0; background: none; pointer-events: none; }
+.v2-bild .marked-thumb-inner {
+  display: inline-block; width: auto !important; height: auto; aspect-ratio: auto !important;
+  border-radius: 18px; overflow: hidden; box-shadow: var(--shadow-raised);
+}
+.v2-bild .marked-thumb-inner img { width: auto; height: auto; max-width: 100%; max-height: 50vh; }
+.v2-bild-liten .marked-thumb-inner img { max-height: 22vh; }
+.v2-namn { margin: 6px 0 0; text-align: center; font-size: 26px; letter-spacing: -0.02em; }
 .v2-bild-tom { padding: 48px 16px; text-align: center; color: var(--muted); cursor: default; }
 
 .v2-skada h2 { margin: 0; display: flex; align-items: center; gap: 10px; font-size: 24px; letter-spacing: -0.02em; }

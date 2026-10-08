@@ -166,14 +166,8 @@ export default function ResultScreenV2({
           />
         ) : (
           <>
-            <div className="v2-skada">
-              <h2>
-                {typeLabel(d.type)}
-                <span className={`v2-grad v2-grad-${d.severity}`}>{severityLabel(d.severity)}</span>
-              </h2>
-              <p className="v2-var">{[d.part, d.semanticLocation].filter(Boolean).join(" · ")}</p>
-              {d.description && <p className="v2-text">{d.description}</p>}
-            </div>
+            {/* Bara namnet. Var skadan sitter syns i bilden, och resten finns under "Redigera". */}
+            <h2 className="v2-namn">{typeLabel(d.type)}</h2>
 
             <div className="v2-svar">
               <button className="btn btn-primary" disabled={sparar} onClick={() => void svara(d, "confirm")}>
