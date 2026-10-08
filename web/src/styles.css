@@ -5407,3 +5407,10 @@ body:has(.grind) .consent { display: none; }
 .v2-beskarning .v2-kort-bild { position: absolute; inset: 0; }
 .v2-kort-topp { top: 14px; left: 14px; right: 14px; }
 .v2-kort-botten { left: 14px; right: 14px; bottom: calc(16px + env(safe-area-inset-bottom)); }
+
+/* v7: knapparna ovanför hemindikatorn. Kortet går ända ner bakom den; glaset med svaren håller
+   telefonens säkra marginal. --demo-safe-bottom finns bara i förhandsvisningen (jamfor.html), där
+   env() är 0 i en iframe — i appen är den osatt och env() gäller. */
+.v2-kort-botten {
+  bottom: calc(14px + max(env(safe-area-inset-bottom), var(--demo-safe-bottom, 0px)));
+}
