@@ -5414,3 +5414,18 @@ body:has(.grind) .consent { display: none; }
 .v2-kort-botten {
   bottom: calc(14px + max(env(safe-area-inset-bottom), var(--demo-safe-bottom, 0px)));
 }
+
+/* v8: helheten ryms på en telefonskärm utan att man scrollar, med "Vi missade en skada" som en
+   riktig knapp direkt under "Se annonsen". */
+.v2-helhet-skarm { gap: 12px; }
+.v2-helhet-skarm .v2-mobel { margin: 0; }
+.v2-helhet-skarm .v2-helhet { padding: 2px 8px 0; gap: 4px; }
+.v2-helhet-skarm .v2-helhet h2 { margin: 4px 0 0; font-size: 24px; }
+.v2-helhet-skarm .v2-helhet p { font-size: 15px; line-height: 1.4; }
+.v2-helhet-skarm .v2-sammanfattning { padding: 14px 18px; border-radius: 18px; }
+.v2-helhet-skarm .v2-sammanfattning h3 { margin-bottom: 8px; font-size: 16px; }
+.v2-helhet-skarm .v2-lista { gap: 6px; }
+.v2-avslut { display: grid; gap: 10px; margin-top: 4px; }
+.v2-avslut .next-step { margin: 0; }
+.v2-missade { display: flex; align-items: center; justify-content: center; gap: 8px; height: 50px; width: 100%; font-weight: 700; }
+.v2-avslut .v2-lank { justify-self: center; padding: 4px 8px; }

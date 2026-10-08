@@ -16,7 +16,7 @@ import { actOnDamage, addDamageFromPhoto, getJob, imageUrl } from "../api";
 import type { ConditionResult, Damage } from "../types";
 import GradeBadge from "../components/GradeBadge";
 import EvidenceViewer from "../components/EvidenceViewer";
-import { AlertIcon, ArrowLeftIcon, ChevronRight } from "../components/icons";
+import { AlertIcon, ArrowLeftIcon, CameraIcon, ChevronRight } from "../components/icons";
 import FlowSteps from "../components/FlowSteps";
 import { DAMAGE_TYPE_OPTIONS, SEVERITY_OPTIONS, typeLabel, severityLabel } from "../lib/labels";
 import { usePageTitle } from "../lib/pageTitle";
@@ -223,7 +223,7 @@ export default function ResultScreenV2({
   const bortvalda = skador.length - godkanda.length;
 
   return (
-    <div className="screen screen-light v2">
+    <div className="screen screen-light v2 v2-helhet-skarm">
       <button className="btn btn-text btn-back" onClick={onHome}>
         <ArrowLeftIcon /> {t("Startsidan")}
       </button>
@@ -233,7 +233,7 @@ export default function ResultScreenV2({
 
       {result.grade && (
         <section className="v2-helhet">
-          <GradeBadge grade={result.grade.grade} size={88} />
+          <GradeBadge grade={result.grade.grade} size={64} />
           <h2>{result.grade.label}</h2>
           <p>{result.grade.rationale}</p>
         </section>
@@ -273,20 +273,22 @@ export default function ResultScreenV2({
       )}
       {besked && <p className="v2-dampad v2-besked">{besked}</p>}
 
-      <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
-        <span>{t("Se annonsen")}</span>
-        <ChevronRight size={18} />
-      </button>
-
-      <div className="v2-sekundara">
+      <div className="v2-avslut">
+        <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
+          <span>{t("Se annonsen")}</span>
+          <ChevronRight size={18} />
+        </button>
+        {/* En riktig knapp och inte en länk: en missad skada är det enda säljaren kan behöva göra här,
+            och den ska synas utan att man scrollar. */}
+        <button className="btn btn-outline v2-missade" disabled={laggerTill} onClick={() => fotoRef.current?.click()}>
+          <CameraIcon size={18} />
+          {laggerTill ? t("Bedömer bilden…") : t("Vi missade en skada")}
+        </button>
         {skador.length > 0 && (
           <button className="btn btn-text v2-lank" onClick={() => setLage({ steg: "granska", index: 0 })}>
             {t("Granska skadorna igen")}
           </button>
         )}
-        <button className="btn btn-text v2-lank" disabled={laggerTill} onClick={() => fotoRef.current?.click()}>
-          {laggerTill ? t("Bedömer bilden…") : t("Vi missade en skada")}
-        </button>
       </div>
 
       <input ref={fotoRef} type="file" accept="image/*" capture="environment" style={{ display: "none" }} onChange={fotoValt} />
