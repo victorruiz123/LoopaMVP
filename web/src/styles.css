@@ -5589,3 +5589,8 @@ body:has(.grind) .consent { display: none; }
 }
 .v2-h-knapp:active { transform: scale(0.98); }
 .v2-h-knapp:disabled { opacity: .6; }
+
+/* v11: knapparna följer innehållet i stället för att tryckas ner till kanten. Hela gruppen — betyget,
+   skadorna och knapparna — centreras i höjdled, så att avstånden är jämna oavsett skärmhöjd. */
+.v2-h-betyg { margin-top: auto; margin-bottom: 22px; }
+.v2-h-knappar { margin-top: 0; padding-top: 30px; margin-bottom: auto; }
