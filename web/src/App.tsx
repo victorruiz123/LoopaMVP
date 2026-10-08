@@ -8,6 +8,7 @@ import DisclosuresScreen from "./screens/DisclosuresScreen";
 import VariantScreen from "./screens/VariantScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
+import ResultScreenV2 from "./screens/ResultScreenV2";
 import ListingScreen from "./screens/ListingScreen";
 import AuthScreen from "./screens/AuthScreen";
 import NyttLosenordScreen from "./screens/LosenordScreen";
@@ -472,9 +473,11 @@ function FlowApp() {
           onAbort={goHome}
         />
       );
-    case "result":
+    case "result": {
+      // EXPERIMENT: ?vy=2 visar förslaget i ResultScreenV2.tsx. Utan den är allt som förut.
+      const Skick = new URLSearchParams(window.location.search).get("vy") === "2" ? ResultScreenV2 : ResultScreen;
       return (
-        <ResultScreen
+        <Skick
           jobId={screen.jobId}
           onHome={goHome}
           // Resultatet kommer från skärmen själv, som redan har det. ID:t bor på jobbet och hämtas
@@ -489,6 +492,7 @@ function FlowApp() {
           }}
         />
       );
+    }
     case "listing": {
       const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
       // Adminvägen öppnar samma skärm för någon annans möbel. "Till mina annonser" hade tagit
