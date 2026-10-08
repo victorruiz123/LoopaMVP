@@ -48,6 +48,7 @@ export default function ListingView({
   loopaId,
   hideHeader = false,
   hideChat = false,
+  hideCoverNote = false,
   hideSources = false,
   collapsible = false,
   onSaveListing,
@@ -97,6 +98,14 @@ export default function ListingView({
    * står kvar överallt där någon annan än säljaren läser kortet.
    */
   hideChat?: boolean;
+  /**
+   * Utan bildtexten under omslaget ("Säljarens egen bild av möbeln, orörd" m.fl.).
+   *
+   * Säljarens annonssida (ListingScreen) visar sin EGEN möbel för säljaren själv — där säger texten
+   * ingenting säljaren inte redan vet. Det publika kortet och butiken behåller den: där är den en
+   * uppgift till en köpare om vad bilden har varit med om.
+   */
+  hideCoverNote?: boolean;
   /**
    * Utelämnar källänkarna vid specifikationerna och under omslaget.
    *
@@ -339,6 +348,9 @@ export default function ListingView({
             className={`listing-stage listing-stage-photo ${
               shown.kind === "cutout" ? "listing-stage-cutout" : ""
             }`}
+            /* Bilden som stilvariabel, för den som vill fylla ytan runt fotot med en suddig kopia av
+               det (säljarens annonssida, .annons-v2 i styles.css). Gör ingenting annars. */
+            style={{ ["--bakgrund" as string]: `url("${shown.url}")` }}
           >
             {grade && (
               <span className="listing-stage-badge">
@@ -408,7 +420,7 @@ export default function ListingView({
               lyckats och kvalitetskontrollen godkänt resultatet; annars är omslaget bildrutan och
               texten säger det.
               Katalogbilden: den visar inte ens möbeln som säljs, och då ska det stå — inte antas. */}
-          {shown.kind === "photo" && (
+          {!hideCoverNote && shown.kind === "photo" && (
             <p className="listing-cover-note">{t("Säljarens egen bild av möbeln, orörd")}</p>
           )}
           {/*
@@ -418,14 +430,14 @@ export default function ListingView({
               vitt, medan annonsens första bild dessutom står i en studio vi själva låtit generera.
               Att kalla båda "bakgrunden borttagen" hade varit sant om den ena och tyst om den andra.
           */}
-          {shown.kind === "cutout" && (
+          {!hideCoverNote && shown.kind === "cutout" && (
             <p className="listing-cover-note">
               {aktiv === 0 && cover?.backdrop
                 ? t("Säljarens egen bild av möbeln, mot vår studiobakgrund")
                 : t("Säljarens egen bild av möbeln, bakgrunden borttagen")}
             </p>
           )}
-          {shown.kind === "product" && (
+          {!hideCoverNote && shown.kind === "product" && (
             <p className="listing-cover-note">
               {t("Produktbild av modellen — inte möbeln som säljs")}
               {shown.sourceUrl && !hideSources && (

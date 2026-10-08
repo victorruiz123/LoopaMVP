@@ -53,8 +53,16 @@ export default function SellWithLoopa({
   coverUrl,
   onMyListings,
   onSellAnother,
+  fastList = false,
 }: {
   jobId: string;
+  /**
+   * En fast säljlist längst ner på skärmen — beloppet och knappen — som syns medan säljaren läser
+   * annonsen och försvinner när rutan själv kommer in i bild. Målet med annonssidan är att säljaren
+   * trycker "Sälj med Loopa", och en knapp man bara hittar genom att scrolla ner är lätt att missa.
+   * Av som förval; säljarens annonssida (ListingScreen) slår på den.
+   */
+  fastList?: boolean;
   /**
    * Möbelns omslagsbild, till bekräftelsen.
    *
@@ -125,6 +133,25 @@ export default function SellWithLoopa({
    * aktiva valet. Servern avgör om krediten fortfarande gäller när trycket kommer.
    */
   const [anvandGratis, setAnvandGratis] = useState(true);
+
+  /**
+   * Ligger rutan fortfarande nedanför det man ser? Då står den fasta listen kvar. Så fort rutan
+   * kommer in i bild — eller har passerats — försvinner listen, så att knappen aldrig står två gånger
+   * och listen aldrig ligger över borttagningen längst ner.
+   */
+  const [rutanNedanfor, setRutanNedanfor] = useState(false);
+  const bevakare = useRef<IntersectionObserver | null>(null);
+  const rutan = useCallback(
+    (el: HTMLElement | null) => {
+      bevakare.current?.disconnect();
+      if (!fastList || !el) return;
+      bevakare.current = new IntersectionObserver(([e]) => setRutanNedanfor(!e.isIntersecting && e.boundingClientRect.top > 0), {
+        threshold: 0.25,
+      });
+      bevakare.current.observe(el);
+    },
+    [fastList],
+  );
 
   async function publish() {
     setSending(true);
@@ -285,7 +312,7 @@ export default function SellWithLoopa({
 
   return (
     <>
-      <section className="card-block sell-block">
+      <section className="card-block sell-block" ref={rutan}>
         {/* Ingen ordmärkning här. Rubriken är en versal etikett i samma form som "SPECIFIKATIONER"
             och "SKICK" (.card-block h3), och `text-transform: uppercase` hade gjort märket till
             LOOPA i Poppins — vilket är fel bokstavsform för det. Den läser som en avdelningsrubrik,
@@ -358,6 +385,31 @@ export default function SellWithLoopa({
           </>
         )}
       </section>
+
+      {fastList && !blocked && (
+        /* Slöjan: sidan bakom listen blir gradvis suddigare nedåt, så att blicken landar på knappen. */
+        <div className={`sell-fastlist-slöja${rutanNedanfor && !confirming ? " synlig" : ""}`} aria-hidden="true" />
+      )}
+      {fastList && !blocked && (
+        <div className={`sell-fastlist${rutanNedanfor && !confirming ? " synlig" : ""}`} aria-hidden={!rutanNedanfor}>
+          {utfall && (
+            <span className="sell-fastlist-belopp">
+              <small>{t("Du får")}</small>
+              <strong>{formatSek(utfall.saljarenSek)}</strong>
+            </span>
+          )}
+          <button
+            className="btn btn-primary"
+            tabIndex={rutanNedanfor ? 0 : -1}
+            onClick={() => {
+              setFailure(null);
+              setConfirming(true);
+            }}
+          >
+            {t("Sälj med")} <span className="ordmark ordmark-vit">loopa</span>
+          </button>
+        </div>
+      )}
 
       {confirming && plan && (
         <SellConfirm

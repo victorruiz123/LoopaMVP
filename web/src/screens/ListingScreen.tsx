@@ -134,9 +134,9 @@ export default function ListingScreen({
   const ready = listing?.status === "ok" && !!card;
 
   return (
-    <div className="screen screen-light card-screen">
+    <div className="screen screen-light card-screen annons-v2">
       <button className="btn btn-text btn-back" onClick={onBack}>
-        <ArrowLeftIcon /> {backLabel ?? t("Tillbaka till skicket")}
+        <ArrowLeftIcon /> {backLabel ?? t("Skick")}
       </button>
 
       {/*
@@ -154,11 +154,6 @@ export default function ListingScreen({
         loopaId.ts) och saknas i ett svar hämtat innan dess. Då står raden inte där, i stället för
         att stå tom.
       */}
-      {loopaId && (
-        <p className="card-loopa-id">
-          {t("Loopa-ID")} <span>{loopaId}</span>
-        </p>
-      )}
 
       {!listing || listing.status === "unavailable" ? (
         <section className="card-panel">
@@ -203,6 +198,8 @@ export default function ListingScreen({
             collapsible
             /* Säljaren har inga frågor att ställa om sin egen möbel — se `hideChat` i ListingView. */
             hideChat
+            /* Säljaren vet vad det är för bild av sin egen möbel — se `hideCoverNote`. */
+            hideCoverNote
             onSaveListing={async (patch) => setResult(await saveListingDetails(result.jobId, patch))}
             annonstext={annonstext}
           />
@@ -214,6 +211,7 @@ export default function ListingScreen({
               ID:t självt står kvar högst upp på skärmen som en rad bland de andra: säljaren behöver
               kunna säga VILKEN annons det här är, men inte göra något åt den. */}
           <SellWithLoopa
+            fastList
             jobId={result.jobId}
             coverUrl={sellerCover(result)?.url ?? null}
             onMyListings={onMyListings}
@@ -229,6 +227,9 @@ export default function ListingScreen({
         Ritas bara när någon tagit emot den — adminpanelen öppnar samma skärm för andras kort, och
         där finns ingenting att ta bort (se `onDeleted` i App.tsx).
       */}
+      {/* Annonsens ID längst ner, diskret: säljaren behöver kunna säga vilken annons det här är,
+          men det är inget att göra något åt — och det ska inte stå före själva annonsen. */}
+      {loopaId && <p className="annons-v2-id">{t("Loopa-ID")} {loopaId}</p>}
       {onDeleted && (
         <section className="card-delete">
           {deleteError && <p className="sell-error">{deleteError}</p>}
