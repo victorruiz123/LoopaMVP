@@ -5507,3 +5507,21 @@ body:has(.grind) .consent { display: none; }
 }
 .annons-v2 .listing-carousel { position: relative; z-index: 1; }
 .annons-v2 .listing-stage-badge { z-index: 2; }
+
+/* Den fasta säljlisten (SellWithLoopa, fastList). Glas längst ner, ovanför hemindikatorn; glider ner
+   och bort när säljrutan själv syns. */
+.sell-fastlist {
+  position: fixed; z-index: 30; left: 50%; width: min(calc(100% - 24px), calc(var(--spalt) - 24px));
+  bottom: calc(10px + max(env(safe-area-inset-bottom), var(--demo-safe-bottom, 0px)));
+  display: flex; align-items: center; gap: 12px; padding: 10px 10px 10px 18px; border-radius: 22px;
+  background: rgba(250, 247, 242, 0.72); -webkit-backdrop-filter: blur(20px) saturate(1.6); backdrop-filter: blur(20px) saturate(1.6);
+  border: 1px solid rgba(20, 17, 13, 0.08); box-shadow: 0 18px 40px -18px rgba(20, 17, 13, 0.45);
+  transform: translate(-50%, calc(100% + 40px)); opacity: 0; pointer-events: none;
+  transition: transform .35s cubic-bezier(.2,.8,.2,1), opacity .25s ease;
+}
+.sell-fastlist.synlig { transform: translate(-50%, 0); opacity: 1; pointer-events: auto; }
+.sell-fastlist-belopp { display: grid; line-height: 1.1; }
+.sell-fastlist-belopp small { font-size: 12px; color: var(--muted); }
+.sell-fastlist-belopp strong { font-size: 20px; letter-spacing: -0.02em; color: var(--ink); }
+.sell-fastlist .btn-primary { flex: 1; min-height: 50px; border-radius: 16px; font-size: 17px; white-space: nowrap; }
+@media (prefers-reduced-motion: reduce) { .sell-fastlist { transition: none; } }

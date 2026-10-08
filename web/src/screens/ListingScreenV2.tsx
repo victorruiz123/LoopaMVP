@@ -213,6 +213,7 @@ export default function ListingScreenV2({
               ID:t självt står kvar högst upp på skärmen som en rad bland de andra: säljaren behöver
               kunna säga VILKEN annons det här är, men inte göra något åt den. */}
           <SellWithLoopa
+            fastList
             jobId={result.jobId}
             coverUrl={sellerCover(result)?.url ?? null}
             onMyListings={onMyListings}
