@@ -9,6 +9,7 @@ import VariantScreen from "./screens/VariantScreen";
 import PriceScreen from "./screens/PriceScreen";
 import ResultScreen from "./screens/ResultScreen";
 import ResultScreenV2 from "./screens/ResultScreenV2";
+import ListingScreenV2 from "./screens/ListingScreenV2";
 import ListingScreen from "./screens/ListingScreen";
 import AuthScreen from "./screens/AuthScreen";
 import NyttLosenordScreen from "./screens/LosenordScreen";
@@ -498,8 +499,10 @@ function FlowApp() {
       // Adminvägen öppnar samma skärm för någon annans möbel. "Till mina annonser" hade tagit
       // adminen till sin EGEN profil därifrån — så den vägen finns bara för säljarens eget kort.
       const ownCard = screen.back?.name !== "adminUser";
+      // EXPERIMENT: ?vy=2 visar förslaget i ListingScreenV2.tsx.
+      const Annons = new URLSearchParams(window.location.search).get("vy") === "2" ? ListingScreenV2 : ListingScreen;
       return (
-        <ListingScreen
+        <Annons
           result={screen.result}
           loopaId={screen.loopaId}
           onBack={() => setScreen(back)}
