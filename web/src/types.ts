@@ -782,6 +782,29 @@ export interface AdminKontoAdress {
  * Slås upp för ett konto i taget och inte i listan: adressen och inloggningstiderna kostar ett eget
  * anrop till Supabase, och hör hemma på en sida någon valt att öppna. Se kontoDetalj på servern.
  */
+/** Vad "Radera användare & innehåll" kommer att ta bort, och vad som stoppar. Se raderaKonto.ts. */
+export interface RaderingsUnderlag {
+  userId: string;
+  email: string | null;
+  namn: string | null;
+  jobb: number;
+  annonser: number;
+  uteNu: number;
+  bevakningar: number;
+  efterlysningar: number;
+  ordrar: number;
+  affarer: number;
+  omdomen: number;
+  hinder: string[];
+  forHand: string[];
+}
+
+export interface RaderingsResultat {
+  raderat: Record<string, number>;
+  forHand: string[];
+  inloggning: { raderad: boolean; fel: string | null };
+}
+
 export interface AdminKontoDetalj extends AdminUser {
   adress: AdminKontoAdress | null;
   /** Användarnamnet i profilen — det namn kontot har i Vips. */

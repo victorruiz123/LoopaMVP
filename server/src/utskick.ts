@@ -24,7 +24,7 @@
  * taket är samma.
  */
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { DATA_DIR } from "./jobStore.js";
@@ -222,6 +222,33 @@ export async function skickadeFor(amne: string): Promise<string[]> {
 async function logga(post: Record<string, unknown>): Promise<void> {
   await mkdir(LOGG_DIR(), { recursive: true });
   await appendFile(LOGG_FIL(), JSON.stringify({ ...post, tid: new Date().toISOString() }) + "\n", "utf-8");
+}
+
+/**
+ * Stryker en adress ur utskicksloggen. Antalet rader. Se raderaKonto.ts.
+ *
+ * Loggen är spärren mot dubbla brev — men ett raderat konto står inte längre i mottagarlistan
+ * (den läses ur `profiles`), så det finns inget brev för spärren att stoppa.
+ */
+export async function glomMottagare(email: string): Promise<number> {
+  const epost = email.trim().toLowerCase();
+  let raw: string;
+  try {
+    raw = await readFile(LOGG_FIL(), "utf-8");
+  } catch {
+    return 0;
+  }
+  const rader = raw.split("\n").filter((r) => r.trim());
+  const kvar = rader.filter((r) => {
+    try {
+      return (JSON.parse(r) as { epost?: string }).epost?.trim().toLowerCase() !== epost;
+    } catch {
+      return true;
+    }
+  });
+  const borta = rader.length - kvar.length;
+  if (borta) await writeFile(LOGG_FIL(), kvar.length ? kvar.join("\n") + "\n" : "", "utf-8");
+  return borta;
 }
 
 export function smtpKonfigurerat(): boolean {

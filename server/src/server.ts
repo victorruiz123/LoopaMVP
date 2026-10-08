@@ -305,63 +305,18 @@ async function handleDeleteJob(id: string, res: ServerResponse) {
     });
   }
 
-  // 1. Tradera, om annonsen nått dit. `pending` har aldrig lämnat oss — den ligger i panelens kö och
-  //    har inget itemId att ta ner.
+  // 1. Tradera, om annonsen nått dit. Reglerna — saknade nycklar, utgångna auktioner — står i
+  //    nedtagning.ts, så att adminens radering av ett konto tar ner på samma sätt.
   const itemId = job.tradera?.itemId ?? null;
-  if (itemId && (job.tradera?.status === "published" || job.tradera?.status === "publishing")) {
-    try {
-      const { endTraderaItem, getTraderaLage, traderaConfigured: traderaPakopplat } = await import(
-        "./integrations/tradera/tradera.js"
-      );
-      /**
-       * UTAN NYCKLAR FINNS INGET ATT TA NER, och säljaren ska inte hållas fången av det.
-       *
-       * `endTraderaItem` läser TRADERA_USER_ID ur miljön och kastar "Saknar env-variabel" när den
-       * inte finns. Det felet blev en 502 härifrån, och säljaren kunde inte ta bort sin annons alls —
-       * exakt samma utfall som den utgångna auktionen nedan, men av en helt annan orsak. Oracle-servern
-       * hade i september 2026 bara APP-nycklarna, inte USER-nycklarna, och därför gällde det VARJE
-       * annons som nått Tradera, inte bara de utgångna.
-       *
-       * Att ändå ta bort hos oss är det minst dåliga: annonsen kan ligga kvar hos Tradera, och det
-       * loggas högt, men alternativet är en annons säljaren aldrig blir av med. Nycklarna är vårt
-       * fel att laga, inte deras att vänta ut.
-       */
-      if (!traderaPakopplat()) {
-        console.error(
-          `[tradera] ${loopaId}: annons ${itemId} kunde INTE tas ner — Tradera är inte konfigurerat på servern.` +
-            " Annonsen togs bort hos oss ändå. Ta ner den för hand hos Tradera.",
-        );
-      } else {
-        /**
-         * EN AVSLUTAD AUKTION GÅR INTE ATT TA NER, och ska inte heller behöva det.
-         *
-         * Tradera svarar med ett fel på DELETE mot en annons som redan löpt ut — det finns ingenting
-         * kvar att avsluta. Utan kontrollen nedan blev det felet en 502 härifrån, och säljaren kunde
-         * INTE TA BORT SIN ANNONS ALLS: märkningen i steg 3 nås aldrig, så annonsen låg kvar i
-         * profilen och i butiken hur många gånger de än tryckte. Det gällde varje möbel vars auktion
-         * hunnit gå ut, alltså förr eller senare varenda en — och bara i drift, där annonser faktiskt
-         * publiceras. En Swedese Lamino vars auktion tog slut 2026-09-11 16:39 var den som visade det.
-         *
-         * Grinden nedan är därför inte "hoppa över när det är krångligt": en utgången annons är inte
-         * köpbar, och det är just köpbarheten 502:an finns för att skydda. Går läget inte att läsa
-         * (null, t.ex. ett tillfälligt fel hos Tradera) försöker vi ta ner som förut — då vet vi inte
-         * att den är ofarlig, och då ska säljaren hellre få försöka igen.
-         */
-        const lage = await getTraderaLage(itemId);
-        if (lage?.ended) {
-          console.log(`[tradera] ${loopaId}: annons ${itemId} hade redan löpt ut — inget att ta ner.`);
-        } else {
-          await endTraderaItem(itemId);
-          console.log(`[tradera] ${loopaId}: annons ${itemId} togs ner — säljaren tog bort annonsen.`);
-        }
-      }
-    } catch (err) {
-      const detalj = err instanceof Error ? err.message : String(err);
-      console.error(`[tradera] ${loopaId}: kunde inte ta ner annons ${itemId}:`, detalj);
-      return sendJson(res, 502, {
-        error: "Annonsen kunde inte tas ner från Tradera just nu. Försök igen om en stund.",
-      });
-    }
+  try {
+    const { taNerTraderaAnnons } = await import("./integrations/tradera/nedtagning.js");
+    await taNerTraderaAnnons(job, loopaId, "säljaren tog bort annonsen");
+  } catch (err) {
+    const detalj = err instanceof Error ? err.message : String(err);
+    console.error(`[tradera] ${loopaId}: kunde inte ta ner annons ${itemId}:`, detalj);
+    return sendJson(res, 502, {
+      error: "Annonsen kunde inte tas ner från Tradera just nu. Försök igen om en stund.",
+    });
   }
 
   // 2. Ur butiken, medan jobbet finns kvar att ta ur.
@@ -2179,6 +2134,31 @@ const server = http.createServer(async (req, res) => {
           const konto = await kontoDetalj(segments[3]);
           if (!konto) return sendJson(res, 404, { error: "Kontot finns inte." });
           return sendJson(res, 200, konto);
+        }
+        /**
+         * Radera användare & innehåll. Underlaget först — vad som försvinner och vad som stoppar —
+         * och sedan raderingen, som räknar om underlaget själv och kräver kontots e-postadress i
+         * kroppen. POST och inte DELETE: kroppen bär bekräftelsen, och den ska inte stå i en adress.
+         * Se raderaKonto.ts.
+         */
+        if (segments[2] === "users" && segments.length === 5 && segments[4] === "radering" && req.method === "GET") {
+          const { underlag } = await import("./raderaKonto.js");
+          const svar = await underlag(segments[3], identity.id);
+          if (!svar) return sendJson(res, 404, { error: "Kontot finns inte." });
+          return sendJson(res, 200, svar);
+        }
+        if (segments[2] === "users" && segments.length === 5 && segments[4] === "radera" && req.method === "POST") {
+          const { raderaKonto, RaderingsFel } = await import("./raderaKonto.js");
+          try {
+            const body = await readJsonBody<{ bekraftelse?: unknown }>(req, 4 * 1024);
+            return sendJson(res, 200, await raderaKonto(segments[3], body.bekraftelse, identity.id));
+          } catch (err) {
+            if (err instanceof RaderingsFel) return sendJson(res, err.status, { error: err.message, hinder: err.hinder });
+            console.error("[radering]", err);
+            return sendJson(res, 500, {
+              error: "Raderingen stannade halvvägs. Det som hann raderas är borta — tryck igen för att radera resten.",
+            });
+          }
         }
 
         /**

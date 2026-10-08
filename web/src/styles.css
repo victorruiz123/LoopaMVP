@@ -5217,3 +5217,29 @@ body:has(.grind) .consent { display: none; }
 .ai-steg ol { margin: 6px 0 0; padding-left: 20px; }
 .admin-tag.ai-tag-ok { background: var(--green-light); color: var(--green-dark); }
 .admin-tag.ai-tag-nej { background: var(--danger-light); color: var(--danger-dark); }
+
+/* ==========================================================================
+   Radera användare & innehåll
+
+   Rött bara där det raderas. Rutan runt stegen håller ihop de fyra trycken så att
+   det syns att man är mitt i något — och att Avbryt alltid står bredvid.
+   ========================================================================== */
+.admin-radera { margin: 28px 0 8px; }
+.admin-radera-ruta {
+  padding: 16px; border-radius: var(--r); border: 1px solid var(--danger);
+  background: var(--surface);
+}
+.admin-radera-steg { margin: 0 0 4px; font-size: var(--fs-xs); color: var(--danger-dark); font-weight: 600; }
+.admin-radera-lista { margin: 0 0 16px; padding-left: 20px; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.6; }
+.admin-radera-varning {
+  margin: 0 0 16px; padding: 10px 12px; border-radius: var(--r-sm);
+  background: var(--danger-light); color: var(--danger-dark); font-size: var(--fs-sm); white-space: pre-line;
+}
+.admin-radera-varning p { margin: 0 0 6px; }
+.admin-radera-varning ul { margin: 0; padding-left: 20px; overflow-wrap: anywhere; }
+.admin-radera-falt { display: flex; flex-direction: column; gap: 6px; margin: 0 0 16px; font-size: var(--fs-sm); color: var(--ink-soft); }
+.admin-radera-falt input {
+  font: inherit; font-size: var(--fs-md); padding: 10px 12px; border-radius: var(--r-sm);
+  border: 1px solid var(--hairline); background: var(--field); color: var(--ink);
+}
+.admin-radera-knappar { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }

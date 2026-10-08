@@ -283,6 +283,31 @@ export async function updateOrder(id: string, patch: Partial<Order>): Promise<Or
   });
 }
 
+/**
+ * Avidentifierar köparens ordrar: kontot, adressen, postnumret och tiderna försvinner, köpet står kvar.
+ *
+ * INTE EN RADERING. Bokföringslagen kräver att ett köp går att visa i sju år — belopp, datum, vad
+ * som såldes. Det som gör raden till en PERSON tas bort, resten är vår bokföring. Händelseloggen
+ * behålls: den skrivs av oss och bär läge och tid, inte köparens uppgifter. Antalet ordrar som
+ * ändrades. Se raderaKonto.ts.
+ */
+export async function avidentifieraKopare(userId: string, email: string | null): Promise<number> {
+  return serialize(async () => {
+    const map = await load();
+    const epost = email?.trim().toLowerCase() || null;
+    const at = new Date().toISOString();
+    let n = 0;
+    for (const o of map.values()) {
+      const egen = o.userId === userId || (!!epost && o.email?.trim().toLowerCase() === epost);
+      if (!egen) continue;
+      map.set(o.id, { ...o, userId: null, email: null, postalCode: null, requestedSlots: [], updatedAt: at });
+      n += 1;
+    }
+    if (n) await flush();
+    return n;
+  });
+}
+
 /** Bara för tester. */
 export function resetOrders(): void {
   cache = null;

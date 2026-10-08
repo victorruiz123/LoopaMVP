@@ -19,7 +19,7 @@
  * mottagaren oavsett vilken adapter som är vald. Brevet är en påminnelse om inkorgen, inte tvärtom.
  */
 
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 
@@ -39,11 +39,15 @@ export interface Sender {
 
 const OUTBOX = () => process.env.OUTBOX_DIR?.trim() || path.join(DATA_DIR, "..", "..", "outbox");
 
+/** Mottagaren som den står i filnamnet. Samma tvätt åt båda hållen — se `glomMottagare`. */
+function mottagareIFilnamn(to: string): string {
+  return to.replace(/[^a-z0-9@._-]/gi, "_").slice(0, 40);
+}
+
 /** Ett filnamn som går att sortera och läsa: tid, sort, mottagare. */
 function fileNameFor(letter: Letter): string {
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const who = letter.to.replace(/[^a-z0-9@._-]/gi, "_").slice(0, 40);
-  return `${stamp}__${letter.kind}__${who}.txt`;
+  return `${stamp}__${letter.kind}__${mottagareIFilnamn(letter.to)}.txt`;
 }
 
 const fileSender: Sender = {
@@ -113,4 +117,23 @@ export function sender(): Sender {
 
 export function outboxDir(): string {
   return OUTBOX();
+}
+
+/**
+ * Tar bort de sparade breven till en adress ur /outbox. Antalet filer. Se raderaKonto.ts.
+ *
+ * Bara filleverantören lämnar brev efter sig hos oss; med SMTP ligger de hos mottagaren och inte
+ * här, och då finns det inget att ta bort.
+ */
+export async function glomMottagare(email: string): Promise<number> {
+  const slut = `__${mottagareIFilnamn(email)}.txt`.toLowerCase();
+  let filer: string[];
+  try {
+    filer = await readdir(OUTBOX());
+  } catch {
+    return 0;
+  }
+  const deras = filer.filter((f) => f.toLowerCase().endsWith(slut));
+  for (const f of deras) await rm(path.join(OUTBOX(), f), { force: true });
+  return deras.length;
 }

@@ -140,3 +140,23 @@ export async function listaFeedback(): Promise<{ poster: Feedback[]; snitt: numb
     antalBetyg: betyg.length,
   };
 }
+
+/**
+ * Tar bort kontots omdömen, och omdömen om kontots möbler. Antalet som försvann. Se raderaKonto.ts.
+ *
+ * Jobb-id:na följer med för att `userId` är den som SKREV — ett omdöme om en möbel vars bilder och
+ * besiktning raderas har inget kvar att handla om.
+ */
+export async function glomKonto(userId: string, jobIds: ReadonlySet<string>): Promise<number> {
+  return serialize(async () => {
+    const rows = await load();
+    const kvar = rows.filter((r) => r.userId !== userId && !(r.jobId && jobIds.has(r.jobId)));
+    const borta = rows.length - kvar.length;
+    if (borta) {
+      cache = kvar;
+      await mkdir(DIR(), { recursive: true });
+      await writeFile(FILE(), JSON.stringify(kvar, null, 2), "utf-8");
+    }
+    return borta;
+  });
+}

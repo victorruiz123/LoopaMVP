@@ -21,7 +21,7 @@
  * hårt. Ingen e-post, ingen IP, ingen webbläsarsträng.
  */
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 
@@ -197,6 +197,42 @@ export async function allaSamtal(): Promise<Samtal[]> {
     });
   }
   return ut.sort((a, b) => (a.slut < b.slut ? 1 : -1));
+}
+
+/**
+ * Stryker kontots samtal ur filen — HELA samtalet, även turerna före inloggningen. Antalet samtal.
+ *
+ * Det enda stället filen skrivs om i stället för att läggas till i. Det sker i samma kedja som
+ * skrivningarna, så en rad som kommer in under tiden hamnar efter omskrivningen och inte i ett
+ * hål. Minnet töms och läses om: indexet är byggt ur filen och ska inte veta mer än den. Se
+ * raderaKonto.ts.
+ */
+export async function glomKonto(userId: string): Promise<number> {
+  const jobb = kedja.then(async () => {
+    let raw: string;
+    try {
+      raw = await readFile(SAMTAL_FIL(), "utf-8");
+    } catch {
+      return 0;
+    }
+    const rader = raw.split("\n").filter((r) => r.trim());
+    const tolkade = rader.map((r) => {
+      try {
+        return JSON.parse(r) as SamtalsRad;
+      } catch {
+        return null;
+      }
+    });
+    const deras = new Set(tolkade.filter((r) => r?.uid === userId).map((r) => r!.samtal));
+    if (!deras.size) return 0;
+    const kvar = rader.filter((_, i) => !(tolkade[i] && deras.has(tolkade[i]!.samtal)));
+    await writeFile(SAMTAL_FIL(), kvar.length ? kvar.join("\n") + "\n" : "", "utf-8");
+    samtalen.clear();
+    laddad = null;
+    return deras.size;
+  });
+  kedja = jobb.catch(() => undefined);
+  return jobb;
 }
 
 /** Bara för tester: glöm allt och läs om vid nästa fråga. */

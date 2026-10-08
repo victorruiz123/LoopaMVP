@@ -161,4 +161,23 @@ export async function all(): Promise<Fortur[]> {
   return [...(await load())];
 }
 
+/**
+ * Tar bort kontots förturer, levande som avslutade. Antalet som försvann. Se raderaKonto.ts.
+ *
+ * En levande förtur håller en möbel gömd för alla andra; försvinner raden släpper grinden samma
+ * sekund, och möbeln kan publiceras som vanligt.
+ */
+export async function glomKonto(userId: string): Promise<number> {
+  return serialize(async () => {
+    const list = await load();
+    const kvar = list.filter((f) => f.userId !== userId);
+    const borta = list.length - kvar.length;
+    if (borta) {
+      cache = kvar;
+      await flush();
+    }
+    return borta;
+  });
+}
+
 export function reset(): void { cache = null; }

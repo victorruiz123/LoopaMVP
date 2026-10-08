@@ -563,6 +563,8 @@ function FlowApp() {
           flik={screen.flik}
           backLabel={screen.back?.name === "adminAd" ? t("Tillbaka till annonsen") : undefined}
           onBack={() => setScreen(screen.back ?? { name: "admin" })}
+          // Ett raderat konto har ingen annons att gå tillbaka till — listan, alltid.
+          onRaderad={() => setScreen({ name: "admin" })}
           // Kortet och inte skickvyn: adminvägarna är läsande, och skickvyn är den som har knappar
           // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
           onOpenJob={async (jobId) => {

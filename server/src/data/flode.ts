@@ -35,7 +35,7 @@
  * sparas där de passerar servern ändå, se data/samtal.ts.
  */
 
-import { appendFile, mkdir, readFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
 
@@ -473,4 +473,41 @@ export const berattaFinns = false;
 export function nollstall(): void {
   sessioner.clear();
   laddad = null;
+}
+
+/**
+ * Stryker kontots flöden ur filen: varje session där kontot loggat in, eller där ett av kontots jobb
+ * skapades. Antalet sessioner. Se raderaKonto.ts.
+ *
+ * Hela sessionen och inte bara de rader som bär id:t — stegen före inloggningen är samma besök av
+ * samma person. Skrivs om i skrivningarnas kedja, och minnet läses om ur filen efteråt.
+ */
+export async function glomKonto(userId: string, jobIds: ReadonlySet<string>): Promise<number> {
+  const jobb = kedja.then(async () => {
+    let raw: string;
+    try {
+      raw = await readFile(FLODE_FIL(), "utf-8");
+    } catch {
+      return 0;
+    }
+    const rader = raw.split("\n").filter((r) => r.trim());
+    const tolkade = rader.map((r) => {
+      try {
+        return JSON.parse(r) as FlodesRad;
+      } catch {
+        return null;
+      }
+    });
+    const deras = new Set(
+      tolkade.filter((r) => r && (r.uid === userId || (r.jobId && jobIds.has(r.jobId)))).map((r) => r!.sess),
+    );
+    if (!deras.size) return 0;
+    const kvar = rader.filter((_, i) => !(tolkade[i] && deras.has(tolkade[i]!.sess)));
+    await writeFile(FLODE_FIL(), kvar.length ? kvar.join("\n") + "\n" : "", "utf-8");
+    sessioner.clear();
+    laddad = null;
+    return deras.size;
+  });
+  kedja = jobb.catch(() => undefined);
+  return jobb;
 }

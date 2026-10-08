@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad,
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, UtbetalningsRad,
   UtskickLista,
   UtskickLage,
 } from "./types";
@@ -783,6 +783,33 @@ export async function selectVariant(jobId: string, variant: string): Promise<voi
 export async function hamtaKonto(userId: string): Promise<AdminKontoDetalj> {
   const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}`);
   return json<AdminKontoDetalj>(res);
+}
+
+/** Vad en radering av kontot skulle ta bort, och vad som stoppar den. Läser bara. */
+export async function hamtaRaderingsunderlag(userId: string): Promise<RaderingsUnderlag> {
+  const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}/radering`);
+  return json<RaderingsUnderlag>(res);
+}
+
+/**
+ * Raderar kontot och allt dess innehåll. Går inte att ångra.
+ *
+ * `bekraftelse` är kontots e-postadress, inskriven för hand — servern raderar ingenting utan den.
+ * Ett 409 bär `hinder`, listan över vad som måste lösas först; det kastas som ett fel med listan i
+ * meddelandet, så panelen kan visa den som den är.
+ */
+export async function raderaKonto(userId: string, bekraftelse: string): Promise<RaderingsResultat> {
+  const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}/radera`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bekraftelse }),
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; hinder?: string[] };
+    const hinder = body.hinder?.length ? `\n• ${body.hinder.join("\n• ")}` : "";
+    throw new Error(`${body.error ?? `Raderingen misslyckades (${res.status}).`}${hinder}`);
+  }
+  return res.json() as Promise<RaderingsResultat>;
 }
 
 /** Alla som går att skriva till: profiler med både e-post och förnamn. Adminbehörighet krävs. */

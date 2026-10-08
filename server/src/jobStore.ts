@@ -1,5 +1,5 @@
 import path from "node:path";
-import { mkdir, readFile, writeFile, readdir } from "node:fs/promises";
+import { mkdir, readFile, writeFile, readdir, rm } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import type { ConditionJob, DebugTrace, FurnitureIdentity, JobProgress } from "./types.js";
 
@@ -89,7 +89,7 @@ export async function getJob(id: string): Promise<ConditionJob | undefined> {
 }
 
 /** Stadier ett jobb kan ligga kvar i utan att någon längre arbetar på det. */
-const IN_FLIGHT = new Set(["queued", "preparing", "inspecting", "verifying", "grading", "pricing"]);
+export const IN_FLIGHT: ReadonlySet<string> = new Set(["queued", "preparing", "inspecting", "verifying", "grading", "pricing"]);
 
 /**
  * Jobb som stod mitt i en körning när processen dog.
@@ -288,6 +288,18 @@ export async function markJobRemoved(id: string, by: "seller" | "admin"): Promis
   job.removedBy = by;
   await persist(job);
   return job;
+}
+
+/**
+ * Raderar jobbet PÅ RIKTIGT: mappen med bilder, besiktning och spår, och kopian i minnet.
+ *
+ * Inte samma sak som `markJobRemoved`, som behåller jobbet för panelens skull. Den här finns för
+ * ett enda ändamål — adminens radering av ett helt konto (raderaKonto.ts) — där personen bett att
+ * få sina uppgifter borttagna och en kvarlämnad mapp med fotona från deras hem vore fel svar.
+ */
+export async function raderaJobb(id: string): Promise<void> {
+  jobs.delete(id);
+  await rm(jobDir(id), { recursive: true, force: true });
 }
 
 /** Debug trace is written separately from job.json and never sent to the normal seller-facing UI. */

@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { hamtaKonto, imageUrl, listUserJobs } from "../api";
+import { hamtaKonto, hamtaRaderingsunderlag, imageUrl, listUserJobs, raderaKonto } from "../api";
 import GradeBadge from "../components/GradeBadge";
 import { ArrowLeftIcon, CardIcon, ChevronRight } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { displayName, formatDate, initials } from "./AdminScreen";
-import type { AdminKontoDetalj, AdminUser, JobSummary } from "../types";
+import type { AdminKontoDetalj, AdminUser, JobSummary, RaderingsResultat, RaderingsUnderlag } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
@@ -20,8 +20,9 @@ import { useT } from "../lib/i18n";
  * om ägaren är ett id och en adress — ingen rad ur användarlistan finns att skicka med. Finns raden
  * ändå används den som första bild, så sidan har ett namn att visa medan uppslaget hämtas.
  *
- * Läsning och ingenting annat: adminvägarna hit svarar bara på GET, så det finns ingen knapp här
- * som kan ändra i någon annans konto.
+ * Läsning, med ETT undantag: "Radera användare & innehåll" längst ner i kontofliken. Den kräver
+ * fyra tryck och kontots e-postadress inskriven för hand — se RaderaKonto nedan och raderaKonto.ts
+ * på servern.
  */
 export type AdminUserFlik = "konto" | "annonser";
 
@@ -32,6 +33,7 @@ export default function AdminUserScreen({
   backLabel,
   onBack,
   onOpenJob,
+  onRaderad,
 }: {
   userId: string;
   /** Raden ur användarlistan, när sidan öppnades därifrån. Bara en första bild — uppslaget vinner. */
@@ -41,6 +43,8 @@ export default function AdminUserScreen({
   backLabel?: string;
   onBack: () => void;
   onOpenJob: (jobId: string) => void;
+  /** Kontot är raderat. Sidan har inget kvar att visa, så vägen leder tillbaka till listan. */
+  onRaderad?: () => void;
 }) {
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [konto, setKonto] = useState<AdminKontoDetalj | null>(null);
@@ -124,7 +128,13 @@ export default function AdminUserScreen({
         </button>
       </div>
 
-      {flik === "konto" && <KontoFlik konto={konto} fel={kontoFel} userId={userId} />}
+      {flik === "konto" && (
+        <>
+          <KontoFlik konto={konto} fel={kontoFel} userId={userId} />
+          {/* Inte medan kontot laddas: knappen ska stå under uppgifterna om vem den raderar. */}
+          {kontoFel !== null && <RaderaKonto userId={userId} onKlar={onRaderad ?? onBack} />}
+        </>
+      )}
 
       {flik === "annonser" && (
       <>
@@ -336,3 +346,254 @@ function Fakta({ etikett, varde, notis }: { etikett: string; varde: string | nul
     </div>
   );
 }
+
+/**
+ * Radera användare & innehåll.
+ *
+ * FYRA TRYCK, och vart och ett säger något nytt — inte samma fråga fyra gånger. Ett: vad som
+ * försvinner, och vad som stoppar. Två: att det inte går att ångra, och vad som ändå står kvar för
+ * bokföringen. Tre: att inloggningen delas med Vips och försvinner där också. Fyra: e-postadressen,
+ * inskriven för hand — det enda av trycken som når servern, och det som gör att ett felklick på fel
+ * konto inte kan radera någon.
+ *
+ * Underlaget hämtas först i steg ett och inte när sidan öppnas: det läser hela lagret, och de flesta
+ * som öppnar ett konto kommer inte för att radera det.
+ */
+type RaderingsSteg = 0 | 1 | 2 | 3 | 4 | "raderar" | "klar";
+
+function RaderaKonto({ userId, onKlar }: { userId: string; onKlar: () => void }) {
+  const t = useT();
+  const [steg, setSteg] = useState<RaderingsSteg>(0);
+  const [underlag, setUnderlag] = useState<RaderingsUnderlag | null>(null);
+  const [fel, setFel] = useState<string | null>(null);
+  const [bekraftelse, setBekraftelse] = useState("");
+  const [resultat, setResultat] = useState<RaderingsResultat | null>(null);
+
+  const avbryt = () => {
+    setSteg(0);
+    setFel(null);
+    setBekraftelse("");
+  };
+
+  const borja = () => {
+    setSteg(1);
+    setFel(null);
+    setUnderlag(null);
+    hamtaRaderingsunderlag(userId)
+      .then(setUnderlag)
+      .catch((e: Error) => setFel(e.message));
+  };
+
+  const forvantat = underlag ? (underlag.email ?? underlag.userId) : "";
+  const stammer = !!forvantat && bekraftelse.trim().toLowerCase() === forvantat.toLowerCase();
+
+  const radera = () => {
+    if (!stammer) return;
+    setSteg("raderar");
+    setFel(null);
+    raderaKonto(userId, bekraftelse.trim())
+      .then((r) => {
+        setResultat(r);
+        setSteg("klar");
+      })
+      .catch((e: Error) => {
+        setFel(e.message);
+        setSteg(4);
+      });
+  };
+
+  if (steg === 0) {
+    return (
+      <section className="admin-radera">
+        <h2 className="profile-section-title">{t("Radera")}</h2>
+        <p className="admin-tomt">
+          {t("Tar bort personen ur Loopa: annonser, bilder, bevakningar, efterlysningar, loggar och inloggningen.")}
+        </p>
+        <button className="btn-danger" onClick={borja}>
+          {t("Radera användare & innehåll")}
+        </button>
+      </section>
+    );
+  }
+
+  if (steg === "klar" && resultat) {
+    return (
+      <section className="admin-radera admin-radera-ruta">
+        <h2 className="profile-section-title">{t("Kontot är raderat")}</h2>
+        <ul className="admin-radera-lista">
+          {Object.entries(resultat.raderat)
+            .filter(([, n]) => n > 0)
+            .map(([vad, n]) => (
+              <li key={vad}>
+                {RADERAT_ETIKETT[vad] ?? vad}: {n}
+              </li>
+            ))}
+          <li>{resultat.inloggning.raderad ? t("Inloggningen: raderad") : t("Inloggningen: INTE raderad")}</li>
+        </ul>
+        {resultat.inloggning.fel && (
+          <p className="admin-radera-varning">
+            {t("Loopa-datan är borta, men inloggningen står kvar:")} {resultat.inloggning.fel}{" "}
+            {t("Öppna kontot igen och tryck en gång till.")}
+          </p>
+        )}
+        {resultat.forHand.length > 0 && <ForHand rader={resultat.forHand} />}
+        <button className="btn btn-outline btn-small" onClick={onKlar}>
+          {t("Tillbaka till användarna")}
+        </button>
+      </section>
+    );
+  }
+
+  const nummer = typeof steg === "number" ? steg : 4;
+  return (
+    <section className="admin-radera admin-radera-ruta" aria-live="polite">
+      <p className="admin-radera-steg">{t("Steg {n} av 4", { n: nummer })}</p>
+
+      {steg === 1 && (
+        <>
+          <h2 className="profile-section-title">{t("Är du säker?")}</h2>
+          {!underlag && !fel && (
+            <div className="profile-loading">
+              <div className="spinner" />
+            </div>
+          )}
+          {underlag && (
+            <>
+              <p className="admin-tomt">
+                {t("Det här raderas för {vem}:", { vem: underlag.email ?? underlag.namn ?? underlag.userId })}
+              </p>
+              <ul className="admin-radera-lista">
+                <li>{t("{n} inlämnade möbler, varav {a} annonser — med alla bilder", { n: underlag.jobb, a: underlag.annonser })}</li>
+                {underlag.uteNu > 0 && <li>{t("{n} annonser som ligger ute nu tas ner (butiken och Tradera)", { n: underlag.uteNu })}</li>}
+                <li>{t("{n} bevakningar och {e} efterlysningar", { n: underlag.bevakningar, e: underlag.efterlysningar })}</li>
+                {underlag.omdomen > 0 && <li>{t("{n} omdömen", { n: underlag.omdomen })}</li>}
+                <li>{t("Chattloggar, notiser och utskick till adressen")}</li>
+                <li>{t("Inloggningen och profilen i Supabase")}</li>
+              </ul>
+              {underlag.hinder.length > 0 && (
+                <div className="admin-radera-varning">
+                  <p>{t("Kontot kan inte raderas än. Lös det här först:")}</p>
+                  <ul>
+                    {underlag.hinder.map((h) => (
+                      <li key={h}>{h}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {steg === 2 && underlag && (
+        <>
+          <h2 className="profile-section-title">{t("Det går inte att ångra")}</h2>
+          <p className="admin-tomt">
+            {t("Bilder, annonser och historik försvinner för gott. Det finns ingen papperskorg och ingen kopia att återställa från.")}
+          </p>
+          {(underlag.ordrar > 0 || underlag.affarer > 0) && (
+            <p className="admin-tomt">
+              {t("{o} ordrar och {a} affärer behålls för bokföringen, men utan personens namn, e-post och postnummer.", {
+                o: underlag.ordrar,
+                a: underlag.affarer,
+              })}
+            </p>
+          )}
+          {underlag.forHand.length > 0 && <ForHand rader={underlag.forHand} />}
+        </>
+      )}
+
+      {steg === 3 && (
+        <>
+          <h2 className="profile-section-title">{t("Inloggningen raderas också")}</h2>
+          <p className="admin-radera-varning">
+            {t("Loopa och Vips delar samma inloggning. Personen försvinner därför även från Vips och kan inte logga in någonstans efteråt.")}
+          </p>
+        </>
+      )}
+
+      {(steg === 4 || steg === "raderar") && underlag && (
+        <>
+          <h2 className="profile-section-title">{t("Sista bekräftelsen")}</h2>
+          <label className="admin-radera-falt">
+            <span>
+              {underlag.email
+                ? t("Skriv kontots e-postadress, {adress}, för att radera:", { adress: underlag.email })
+                : t("Skriv kontots id, {id}, för att radera:", { id: underlag.userId })}
+            </span>
+            <input
+              type="text"
+              autoComplete="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              value={bekraftelse}
+              disabled={steg === "raderar"}
+              onChange={(e) => setBekraftelse(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && radera()}
+            />
+          </label>
+        </>
+      )}
+
+      {fel && <p className="admin-radera-varning admin-radera-fel">{fel}</p>}
+
+      <div className="admin-radera-knappar">
+        {steg === 1 && (
+          <button className="btn-danger" disabled={!underlag || underlag.hinder.length > 0} onClick={() => setSteg(2)}>
+            {t("Ja, radera")}
+          </button>
+        )}
+        {steg === 2 && (
+          <button className="btn-danger" onClick={() => setSteg(3)}>
+            {t("Ja, radera")}
+          </button>
+        )}
+        {steg === 3 && (
+          <button className="btn-danger" onClick={() => setSteg(4)}>
+            {t("Ja, radera")}
+          </button>
+        )}
+        {(steg === 4 || steg === "raderar") && (
+          <button className="btn-danger" disabled={!stammer || steg === "raderar"} onClick={radera}>
+            {steg === "raderar" ? t("Raderar…") : t("Ja, radera för gott")}
+          </button>
+        )}
+        <button className="btn btn-outline btn-small" disabled={steg === "raderar"} onClick={avbryt}>
+          {t("Avbryt")}
+        </button>
+      </div>
+    </section>
+  );
+}
+
+/** Det som ligger ute hos Facebook och Blocket. Ingen av dem har en väg att avpublicera härifrån. */
+function ForHand({ rader }: { rader: string[] }) {
+  const t = useT();
+  return (
+    <div className="admin-radera-varning">
+      <p>{t("Det här måste tas ner för hand — Loopa kan inte avpublicera där:")}</p>
+      <ul>
+        {rader.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+const RADERAT_ETIKETT: Record<string, string> = {
+  jobb: "Möbler med bilder",
+  bevakningar: "Bevakningar",
+  efterlysningar: "Efterlysningar",
+  forturer: "Förturer",
+  notiser: "Notiser",
+  ordrarAvidentifierade: "Ordrar avidentifierade",
+  affarerAvidentifierade: "Affärer avidentifierade",
+  inbjudningsprofil: "Inbjudningsprofil rensad",
+  krediterAvslutade: "Krediter avslutade",
+  omdomen: "Omdömen",
+  chattsamtal: "Chattsamtal",
+  flodessessioner: "Flödesloggar",
+  utskicksrader: "Utskicksrader",
+  sparadeBrev: "Sparade brev",
+};
