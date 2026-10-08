@@ -166,7 +166,7 @@ export default function ResultScreenV2({
 
           {/* Överst: frågan och var i högen man är. Prickarna leder tillbaka till en tidigare skada. */}
           <div className="v2-glas v2-kort-topp">
-            <span>{t("Stämmer det här?")}</span>
+            <span className="v2-kort-fraga">{t("Stämmer denna skada?")}</span>
             <span className="v2-prickar" aria-label={t("Skada {nr} av {antal}", { nr: lage.index + 1, antal: skador.length })}>
               {skador.map((s, i) => (
                 <button
