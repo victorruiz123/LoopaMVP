@@ -275,7 +275,7 @@ export default function ResultScreenV2({
 
       <div className="v2-avslut">
         <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
-          <span>{t("Se annonsen")}</span>
+          <span>{t("Till annonsen")}</span>
           <ChevronRight size={18} />
         </button>
         {/* En riktig knapp och inte en länk: en missad skada är det enda säljaren kan behöva göra här,
