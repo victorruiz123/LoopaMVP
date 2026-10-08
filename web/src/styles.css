@@ -5545,3 +5545,16 @@ body:has(.grind) .consent { display: none; }
 }
 .sell-fastlist-belopp small { color: var(--muted); }
 .sell-fastlist-belopp strong { color: var(--ink); }
+
+/* annons v5: oskärpezonen bakom listen. Fast längst ner, suddar det som ligger bakom och tonar in
+   uppifrån — ingen kant syns, sidan bara löses upp mot listen. */
+.sell-fastlist-slöja {
+  position: fixed; z-index: 29; left: 0; right: 0; bottom: 0;
+  height: calc(150px + max(env(safe-area-inset-bottom), var(--demo-safe-bottom, 0px)));
+  -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+  background: linear-gradient(to top, rgba(250, 247, 242, 0.75) 0%, rgba(250, 247, 242, 0.35) 55%, rgba(250, 247, 242, 0) 100%);
+  -webkit-mask-image: linear-gradient(to top, #000 45%, transparent 100%); mask-image: linear-gradient(to top, #000 45%, transparent 100%);
+  opacity: 0; pointer-events: none; transition: opacity .3s ease;
+}
+.sell-fastlist-slöja.synlig { opacity: 1; }
+@media (prefers-reduced-motion: reduce) { .sell-fastlist-slöja { transition: none; } }

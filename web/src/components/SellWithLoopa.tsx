@@ -386,6 +386,10 @@ export default function SellWithLoopa({
       </section>
 
       {fastList && !blocked && (
+        /* Slöjan: sidan bakom listen blir gradvis suddigare nedåt, så att blicken landar på knappen. */
+        <div className={`sell-fastlist-slöja${rutanNedanfor && !confirming ? " synlig" : ""}`} aria-hidden="true" />
+      )}
+      {fastList && !blocked && (
         <div className={`sell-fastlist${rutanNedanfor && !confirming ? " synlig" : ""}`} aria-hidden={!rutanNedanfor}>
           {utfall && (
             <span className="sell-fastlist-belopp">
