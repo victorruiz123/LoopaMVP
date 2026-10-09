@@ -5686,3 +5686,185 @@ body:has(.grind) .consent { display: none; }
 /* Knapparna lättare: huvudknappen bär, de två andra är bara en tunn kant. */
 .v2-h .v2-h-knappar { padding-top: 34px; }
 .v2-h .v2-h-knapp { box-shadow: none; background: transparent; border-color: rgba(20, 17, 13, 0.14); font-weight: 600; }
+
+
+/* --------------------------------------------------------------------------
+   Profilen, omdesign (grenen ui/omdesign)
+   --------------------------------------------------------------------------
+   Minimalistisk: siffror som tal, flikar som knappar, annonser som bildkort. Samma färger och
+   typsnitt som resten av sidan — rubrikerna i startsidans täta spärr (.home-title), ytorna som
+   kort utan ram med mjuk skugga. Mobil: en spalt, kontot sist. Dator: sidopanel + innehåll.
+   Se screens/ProfileScreen.tsx.
+   -------------------------------------------------------------------------- */
+
+.pf { --pf-kort: var(--surface); --pf-skugga: 0 1px 2px rgba(20, 17, 13, 0.04), 0 10px 30px -18px rgba(20, 17, 13, 0.22);
+  --pf-skugga-upp: 0 2px 4px rgba(20, 17, 13, 0.05), 0 22px 44px -22px rgba(20, 17, 13, 0.32); gap: 20px; }
+.pf-layout { display: flex; flex-direction: column; gap: 20px; }
+/* Mobil: sidopanelen löses upp, så att kontot hamnar SIST — efter flikarna, inte före dem. */
+.pf-sida { display: contents; }
+.pf-jag { order: 1; } .pf-tal { order: 2; } .pf-huvud { order: 3; } .pf-konto { order: 4; } .pf-juridik { order: 5; }
+.pf-huvud { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* ── Vem: ett varmt kort, samma glöd som startsidans topp ── */
+.pf-jag {
+  position: relative; display: flex; align-items: center; gap: 14px; padding: 18px;
+  border-radius: var(--r-xl); overflow: hidden;
+  background:
+    radial-gradient(120% 140% at 0% 0%, hsl(14 90% 92%) 0%, transparent 55%),
+    radial-gradient(90% 120% at 100% 100%, hsl(36 70% 92%) 0%, transparent 60%),
+    var(--pf-kort);
+  box-shadow: var(--pf-skugga);
+}
+.pf-avatar {
+  width: 58px; height: 58px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: linear-gradient(145deg, hsl(16 82% 60%), var(--accent-dark)); color: #fff;
+  font-family: var(--ordmark-font); font-weight: 700; font-size: 21px; letter-spacing: -0.02em;
+  box-shadow: 0 0 0 4px var(--pf-kort), 0 8px 18px -8px hsl(14 77% 40% / 0.55);
+}
+.pf-jag-text { flex: 1; min-width: 0; }
+.pf-namn { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.033em; line-height: 1.1; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-epost { margin: 4px 0 0; font-size: var(--fs-sm); color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ── Siffrorna: separata rutor, etikett · tal · tillägg ── */
+.pf-tal { margin: 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.pf-tal-ruta { padding: 12px 12px 11px; display: flex; flex-direction: column; gap: 3px; min-width: 0;
+  background: var(--pf-kort); border-radius: var(--r-lg); box-shadow: var(--pf-skugga); }
+.pf-tal dt { font-size: var(--fs-2xs); font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted-soft); }
+.pf-tal dd { margin: 0; display: flex; flex-direction: column; gap: 1px; }
+.pf-tal-varde { font-size: clamp(15px, 4.2vw, 19px); font-weight: 700; letter-spacing: -0.03em; color: var(--ink);
+  font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pf-tal-under { font-size: var(--fs-2xs); color: var(--muted); }
+/* Det enda som kräver något av en: fylld accent, inte bara tonad. */
+.pf-tal-ruta.lyser { background: linear-gradient(150deg, hsl(16 82% 60%), var(--accent-dark)); box-shadow: 0 12px 26px -14px hsl(14 77% 40% / 0.6); }
+.pf-tal-ruta.lyser dt { color: rgba(255, 255, 255, 0.8); }
+.pf-tal-ruta.lyser .pf-tal-varde { color: #fff; }
+.pf-tal-ruta.lyser .pf-tal-under { color: rgba(255, 255, 255, 0.85); }
+
+/* ── Flikarna: en segmenterad kontroll ── */
+.pf-flikar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 2px; padding: 4px;
+  background: var(--surface-sunk); border-radius: 999px; }
+.pf-flik {
+  display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 42px;
+  border: 0; border-radius: 999px; background: none; color: var(--muted); cursor: pointer;
+  font: inherit; font-size: var(--fs-base); font-weight: 650; letter-spacing: -0.01em;
+  transition: color var(--t) var(--ease-ui), background var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+.pf-flik:hover { color: var(--ink); }
+.pf-flik.vald { background: var(--surface); color: var(--ink); box-shadow: 0 1px 2px rgba(20, 17, 13, 0.08), 0 6px 14px -8px rgba(20, 17, 13, 0.3); }
+.pf-flik-antal { min-width: 19px; height: 19px; padding: 0 6px; border-radius: 999px; display: inline-grid; place-items: center;
+  background: rgba(20, 17, 13, 0.07); color: var(--ink-soft); font-size: var(--fs-2xs); font-weight: 700; font-variant-numeric: tabular-nums; }
+.pf-flik.vald .pf-flik-antal { background: var(--accent); color: #fff; }
+
+/* ── Filtret: lätta chips ── */
+.pf-filter { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 2px 0; }
+.pf-filter::-webkit-scrollbar { display: none; }
+.pf-chip {
+  flex: none; display: inline-flex; align-items: center; gap: 6px; height: 34px; padding: 0 14px;
+  border: 0; border-radius: 999px; background: var(--pf-kort); color: var(--ink-soft); box-shadow: inset 0 0 0 1px var(--border);
+  font: inherit; font-size: var(--fs-md); font-weight: 600; cursor: pointer; transition: background var(--t) var(--ease-ui);
+}
+.pf-chip:hover { background: var(--surface-pressed); }
+.pf-chip.vald { background: var(--ink); color: var(--bg); box-shadow: none; }
+.pf-chip-antal { font-weight: 500; opacity: 0.55; font-variant-numeric: tabular-nums; }
+
+/* ── Annonskorten: bilden inramad, läget på bilden, priset först ── */
+.pf-kort { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.pf-annons {
+  width: 100%; display: flex; flex-direction: column; text-align: left; padding: 6px; border: 0;
+  border-radius: var(--r-xl); background: var(--pf-kort); box-shadow: var(--pf-skugga); cursor: pointer; font: inherit; color: inherit;
+  transition: box-shadow 200ms var(--ease-ui), transform 200ms var(--ease-ui);
+}
+.pf-annons:hover { box-shadow: var(--pf-skugga-upp); transform: translateY(-2px); }
+.pf-annons:active { transform: translateY(0) scale(0.99); }
+.pf-annons:focus-visible { outline: none; box-shadow: var(--focus); }
+.pf-annons-bild { position: relative; aspect-ratio: 1; border-radius: calc(var(--r-xl) - 5px); overflow: hidden;
+  background: var(--field); display: grid; place-items: center; color: var(--muted-soft); }
+.pf-annons-bild img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 400ms var(--ease-ui); }
+.pf-annons:hover .pf-annons-bild img { transform: scale(1.03); }
+.pf-annons-betyg { position: absolute; top: 8px; right: 8px; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.18)); }
+.pf-annons-text { display: flex; flex-direction: column; gap: 3px; padding: 10px 8px 8px; min-width: 0; }
+.pf-annons-pris { font-size: 17px; font-weight: 700; letter-spacing: -0.03em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-annons-titel { font-size: var(--fs-md); font-weight: 500; color: var(--ink-soft); line-height: 1.3;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.pf-annons-rad { font-size: var(--fs-xs); color: var(--muted-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-top: 2px; }
+
+/* ── Lägesetiketten: en färg per läge, alltid samma form ── */
+.pf-lage { align-self: flex-start; max-width: 100%; padding: 4px 9px; border-radius: 999px; font-size: var(--fs-2xs); font-weight: 700;
+  background: var(--field); color: var(--ink-soft); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-lage-pa-bild { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.18); }
+.pf-lage-live, .pf-lage-published { background: hsl(140 42% 93% / 0.94); color: var(--green-dark); }
+.pf-lage-reserved, .pf-lage-pending { background: hsl(42 78% 92% / 0.94); color: var(--amber-ink); }
+.pf-lage-sold, .pf-lage-delivered, .pf-lage-accent, .pf-lage-publishing { background: hsl(15 80% 94% / 0.95); color: var(--accent-ink); }
+.pf-lage-error, .pf-lage-returned { background: hsl(8 70% 95% / 0.95); color: var(--danger-dark); }
+
+/* ── Köp och affärer: befintliga rader, i kortform ── */
+.pf-rader { display: flex; flex-direction: column; gap: 10px; }
+.pf-rader .trade-row { border: 0; border-radius: var(--r-xl); background: var(--pf-kort); box-shadow: var(--pf-skugga);
+  transition: box-shadow 200ms var(--ease-ui), transform 200ms var(--ease-ui); }
+.pf-rader .trade-row:hover { box-shadow: var(--pf-skugga-upp); transform: translateY(-1px); }
+
+.pf-tomt { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 44px 16px;
+  border-radius: var(--r-xl); background: var(--pf-kort); box-shadow: var(--pf-skugga); color: var(--muted-soft); }
+.pf-tomt svg { padding: 12px; box-sizing: content-box; border-radius: 50%; background: var(--field); }
+.pf-tomt p { margin: 0; font-size: var(--fs-base); font-weight: 600; color: var(--muted); }
+
+/* ── Tjäna: två kort, knapparna först ── */
+.pf-tjana { display: grid; gap: 12px; }
+.pf-tjana-kort { display: flex; flex-direction: column; gap: 10px; padding: 20px; background: var(--pf-kort);
+  border-radius: var(--r-xl); box-shadow: var(--pf-skugga); }
+/* Affiliate är pengar: kortet får startsidans varma glöd. */
+.pf-tjana-kort + .pf-tjana-kort {
+  background: radial-gradient(110% 90% at 100% 0%, hsl(14 90% 93%) 0%, transparent 60%), var(--pf-kort);
+}
+.pf-tjana-etikett { align-self: flex-start; margin: 0; padding: 4px 9px; border-radius: 999px; background: var(--accent-light);
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-ink); }
+.pf-tjana-rubrik { margin: 2px 0 0; font-size: 24px; font-weight: 700; letter-spacing: -0.033em; line-height: 1.1; color: var(--ink); }
+.pf-tjana-not { margin: 0; font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
+.pf-dela { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 6px; }
+.pf-dela-knapp { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: var(--tap); white-space: nowrap; }
+.pf-tjana-tal { display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px; margin-top: 2px; }
+.pf-tjana-tal-fem { grid-template-columns: repeat(3, 1fr); }
+.pf-tjana-tal span { display: flex; flex-direction: column; gap: 1px; padding: 9px 11px; border-radius: var(--r);
+  background: var(--bg); font-size: var(--fs-2xs); color: var(--muted); }
+.pf-tjana-tal strong { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pf-tjana-lista { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; }
+.pf-tjana-lista li { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 0;
+  border-top: 1px solid var(--hairline, var(--border)); font-size: var(--fs-md); color: var(--ink-soft); }
+
+/* ── Konto: en knapplista utan ram ── */
+.pf-konto { display: flex; flex-direction: column; background: var(--pf-kort); border-radius: var(--r-xl); box-shadow: var(--pf-skugga); }
+.pf-konto-rad {
+  display: flex; align-items: center; gap: 10px; min-height: 50px; padding: 0 16px; border: 0;
+  border-bottom: 1px solid var(--hairline, var(--border)); background: none; color: var(--ink); cursor: pointer;
+  font: inherit; font-size: var(--fs-base); font-weight: 600; text-align: left; transition: background var(--t) var(--ease-ui);
+}
+.pf-konto-rad:first-child { border-radius: var(--r-xl) var(--r-xl) 0 0; }
+.pf-konto-rad:last-child { border-bottom: 0; border-radius: 0 0 var(--r-xl) var(--r-xl); }
+.pf-konto-rad span { flex: 1; }
+.pf-konto-rad svg { color: var(--muted-soft); flex: none; }
+.pf-konto-rad:hover { background: var(--surface-pressed); }
+.pf-loggaut { color: var(--danger-dark); }
+/* Språkväljaren klär sig som en rad: ingen ram, full bredd, menyn under raden. */
+.pf-konto-rad.pf-konto-sprak { padding: 0; position: relative; z-index: 20; }
+.pf-konto-rad.pf-konto-sprak:hover { background: none; }
+.pf-konto-sprak .lang-picker { margin: 0; flex: 1; align-self: stretch; display: flex; }
+.pf-konto-sprak .lang-button { flex: 1; justify-content: flex-start; gap: 10px; height: auto; min-height: 50px;
+  padding: 0 16px; border: 0; border-radius: inherit; background: none; color: var(--ink); font-size: var(--fs-base); font-weight: 600; }
+.pf-konto-sprak .lang-button:hover { background: var(--surface-pressed); }
+.pf-konto-sprak .lang-button svg { color: var(--muted-soft); }
+.pf-konto-sprak .lang-menu { left: 8px; right: auto; }
+.pf-juridik { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; font-size: var(--fs-xs); opacity: 0.85; }
+
+/* ── Dator: sidopanel + innehåll ── */
+[data-view="desktop"] .pf { max-width: clamp(1000px, 74vw, 1260px); }
+[data-view="desktop"] .pf-layout { display: grid; grid-template-columns: 310px minmax(0, 1fr); gap: 40px; align-items: start; }
+[data-view="desktop"] .pf-sida { display: flex; flex-direction: column; gap: 14px; position: sticky; top: 24px; }
+[data-view="desktop"] .pf-jag { flex-direction: column; align-items: flex-start; gap: 14px; padding: 22px; }
+[data-view="desktop"] .pf-avatar { width: 64px; height: 64px; font-size: 23px; }
+[data-view="desktop"] .pf-namn { font-size: 26px; white-space: normal; }
+[data-view="desktop"] .pf-tal { grid-template-columns: repeat(2, 1fr); }
+[data-view="desktop"] .pf-flikar { max-width: 420px; }
+[data-view="desktop"] .pf-kort { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
+[data-view="desktop"] .pf-tjana { grid-template-columns: 1fr 1fr; align-items: start; gap: 18px; }

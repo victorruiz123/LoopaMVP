@@ -1,10 +1,10 @@
-import { useEffect, useState } from "react";
-import { imageUrl, listJobs } from "../api";
+import { useEffect, useMemo, useState } from "react";
+import { getMinAffiliate, getMinInbjudan, imageUrl, listJobs, loggaLankKopierad } from "../api";
 import { useAuth } from "../auth/AuthProvider";
 import GradeBadge from "../components/GradeBadge";
-import { ArrowLeftIcon, CardIcon, ChevronRight, UsersIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, CheckIcon, ChevronRight, CopyIcon, SendIcon, UsersIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
-import type { JobSummary } from "../types";
+import type { JobSummary, MinAffiliate, MinInbjudan } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
 import LegalLink from "../components/LegalLink";
 import LanguagePicker from "../components/LanguagePicker";
@@ -15,28 +15,29 @@ import { fetchMyOrders } from "../butik/api";
 import type { DealView } from "../affar/types";
 import type { Order } from "../butik/api";
 import type { Product } from "../butik/types";
-import { buyStats, CLOSED_DEAL_STATES, plural, sellStats } from "../profil/stats";
-import { DealRow, OrderRow, StatGrid } from "../profil/TradeSections";
-import { ProfilInbjudan } from "../components/BjudIn";
-import { ProfilAffiliate } from "../components/Affiliate";
+import { buyStats, CLOSED_DEAL_STATES, sellStats } from "../profil/stats";
+import { DealRow, OrderRow } from "../profil/TradeSections";
+import { formatOre } from "../components/Affiliate";
 
 /**
  * Profilen: allt konto-innehavaren handlar med, sålt som köpt, på ett ställe.
  *
- * EN SKÄRM FÖR BÅDA SIDORNA, och det är inte en layoutfråga. Samma person filmar en soffa på
- * förmiddagen och köper ett matbord på kvällen; två profiler hade tvingat dem att veta vilken av
- * sina roller de var i innan de kunde leta. Skärmen nås därför både ur säljverktyget och ur butiken
- * (/butik/profil) och visar samma sak på båda ställena.
+ * OMDESIGN (grenen ui/omdesign): samma information som förut, men ordnad bakom knappar i stället för
+ * i en lång lista. Tre flikar — Säljer, Köper, Tjäna — och inom Säljer ett filter per läge. Siffrorna
+ * står överst som en rad tal; texten är kortad till etiketter. På datorn ligger kontot och siffrorna i
+ * en sidopanel och innehållet bredvid.
  *
- * TRE KÄLLOR, tre frågor:
+ * TRE KÄLLOR, tre frågor (oförändrat):
  *
  *   GET /api/jobs           vad jag filmat och lagt ut       — med butikens läge per möbel
  *   GET /api/butik/order    vad jag köpt i butiken
  *   GET /api/affar          affärer där jag är köpare ELLER säljare, med läge, actions och kort
  *
- * Siffrorna räknas ur just de listorna (profil/stats.ts) och inte på servern: ett fjärde svar som
- * räknade samma sak hade kunnat säga något annat än raderna under det.
+ * Siffrorna räknas ur just de listorna (profil/stats.ts) och inte på servern.
  */
+type Flik = "salj" | "kop" | "tjana";
+type SaljFilter = "ute" | "salda" | "sparade" | "affarer";
+
 export default function ProfileScreen({
   onBack,
   onOpenJob,
@@ -44,14 +45,7 @@ export default function ProfileScreen({
   onOpenAdmin,
 }: {
   onBack: () => void;
-  /**
-   * Öppna ett annonskort.
-   *
-   * Tar HELA raden, inte bara id:t. Båda ingångarna öppnar numera säljarens egen kortvy — säljverktyget
-   * som en skärm i sitt flöde, butiken på adressen /butik/annons/<jobId> — men raden bär både `id` och
-   * `loopaId`, och att skicka med bara det ena hade tvingat den som behöver det andra att slå upp
-   * resten en gång till.
-   */
+  /** Öppna ett annonskort. Tar hela raden: den bär både `id` och `loopaId`. */
   onOpenJob: (job: JobSummary) => void;
   /** Serverns besked ur inloggningen. Ingången ritas bara då — och prövas igen bakom varje adminväg. */
   isAdmin?: boolean;
@@ -64,14 +58,10 @@ export default function ProfileScreen({
   const [jobs, setJobs] = useState<JobSummary[] | null>(null);
   const [orders, setOrders] = useState<Array<{ order: Order; product: Product | null }> | null>(null);
   const [deals, setDeals] = useState<DealView[] | null>(null);
+  const [flik, setFlik] = useState<Flik | null>(null);
+  const [filter, setFilter] = useState<SaljFilter | null>(null);
 
-  /**
-   * Tre hämtningar, var och en med sitt eget fall.
-   *
-   * Ingen `Promise.all`: en säljare utan ett enda köp ska inte få en tom profil för att orderlistan
-   * svarade 401, och en köpare utan annonser ska se sina köp även om jobblistan faller. Delarna är
-   * oberoende och laddas som det.
-   */
+  /** Tre hämtningar, var och en med sitt eget fall — en lista som faller tömmer inte de andra. */
   useEffect(() => {
     listJobs().then(setJobs).catch(() => setJobs([]));
     fetchMyOrders().then((r) => setOrders(r.orders)).catch(() => setOrders([]));
@@ -82,21 +72,7 @@ export default function ProfileScreen({
   const valued = cards.filter((j) => j.price?.status === "ok" && j.price.default !== null);
   const totalValue = valued.reduce((sum, j) => sum + (j.price?.default ?? 0), 0);
 
-  /**
-   * Två listor, inte en.
-   *
-   * En annons som ligger ute hos köparna är inte samma sak som en sparad: den arbetar, den kan bli
-   * såld i natt, och den är det säljaren öppnar profilen för att titta till. Därför står de först,
-   * under egen rubrik. Ett misslyckat försök hör inte hit — den möbeln är fortfarande bara sparad,
-   * och raden säger varför i stället för att låtsas att den är ute.
-   */
-  /**
-   * Vad som ligger ute — oavsett var.
-   *
-   * `sale` känner bara Tradera; `shop` är Loopa Butik. En möbel som ligger i vår egen butik utan att
-   * ha lagts ut på en marknadsplats är lika mycket till salu, och stod förut under "Sparade
-   * annonser" som om ingen kunde köpa den.
-   */
+  /** Vad som ligger ute — oavsett var. Butiken räknas lika mycket som Tradera. */
   const selling = cards.filter(
     (j) =>
       j.sale?.status === "published" ||
@@ -114,178 +90,386 @@ export default function ProfileScreen({
   const buy = buyStats(orders ?? [], deals ?? []);
   const sellerDeals = (deals ?? []).filter((d) => d.role === "seller");
   const buyerDeals = (deals ?? []).filter((d) => d.role === "buyer");
-  /** Öppna affärer först: en avslutad affär är historik, en pågående väntar på någon. */
   const byOpen = (a: DealView, b: DealView) =>
     Number(CLOSED_DEAL_STATES.includes(a.state)) - Number(CLOSED_DEAL_STATES.includes(b.state));
-  const hasBuying = buy.orders > 0 || buyerDeals.length > 0;
+  const oppnaAffarer = buy.openDeals + sellerDeals.filter((d) => !CLOSED_DEAL_STATES.includes(d.state)).length;
+  const vantar = buy.needsMe + sell.needsMe;
+  const kopAntal = buyerDeals.length + (orders ?? []).length;
+
+  /**
+   * Fliken man landar på: den där något finns. Den som bara köpt ska inte mötas av en tom säljlista.
+   * Ett eget val vinner alltid.
+   */
+  const aktivFlik: Flik = flik ?? (cards.length === 0 && sellerDeals.length === 0 && kopAntal > 0 ? "kop" : "salj");
+  const filterAntal: Record<SaljFilter, number> = {
+    ute: selling.length,
+    salda: soldCards.length,
+    sparade: saved.length,
+    affarer: sellerDeals.length,
+  };
+  const aktivtFilter: SaljFilter =
+    filter ?? ((["ute", "salda", "sparade", "affarer"] as SaljFilter[]).find((f) => filterAntal[f] > 0) ?? "ute");
+  const filterJobb: Record<Exclude<SaljFilter, "affarer">, JobSummary[]> = { ute: selling, salda: soldCards, sparade: saved };
 
   return (
-    <div className="screen screen-light profile">
+    <div className="screen screen-light profile pf">
       <button className="btn btn-text btn-back" onClick={onBack}>
         <ArrowLeftIcon /> {t("Tillbaka")}
       </button>
 
-      <section className="profile-head">
-        <div className="profile-avatar" aria-hidden>
-          {initials(displayName)}
-        </div>
-        <div className="profile-identity">
-          <h1 className="profile-name">{displayName}</h1>
-          <p className="profile-email">{user?.email}</p>
-        </div>
-        {/* Språket byts här, bredvid namnet: det är en inställning för kontot, inte för en skärm. */}
-        <LanguagePicker />
-      </section>
-
-      {/*
-        Siffrorna över allt: sålt OCH köpt.
-        Rutan visade förut två tal om säljandet. Den som köper en möbel har lika mycket rätt till ett
-        svar på "hur mycket och vad väntar", och den som gör båda ska se dem bredvid varandra.
-      */}
-      <StatGrid
-        items={[
-          { label: t("Annonser"), value: String(sell.cards), hint: sell.live ? `${sell.live} till salu` : undefined },
-          { label: t("Sålt"), value: sell.sold ? formatSek(sell.earned) : "—", hint: sell.sold ? plural(sell.sold, "möbel", "möbler") : undefined },
-          { label: t("Samlat värde"), value: valued.length ? formatSek(totalValue) : "—", hint: sell.liveValue ? `${formatSek(sell.liveValue)} ute` : undefined },
-          { label: t("Köpt"), value: buy.completed ? formatSek(buy.spent) : "—", hint: buy.completed ? plural(buy.completed, "köp", "köp") : undefined },
-          { label: t("Pågående affärer"), value: String(buy.openDeals + sellerDeals.filter((d) => !CLOSED_DEAL_STATES.includes(d.state)).length), hint: buy.committed ? formatSek(buy.committed) : undefined },
-          { label: t("Väntar på dig"), value: String(buy.needsMe + sell.needsMe) },
-        ]}
-      />
-
-      {jobs === null || cards.length === 0 ? (
-        <>
-          <h2 className="profile-section-title">{t("Sparade annonser")}</h2>
-          {jobs === null ? (
-            <div className="profile-loading">
-              <div className="spinner" />
+      <div className="pf-layout">
+        {/* ── Sidopanelen: vem, siffrorna, kontot ─────────────────────────── */}
+        <aside className="pf-sida">
+          <section className="pf-jag">
+            <div className="pf-avatar" aria-hidden>
+              {initials(displayName)}
             </div>
-          ) : (
-            <div className="profile-empty">
-              <span className="profile-empty-mark">
-                <CardIcon size={22} />
-              </span>
-              <p className="profile-empty-title">{t("Inga annonser än")}</p>
-              <p className="profile-empty-hint">
-                {t("Varje möbel du säljer med Loopa hamnar här — med skick, pris och annons.")}
-              </p>
+            <div className="pf-jag-text">
+              <h1 className="pf-namn">{displayName}</h1>
+              <p className="pf-epost">{user?.email}</p>
             </div>
-          )}
-        </>
-      ) : (
-        <>
-          {selling.length > 0 && (
-            <>
-              <h2 className="profile-section-title">{t("Till salu")}</h2>
-              <CardList jobs={selling} onOpenJob={onOpenJob} lang={lang} />
-            </>
-          )}
-          {soldCards.length > 0 && (
-            <>
-              <h2 className="profile-section-title">{t("Sålda")}</h2>
-              <CardList jobs={soldCards} onOpenJob={onOpenJob} lang={lang} />
-            </>
-          )}
-          {saved.length > 0 && (
-            <>
-              <h2 className="profile-section-title">{t("Sparade annonser")}</h2>
-              <CardList jobs={saved} onOpenJob={onOpenJob} lang={lang} />
-            </>
-          )}
-        </>
-      )}
+          </section>
 
-      {/* Inbjudan: länken, gratisförsäljningarna och de inbjudna. Under annonserna, för att det är
-          som säljare man bjuder in — och det är där den som just fått en möbel utbetald tittar. */}
-      <ProfilInbjudan />
+          <dl className="pf-tal">
+            <Tal etikett={t("Annonser")} varde={String(sell.cards)} under={sell.live ? t("{antal} ute", { antal: sell.live }) : undefined} />
+            <Tal etikett={t("Sålt")} varde={sell.sold ? formatSek(sell.earned) : "—"} under={sell.sold ? t("{antal} st", { antal: sell.sold }) : undefined} />
+            <Tal etikett={t("Värde")} varde={valued.length ? formatSek(totalValue) : "—"} under={sell.liveValue ? t("{belopp} ute", { belopp: formatSek(sell.liveValue) }) : undefined} />
+            <Tal etikett={t("Köpt")} varde={buy.completed ? formatSek(buy.spent) : "—"} under={buy.completed ? t("{antal} st", { antal: buy.completed }) : undefined} />
+            <Tal etikett={t("Affärer")} varde={String(oppnaAffarer)} under={buy.committed ? formatSek(buy.committed) : undefined} />
+            <Tal etikett={t("Din tur")} varde={String(vantar)} under={vantar > 0 ? t("väntar på dig") : undefined} lyser={vantar > 0} />
+          </dl>
 
-      {/* Affiliate: den personliga länken och provisionerna. Eget program, egen ruta — se Affiliate.tsx. */}
-      <ProfilAffiliate />
+          <nav className="pf-konto" aria-label={t("Konto")}>
+            {/* Språket är en kontoinställning — här, inte bredvid namnet, där det tog namnets plats. */}
+            <div className="pf-konto-rad pf-konto-sprak">
+              <LanguagePicker />
+            </div>
+            {isAdmin && onOpenAdmin && (
+              <button className="pf-konto-rad" onClick={onOpenAdmin}>
+                <UsersIcon size={18} /> <span>{t("Adminpanel")}</span> <ChevronRight size={16} />
+              </button>
+            )}
+            <button className="pf-konto-rad" onClick={reopenConsent}>
+              <span>{t("Cookieinställningar")}</span> <ChevronRight size={16} />
+            </button>
+            <button className="pf-konto-rad pf-loggaut" onClick={() => void signOut()}>
+              <span>{t("Logga ut")}</span>
+            </button>
+          </nav>
+          <footer className="pf-juridik">
+            <LegalLink doc="privacy" />
+            <LegalLink doc="cookies" />
+            <LegalLink doc="terms" />
+          </footer>
+        </aside>
 
-      {/* ── Affärer där jag är säljaren ───────────────────────────────────
-          Egen avdelning och inte blandad med annonserna: en Trygg affär är en köpare som redan
-          finns, med ett pris som ska svaras på. Den kan inte ligga i samma lista som en annons som
-          väntar på att någon ska höra av sig. */}
-      {sellerDeals.length > 0 && (
-        <>
-          <h2 className="profile-section-title">{t("Affärer där du säljer")}</h2>
-          <ul className="trade-list">
-            {[...sellerDeals].sort(byOpen).map((d) => <DealRow key={d.id} deal={d} />)}
-          </ul>
-        </>
-      )}
-
-      {/* ── Köpsidan ─────────────────────────────────────────────────────── */}
-      {hasBuying && (
-        <>
-          <h2 className="profile-section-title">{t("Du köper")}</h2>
-          {buyerDeals.length > 0 && (
-            <ul className="trade-list">
-              {[...buyerDeals].sort(byOpen).map((d) => <DealRow key={d.id} deal={d} />)}
-            </ul>
-          )}
-          {(orders ?? []).length > 0 && (
-            <ul className="trade-list">
-              {(orders ?? []).map(({ order, product }) => (
-                <OrderRow key={order.id} order={order} product={product} />
-              ))}
-            </ul>
-          )}
-        </>
-      )}
-
-      {/* Har man aldrig köpt något sägs det en gång, i stället för två tomma listor. */}
-      {orders !== null && deals !== null && !hasBuying && (
-        <>
-          <h2 className="profile-section-title">{t("Du köper")}</h2>
-          <div className="profile-empty">
-            <span className="profile-empty-mark"><CardIcon size={22} /></span>
-            <p className="profile-empty-title">{t("Inga köp än")}</p>
-            <p className="profile-empty-hint">
-              {t("Möbler du köper i butiken och affärer du startar från en annan annons hamnar här.")}
-            </p>
+        {/* ── Innehållet: tre flikar ──────────────────────────────────────── */}
+        <main className="pf-huvud">
+          <div className="pf-flikar" role="tablist" aria-label={t("Profil")}>
+            <FlikKnapp vald={aktivFlik === "salj"} onClick={() => setFlik("salj")} etikett={t("Säljer")} antal={cards.length + sellerDeals.length} />
+            <FlikKnapp vald={aktivFlik === "kop"} onClick={() => setFlik("kop")} etikett={t("Köper")} antal={kopAntal} />
+            <FlikKnapp vald={aktivFlik === "tjana"} onClick={() => setFlik("tjana")} etikett={t("Tjäna")} />
           </div>
-        </>
-      )}
 
-      {isAdmin && onOpenAdmin && (
-        <button className="btn profile-admin-link" onClick={onOpenAdmin}>
-          <UsersIcon /> {t("Adminpanel")}
-        </button>
-      )}
+          {aktivFlik === "salj" &&
+            (jobs === null ? (
+              <Laddar />
+            ) : cards.length === 0 && sellerDeals.length === 0 ? (
+              <Tomt rubrik={t("Inga annonser än")} />
+            ) : (
+              <>
+                <div className="pf-filter" role="tablist" aria-label={t("Visa")}>
+                  {(
+                    [
+                      ["ute", t("Till salu")],
+                      ["salda", t("Sålda")],
+                      ["sparade", t("Sparade")],
+                      ["affarer", t("Affärer")],
+                    ] as Array<[SaljFilter, string]>
+                  )
+                    .filter(([f]) => filterAntal[f] > 0 || f === "ute")
+                    .map(([f, etikett]) => (
+                      <button
+                        key={f}
+                        type="button"
+                        role="tab"
+                        aria-selected={aktivtFilter === f}
+                        className={`pf-chip${aktivtFilter === f ? " vald" : ""}`}
+                        onClick={() => setFilter(f)}
+                      >
+                        {etikett} <span className="pf-chip-antal">{filterAntal[f]}</span>
+                      </button>
+                    ))}
+                </div>
+                {aktivtFilter === "affarer" ? (
+                  <ul className="trade-list pf-rader">
+                    {[...sellerDeals].sort(byOpen).map((d) => <DealRow key={d.id} deal={d} />)}
+                  </ul>
+                ) : filterJobb[aktivtFilter].length === 0 ? (
+                  <Tomt rubrik={t("Inget här just nu")} />
+                ) : (
+                  <ul className="pf-kort">
+                    {filterJobb[aktivtFilter].map((j) => (
+                      <AnnonsKort key={j.id} job={j} lang={lang} onOpen={() => onOpenJob(j)} />
+                    ))}
+                  </ul>
+                )}
+              </>
+            ))}
 
-      <button className="btn btn-text profile-signout" onClick={() => void signOut()}>
-        {t("Logga ut")}
-      </button>
+          {aktivFlik === "kop" &&
+            (orders === null || deals === null ? (
+              <Laddar />
+            ) : kopAntal === 0 ? (
+              <Tomt rubrik={t("Inga köp än")} />
+            ) : (
+              <ul className="trade-list pf-rader">
+                {[...buyerDeals].sort(byOpen).map((d) => <DealRow key={d.id} deal={d} />)}
+                {(orders ?? []).map(({ order, product }) => (
+                  <OrderRow key={order.id} order={order} product={product} />
+                ))}
+              </ul>
+            ))}
 
-      {/* Samtycket måste gå att ta tillbaka lika lätt som det gavs, och profilen är stället man
-          letar på. Knappen glömmer valet, vilket får cookierutan att komma tillbaka — se
-          lib/consent.ts. */}
-      <footer className="legal-footer">
-        <LegalLink doc="privacy" />
-        <LegalLink doc="cookies" />
-        <LegalLink doc="terms" />
-        <button className="legal-link legal-link-button" onClick={reopenConsent}>
-          {t("Cookieinställningar")}
-        </button>
-      </footer>
+          {aktivFlik === "tjana" && <Tjana />}
+        </main>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Små byggstenar
+// ---------------------------------------------------------------------------
+
+function Tal({ etikett, varde, under, lyser = false }: { etikett: string; varde: string; under?: string; lyser?: boolean }) {
+  return (
+    <div className={`pf-tal-ruta${lyser ? " lyser" : ""}`}>
+      <dt>{etikett}</dt>
+      <dd>
+        <span className="pf-tal-varde">{varde}</span>
+        {under && <span className="pf-tal-under">{under}</span>}
+      </dd>
+    </div>
+  );
+}
+
+function FlikKnapp({ vald, onClick, etikett, antal }: { vald: boolean; onClick: () => void; etikett: string; antal?: number }) {
+  return (
+    <button type="button" role="tab" aria-selected={vald} className={`pf-flik${vald ? " vald" : ""}`} onClick={onClick}>
+      {etikett}
+      {antal !== undefined && antal > 0 && <span className="pf-flik-antal">{antal}</span>}
+    </button>
+  );
+}
+
+function Laddar() {
+  return (
+    <div className="profile-loading">
+      <div className="spinner" />
+    </div>
+  );
+}
+
+function Tomt({ rubrik }: { rubrik: string }) {
+  return (
+    <div className="pf-tomt">
+      <CardIcon size={22} />
+      <p>{rubrik}</p>
     </div>
   );
 }
 
 /**
- * Vad de tre lägena heter för säljaren.
- *
- * Marknadsplatsen nämns inte: det är Loopa som säljer möbeln, och var annonsen råkar ligga är hur vi
- * gör det. Ett misslyckat försök står kvar som text i stället för att försvinna — annars ser kortet
- * ut som vilken sparad annons som helst, och säljaren väntar på ett besked som aldrig kommer.
+ * Ett annonskort: bild, rubrik, pris och EN etikett för läget. Det som tidigare stod som rader under
+ * — visningar, leveranssteg, utbetalning — står kvar, men som en enda kort rad.
  */
+function AnnonsKort({ job: j, lang, onOpen }: { job: JobSummary; lang: string; onOpen: () => void }) {
+  const t = useT();
+  const bild = j.coverImageUrl ?? (j.thumbnailImageId ? imageUrl(j.id, j.thumbnailImageId) : undefined);
+
+  /** Etiketten: köpets steg går före butikens läge, som går före marknadsplatsens. */
+  const lage: { text: string; ton: string } | null = j.order
+    ? { text: t(ORDER_STEG[j.order.status]), ton: "accent" }
+    : j.shop && SHOP_LABEL[j.shop.state]
+      ? { text: t(SHOP_LABEL[j.shop.state]!) + (j.shop.soldChannel === "tradera" ? t(" på Tradera") : ""), ton: j.shop.state }
+      : j.sale
+        ? { text: t(SALE_LABEL[j.sale.status]), ton: j.sale.status }
+        : null;
+
+  const rad = j.shop?.utbetalning
+    ? t("Utbetalt {belopp}", { belopp: formatSek(j.shop.utbetalning.saljarenSek) }) +
+      (j.shop.utbetalning.andel === 0 ? ` · ${t("gratisförsäljning")}` : "")
+    : j.order?.deliveryDate
+      ? `${leveransDatum(j.order.deliveryDate)} ${j.order.deliveryWindow ?? ""}`
+      : j.shop?.state === "live" && j.statistik && j.statistik.visningar > 0
+        ? [
+            t("{antal} visningar", { antal: j.statistik.visningar }),
+            j.statistik.klick > 0 ? t("{antal} klick", { antal: j.statistik.klick }) : null,
+            j.shop.listedAt ? dagarUppe(j.shop.listedAt, t) : null,
+          ]
+            .filter(Boolean)
+            .join(" · ")
+        : formatDate(j.createdAt, lang);
+
+  return (
+    <li>
+      <button className="pf-annons" onClick={onOpen}>
+        <span className="pf-annons-bild">
+          {bild ? <img src={bild} alt="" /> : <CardIcon size={22} />}
+          {j.grade && (
+            <span className="pf-annons-betyg">
+              <GradeBadge grade={j.grade.grade} size={26} />
+            </span>
+          )}
+          {/* Läget ligger på bilden: det är det första ögat söker, och texten under blir kortare. */}
+          {lage && <span className={`pf-lage pf-lage-pa-bild pf-lage-${lage.ton}`}>{lage.text}</span>}
+        </span>
+        <span className="pf-annons-text">
+          <span className="pf-annons-pris">{j.price?.status === "ok" ? formatSek(j.price.default) : "—"}</span>
+          <span className="pf-annons-titel">{describe(j, t)}</span>
+          <span className="pf-annons-rad">{rad}</span>
+        </span>
+      </button>
+    </li>
+  );
+}
+
 /**
- * Butikens lägen, som säljaren läser dem.
- *
- * `draft` står medvetet tom: möbeln är inlagd men inte utlagd, och det är precis vad "Sparad" redan
- * betyder — en etikett till hade sagt samma sak två gånger.
+ * Tjäna: inbjudan och affiliate som två kort. Samma data som tidigare (BjudIn.tsx, Affiliate.tsx),
+ * men knapparna först och förklaringen kortad till en rad.
  */
+function Tjana() {
+  const t = useT();
+  const { lang } = useLang();
+  const [inbjudan, setInbjudan] = useState<MinInbjudan | null>(null);
+  const [affiliate, setAffiliate] = useState<MinAffiliate | null>(null);
+  const [laddat, setLaddat] = useState(false);
+
+  useEffect(() => {
+    let aktiv = true;
+    void Promise.allSettled([getMinInbjudan(), getMinAffiliate()]).then(([i, a]) => {
+      if (!aktiv) return;
+      if (i.status === "fulfilled") setInbjudan(i.value);
+      if (a.status === "fulfilled") setAffiliate(a.value);
+      setLaddat(true);
+    });
+    return () => {
+      aktiv = false;
+    };
+  }, []);
+
+  const inbjudanLank = useMemo(
+    () => (inbjudan ? (inbjudan.lank ?? `${window.location.origin}/?ref=${encodeURIComponent(inbjudan.kod)}`) : null),
+    [inbjudan],
+  );
+
+  if (!laddat) return <Laddar />;
+  if (!inbjudan && !affiliate) return <Tomt rubrik={t("Inget att visa just nu")} />;
+
+  const tillgangliga = inbjudan?.krediter.filter((k) => k.status === "available") ?? [];
+  const datum = (iso: string) => new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "short" });
+
+  return (
+    <div className="pf-tjana">
+      {inbjudan && inbjudanLank && (
+        <section className="pf-tjana-kort">
+          <p className="pf-tjana-etikett">{t("Bjud in")}</p>
+          <h2 className="pf-tjana-rubrik">{t("Nästa försäljning gratis")}</h2>
+          <p className="pf-tjana-not">{t("När en vän lagt upp sin första annons.")}</p>
+          <DelaKnappar lank={inbjudanLank} text={t("Jag säljer mina möbler med Loopa AI. Du filmar, de sköter resten.")} onDelat={loggaLankKopierad} />
+          <div className="pf-tjana-tal">
+            <span><strong>{tillgangliga.length}</strong> {t("gratis")}</span>
+            <span><strong>{inbjudan.inbjudna.length}</strong> {t("inbjudna")}</span>
+          </div>
+          {tillgangliga.length > 0 && (
+            <p className="pf-tjana-not">{tillgangliga.map((k) => t("Gäller till {datum}", { datum: datum(k.gar_ut) })).join(" · ")}</p>
+          )}
+          {inbjudan.inbjudna.length > 0 && (
+            <ul className="pf-tjana-lista">
+              {inbjudan.inbjudna.map((p, i) => (
+                <li key={i}>
+                  <span>{p.email ?? t("En vän")}</span>
+                  <span className={`pf-lage ${p.status === "annons" ? "pf-lage-live" : ""}`}>
+                    {p.status === "annons" ? t("Annons uppe") : t("Registrerad")}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      )}
+
+      {affiliate && (
+        <section className="pf-tjana-kort">
+          <p className="pf-tjana-etikett">{t("Affiliate")}</p>
+          <h2 className="pf-tjana-rubrik">{t("5 % på allt de säljer")}</h2>
+          <p className="pf-tjana-not">{t("För varje såld annons från någon som registrerat sig via din länk.")}</p>
+          <DelaKnappar lank={affiliate.lank} text={t("Sälj dina begagnade möbler med Loopa AI.")} />
+          <div className="pf-tjana-tal pf-tjana-tal-fem">
+            <span><strong>{affiliate.registreringar}</strong> {t("registrerade")}</span>
+            <span><strong>{affiliate.annonser}</strong> {t("annonser")}</span>
+            <span><strong>{affiliate.salda}</strong> {t("sålda")}</span>
+            <span><strong>{formatOre(affiliate.vantandeOre)}</strong> {t("väntande")}</span>
+            <span><strong>{formatOre(affiliate.utbetaltOre)}</strong> {t("utbetalt")}</span>
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+/** Kopiera och Dela. Faller urklippet visas länken markerbar. */
+function DelaKnappar({ lank, text, onDelat }: { lank: string; text: string; onDelat?: (kanal: "kopiera" | "dela") => void }) {
+  const t = useT();
+  const [kopierad, setKopierad] = useState(false);
+  const [visaLank, setVisaLank] = useState(false);
+
+  async function kopiera() {
+    try {
+      await navigator.clipboard.writeText(lank);
+      setKopierad(true);
+      setVisaLank(false);
+      window.setTimeout(() => setKopierad(false), 2500);
+      onDelat?.("kopiera");
+    } catch {
+      setVisaLank(true);
+    }
+  }
+
+  async function dela() {
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ title: "Loopa AI", text, url: lank });
+        onDelat?.("dela");
+      } catch {
+        // Stängd delningsmeny.
+      }
+      return;
+    }
+    await kopiera();
+  }
+
+  return (
+    <>
+      <div className="pf-dela">
+        <button type="button" className="btn btn-primary pf-dela-knapp" onClick={() => void kopiera()}>
+          {kopierad ? <CheckIcon size={16} /> : <CopyIcon size={16} />} {kopierad ? t("Kopierad") : t("Kopiera")}
+        </button>
+        <button type="button" className="btn btn-outline pf-dela-knapp" onClick={() => void dela()}>
+          <SendIcon size={16} /> {t("Dela")}
+        </button>
+      </div>
+      {visaLank && <input className="bjudin-lank" readOnly value={lank} onFocus={(e) => e.currentTarget.select()} aria-label={t("Länk")} />}
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Etiketter och format (oförändrade)
+// ---------------------------------------------------------------------------
+
+/** Butikens lägen, som säljaren läser dem. `draft` står medvetet tom — "Sparad" säger redan det. */
 const SHOP_LABEL: Partial<Record<NonNullable<JobSummary["shop"]>["state"], string>> = {
   live: "Till salu i butiken",
   reserved: "Reserverad av en köpare",
@@ -301,85 +485,16 @@ const SALE_LABEL = {
   error: "Kunde inte läggas ut",
 } as const;
 
-/** Listraden, delad av båda avdelningarna — samma miniatyr, samma betyg, samma väg in i kortet. */
-function CardList({
-  jobs,
-  onOpenJob,
-  lang,
-}: {
-  jobs: JobSummary[];
-  onOpenJob: (job: JobSummary) => void;
-  /** Datumen skrivs på skärmens språk: "3 sep", "3 Sep", "3 sept.". */
-  lang: string;
-}) {
-  const t = useT();
-  return (
-    <ul className="card-list">
-      {jobs.map((j) => (
-        <li key={j.id}>
-          <button className="card-row" onClick={() => onOpenJob(j)}>
-            <img
-              className="card-row-thumb"
-              src={j.coverImageUrl ?? (j.thumbnailImageId ? imageUrl(j.id, j.thumbnailImageId) : undefined)}
-              alt=""
-            />
-            <span className="card-row-body">
-              <span className="card-row-title">{describe(j, t)}</span>
-              <span className="card-row-meta">
-                {formatDate(j.createdAt, lang)}
-                {j.price?.status === "ok" ? ` · ${formatSek(j.price.default)}` : ""}
-              </span>
-              {/* Butikens läge går före marknadsplatsens: säljs möbeln hos oss är det det svaret
-                  säljaren vill ha, och `sale` säger bara om den dessutom ligger på Tradera. */}
-              {j.shop && SHOP_LABEL[j.shop.state] ? (
-                <span className={`card-row-sale card-row-sale-shop-${j.shop.state}`}>
-                  {t(SHOP_LABEL[j.shop.state]!)}
-                  {j.shop.soldChannel === "tradera" ? t(" på Tradera") : ""}
-                </span>
-              ) : (
-                j.sale && (
-                  <span className={`card-row-sale card-row-sale-${j.sale.status}`}>{t(SALE_LABEL[j.sale.status])}</span>
-                )
-              )}
-              {/*
-                Vad som HÄNT med annonsen, på en rad.
-                
-                Ligger den ute visas visningar och klick — säljaren ska kunna skilja "ingen har sett
-                den" från "många har sett den och ingen köpt". Är den såld visas i stället var köpet
-                står, för då är intresset historia och leveransen det enda som gäller.
-              */}
-              {/* Utbetalningen, när den är gjord: det säljaren faktiskt fick, efter Loopas del. */}
-              {j.shop?.utbetalning && (
-                <span className="card-row-meta" style={{ color: "var(--green-dark)" }}>
-                  {t("Utbetalt {belopp}", { belopp: formatSek(j.shop.utbetalning.saljarenSek) })}
-                  {j.shop.utbetalning.andel === 0 ? ` · ${t("gratisförsäljning")}` : ""}
-                </span>
-              )}
-              {j.order ? (
-                <span className="card-row-meta" style={{ color: "var(--accent)" }}>
-                  {ORDER_STEG[j.order.status]}
-                  {j.order.deliveryDate ? ` · ${leveransDatum(j.order.deliveryDate)} ${j.order.deliveryWindow ?? ""}` : ""}
-                </span>
-              ) : (
-                j.shop?.state === "live" && j.statistik && j.statistik.visningar > 0 && (
-                  <span className="card-row-meta">
-                    {t("{antal} visningar", { antal: j.statistik.visningar })}
-                    {j.statistik.klick > 0 ? ` · ${t("{antal} klick", { antal: j.statistik.klick })}` : ""}
-                    {j.shop.listedAt ? ` · ${dagarUppe(j.shop.listedAt, t)}` : ""}
-                  </span>
-                )
-              )}
-            </span>
-            {j.grade && <GradeBadge grade={j.grade.grade} size={32} />}
-            <span className="card-row-chevron">
-              <ChevronRight size={16} />
-            </span>
-          </button>
-        </li>
-      ))}
-    </ul>
-  );
-}
+/** Var köpet står, sagt för SÄLJAREN. Köparens adress och tider nämns aldrig. */
+const ORDER_STEG: Record<NonNullable<JobSummary["order"]>["status"], string> = {
+  paid: "Såld — köparen väljer leveranstid",
+  booking: "Såld — vi bokar frakt",
+  scheduled: "Såld — frakt bokad",
+  delivered: "Levererad till köparen",
+  cancel_requested: "Köparen ångrade sig — möbeln läggs ut igen",
+  return_requested: "Retur begärd",
+  returned: "Returnerad",
+};
 
 function describe(job: JobSummary, t: (sv: string) => string): string {
   const name = [job.identity?.brand, job.identity?.model].filter(Boolean).join(" ");
@@ -398,29 +513,11 @@ function formatDate(iso: string, lang: string): string {
   return new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "short" });
 }
 
-/** Var köpet står, sagt för SÄLJAREN. Köparens adress och tider nämns aldrig. */
-const ORDER_STEG: Record<NonNullable<JobSummary["order"]>["status"], string> = {
-  paid: "Såld — köparen väljer leveranstid",
-  booking: "Såld — vi bokar frakt",
-  scheduled: "Såld — frakt bokad",
-  delivered: "Levererad till köparen",
-  // Köparen hann ångra sig innan möbeln kördes ut. För säljaren betyder det att den går tillbaka
-  // till butiken — inte att något är fel på möbeln.
-  cancel_requested: "Köparen ångrade sig — möbeln läggs ut igen",
-  return_requested: "Retur begärd",
-  returned: "Returnerad",
-};
-
 function leveransDatum(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString("sv-SE", { day: "numeric", month: "short" });
 }
 
-/**
- * Hur länge annonsen legat ute.
- *
- * Dagar och inte datum: "utlagd 12 augusti" kräver att man räknar själv, och frågan säljaren
- * faktiskt ställer är "hur länge har den legat".
- */
+/** Hur länge annonsen legat ute — i dagar, för det är frågan säljaren ställer. */
 function dagarUppe(listedAt: string, t: (sv: string, vars?: Record<string, string | number>) => string): string {
   const dagar = Math.max(0, Math.floor((Date.now() - new Date(listedAt).getTime()) / 86_400_000));
   if (dagar === 0) return t("utlagd i dag");
