@@ -360,7 +360,13 @@ function Kort({
   }
 
   return (
-    <div ref={ref} className={`v2-kort${liten ? " v2-kort-liten" : ""}`}>
+    <div
+      ref={ref}
+      className={`v2-kort${liten ? " v2-kort-liten" : ""}`}
+      // Bildens egna proportioner — datorvyn ger kortet dem, så att fotot visas helt och skarpt i
+      // stället för att beskäras till skärmens liggande format (se [data-view="desktop"] .v2-kort).
+      style={{ ["--ratio" as string]: bildMeta ? bildMeta.width / bildMeta.height : 0.75 }}
+    >
       <div className="v2-beskarning" style={lager}>
         {bild}
       </div>
