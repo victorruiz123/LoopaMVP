@@ -5868,3 +5868,180 @@ body:has(.grind) .consent { display: none; }
 [data-view="desktop"] .pf-flikar { max-width: 420px; }
 [data-view="desktop"] .pf-kort { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 18px; }
 [data-view="desktop"] .pf-tjana { grid-template-columns: 1fr 1fr; align-items: start; gap: 18px; }
+
+/* --------------------------------------------------------------------------
+   Bekräftelsen "Sälj med Loopa" på datorn (grenen ui/omdesign)
+   --------------------------------------------------------------------------
+   Telefonen får hela skärmen som förut. På en dator var den samma telefonspalt, 560 px mitt i en
+   tom yta. Här blir den ett kort i två spalter ovanpå en suddad bakgrund: möbeln till vänster —
+   bilden stor, så säljaren känner igen den — och pengarna och intygen till höger, ovanför knappen.
+   Suddet löser det som fick den att bli helskärm en gång: knappen bakom syns inte längre som en
+   konkurrent, den är borta i dimman. Bara .sell-bekraftelse — feedbackfrågan lånar samma skal.
+   -------------------------------------------------------------------------- */
+
+.sell-modal-vanster, .sell-modal-hoger, .sell-modal-ekonomi { display: contents; }
+
+[data-view="desktop"] .sell-bekraftelse { align-items: center; justify-content: center; padding: 40px; }
+[data-view="desktop"] .sell-bekraftelse .sell-modal-scrim {
+  background: hsl(36 30% 96% / 0.55);
+  backdrop-filter: blur(18px) saturate(1.1); -webkit-backdrop-filter: blur(18px) saturate(1.1);
+}
+[data-view="desktop"] .sell-bekraftelse .sell-modal-panel {
+  width: min(980px, 100%); max-width: none; max-height: min(780px, 100%);
+  border-radius: 28px; overflow: hidden; background: var(--bg);
+  box-shadow: 0 0 0 1px rgba(20, 17, 13, 0.06), 0 50px 110px -40px rgba(20, 17, 13, 0.5), 0 18px 40px -24px rgba(20, 17, 13, 0.25);
+}
+
+/* Huvudet: luftigt, utan linje — kortet självt är ramen. */
+[data-view="desktop"] .sell-bekraftelse .sell-modal-head {
+  padding: 24px 30px 4px 36px; background: none; border-bottom: 0;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-modal-head h2 { font-size: 28px; letter-spacing: -0.035em; }
+
+/* Kroppen: två spalter, den högra som en egen yta. */
+[data-view="desktop"] .sell-bekraftelse .sell-modal-body {
+  display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(0, 1fr); gap: 0; padding: 0;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-modal-vanster {
+  display: flex; flex-direction: column; gap: 16px; padding: 0 36px 28px;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-modal-hoger {
+  display: flex; flex-direction: column; gap: 16px; margin: 0 36px 22px 0; align-self: start;
+}
+/* Bara pengarna är ett kort. Intygen står under det, på kortets egen bakgrund. */
+[data-view="desktop"] .sell-bekraftelse .sell-modal-ekonomi {
+  display: flex; flex-direction: column; gap: 6px; padding: 26px 32px 24px;
+  background: var(--surface); border-radius: 22px; box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 14px 34px -22px rgba(20, 17, 13, 0.28);
+}
+/* Över båda spalterna: då börjar möbelns bild och pengakortet på samma linje. */
+[data-view="desktop"] .sell-bekraftelse .sell-modal-lede,
+[data-view="desktop"] .sell-bekraftelse .sell-error { grid-column: 1 / -1; margin: 0 36px 20px; }
+[data-view="desktop"] .sell-bekraftelse .sell-modal-lede { font-size: var(--fs-md); color: var(--muted); max-width: 60ch; }
+
+/* Möbeln: bilden stor mot vitt, texten under den. */
+[data-view="desktop"] .sell-bekraftelse .sell-preview {
+  flex-direction: column; align-items: stretch; gap: 14px; padding: 0; background: none; box-shadow: none;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-preview-bild {
+  width: 100%; height: 190px; border-radius: 20px; padding: 14px; box-sizing: border-box;
+  box-shadow: 0 1px 2px rgba(20, 17, 13, 0.04), 0 14px 34px -22px rgba(20, 17, 13, 0.28);
+}
+[data-view="desktop"] .sell-bekraftelse .sell-preview-titel { font-size: 20px; letter-spacing: -0.025em; }
+[data-view="desktop"] .sell-bekraftelse .sell-preview-pris { font-size: 28px; letter-spacing: -0.035em; margin-top: 4px; }
+[data-view="desktop"] .sell-bekraftelse .sell-villkor { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+[data-view="desktop"] .sell-bekraftelse .sell-villkor li {
+  padding: 9px 12px; border-radius: 14px; background: var(--surface); border-top: 0 !important;
+  font-size: var(--fs-sm); line-height: 1.35; align-items: center;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-villkor svg { margin-top: 0; }
+
+/* Pengarna: "Du får" är talet man kom för — störst på kortet. */
+[data-view="desktop"] .sell-bekraftelse .sell-delning > div { padding: 8px 0; }
+[data-view="desktop"] .sell-bekraftelse .sell-delning-sum {
+  flex-direction: column; align-items: flex-start !important; gap: 2px; margin-top: 10px; padding-top: 16px !important;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-delning-sum dt { font-size: var(--fs-sm); font-weight: 600; color: var(--muted); }
+[data-view="desktop"] .sell-bekraftelse .sell-delning-sum dd { font-size: 40px; letter-spacing: -0.04em; color: var(--ink); line-height: 1.05; }
+[data-view="desktop"] .sell-bekraftelse .sell-delning-not { margin: 2px 0 0; }
+[data-view="desktop"] .sell-bekraftelse .sell-intyg { margin: 0; padding: 0 6px; border-top: 0; }
+[data-view="desktop"] .sell-bekraftelse .sell-intyg label { font-size: var(--fs-sm); padding: 11px 0; }
+
+/* Knapparna: till höger, under pengarna. Ingen fot över hela bredden. */
+[data-view="desktop"] .sell-bekraftelse .sell-modal-actions {
+  justify-content: flex-end; gap: 12px; padding: 0 54px 28px 36px; margin-top: -6px;
+  background: none; border-top: 0;
+}
+[data-view="desktop"] .sell-bekraftelse .sell-modal-actions .btn-text { flex: none; width: auto; padding-inline: 18px; }
+[data-view="desktop"] .sell-bekraftelse .sell-modal-actions .btn-primary {
+  flex: none; width: auto; min-width: 280px; min-height: 54px; border-radius: 999px; font-size: var(--fs-lg);
+}
+
+/* --------------------------------------------------------------------------
+   Bekräftelsen "Sälj med Loopa" på telefonen (grenen ui/omdesign)
+   --------------------------------------------------------------------------
+   Allt på en skärm, utan att rulla. Det som stod två gånger står en gång: inledningen säger samma
+   sak som "Det här läggs ut" och knappen, och noten om hemleveransen samma sak som raden under
+   priset — båda döljs här. Villkoren blir brickor två och två, pengarna ett kort med "Du får"
+   störst, intygen två täta rader. Datorn har sin egen form ovanför.
+   -------------------------------------------------------------------------- */
+
+[data-view="mobile"] .sell-bekraftelse .sell-modal-head { padding-top: calc(10px + env(safe-area-inset-top)); padding-bottom: 10px; }
+[data-view="mobile"] .sell-bekraftelse .sell-modal-head h2 { font-size: 21px; }
+[data-view="mobile"] .sell-bekraftelse .sell-modal-body { gap: 10px; padding-top: 12px; padding-bottom: 12px; }
+[data-view="mobile"] .sell-bekraftelse .sell-modal-lede,
+[data-view="mobile"] .sell-bekraftelse .sell-delning-not { display: none; }
+
+/* Möbeln: bild, titel, pris — tätt. */
+[data-view="mobile"] .sell-bekraftelse .sell-preview { gap: 12px; padding: 10px; border-radius: 18px; }
+[data-view="mobile"] .sell-bekraftelse .sell-preview-bild { width: 74px; height: 74px; border-radius: 12px; }
+[data-view="mobile"] .sell-bekraftelse .sell-preview-titel {
+  margin-top: 3px; font-size: var(--fs-base); line-height: 1.25;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+}
+[data-view="mobile"] .sell-bekraftelse .sell-preview-pris { margin-top: 3px; font-size: 21px; }
+[data-view="mobile"] .sell-bekraftelse .sell-preview-delar { font-size: var(--fs-2xs); }
+
+/* Villkoren: brickor, två i bredd. */
+[data-view="mobile"] .sell-bekraftelse .sell-villkor { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+[data-view="mobile"] .sell-bekraftelse .sell-villkor li {
+  align-items: center; gap: 7px; padding: 7px 9px; border-top: 0 !important; border-radius: 11px;
+  background: var(--surface); font-size: var(--fs-xs); line-height: 1.3;
+}
+[data-view="mobile"] .sell-bekraftelse .sell-villkor svg { margin-top: 0; }
+
+/* Pengarna: ett kort. Avdraget till vänster, "Du får" störst. */
+[data-view="mobile"] .sell-bekraftelse .sell-modal-ekonomi {
+  display: block; padding: 4px 14px 12px; border-radius: 18px; background: var(--surface); box-shadow: var(--shadow-card);
+}
+[data-view="mobile"] .sell-bekraftelse .sell-delning > div { padding: 7px 0; }
+[data-view="mobile"] .sell-bekraftelse .sell-delning dt,
+[data-view="mobile"] .sell-bekraftelse .sell-delning dd { font-size: var(--fs-md); }
+[data-view="mobile"] .sell-bekraftelse .sell-delning dt { flex-direction: row; align-items: baseline; gap: 6px; flex-wrap: wrap; }
+[data-view="mobile"] .sell-bekraftelse .sell-delning-sum { margin-top: 2px; padding-top: 10px !important; }
+[data-view="mobile"] .sell-bekraftelse .sell-delning-sum dt { font-size: var(--fs-base); }
+[data-view="mobile"] .sell-bekraftelse .sell-delning-sum dd { font-size: 26px; }
+
+/* Gratisförsäljningen, när den finns: två val bredvid varandra i stället för under. */
+[data-view="mobile"] .sell-bekraftelse .sell-gratis { grid-template-columns: 1fr 1fr; gap: 6px; margin: 0 0 10px; }
+[data-view="mobile"] .sell-bekraftelse .sell-gratis-fraga { grid-column: 1 / -1; margin-bottom: 2px; font-size: var(--fs-md); }
+[data-view="mobile"] .sell-bekraftelse .sell-gratis label { font-size: var(--fs-sm); padding: 9px 10px; }
+[data-view="mobile"] .sell-bekraftelse .sell-gratis small { font-size: var(--fs-2xs); }
+
+/* Intygen: två täta rader. */
+[data-view="mobile"] .sell-bekraftelse .sell-intyg { margin-top: 2px; border-top: 0; }
+[data-view="mobile"] .sell-bekraftelse .sell-intyg label { padding: 7px 2px; font-size: var(--fs-sm); line-height: 1.35; align-items: center; }
+[data-view="mobile"] .sell-bekraftelse .sell-intyg label + label { border-top: 0; }
+[data-view="mobile"] .sell-bekraftelse .sell-intyg input { width: 20px; height: 20px; }
+
+[data-view="mobile"] .sell-bekraftelse .sell-modal-actions { padding-top: 10px; padding-bottom: calc(12px + env(safe-area-inset-bottom)); }
+[data-view="mobile"] .sell-bekraftelse .sell-modal-actions .btn-primary { min-height: 48px; }
+
+/* ── Bottenpanelen: godkänn, sedan sälj ──
+   Kryssen och knappen är ett och samma steg och står därför ihop, längst ner, på en egen vit yta som
+   går kant i kant med knappens fot. Den lediga höjden hamnar ovanför panelen i stället för mitt i
+   sidan. Knappen är tydligt avstängd tills båda kryssen är gjorda — och säger varför. */
+[data-view="mobile"] .sell-bekraftelse .sell-modal-body { padding-bottom: 0; }
+[data-view="mobile"] .sell-bekraftelse .sell-intyg {
+  margin: auto calc(-1 * var(--safe-right)) 0 calc(-1 * var(--safe-left));
+  padding: 14px var(--safe-right) 2px var(--safe-left);
+  background: var(--surface); border-radius: 22px 22px 0 0;
+  box-shadow: 0 -12px 28px -20px rgba(20, 17, 13, 0.28);
+}
+[data-view="mobile"] .sell-bekraftelse .sell-modal-actions { border-top: 0; padding-top: 6px; }
+.sell-bekraftelse .sell-intyg input { accent-color: var(--accent); cursor: pointer; }
+.sell-bekraftelse .sell-modal-actions .btn-primary { transition: background var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui), color var(--t) var(--ease-ui); }
+.sell-bekraftelse .sell-modal-actions .btn-primary:not(:disabled) { box-shadow: 0 10px 22px -12px hsl(14 77% 40% / 0.65); }
+.sell-bekraftelse .sell-modal-actions .btn-primary:disabled {
+  background: var(--field); color: var(--muted); opacity: 1; box-shadow: inset 0 0 0 1.5px var(--border); font-size: var(--fs-base);
+}
+/* Den lediga höjden fylls av innehållet, inte av ett hål: bilden och avstånden växer med skärmen
+   och krymper tillbaka på en mindre telefon, så att allt fortfarande ryms utan att rulla. */
+[data-view="mobile"] .sell-bekraftelse .sell-modal-body { gap: clamp(10px, calc((100dvh - 640px) / 9), 18px); }
+[data-view="mobile"] .sell-bekraftelse .sell-preview-bild {
+  width: clamp(74px, calc(100dvh - 660px), 138px); height: clamp(74px, calc(100dvh - 660px), 138px);
+}
+[data-view="mobile"] .sell-bekraftelse .sell-preview { padding: clamp(10px, calc((100dvh - 640px) / 12), 14px); }
+/* Det som ändå blir över fördelas lika ovanför och under innehållet — en luft som ser avsiktlig ut,
+   inte ett hål ovanför panelen. */
+[data-view="mobile"] .sell-bekraftelse .sell-preview { margin-top: auto; }
+[data-view="mobile"] .sell-bekraftelse .sell-modal-body { gap: clamp(10px, calc((100dvh - 640px) / 7), 22px); }

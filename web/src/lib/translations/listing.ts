@@ -195,6 +195,8 @@ export const LISTING: Record<string, Translation> = {
     fr: "Je retire mes autres annonces publiées pour ce meuble",
   },
   "Ja, sälj den": { en: "Yes, sell it", fr: "Oui, vendez-le" },
+  "Ja, sälj med": { en: "Yes, sell with", fr: "Oui, vendre avec" },
+  "Godkänn villkoren först": { en: "Accept the terms first", fr: "Acceptez d'abord les conditions" },
   "Lägger ut…": { en: "Publishing…", fr: "Publication…" },
   "Ligger på": { en: "Currently at", fr: "Actuellement à" },
   "frakt inräknad": { en: "delivery included", fr: "livraison comprise" },

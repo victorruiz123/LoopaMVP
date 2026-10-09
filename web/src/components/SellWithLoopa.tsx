@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { getTraderaState, publishToTradera } from "../api";
 import { CheckIcon, CloseIcon } from "./icons";
 import ProcessFeedback from "./ProcessFeedback";
@@ -618,8 +619,14 @@ function SellConfirm({
       : null,
   ].filter((v): v is string => v !== null);
 
-  return (
-    <div className="sell-modal-root" role="dialog" aria-modal="true" aria-labelledby="sell-modal-title">
+  /**
+   * I <body> och inte där komponenten står. På datorn tonar varje skärm in med en transform
+   * ([data-view="desktop"] .screen), och en förälder med transform gör `position: fixed` relativ
+   * till sig själv — bekräftelsen stängdes då in i sidans smala kolumn i stället för att täcka
+   * fönstret. En portal har ingen sådan förälder.
+   */
+  return createPortal(
+    <div className="sell-modal-root sell-bekraftelse" role="dialog" aria-modal="true" aria-labelledby="sell-modal-title">
       <div className="sell-modal-scrim" onClick={sending ? undefined : onCancel} />
       <div className="sell-modal-panel" ref={panel} tabIndex={-1}>
         <header className="sell-modal-head">
@@ -634,6 +641,9 @@ function SellConfirm({
         </header>
 
         <div className="sell-modal-body">
+          {/* Inledningen och felet över båda spalterna på datorn, så att de två korten under dem börjar
+              på samma höjd. Sedan två spalter: möbeln till vänster, pengarna och intygen till höger.
+              På telefonen är omslagen genomskinliga (display: contents) och ordningen densamma. */}
           <p className="sell-modal-lede">
             {plan.mode === "fixed"
               ? t("Trycker du på ja går möbeln ut till salu direkt. Därifrån sköter vi resten.")
@@ -644,6 +654,7 @@ function SellConfirm({
 
           {error && <p className="sell-error">{t("Annonsen kunde inte läggas ut: {fel}", { fel: error })}</p>}
 
+          <div className="sell-modal-vanster">
           {/* ANNONSEN. Bilden mot vitt precis som på kortet ovanför, så säljaren känner igen den. */}
           <div className="sell-preview">
             {coverUrl && (
@@ -675,6 +686,11 @@ function SellConfirm({
               </li>
             ))}
           </ul>
+          </div>
+
+          <div className="sell-modal-hoger">
+          {/* Pengarna i ett eget kort; intygen under kortet, inte i det. */}
+          <div className="sell-modal-ekonomi">
 
           {/*
             VAD SÄLJAREN FÅR UT, uträknat.
@@ -762,6 +778,8 @@ function SellConfirm({
             })}
           </p>
 
+          </div>
+
           <div className="sell-intyg">
             <label>
               <input
@@ -784,6 +802,7 @@ function SellConfirm({
               <span>{t("Jag tar bort mina andra publicerade annonser av möbeln")}</span>
             </label>
           </div>
+          </div>
         </div>
 
         <footer className="sell-modal-actions">
@@ -791,11 +810,22 @@ function SellConfirm({
             {t("Avbryt")}
           </button>
           <button className="btn btn-primary" onClick={onConfirm} disabled={sending || !fårSälja}>
-            {sending ? t("Lägger ut…") : t("Ja, sälj den")}
+            {/* Knappen säger själv vad som saknas: så länge kryssen inte är gjorda står det vad man ska
+                göra först, inte ett grått "Ja" som inte svarar. */}
+            {sending ? (
+              t("Lägger ut…")
+            ) : fårSälja ? (
+              <>
+                {t("Ja, sälj med")} <span className="ordmark ordmark-vit">loopa</span>
+              </>
+            ) : (
+              t("Godkänn villkoren först")
+            )}
           </button>
         </footer>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
 
