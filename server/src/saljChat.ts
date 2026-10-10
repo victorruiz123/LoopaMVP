@@ -65,7 +65,7 @@ const RESPONSE_SCHEMA = {
  * samma veva, annars lovar boten en avgift appen inte tar. Det är den enda dubbleringen i den här
  * filen, och den är värd en kontroll vid varje prisändring.
  */
-const FAKTA = `=== SÅ FUNGERAR LOOPA ===
+export const FAKTA = `=== SÅ FUNGERAR LOOPA ===
 
 VAD LOOPA ÄR: en tjänst som säljer begagnade möbler åt privatpersoner i Stockholm. Säljaren behöver
 aldrig träffa köparen, skriva annonsen eller sätta priset.

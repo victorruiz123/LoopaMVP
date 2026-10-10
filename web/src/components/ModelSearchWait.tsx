@@ -48,13 +48,13 @@ export default function ModelSearchWait({ brand, again }: { brand: string | null
       <div className="vanta-inner">
       <ModelSearchLoader />
 
-      <div className="vanta-status" role="status" aria-live="polite">
-        <b>{again ? t("Letar efter andra modeller…") : t("Letar upp modellen…")}</b>
-        <span>
-          {again
-            ? t("Söker vidare bland {modeller} — de du sagt nej till räknas bort", { modeller })
-            : t("Jämför med {modeller} som matchar bilderna", { modeller })}
-        </span>
+      {/* Statusraden syns inte längre — animationen och texten om processen räcker för ögat — men den
+          läses fortfarande upp: den som inte ser laddaren ska ändå få veta vad som händer. */}
+      <div className="visually-hidden" role="status" aria-live="polite">
+        {again ? t("Letar efter andra modeller…") : t("Letar upp modellen…")}{" "}
+        {again
+          ? t("Söker vidare bland {modeller} — de du sagt nej till räknas bort", { modeller })
+          : t("Jämför med {modeller} som matchar bilderna", { modeller })}
       </div>
 
       <div className="vanta-head">

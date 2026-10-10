@@ -394,6 +394,51 @@ export async function askSalj(
   return json(res);
 }
 
+/**
+ * Säljguiden (server/src/saljGuide.ts): en fråga från ett steg i säljflödet.
+ *
+ * Fungerar både utloggad och inloggad — filmningen sker före kontot. Är säljaren inloggad följer
+ * token med, och då får guiden svara om säljarens egen möbel (`jobId`). Utan token blir det en
+ * vanlig processguide; servern släpper aldrig ut någon annans möbel.
+ */
+export async function askGuide(
+  question: string,
+  history: Array<{ role: "user" | "assistant"; content: string }>,
+  steg: string,
+  jobId: string | null,
+  spar: { samtal: string; sess: string | null; uid: string | null } | null = null,
+): Promise<{ answer: string; andring: GuideAndring | null }> {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  try {
+    headers.set("Authorization", `Bearer ${await accessToken()}`);
+  } catch {
+    // Utloggad: en vanlig processguide.
+  }
+  const res = await fetch("/api/salj/guide", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ question, history, steg, jobId, ...(spar ?? {}) }),
+  });
+  return json(res);
+}
+
+/** En ändring guiden gjort: vad som ändrades i klartext, och id:t att ångra den med. */
+export interface GuideAndring {
+  sammanfattning: string[];
+  angraId: string;
+}
+
+/** Ångrar en ändring guiden gjort — återställer exakt det som stod innan. */
+export async function angraGuideAndring(angraId: string): Promise<void> {
+  const headers = new Headers({ "Content-Type": "application/json" });
+  try {
+    headers.set("Authorization", `Bearer ${await accessToken()}`);
+  } catch {
+    // Utan inloggning finns inget att ångra; servern svarar då nej.
+  }
+  await json(await fetch("/api/salj/guide/angra", { method: "POST", headers, body: JSON.stringify({ angraId }) }));
+}
+
 export async function askListing(
   loopaId: string,
   question: string,

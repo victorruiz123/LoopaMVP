@@ -55,7 +55,7 @@ import { avtryck, KLIENTHANDELSER, spara, allStatistik, type AnnonsStatistik } f
 import { answerCardQuestion, MAX_QUESTION_CHARS, type ChatTurn } from "./cardChat.js";
 import { answerSaljQuestion, MAX_QUESTION_CHARS as MAX_SALJ_QUESTION_CHARS } from "./saljChat.js";
 import { giltigtKandidatbildsnamn, kandidatbilderDir } from "./kandidatbild.js";
-import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ModelCandidate, Severity } from "./types.js";
+import type { CapturedImage, ConditionJob, Damage, DamageType, FurnitureIdentity, Impact, ListingAttribute, ModelCandidate, PriceLadder, Severity } from "./types.js";
 
 const PORT = Number(process.env.PORT ?? 8799);
 const MAX_BODY_BYTES = 60 * 1024 * 1024; // up to ~10 camera-resolution JPEGs as base64
@@ -552,16 +552,26 @@ async function handleSetDisclosures(id: string, req: IncomingMessage, res: Serve
 async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  if (job.tradera?.status === "published" || job.blocket?.status === "published") {
-    return sendJson(res, 409, {
-      error: "Annonsen ligger redan uppe, så prisspannet går inte att ändra här.",
-      ladder: job.priceLadder ?? null,
-    });
-  }
-
   const body = await readJsonBody<{ startPrice?: number; floorPrice?: number; weeklyDropPct?: number }>(req);
+  const utfall = await tillampaPrisplan(job, body);
+  if ("error" in utfall) return sendJson(res, utfall.status, { error: utfall.error, ...(utfall.status === 409 ? { ladder: job.priceLadder ?? null } : {}) });
+  sendJson(res, 200, { ladder: utfall.ladder });
+}
+
+/**
+ * Prisplanen, utan HTTP: säljarens prissteg och säljguiden går samma väg — samma spärr mot en annons
+ * som redan ligger uppe, samma kontroll i makePriceLadder, samma loggning. Sparar jobbet.
+ */
+async function tillampaPrisplan(
+  job: ConditionJob,
+  body: { startPrice?: number; floorPrice?: number; weeklyDropPct?: number },
+): Promise<{ ladder: PriceLadder } | { error: string; status: number }> {
+  const jobId = job.id;
+  if (job.tradera?.status === "published" || job.blocket?.status === "published") {
+    return { error: "Annonsen ligger redan uppe, så prisspannet går inte att ändra här.", status: 409 };
+  }
   if (body.startPrice === undefined || body.floorPrice === undefined) {
-    return sendJson(res, 400, { error: "startPrice och floorPrice krävs." });
+    return { error: "startPrice och floorPrice krävs.", status: 400 };
   }
 
   const ladder = makePriceLadder({
@@ -569,7 +579,7 @@ async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: Serv
     floorPrice: body.floorPrice,
     weeklyDropPct: body.weeklyDropPct,
   });
-  if ("error" in ladder) return sendJson(res, 400, { error: ladder.error });
+  if ("error" in ladder) return { error: ladder.error, status: 400 };
 
   /**
    * Vad motorn föreslog, och vad säljaren la sig på.
@@ -593,7 +603,7 @@ async function handleSetPricePlan(jobId: string, req: IncomingMessage, res: Serv
 
   job.priceLadder = ladder;
   await persist(job);
-  sendJson(res, 200, { ladder });
+  return { ladder };
 }
 
 // ---- Tradera: lägger upp annonsen som en riktig Tradera-annons ------------
@@ -1020,6 +1030,170 @@ async function handleSaljChat(req: IncomingMessage, res: ServerResponse) {
     sendJson(res, 503, { error: "Chatten kunde inte nås just nu. Försök igen om en stund." });
     await anteckna("", true);
   }
+}
+
+/**
+ * Säljguiden: en fråga från var som helst i säljflödet. Se saljGuide.ts.
+ *
+ * Utanför grinden, som startsidans chatt: guiden står på steg där säljaren ännu inte har ett konto
+ * (filmningen). Möbelns uppgifter följer med bara när anroparen ÄGER jobbet — ett okänt eller
+ * utloggat anrop får en vanlig processguide, och ingen kan fråga ut någon annans möbel.
+ */
+async function handleSaljGuide(req: IncomingMessage, res: ServerResponse) {
+  const limited = chatRateLimit(chatClientKey(req));
+  if (limited) return sendJson(res, 429, { error: limited });
+
+  const body = await readJsonBody<{
+    question?: unknown;
+    history?: unknown;
+    steg?: unknown;
+    jobId?: unknown;
+    samtal?: unknown;
+    sess?: unknown;
+    uid?: unknown;
+  }>(req, CHAT_BODY_BYTES);
+  const question = typeof body.question === "string" ? body.question.trim() : "";
+  if (!question) return sendJson(res, 400, { error: "Skriv en fråga." });
+  if (question.length > MAX_SALJ_QUESTION_CHARS) {
+    return sendJson(res, 400, { error: `Frågan får vara högst ${MAX_SALJ_QUESTION_CHARS} tecken.` });
+  }
+  const { answerGuideQuestion, GUIDE_STEG, mobelKontext } = await import("./saljGuide.js");
+  const steg = typeof body.steg === "string" && GUIDE_STEG.has(body.steg) ? body.steg : "capture";
+
+  let mobel: string | null = null;
+  let egetJobb: ConditionJob | null = null;
+  let agare: string | null = null;
+  if (typeof body.jobId === "string" && body.jobId) {
+    const identity = await identityFromRequest(req).catch(() => null);
+    const job = identity ? await getJob(body.jobId).catch(() => undefined) : undefined;
+    if (identity && job && (ownerIdOf(job) === identity.id || identity.isAdmin)) {
+      mobel = mobelKontext(job);
+      egetJobb = job;
+      agare = identity.id;
+    }
+  }
+  /** Ändringar bara på säljarens eget jobb, och bara när det finns en annons att ändra i. */
+  const kanAndra = !!egetJobb && !!(egetJobb.result?.listing ?? egetJobb.listing ?? egetJobb.pendingListing)?.result;
+
+  const anteckna = async (svar: string, fel: boolean) => {
+    try {
+      const { spara: sparaSamtal } = await import("./data/samtal.js");
+      await sparaSamtal({ samtal: body.samtal, sess: body.sess, uid: body.uid, chatt: "guide", steg, fraga: question, svar, fel });
+    } catch {
+      // Tyst, som startsidans chatt: anteckningen får aldrig fälla svaret.
+    }
+  };
+
+  try {
+    const svar = await answerGuideQuestion(question, readChatHistory(body.history), steg as never, mobel, kanAndra);
+    let answer = svar.answer;
+    let andring: { sammanfattning: string[]; angraId: string } | null = null;
+    if (svar.andring && egetJobb && agare) {
+      const utfall = await utforGuideAndring(egetJobb, agare, svar.andring);
+      if ("fel" in utfall) answer = `Jag kunde inte göra ändringen: ${utfall.fel}`;
+      else andring = utfall;
+    }
+    sendJson(res, 200, { answer, andring });
+    await anteckna(answer + (andring ? ` [ändrade: ${andring.sammanfattning.join("; ")}]` : ""), false);
+  } catch (err) {
+    console.error("[salj-guide]", err);
+    sendJson(res, 503, { error: "Guiden kunde inte nås just nu. Försök igen om en stund." });
+    await anteckna("", true);
+  }
+}
+
+/**
+ * Det som fanns före en ändring guiden gjort, så att "Ångra" kan återställa exakt — inte en ny
+ * rättelse ovanpå, som hade tappat källorna på rader som aldrig ändrades. I minnet och i tio minuter:
+ * ångra är för stunden efter, inte för i morgon. Bunden till jobbet och ägaren.
+ */
+const guideAngra = new Map<
+  string,
+  { jobId: string; agare: string; at: number; attributes?: ListingAttribute[]; description?: string; priceLadder?: PriceLadder | null }
+>();
+const ANGRA_MS = 10 * 60_000;
+
+/** Raden i annonsen som säljaren menar: samma etikett, utan hänsyn till versaler och mellanslag. */
+function samma(a: string, b: string): boolean {
+  const n = (x: string) => x.toLowerCase().replace(/\s+/g, " ").trim();
+  return n(a) === n(b);
+}
+
+/**
+ * Utför en ändring guiden föreslagit, med samma funktioner som säljarens egna rutor. Svarar med vad
+ * som ändrades i klartext och ett id att ångra med — eller med varför det inte gick.
+ */
+async function utforGuideAndring(
+  job: ConditionJob,
+  agare: string,
+  andring: import("./saljGuide.js").GuideAndring,
+): Promise<{ sammanfattning: string[]; angraId: string } | { fel: string }> {
+  const annons = (job.result?.listing ?? job.listing ?? job.pendingListing)?.result;
+  if (!annons) return { fel: "annonsen finns inte än." };
+  const angraId = randomUUID();
+  const fore = { jobId: job.id, agare, at: Date.now() };
+
+  if (andring.typ === "matt") {
+    const tidigare = annons.attributes.map((a) => ({ ...a }));
+    const nya = annons.attributes.map((a) => ({ key: a.key, label: a.label, value: a.value }));
+    const sammanfattning: string[] = [];
+    for (const rad of andring.rader) {
+      const finns = nya.find((a) => samma(a.label, rad.etikett));
+      if (finns) {
+        if (finns.value === rad.varde) continue;
+        sammanfattning.push(`${finns.label}: ${finns.value} → ${rad.varde}`);
+        finns.value = rad.varde;
+      } else {
+        sammanfattning.push(`${rad.etikett}: ${rad.varde} (ny)`);
+        nya.push({ key: rad.etikett.toLowerCase().replace(/\s+/g, "_"), label: rad.etikett, value: rad.varde });
+      }
+    }
+    if (sammanfattning.length === 0) return { fel: "uppgifterna stod redan så." };
+    await tillampaAnnonsRattelse(job, { attributes: nya });
+    guideAngra.set(angraId, { ...fore, attributes: tidigare });
+    return { sammanfattning, angraId };
+  }
+
+  if (andring.typ === "beskrivning") {
+    const tidigare = annons.listing.description;
+    await tillampaAnnonsRattelse(job, { description: andring.text });
+    guideAngra.set(angraId, { ...fore, description: tidigare });
+    return { sammanfattning: ["Beskrivningen är omskriven"], angraId };
+  }
+
+  // Pris. Utan angivet golv behålls det gamla om det ryms under startpriset, annars blir golvet
+  // startpriset — ingen sänkning säljaren inte bett om.
+  const tidigare = job.priceLadder ?? null;
+  const golv = andring.golvpris ?? (tidigare && tidigare.floorPrice <= andring.startpris ? tidigare.floorPrice : andring.startpris);
+  const utfall = await tillampaPrisplan(job, {
+    startPrice: andring.startpris,
+    floorPrice: golv,
+    weeklyDropPct: tidigare?.weeklyDropPct,
+  });
+  if ("error" in utfall) return { fel: utfall.error };
+  guideAngra.set(angraId, { ...fore, priceLadder: tidigare });
+  return {
+    sammanfattning: [`Startpris ${utfall.ladder.startPrice} kr, golvpris ${utfall.ladder.floorPrice} kr`],
+    angraId,
+  };
+}
+
+/** POST /api/salj/guide/angra { angraId } — återställer det som fanns före guidens ändring. */
+async function handleSaljGuideAngra(req: IncomingMessage, res: ServerResponse) {
+  const body = await readJsonBody<{ angraId?: unknown }>(req, 4 * 1024);
+  const post = typeof body.angraId === "string" ? guideAngra.get(body.angraId) : undefined;
+  if (!post || Date.now() - post.at > ANGRA_MS) return sendJson(res, 410, { error: "Ändringen går inte att ångra längre." });
+  const identity = await identityFromRequest(req).catch(() => null);
+  if (!identity || (identity.id !== post.agare && !identity.isAdmin)) return sendJson(res, 403, { error: "Inte din ändring." });
+  const job = await getJob(post.jobId);
+  const annons = job ? (job.result?.listing ?? job.listing ?? job.pendingListing)?.result : null;
+  if (!job || !annons) return sendJson(res, 404, { error: "Annonsen finns inte." });
+  if (post.attributes) annons.attributes = post.attributes;
+  if (post.description !== undefined) annons.listing.description = post.description;
+  if (post.priceLadder !== undefined) job.priceLadder = post.priceLadder ?? undefined;
+  await persist(job);
+  guideAngra.delete(body.angraId as string);
+  sendJson(res, 200, { ok: true });
 }
 
 // ---- public API: /v1/condition, authenticated with x-api-key ---------------
@@ -1754,16 +1928,28 @@ const kort = (v: unknown, max: number): string => (typeof v === "string" ? v.tri
  */
 async function handleListingEdit(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
+  if (!job) return sendJson(res, 404, { error: "Job or listing not found" });
+  const body = await readJsonBody<ListingEditBody>(req);
+  if (!(await tillampaAnnonsRattelse(job, body))) return sendJson(res, 404, { error: "Job or listing not found" });
+  // Null när besiktningen inte är klar än: måttsteget läser inte svaret, det väntar på nästa poll.
+  sendJson(res, 200, job.result ?? null);
+}
+
+/**
+ * Själva rättelsen, utan HTTP: säljarens egen ruta (handleListingEdit) och säljguiden går samma väg,
+ * så att en rättelse via guiden tappar källan, loggas och lär måttminnet precis som en för hand.
+ * Falskt när jobbet inte har någon annons att rätta. Sparar jobbet.
+ */
+async function tillampaAnnonsRattelse(job: ConditionJob, body: ListingEditBody): Promise<boolean> {
+  const jobId = job.id;
   /*
    * Samma kedja som klienten läser annonsen ur. Måttsteget visas direkt efter modellvalet, oftast
    * innan besiktningen är klar — då finns annonsen bara i `pendingListing`, och det är där säljaren
    * först ser måtten och ska kunna rätta dem. Pipelinen bär rättelsen vidare när den skriver om
    * annonsen; se `behallSaljarensRattelser` i pipeline/identify.ts.
    */
-  const listing = (job?.result?.listing ?? job?.listing ?? job?.pendingListing)?.result;
-  if (!job || !listing) return sendJson(res, 404, { error: "Job or listing not found" });
-
-  const body = await readJsonBody<ListingEditBody>(req);
+  const listing = (job.result?.listing ?? job.listing ?? job.pendingListing)?.result;
+  if (!listing) return false;
 
   const { notera: noteraAnnons } = await import("./data/rattelser.js");
   const { noteraMatt } = await import("./mattminne.js");
@@ -1831,8 +2017,7 @@ async function handleListingEdit(jobId: string, req: IncomingMessage, res: Serve
   }
 
   await persist(job);
-  // Null när besiktningen inte är klar än: måttsteget läser inte svaret, det väntar på nästa poll.
-  sendJson(res, 200, job.result ?? null);
+  return true;
 }
 
 const server = http.createServer(async (req, res) => {
@@ -1927,6 +2112,13 @@ const server = http.createServer(async (req, res) => {
        */
       if (segments[1] === "salj" && segments.length === 3 && segments[2] === "chat" && req.method === "POST") {
         return await handleSaljChat(req, res);
+      }
+      /** Säljguiden, utanför grinden av samma skäl. Se handleSaljGuide. */
+      if (segments[1] === "salj" && segments.length === 3 && segments[2] === "guide" && req.method === "POST") {
+        return await handleSaljGuide(req, res);
+      }
+      if (segments[1] === "salj" && segments.length === 4 && segments[2] === "guide" && segments[3] === "angra" && req.method === "POST") {
+        return await handleSaljGuideAngra(req, res);
       }
       /** Vem som bjöd in, för landningssidan — utanför grinden. Se referral/routes.ts, inbjudareFor. */
       if (segments[1] === "salj" && segments[2] === "inbjudan" && segments[3] === "fran" && segments.length === 5 && req.method === "GET") {

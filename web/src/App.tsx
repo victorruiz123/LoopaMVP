@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
+import SaljGuide, { type GuideSteg } from "./components/SaljGuide";
 import HomeScreen from "./screens/HomeScreen";
 import CaptureScreen from "./screens/CaptureScreen";
 import AnalysisScreen from "./screens/AnalysisScreen";
@@ -348,233 +349,269 @@ function FlowApp() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, screen.name]);
 
-  switch (screen.name) {
-    case "home":
-      return (
-        <HomeScreen
-          key={homeKey.current}
-          dealId={dealId.current}
-          // Grinden ligger på märkesvalet: att välja märke är att börja sälja, och att sälja kräver
-          // ett konto. Den utloggade möts av inloggningen med registreringsfliken uppe, och märket
-          // följer med — efteråt öppnas kameran på det märke de redan tryckt på.
-          onStartScan={(identity) =>
-            setScreen(user ? { name: "capture", identity } : { name: "signup", identity })
-          }
-          // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
-          onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
-        />
-      );
-    case "capture":
-      return (
-        <CaptureScreen
-          identity={screen.identity}
-          initialShots={screen.shots}
-          onBack={goHome}
-          // HÄR ligger grinden. Jobbet knyts till en säljare på servern, så det kan inte skapas utan
-          // konto — men det är också först nu det saknas något. Den som har konto märker inget.
-          onCaptured={(shots) =>
-            setScreen(
-              user
-                ? { name: "starting", identity: screen.identity, shots }
-                : { name: "signup", identity: screen.identity, shots },
-            )
-          }
-        />
-      );
-    case "signup":
-      return (
-        <AuthScreen
-          // Utan bilder står säljaren FÖRE filmningen — de tryckte just på sitt märke. Med bilder är
-          // det den gamla grinden mitt i flödet, och de två får inte säga samma sak.
-          intent={screen.shots ? "flow" : "sale"}
-          // Den som tappat sin session har redan ett konto — då är "logga in" fliken de behöver.
-          initialTab={screen.resume ? "signin" : undefined}
-          // Rakt in i uppladdningen. Sessionen finns när det här anropas, så jobbet får sin token —
-          // och säljaren får ingen kvittensskärm att trycka bort, bara flödet de redan var i.
-          onDone={() =>
-            setScreen(
-              screen.shots
-                ? { name: "starting", identity: screen.identity, shots: screen.shots }
-                : { name: "capture", identity: screen.identity },
-            )
-          }
-          onBack={() => {
-            // Utan film kom de hit från märkeslistan, och då är startsidan vägen tillbaka —
-            // kameran har de aldrig sett.
-            if (screen.shots) setScreen({ name: "capture", identity: screen.identity, shots: screen.shots });
-            else goHome();
-          }}
-        />
-      );
-    case "login":
-      return <AuthScreen onDone={goHome} onBack={goHome} />;
-    case "starting":
-      return (
-        <StartingJob
-          dealId={dealId.current}
-          identity={screen.identity}
-          shots={screen.shots}
-          onStarted={(jobId) =>
-            setScreen({ name: "identify", jobId, identity: screen.identity, previewShots: screen.shots })
-          }
-          onBack={() => setScreen({ name: "capture", identity: screen.identity, shots: screen.shots })}
-          onNeedsLogin={() =>
-            setScreen({ name: "signup", identity: screen.identity, shots: screen.shots, resume: true })
-          }
-        />
-      );
-    case "identify":
-      return (
-        <IdentifyGate
-          jobId={screen.jobId}
-          identity={screen.identity}
-          onResolved={() =>
-            setScreen({
-              name: "specs",
-              jobId: screen.jobId,
-              identity: screen.identity,
-              previewShots: screen.previewShots,
-            })
-          }
-        />
-      );
-    case "specs":
-      return (
-        // Frågorna om pälsdjur och lukt ligger framför väntan på annonsen, inte i en egen skärm i
-        // flödet: bygget pågår bakom dem. Se DisclosuresGate.
-        <DisclosuresGate jobId={screen.jobId}>
-          <VariantGate jobId={screen.jobId}>
-          <SpecsGate
-            jobId={screen.jobId}
-            onNext={() => setScreen({ ...screen, name: "price" })}
-            onBack={() => setScreen({ ...screen, name: "identify" })}
+  /**
+   * Säljguiden (components/SaljGuide.tsx) står på flödets steg — inte på startsidan, som har sitt
+   * eget ark, och inte i profilen, inloggningen eller adminpanelen. Steget och jobbet följer med, så
+   * att guiden kan svara om just det här steget och om säljarens egen möbel.
+   */
+  const guideSteg: GuideSteg | null =
+    screen.name === "capture" || screen.name === "signup" || screen.name === "identify" || screen.name === "specs" ||
+    screen.name === "price" || screen.name === "analysis" || screen.name === "result" || screen.name === "listing"
+      ? screen.name
+      : null;
+  const guideJobb = "jobId" in screen ? screen.jobId : null;
+  /**
+   * Guiden ändrade något i annonsen: steget bakom ritas om och läser jobbet på nytt. Annonsen bär sitt
+   * resultat i skärmen och får det färska; övriga steg hämtar själva när de monteras om.
+   */
+  const [vyNyckel, setVyNyckel] = useState(0);
+  const efterGuidensAndring = () => {
+    const nu = screen;
+    if (nu.name === "listing") {
+      void getJob(nu.jobId)
+        .then((j) => j.result && setScreen({ ...nu, result: j.result }))
+        .finally(() => setVyNyckel((n) => n + 1));
+    } else {
+      setVyNyckel((n) => n + 1);
+    }
+  };
+
+  const vy = ((): ReactNode => {
+    switch (screen.name) {
+      case "home":
+        return (
+          <HomeScreen
+            key={homeKey.current}
+            dealId={dealId.current}
+            // Grinden ligger på märkesvalet: att välja märke är att börja sälja, och att sälja kräver
+            // ett konto. Den utloggade möts av inloggningen med registreringsfliken uppe, och märket
+            // följer med — efteråt öppnas kameran på det märke de redan tryckt på.
+            onStartScan={(identity) =>
+              setScreen(user ? { name: "capture", identity } : { name: "signup", identity })
+            }
+            // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
+            onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
           />
-          </VariantGate>
-        </DisclosuresGate>
-      );
-    case "price":
-      return (
-        <PriceScreen
-          identity={screen.identity}
-          jobId={screen.jobId}
-          onSeeCondition={() =>
-            setScreen({ name: "analysis", jobId: screen.jobId, previewShots: screen.previewShots, identity: screen.identity })
-          }
-        />
-      );
-    case "analysis":
-      return (
-        <AnalysisScreen
-          jobId={screen.jobId}
-          previewShots={screen.previewShots}
-          identity={screen.identity}
-          onDone={() => setScreen({ name: "result", jobId: screen.jobId })}
-          onAbort={goHome}
-        />
-      );
-    case "result":
-      return (
-        <ResultScreen
-          jobId={screen.jobId}
-          onHome={goHome}
-          // Resultatet kommer från skärmen själv, som redan har det. ID:t bor på jobbet och hämtas
-          // här — men faller den hämtningen går kortet ändå fram: det som saknas då är chatten, inte
-          // kortet, och steget efter skicket får aldrig sluta i ett tryck som inte gör något.
-          onContinue={async (result) => {
-            // Jobbet hämtas om, och kortet får den FÄRSKA versionen. Skickvyn slutar polla när
-            // fyndlistan och annonsen står — priset kan skrivas in en stund efter det, och kortet
-            // visar det som "Inget prisförslag" om det byggs på skärmens gamla ögonblicksbild.
-            const job = await getJob(screen.jobId).catch(() => undefined);
-            setScreen({ name: "listing", jobId: screen.jobId, result: job?.result ?? result, loopaId: job?.loopaId });
-          }}
-        />
-      );
-    case "listing": {
-      const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
-      // Adminvägen öppnar samma skärm för någon annans möbel. "Till mina annonser" hade tagit
-      // adminen till sin EGEN profil därifrån — så den vägen finns bara för säljarens eget kort.
-      const ownCard = screen.back?.name !== "adminUser";
-      return (
-        <ListingScreen
-          result={screen.result}
-          loopaId={screen.loopaId}
-          onBack={() => setScreen(back)}
-          // Vägen tillbaka heter det den leder till. Ur profilen ligger inte skicket bakom kortet —
-          // listan över egna annonser gör det, och det är dit knappen går.
-          backLabel={back.name === "profile" ? t("Tillbaka till mina annonser") : undefined}
-          // Borttagningen finns bara för säljarens eget kort, av samma skäl som "Till mina annonser".
-          // Efteråt finns ingen annons att stå kvar på: ur profilen tillbaka till listan, annars hem.
-          onDeleted={ownCard ? () => setScreen(back.name === "profile" ? { name: "profile" } : { name: "home" }) : undefined}
-          onHome={goHome}
-          onMyListings={ownCard ? () => setScreen({ name: "profile" }) : undefined}
-          // Nästa möbel börjar där den första gjorde: på startsidan, där märket anges och filmningen
-          // tar vid. Samma spärr som "Till mina annonser" — adminen som tittar på någon annans kort
-          // ska inte erbjudas att sälja en möbel till härifrån.
-          onSellAnother={ownCard ? goHome : undefined}
-        />
-      );
+        );
+      case "capture":
+        return (
+          <CaptureScreen
+            identity={screen.identity}
+            initialShots={screen.shots}
+            onBack={goHome}
+            // HÄR ligger grinden. Jobbet knyts till en säljare på servern, så det kan inte skapas utan
+            // konto — men det är också först nu det saknas något. Den som har konto märker inget.
+            onCaptured={(shots) =>
+              setScreen(
+                user
+                  ? { name: "starting", identity: screen.identity, shots }
+                  : { name: "signup", identity: screen.identity, shots },
+              )
+            }
+          />
+        );
+      case "signup":
+        return (
+          <AuthScreen
+            // Utan bilder står säljaren FÖRE filmningen — de tryckte just på sitt märke. Med bilder är
+            // det den gamla grinden mitt i flödet, och de två får inte säga samma sak.
+            intent={screen.shots ? "flow" : "sale"}
+            // Den som tappat sin session har redan ett konto — då är "logga in" fliken de behöver.
+            initialTab={screen.resume ? "signin" : undefined}
+            // Rakt in i uppladdningen. Sessionen finns när det här anropas, så jobbet får sin token —
+            // och säljaren får ingen kvittensskärm att trycka bort, bara flödet de redan var i.
+            onDone={() =>
+              setScreen(
+                screen.shots
+                  ? { name: "starting", identity: screen.identity, shots: screen.shots }
+                  : { name: "capture", identity: screen.identity },
+              )
+            }
+            onBack={() => {
+              // Utan film kom de hit från märkeslistan, och då är startsidan vägen tillbaka —
+              // kameran har de aldrig sett.
+              if (screen.shots) setScreen({ name: "capture", identity: screen.identity, shots: screen.shots });
+              else goHome();
+            }}
+          />
+        );
+      case "login":
+        return <AuthScreen onDone={goHome} onBack={goHome} />;
+      case "starting":
+        return (
+          <StartingJob
+            dealId={dealId.current}
+            identity={screen.identity}
+            shots={screen.shots}
+            onStarted={(jobId) =>
+              setScreen({ name: "identify", jobId, identity: screen.identity, previewShots: screen.shots })
+            }
+            onBack={() => setScreen({ name: "capture", identity: screen.identity, shots: screen.shots })}
+            onNeedsLogin={() =>
+              setScreen({ name: "signup", identity: screen.identity, shots: screen.shots, resume: true })
+            }
+          />
+        );
+      case "identify":
+        return (
+          <IdentifyGate
+            jobId={screen.jobId}
+            identity={screen.identity}
+            onResolved={() =>
+              setScreen({
+                name: "specs",
+                jobId: screen.jobId,
+                identity: screen.identity,
+                previewShots: screen.previewShots,
+              })
+            }
+          />
+        );
+      case "specs":
+        return (
+          // Frågorna om pälsdjur och lukt ligger framför väntan på annonsen, inte i en egen skärm i
+          // flödet: bygget pågår bakom dem. Se DisclosuresGate.
+          <DisclosuresGate jobId={screen.jobId}>
+            <VariantGate jobId={screen.jobId}>
+            <SpecsGate
+              jobId={screen.jobId}
+              onNext={() => setScreen({ ...screen, name: "price" })}
+              onBack={() => setScreen({ ...screen, name: "identify" })}
+            />
+            </VariantGate>
+          </DisclosuresGate>
+        );
+      case "price":
+        return (
+          <PriceScreen
+            identity={screen.identity}
+            jobId={screen.jobId}
+            onSeeCondition={() =>
+              setScreen({ name: "analysis", jobId: screen.jobId, previewShots: screen.previewShots, identity: screen.identity })
+            }
+          />
+        );
+      case "analysis":
+        return (
+          <AnalysisScreen
+            jobId={screen.jobId}
+            previewShots={screen.previewShots}
+            identity={screen.identity}
+            onDone={() => setScreen({ name: "result", jobId: screen.jobId })}
+            onAbort={goHome}
+          />
+        );
+      case "result":
+        return (
+          <ResultScreen
+            jobId={screen.jobId}
+            onHome={goHome}
+            // Resultatet kommer från skärmen själv, som redan har det. ID:t bor på jobbet och hämtas
+            // här — men faller den hämtningen går kortet ändå fram: det som saknas då är chatten, inte
+            // kortet, och steget efter skicket får aldrig sluta i ett tryck som inte gör något.
+            onContinue={async (result) => {
+              // Jobbet hämtas om, och kortet får den FÄRSKA versionen. Skickvyn slutar polla när
+              // fyndlistan och annonsen står — priset kan skrivas in en stund efter det, och kortet
+              // visar det som "Inget prisförslag" om det byggs på skärmens gamla ögonblicksbild.
+              const job = await getJob(screen.jobId).catch(() => undefined);
+              setScreen({ name: "listing", jobId: screen.jobId, result: job?.result ?? result, loopaId: job?.loopaId });
+            }}
+          />
+        );
+      case "listing": {
+        const back = screen.back ?? { name: "result" as const, jobId: screen.jobId };
+        // Adminvägen öppnar samma skärm för någon annans möbel. "Till mina annonser" hade tagit
+        // adminen till sin EGEN profil därifrån — så den vägen finns bara för säljarens eget kort.
+        const ownCard = screen.back?.name !== "adminUser";
+        return (
+          <ListingScreen
+            result={screen.result}
+            loopaId={screen.loopaId}
+            onBack={() => setScreen(back)}
+            // Vägen tillbaka heter det den leder till. Ur profilen ligger inte skicket bakom kortet —
+            // listan över egna annonser gör det, och det är dit knappen går.
+            backLabel={back.name === "profile" ? t("Tillbaka till mina annonser") : undefined}
+            // Borttagningen finns bara för säljarens eget kort, av samma skäl som "Till mina annonser".
+            // Efteråt finns ingen annons att stå kvar på: ur profilen tillbaka till listan, annars hem.
+            onDeleted={ownCard ? () => setScreen(back.name === "profile" ? { name: "profile" } : { name: "home" }) : undefined}
+            onHome={goHome}
+            onMyListings={ownCard ? () => setScreen({ name: "profile" }) : undefined}
+            // Nästa möbel börjar där den första gjorde: på startsidan, där märket anges och filmningen
+            // tar vid. Samma spärr som "Till mina annonser" — adminen som tittar på någon annans kort
+            // ska inte erbjudas att sälja en möbel till härifrån.
+            onSellAnother={ownCard ? goHome : undefined}
+          />
+        );
+      }
+      case "profile":
+        return (
+          <ProfileScreen
+            onBack={goHome}
+            isAdmin={isAdmin}
+            onOpenAdmin={() => setScreen({ name: "admin" })}
+            // Profilen öppnar kortet, inte fyndlistan: det är annonsen som sparats, och vägen
+            // tillbaka till skicket finns kvar inifrån det.
+            onOpenJob={async (row) => {
+              const job = await getJob(row.id);
+              // `back` pekar tillbaka på profilen, inte på skickvyn: annonsen öppnades ur listan över
+              // egna annonser, och det är dit man ska kunna gå tillbaka. Det är också den propen som
+              // ger kortet sin borttagningsknapp och sin tillbakatext — se `case "listing"`.
+              if (job.result) setScreen({ name: "listing", jobId: row.id, result: job.result, loopaId: job.loopaId, back: { name: "profile" } });
+              else setScreen({ name: "result", jobId: row.id });
+            }}
+          />
+        );
+      case "admin":
+        return (
+          <AdminScreen
+            flik={screen.flik}
+            onBack={() => setScreen({ name: "profile" })}
+            onOpenUser={(u) => setScreen({ name: "adminUser", userId: u.id, user: u })}
+            onOpenAd={(rad) => setScreen({ name: "adminAd", loopaId: rad.id })}
+            onOpenAdId={(loopaId) => setScreen({ name: "adminAd", loopaId })}
+          />
+        );
+      case "adminAd": {
+        const fran = screen;
+        return (
+          <AdminAdScreen
+            loopaId={screen.loopaId}
+            onBack={() => setScreen({ name: "admin", flik: "annonser" })}
+            // Mejladressen i annonsens huvud leder till kontot, och öppnar den flik frågan gällde:
+            // den som klickar där undrar vem säljaren är och var möbeln står, inte vad de mer lagt upp.
+            onOpenSaljare={(userId) => setScreen({ name: "adminUser", userId, flik: "konto", back: fran })}
+          />
+        );
+      }
+      case "adminUser": {
+        const from = screen;
+        return (
+          <AdminUserScreen
+            userId={screen.userId}
+            user={screen.user}
+            flik={screen.flik}
+            backLabel={screen.back?.name === "adminAd" ? t("Tillbaka till annonsen") : undefined}
+            onBack={() => setScreen(screen.back ?? { name: "admin" })}
+            // Ett raderat konto har ingen annons att gå tillbaka till — listan, alltid.
+            onRaderad={() => setScreen({ name: "admin" })}
+            // Kortet och inte skickvyn: adminvägarna är läsande, och skickvyn är den som har knappar
+            // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
+            onOpenJob={async (jobId) => {
+              const job = await getJob(jobId);
+              if (job.result) setScreen({ name: "listing", jobId, result: job.result, loopaId: job.loopaId, back: from });
+            }}
+          />
+        );
+      }
     }
-    case "profile":
-      return (
-        <ProfileScreen
-          onBack={goHome}
-          isAdmin={isAdmin}
-          onOpenAdmin={() => setScreen({ name: "admin" })}
-          // Profilen öppnar kortet, inte fyndlistan: det är annonsen som sparats, och vägen
-          // tillbaka till skicket finns kvar inifrån det.
-          onOpenJob={async (row) => {
-            const job = await getJob(row.id);
-            // `back` pekar tillbaka på profilen, inte på skickvyn: annonsen öppnades ur listan över
-            // egna annonser, och det är dit man ska kunna gå tillbaka. Det är också den propen som
-            // ger kortet sin borttagningsknapp och sin tillbakatext — se `case "listing"`.
-            if (job.result) setScreen({ name: "listing", jobId: row.id, result: job.result, loopaId: job.loopaId, back: { name: "profile" } });
-            else setScreen({ name: "result", jobId: row.id });
-          }}
-        />
-      );
-    case "admin":
-      return (
-        <AdminScreen
-          flik={screen.flik}
-          onBack={() => setScreen({ name: "profile" })}
-          onOpenUser={(u) => setScreen({ name: "adminUser", userId: u.id, user: u })}
-          onOpenAd={(rad) => setScreen({ name: "adminAd", loopaId: rad.id })}
-          onOpenAdId={(loopaId) => setScreen({ name: "adminAd", loopaId })}
-        />
-      );
-    case "adminAd": {
-      const fran = screen;
-      return (
-        <AdminAdScreen
-          loopaId={screen.loopaId}
-          onBack={() => setScreen({ name: "admin", flik: "annonser" })}
-          // Mejladressen i annonsens huvud leder till kontot, och öppnar den flik frågan gällde:
-          // den som klickar där undrar vem säljaren är och var möbeln står, inte vad de mer lagt upp.
-          onOpenSaljare={(userId) => setScreen({ name: "adminUser", userId, flik: "konto", back: fran })}
-        />
-      );
-    }
-    case "adminUser": {
-      const from = screen;
-      return (
-        <AdminUserScreen
-          userId={screen.userId}
-          user={screen.user}
-          flik={screen.flik}
-          backLabel={screen.back?.name === "adminAd" ? t("Tillbaka till annonsen") : undefined}
-          onBack={() => setScreen(screen.back ?? { name: "admin" })}
-          // Ett raderat konto har ingen annons att gå tillbaka till — listan, alltid.
-          onRaderad={() => setScreen({ name: "admin" })}
-          // Kortet och inte skickvyn: adminvägarna är läsande, och skickvyn är den som har knappar
-          // som skriver. Vägen tillbaka går till samma användare, inte till säljarflödet.
-          onOpenJob={async (jobId) => {
-            const job = await getJob(jobId);
-            if (job.result) setScreen({ name: "listing", jobId, result: job.result, loopaId: job.loopaId, back: from });
-          }}
-        />
-      );
-    }
-  }
+  })();
+
+  return (
+    <>
+      <Fragment key={vyNyckel}>{vy}</Fragment>
+      {guideSteg && <SaljGuide steg={guideSteg} jobId={guideJobb} onAndrat={efterGuidensAndring} />}
+    </>
+  );
 }
 
 /**

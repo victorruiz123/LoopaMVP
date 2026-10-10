@@ -34,7 +34,7 @@ const SAMTAL_FIL = () => path.join(DATA_KATALOG(), "samtal.jsonl");
  * "start" är "Hur fungerar det?" på startsidan. Listan är en vitlista av samma skäl som allt annat
  * här: vägen in är öppen — den som ställer frågan har per definition inget konto än.
  */
-export const CHATTAR = new Set(["start"]);
+export const CHATTAR = new Set(["start", "guide"]);
 
 const MAX_FRAGA = 500;
 const MAX_SVAR = 4000;
