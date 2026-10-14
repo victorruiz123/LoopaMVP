@@ -141,6 +141,11 @@ export default function SellWithLoopa({
    * och listen aldrig ligger över borttagningen längst ner.
    */
   const [rutanNedanfor, setRutanNedanfor] = useState(false);
+  /**
+   * Sant bara i stunden efter ett ja. Helskärmskvittot hör till det ögonblicket; den som öppnar
+   * annonsen senare — ur profilen, dagar efter — ska se sin annons, inte en skärm som täcker den.
+   */
+  const [nyssSkickad, setNyssSkickad] = useState(false);
   const bevakare = useRef<IntersectionObserver | null>(null);
   const rutan = useCallback(
     (el: HTMLElement | null) => {
@@ -161,6 +166,7 @@ export default function SellWithLoopa({
       const gratisErbjuden = !!state?.villkor?.gratis;
       setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis }));
       setConfirming(false);
+      setNyssSkickad(true);
       // Först när annonsen faktiskt gått iväg. Ett ja som föll på ett serverfel är inte en avslutad
       // process, och att fråga vad säljaren tyckte om den mitt i felet vore ett hån.
       if (!feedbackAvklarad(jobId)) setFragarOmProcessen(true);
@@ -218,12 +224,13 @@ export default function SellWithLoopa({
   if (annonsUrl) {
     return (
       <section className="card-block sell-block sell-done">
-        <h3>{t("Möbeln är till salu")}</h3>
-        <p className="muted small">
-          {t(
-            "Loopa sköter försäljningen härifrån. Du får besked så fort möbeln är såld — du behöver inte göra något mer.",
-          )}
-        </p>
+        <VidHallerPa
+          text={
+            state.uppdatering && state.uppdatering.status !== "klar"
+              ? t("Vi för ut de senaste ändringarna till marknadsplatserna.")
+              : t("Möbeln ligger ute till salu, och Loopa sköter försäljningen härifrån. Du får besked så fort den är såld.")
+          }
+        />
         {state.ladder && <LadderStatus ladder={state.ladder} shippingSek={plan?.shippingSek ?? 0} />}
         <a className="btn btn-primary sell-link" href={annonsUrl} target="_blank" rel="noreferrer">
           {t("Se annonsen")}
@@ -231,6 +238,19 @@ export default function SellWithLoopa({
         {/* Kvittot gäller EN möbel. Frågorna som kommer efter det — vad har jag ute nu, och kan jag
             göra det här igen — besvaras i profilen och i ett nytt varv. */}
         <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} />
+        {processfragan}
+      </section>
+    );
+  }
+
+  /**
+   * Väntar på granskning, och säljaren kommer tillbaka senare: annonsen står kvar ovanför, och här
+   * längst ner står var försäljningen är — där "Sälj med Loopa" stod innan ja:et.
+   */
+  if (publication?.status === "pending" && !nyssSkickad) {
+    return (
+      <section className="card-block sell-block sell-done">
+        <VidHallerPa text={t("Loopa granskar annonsen och lägger sedan ut den till salu. Du behöver inte göra något mer.")} />
         {processfragan}
       </section>
     );
@@ -442,6 +462,23 @@ export default function SellWithLoopa({
  * ett mycket mindre fel än en ruta som kraschar flödet, och därför är båda anropen tysta.
  */
 const FEEDBACK_NYCKEL = (jobId: string) => `loopa.feedback.${jobId}`;
+
+/**
+ * "Vi håller på" — där "Sälj med Loopa" stod innan ja:et. Egen komponent och inte en rubrik i
+ * säljrutan: annonsskärmens stil döljer rutans egen rubrik och första textrad (.annons-v2 .sell-block).
+ */
+function VidHallerPa({ text }: { text: string }) {
+  const t = useT();
+  return (
+    <div className="vid-haller-pa" role="status">
+      <span className="vid-haller-pa-prick" aria-hidden="true" />
+      <div>
+        <strong>{t("Vi håller på")}</strong>
+        <span>{text}</span>
+      </div>
+    </div>
+  );
+}
 
 function feedbackAvklarad(jobId: string): boolean {
   try {

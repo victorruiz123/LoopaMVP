@@ -33,6 +33,8 @@ export interface FbAttrappLage {
   /** Säljinlägg genom "Sälj något" i en grupp. `fields.groups` är de ibockade grupperna, `fields.marketplace` brytarens läge. */
   listings: Array<{ groupId: string; fields: Record<string, string>; files: string[] }>;
   marketplace: Array<{ fields: Record<string, string>; files: string[] }>;
+  /** Sparade redigeringar — ska vara tom efter en torrkörning. */
+  redigeringar: Array<{ var: string; text: string; titel?: string; pris?: string }>;
   visited: string[];
 }
 
@@ -56,7 +58,16 @@ export interface FbAttrappOptions {
   marketplaceCardsOnly?: boolean;
   /** Kontots Marketplace-valuta: "kr" (rätt) eller "$" (fel — så såg det riktiga kontot ut 2026-09-25). */
   marketplaceCurrency?: "kr" | "$";
+  /** Det som redan ligger uppe och kan redigeras (facebook/redigera.ts). Spara registreras i `lage.redigeringar`. */
+  redigerbart?: FbRedigerbart;
   groups?: Record<string, AttrappGrupp>;
+}
+
+export interface FbRedigerbart {
+  /** Marketplace-annonser att redigera, per Facebook-id: /marketplace/edit/?listing_id=<id>. */
+  marketplace?: Record<string, { title: string; description: string; price?: number }>;
+  /** Gruppinlägg att redigera, per sökväg (t.ex. "/groups/444/posts/9001/") → nuvarande text. */
+  inlagg?: Record<string, string>;
 }
 
 export interface FbAttrapp {
@@ -119,7 +130,7 @@ const LOGIN = sida("Logga in på Facebook", `<div role="main"><h1>Logga in på F
 export async function startaFbAttrapp(opts: FbAttrappOptions = {}): Promise<FbAttrapp> {
   const loggedIn = opts.loggedIn !== false;
   const groups: Record<string, AttrappGrupp> = JSON.parse(JSON.stringify(opts.groups ?? STANDARD_GRUPPER));
-  const lage: FbAttrappLage = { searches: [], joinClicks: [], joinAnswers: [], posts: [], listings: [], marketplace: [], visited: [] };
+  const lage: FbAttrappLage = { searches: [], joinClicks: [], joinAnswers: [], posts: [], listings: [], marketplace: [], redigeringar: [], visited: [] };
   const pendingJoin = new Set<string>();
 
   const server: Server = createServer((req, res) => {
@@ -157,6 +168,13 @@ export async function startaFbAttrapp(opts: FbAttrappOptions = {}): Promise<FbAt
           pendingJoin.add(id);
         } else if (what === "post" && id) {
           lage.posts.push({ groupId: id, text: String(body.text ?? ""), files: (body.files as string[]) ?? [] });
+        } else if (what === "redigering") {
+          lage.redigeringar.push({
+            var: String(body.var ?? ""),
+            text: String(body.text ?? ""),
+            ...(body.titel !== undefined ? { titel: String(body.titel) } : {}),
+            ...(body.pris !== undefined ? { pris: String(body.pris) } : {}),
+          });
         } else if (what === "listing") {
           lage.listings.push({ groupId: id, fields: (body.fields as Record<string, string>) ?? {}, files: (body.files as string[]) ?? [] });
         } else if (what === "marketplace") {
@@ -347,6 +365,57 @@ if (sell) sell.addEventListener("click", () => {
     // kategori (löv), skicket en lista med role=option. Beskrivning och plats ligger under den
     // hopfällda knappen "Mer information". Prisfältet formateras med kontots valuta (här kr).
     // Sidan efter Nästa (?step=audience) bär Publicera — och eventuellt Facebooks spärrtext.
+    // ── Redigering av det som redan ligger uppe (ANTAGET, som robotens selektorer) ──
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+    if (url.pathname === "/marketplace/edit/") {
+      // Samma fält och etiketter som publiceringsformuläret (selectors.ts, VERIFIERAT): Titel, Pris,
+      // och Beskrivning under den hopfällda "Mer information". Knappen heter Uppdatera.
+      const id = url.searchParams.get("listing_id") ?? "";
+      const a = opts.redigerbart?.marketplace?.[id];
+      if (!a) return html(sida("Marketplace", `<div role="main"><h1>Annonsen hittades inte</h1></div>`), 404);
+      return html(
+        sida(
+          "Redigera annons | Facebook Marketplace",
+          `<div role="main"><h1>Redigera annons</h1>
+           <p><input aria-label="Titel" id="rubrik" value="${esc(a.title)}" style="width:420px"></p>
+           <p><input aria-label="Pris" id="pris" value="${a.price ?? ""}"></p>
+           <div role="button" aria-expanded="false" id="mer">Mer information</div>
+           <div id="mer-innehall" style="display:none"><textarea aria-label="Beskrivning" id="beskrivning" style="width:640px;height:220px;font:13px system-ui">${esc(a.description)}</textarea></div>
+           <div role="button" aria-label="Uppdatera" id="spara">Uppdatera</div></div>`,
+          `<script>
+            document.getElementById("mer").onclick = function () { this.setAttribute("aria-expanded", "true"); document.getElementById("mer-innehall").style.display = "block"; };
+            document.getElementById("spara").onclick = function () {
+              fetch("/attrapp/redigering", { method: "POST", body: JSON.stringify({ var: "annons ${id}", text: document.getElementById("beskrivning").value, titel: document.getElementById("rubrik").value, pris: document.getElementById("pris").value }) });
+            };
+          </script>`,
+        ),
+      );
+    }
+    const inlagg = opts.redigerbart?.inlagg?.[url.pathname];
+    if (inlagg !== undefined) {
+      return html(
+        sida(
+          "Inlägg | Facebook",
+          `<div role="main"><h2>Secondhand Stockholm</h2>
+           <div style="border:1px solid #ccc;padding:12px;max-width:680px"><div role="button" aria-label="Åtgärder för det här inlägget" id="meny">⋯</div>
+           <div id="text" style="white-space:pre-wrap">${esc(inlagg)}</div></div></div>`,
+          `<script>
+            var TEXT = ${JSON.stringify(inlagg)};
+            document.getElementById("meny").onclick = function () {
+              document.body.insertAdjacentHTML("beforeend", '<div role="menu" style="position:absolute;top:90px;left:40px;background:#fff;border:1px solid #333"><div role="menuitem" id="red" style="padding:6px">Redigera inlägg</div><div role="menuitem" style="padding:6px">Ta bort inlägg</div></div>');
+              document.getElementById("red").onclick = function () {
+                document.querySelector('[role=menu]').remove();
+                document.body.insertAdjacentHTML("beforeend", '<div role="dialog"><h3>Redigera inlägg</h3><div contenteditable="true" role="textbox" id="ed" style="white-space:pre-wrap"></div><div role="button" aria-label="Spara" id="spara">Spara</div></div>');
+                document.getElementById("ed").innerText = TEXT;
+                document.addEventListener("keydown", function (e) { if (e.key === "Escape") { var d = document.querySelector('[role=dialog]'); if (d) d.remove(); } });
+                document.getElementById("spara").onclick = function () { fetch("/attrapp/redigering", { method: "POST", body: JSON.stringify({ var: location.pathname, text: document.getElementById("ed").innerText }) }); };
+              };
+            };
+          </script>`,
+        ),
+      );
+    }
+
     if (url.pathname === "/marketplace/create/item") {
       if (opts.checkpointOn === "marketplace") return html(CHECKPOINT);
       const restricted = opts.marketplaceRestricted === true;

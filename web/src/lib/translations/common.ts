@@ -147,4 +147,10 @@ export const COMMON: Record<string, Translation> = {
   "Ändrat i annonsen": { en: "Changed in the listing", fr: "Modifié dans l'annonce" },
   "Ångra": { en: "Undo", fr: "Annuler" },
   "Ångrat": { en: "Undone", fr: "Annulé" },
+
+  // ---- "Vi håller på" (components/SellWithLoopa.tsx) ----
+  "Vi håller på": { en: "We're on it", fr: "Nous nous en occupons" },
+  "Möbeln ligger ute till salu, och Loopa sköter försäljningen härifrån. Du får besked så fort den är såld.": { en: "The furniture is listed for sale, and Loopa handles the sale from here. You'll hear from us as soon as it sells.", fr: "Le meuble est en vente et Loopa gère la vente à partir d'ici. Vous serez prévenu dès qu'il sera vendu." },
+  "Loopa granskar annonsen och lägger sedan ut den till salu. Du behöver inte göra något mer.": { en: "Loopa is reviewing the listing and will then publish it for sale. You don't need to do anything else.", fr: "Loopa examine l'annonce puis la met en vente. Vous n'avez rien d'autre à faire." },
+  "Vi för ut de senaste ändringarna till marknadsplatserna.": { en: "We're bringing the latest changes out to the marketplaces.", fr: "Nous publions les dernières modifications sur les plateformes." },
 };

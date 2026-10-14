@@ -199,6 +199,7 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       error: null,
       publishedAt: new Date().toISOString(),
       adBlocks,
+      rubrik: plan.title,
       shippingSek: plan.shippingSek,
       // Kanalens kvitto: Tradera ligger på möbelpriset annonsen gick ut med. Det är mot det stegen
       // mäter om Tradera hänger med nästa vecka (priceLadder.ts synkaKanaler).

@@ -666,7 +666,12 @@ export async function tickPriceLadders(
         console.info(`[pris-steg] ${job.id.slice(0, 8)} låg ute utan startad klocka — startar den nu`);
       }
 
-      if (await sankSteg(job, now)) sankta++;
+      if (await sankSteg(job, now)) {
+        sankta++;
+        // Facebook ligger utanför stegens kanaler och får det nya priset genom redigeringsroboten.
+        const { schemalaggPrisUppdatering } = await import("./integrations/annonsUppdatering.js");
+        void schemalaggPrisUppdatering(job);
+      }
       if (prisUrFas(job)) {
         const r = await synkaKanaler(job, { nu: () => now, ...beroenden });
         flyttade += r.flyttade.length;

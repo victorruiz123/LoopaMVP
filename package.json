@@ -25,6 +25,7 @@
     "tradera:pris": "tsx server/src/integrations/tradera/pris-prov.ts",
     "blocket:logga-in": "tsx server/src/integrations/blocket/logga-in.ts",
     "facebook:login": "tsx server/src/integrations/facebook/login.ts",
+    "annons:visa": "tsx scripts/visa-redigering.ts",
     "facebook": "tsx server/src/integrations/facebook/cli.ts"
   },
   "devDependencies": {

@@ -654,6 +654,8 @@ async function traderaState(job: ConditionJob) {
       job.tradera?.status === "published" && typeof job.tradera.itemId === "number" && traderaConfigured()
         ? await getTraderaLage(job.tradera.itemId)
         : null,
+    /** Var uppdateringen av marknadsplatserna står efter en ändring. Se annonsUppdatering.ts. */
+    uppdatering: job.annonsUppdatering ?? null,
   };
 }
 
@@ -1193,6 +1195,10 @@ async function handleSaljGuideAngra(req: IncomingMessage, res: ServerResponse) {
   if (post.priceLadder !== undefined) job.priceLadder = post.priceLadder ?? undefined;
   await persist(job);
   guideAngra.delete(body.angraId as string);
+  if (post.attributes || post.description !== undefined) {
+    const { schemalaggAnnonsUppdatering } = await import("./integrations/annonsUppdatering.js");
+    void schemalaggAnnonsUppdatering(job);
+  }
   sendJson(res, 200, { ok: true });
 }
 
@@ -2017,6 +2023,9 @@ async function tillampaAnnonsRattelse(job: ConditionJob, body: ListingEditBody):
   }
 
   await persist(job);
+  // Ligger annonsen ute ska marknadsplatserna visa samma sak. Se integrations/annonsUppdatering.ts.
+  const { schemalaggAnnonsUppdatering } = await import("./integrations/annonsUppdatering.js");
+  void schemalaggAnnonsUppdatering(job);
   return true;
 }
 
@@ -2462,6 +2471,24 @@ const server = http.createServer(async (req, res) => {
           const { granskaAnnons, granskningPagar } = await import("./granskning/agent.js");
           if (!granskningPagar(detalj.id)) void granskaAnnons(detalj.id, identity.id);
           return sendJson(res, 202, { status: "pagar" });
+        }
+        /**
+         * Provkörning av redigeringsrobotarna: ett ord i beskrivningen byts mot en synonym och förs ut
+         * till Blocket och Facebook, eller tillbaka med `riktning: "angra"`. Robotarna kör i bakgrunden;
+         * panelen läser utfallet ur annonsens detalj. Se integrations/provRedigering.ts.
+         */
+        if (segments[2] === "annonser" && segments.length === 5 && segments[4] === "provredigering" && req.method === "POST") {
+          const { jobbFor } = await import("./adminAnnonser.js");
+          const job = await jobbFor(segments[3]);
+          if (!job) return sendJson(res, 404, { error: "Annonsen finns inte." });
+          const body = await readJsonBody<{ riktning?: unknown }>(req, 1024);
+          const { startaProv, ProvFel } = await import("./integrations/provRedigering.js");
+          try {
+            return sendJson(res, 202, await startaProv(job, body.riktning === "angra" ? "angra" : "andra", identity.id));
+          } catch (err) {
+            if (err instanceof ProvFel) return sendJson(res, 409, { error: err.message });
+            throw err;
+          }
         }
         if (segments[2] === "annonser" && segments.length === 4 && req.method === "PATCH") {
           const { andraAnnons, AndringsFel } = await import("./adminAnnonser.js");
@@ -2917,6 +2944,8 @@ void failOrphanedJobs().then((n) => {
 // Prisstegen lever i den här processen — alltid. Möbeln sjunker i butiken och på Blocket även på en
 // server utan Tradera-nycklar; en kanal som inte går att nå bokförs på kanalen (priceLadder.ts).
 startPriceLadderScheduler();
+// Uppdateringar av marknadsplatserna som väntade när servern startades om. Se annonsUppdatering.ts.
+void import("./integrations/annonsUppdatering.js").then((m) => m.aterupptaAnnonsUppdateringar());
 
 /**
  * Butiken lär känna lagret vid uppstart: varje besiktigat och prissatt jobb får en post, och det som

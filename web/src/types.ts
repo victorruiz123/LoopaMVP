@@ -495,7 +495,16 @@ export interface TraderaPlan {
 }
 
 /** Svaret från GET/POST /api/jobs/:id/tradera. */
+/** Var uppdateringen av marknadsplatserna står efter en ändring. Se server/src/integrations/annonsUppdatering.ts. */
+export interface AnnonsUppdatering {
+  begard: string;
+  status: "vantar" | "pagar" | "klar";
+  klar: string | null;
+  kanaler: Partial<Record<"tradera" | "blocket" | "facebook", { status: string; detalj: string; at: string }>>;
+}
+
 export interface TraderaState {
+  uppdatering?: AnnonsUppdatering | null;
   /** Sant när NÅGON kanal kan ta emot en beställning — inte Traderas eget läge. */
   configured: boolean;
   missingEnv: string[];
@@ -1103,6 +1112,11 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   ladder: PriceLadder | null;
   /** Var varje marknadsplats står mot stegen. Tom när inget ligger uppe. */
   prisKanaler: KanalPrisLage[];
+  /** Provkörningen av redigeringsrobotarna. Se server/src/integrations/provRedigering.ts. */
+  prov: {
+    forslag: { byte: { fran: string; till: string; fore: string; efter: string } | null; falt: string; blocket: boolean; facebook: boolean; tradera: boolean };
+    senaste: ProvRedigering | null;
+  } | null;
   /** Publiceringen mot Tradera i sin helhet: länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
@@ -1981,3 +1995,19 @@ export interface FacebookListingChannels {
 }
 
 export type FacebookRunKind = "session" | "discover" | "sync-memberships" | "validate" | "join" | "recheck" | "queue" | "sweep";
+
+export interface ProvKanalUtfall {
+  status: "klar" | "oforandrad" | "torrkord" | "manuell" | "senare" | "fel" | "ej_uppe";
+  detalj: string;
+  at: string;
+}
+
+export interface ProvRedigering {
+  status: "pagar" | "klar";
+  riktning: "andra" | "angra";
+  fran: string;
+  till: string;
+  startad: string;
+  klar: string | null;
+  kanaler: Partial<Record<"blocket" | "facebook", ProvKanalUtfall>>;
+}

@@ -154,7 +154,10 @@ test("skarp körning sparar det nya priset i RÄTT fält, lämnar leveranssidan 
   assert.equal(resultat?.lage, "Aktiv", "en sänkning lämnar annonsen aktiv");
 
   // "Lägsta pris" ligger före "Pris" på sidan: bara exakt etikettmatchning träffar rätt.
-  assert.deepEqual(attrapp.lage.redigeringar, [{ id: ANNONS.id, pris: String(NYTT_PRIS), lagsta: "" }]);
+  assert.deepEqual(
+    attrapp.lage.redigeringar.map(({ id, pris, lagsta }) => ({ id, pris, lagsta })),
+    [{ id: ANNONS.id, pris: String(NYTT_PRIS), lagsta: "" }],
+  );
   assert.equal(attrapp.lage.prisNu[ANNONS.id], String(NYTT_PRIS));
 
   // Spara leder till leveranssidan i redigeringsläge. Den ska besökas (det är dit Blocket går) men

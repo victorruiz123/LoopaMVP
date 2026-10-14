@@ -680,6 +680,8 @@ export interface TraderaPublication {
    * nybyggd text, som kan ha glidit isär. Saknas på annonser publicerade innan fältet fanns.
    */
   adBlocks?: AdBlock[] | null;
+  /** Rubriken som den gick upp. Redigeringen jämför mot den och `adBlocks`. Saknas på äldre annonser. */
+  rubrik?: string | null;
   /**
    * Hemleveransen som är inbakad i annonspriset, i kronor. Prisstegen lägger på samma belopp vid varje
    * sänkning (hemleverans.ts `annonsensFrakt`). Saknas på annonser från före 2026-09-29 — de bär 600.
@@ -730,6 +732,24 @@ export interface BlocketPublication {
   pris?: KanalPris | null;
   /** Senaste prisändringsrobotens steg (integrations/blocket/pris.ts), de sista 30. */
   prisSteg?: BlocketStep[] | null;
+  /** Senaste redigeringen av annonsen på Blocket (integrations/blocket/redigera.ts), stegvis. */
+  redigeringSteg?: BlocketStep[] | null;
+  /**
+   * Det som står i annonsen på Blocket: rubrik, beskrivning, mått och märke som de gick upp eller
+   * senast redigerades. Redigeringsroboten jämför mot det — står det redan så öppnas ingen webbläsare,
+   * och rubrikvakten känner igen annonsen även när rubriken ändrats sedan. Saknas på äldre annonser.
+   */
+  innehall?: BlocketInnehall | null;
+}
+
+export interface BlocketInnehall {
+  rubrik: string;
+  beskrivning: string;
+  hojd: number | null;
+  bredd: number | null;
+  djup: number | null;
+  marke: string | null;
+  postnummer: string;
 }
 
 /** Se ConditionJob.saleTerms. */
@@ -867,6 +887,13 @@ export interface ConditionJob {
    * jobb från före stegen ska inte börja sjunka av sig självt.
    */
   priceLadder?: PriceLadder | null;
+  /**
+   * Senaste uppdateringen av marknadsplatserna efter att säljaren ändrat en annons som ligger ute.
+   * Se integrations/annonsUppdatering.ts.
+   */
+  annonsUppdatering?: import("./integrations/annonsUppdatering.js").AnnonsUppdatering | null;
+  /** Adminens provkörning av redigeringsrobotarna på den här annonsen. Se integrations/provRedigering.ts. */
+  provRedigering?: import("./integrations/provRedigering.js").ProvRedigering | null;
   /**
    * Affären jobbet tillhör, när det är en skanning inuti ett affärsrum (Trygg affär).
    *

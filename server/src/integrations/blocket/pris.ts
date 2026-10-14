@@ -157,7 +157,7 @@ export class BlocketAnnonsInteAktiv extends Error {
  * att kortets länk finns. Flera sidor bläddras igenom (`?pageNumber=`); null id = går inte att veta,
  * och då släpps den igenom (rubrikvakten står kvar).
  */
-async function annonsenArAktiv(page: Page, id: string | null, logga: Logga): Promise<boolean> {
+export async function annonsenArAktiv(page: Page, id: string | null, logga: Logga): Promise<boolean> {
   if (!id) return true;
   const bas = blocketBaseUrl();
   const sedda = new Set<string>();
@@ -299,7 +299,7 @@ export async function driveBlocketPriceChange(
 }
 
 /** Visar sidan ett redigeringsformulär: ett prisfält och ett rubrikfält? Räknat med locators. */
-async function redigeringsformularet(page: Page, timeoutMs = 20_000): Promise<boolean> {
+export async function redigeringsformularet(page: Page, timeoutMs = 20_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     const pris = await page
@@ -314,7 +314,7 @@ async function redigeringsformularet(page: Page, timeoutMs = 20_000): Promise<bo
 }
 
 /** Rubriken som den står i formuläret, eller null när inget rubrikfält finns. */
-async function lasRubrik(page: Page): Promise<string | null> {
+export async function lasRubrik(page: Page): Promise<string | null> {
   const kandidater = [
     page.locator('w-textfield[name="title"] input, input[name="title"]').first(),
     page.getByLabel("Annonsrubrik", { exact: true }).first(),
@@ -342,7 +342,7 @@ const ANDRA = ['a:has-text("Ändra annonsen")', 'a:has-text("Redigera")', 'butto
  * öppnats, så kortet letas upp först (på länkens href eller på rubriken) och menyknappen i det
  * klickas. Sista utvägen är annonssidan. Returnerar vilken väg som gick, eller null.
  */
-async function viaMinaAnnonser(page: Page, id: string | null, title: string, adUrl: string, logga: Logga): Promise<string | null> {
+export async function viaMinaAnnonser(page: Page, id: string | null, title: string, adUrl: string, logga: Logga): Promise<string | null> {
   const bas = blocketBaseUrl();
   await goAndSettle(page, `${bas}/mina-annonser`);
   await dismissCookieBanner(page);
@@ -477,6 +477,6 @@ export async function flyttaBlocketPris(job: ConditionJob, annonspris: number): 
   }
 }
 
-function felText(err: unknown): string {
+export function felText(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
 }

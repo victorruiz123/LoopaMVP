@@ -32,7 +32,7 @@ import { jobToProduct } from "../../butik/normalize.js";
 import { getJob, jobDir, persist } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { resolveCoverImageId } from "../../pipeline/cover.js";
-import type { BlocketPublication, BlocketStep, ConditionJob } from "../../types.js";
+import type { BlocketInnehall, BlocketPublication, BlocketStep, ConditionJob } from "../../types.js";
 import {
   blocketConfigured,
   blocketDataDir,
@@ -290,6 +290,19 @@ export interface BlocketRunResult {
  * känner till ett jobb, en jobbfil eller en publiceringsstatus — det är just det som gör att funktionen
  * kan köras mot attrappen.
  */
+/** Det annonsen bär på Blocket, att jämföra en redigering mot. Se BlocketPublication.innehall. */
+export function blocketInnehall(plan: BlocketPublishPlan, beskrivning: string): BlocketInnehall {
+  return {
+    rubrik: plan.title,
+    beskrivning,
+    hojd: plan.measurements.height ?? null,
+    bredd: plan.measurements.width ?? null,
+    djup: plan.measurements.depth ?? null,
+    marke: plan.brand ?? null,
+    postnummer: plan.postalCode,
+  };
+}
+
 export async function driveBlocketForm(
   page: Page,
   context: BrowserContext,
@@ -631,6 +644,7 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
       // Kanalens kvitto: Blocket ligger på möbelpriset annonsen gick ut med. Det är mot det stegen
       // mäter om Blocket hänger med nästa vecka (priceLadder.ts synkaKanaler, blocket/pris.ts).
       pris: result.status === "published" ? nyttKanalPris(plan.itemPrice, "publicering") : (current.pris ?? null),
+      innehall: result.status === "published" ? blocketInnehall(plan, description) : (current.innehall ?? null),
     }));
     console.info(`[blocket] job ${jobId} ${result.status} — ${result.url ?? result.receiptUrl}`);
 

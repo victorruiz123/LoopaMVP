@@ -45,7 +45,7 @@ export interface AttrappLage {
   /** Hur många gånger formuläret hämtats. Driver utkastfällan. */
   formularVisningar: number;
   /** Redigeringar som SPARATS, i ordning: annons-id, nytt pris, och vad "Lägsta pris"-fältet bar. */
-  redigeringar: Array<{ id: string; pris: string; lagsta: string }>;
+  redigeringar: Array<{ id: string; pris: string; lagsta: string; beskrivning?: string; hojd?: string; bredd?: string; djup?: string; rubrik?: string; postnummer?: string }>;
   /** Priset annonsen visar nu, per annons-id, efter sparade redigeringar. */
   prisNu: Record<string, string>;
   /** Leveransval som sparats från leveranssidan i redigeringsläge. Prisroboten ska lämna den tom. */
@@ -68,7 +68,7 @@ export interface AttrappOptions {
    * Annonser som redan ligger uppe på kontot — det Mina annonser listar, och det prisroboten
    * (integrations/blocket/pris.ts) ska hitta och redigera. Tom = "Du har 0 annonser."
    */
-  annonser?: Array<{ id: string; rubrik: string; pris: number; aktiv?: boolean }>;
+  annonser?: Array<{ id: string; rubrik: string; pris: number; aktiv?: boolean; beskrivning?: string; matt?: { hojd?: number; bredd?: number; djup?: number } }>;
   /**
    * Sant = direktadressen /recommerce/create/<id> ger 404 utan Referer från Mina annonser, så att
    * reservvägen (kortets meny → "Ändra annonsen") blir prövad.
@@ -114,6 +114,8 @@ class WTextarea extends HTMLElement {
     const rot = this.attachShadow({ mode: "open" });
     const inne = document.createElement("textarea");
     if (this.hasAttribute("placeholder")) inne.setAttribute("placeholder", this.getAttribute("placeholder"));
+    if (this.hasAttribute("value")) inne.value = this.getAttribute("value");
+    inne.style.cssText = "width:640px;height:170px;font:13px system-ui";
     rot.appendChild(inne);
   }
   get varde() { return this.shadowRoot.querySelector("textarea").value; }
@@ -204,6 +206,8 @@ const COOKIE_BANNER = `
 </div>`;
 
 /** Startar attrappen på en ledig port. `lage` fylls i medan flödet går framåt. */
+const attr = (t: string): string => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
+
 export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp> {
   const inloggad = opts.inloggad !== false;
   const lage: AttrappLage = {
@@ -307,7 +311,11 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
           "Skapa annons | Blocket",
           `<h1>Marknadsplats</h1>
            <div class="rad"><w-textfield aria-label="Annonsrubrik" name="title" value="${a.rubrik}"></w-textfield></div>
-           <div class="rad"><w-textarea aria-label="Beskrivning"></w-textarea></div>
+           <div class="rad"><w-textarea aria-label="Beskrivning" value="${attr(a.beskrivning ?? "")}"></w-textarea></div>
+           <div class="rad"><w-textfield aria-label="Höjd" name="hojd" value="${a.matt?.hojd ?? ""}"></w-textfield></div>
+           <div class="rad"><w-textfield aria-label="Sitthöjd" name="sitthojd" value=""></w-textfield></div>
+           <div class="rad"><w-textfield aria-label="Bredd" name="bredd" value="${a.matt?.bredd ?? ""}"></w-textfield></div>
+           <div class="rad"><w-textfield aria-label="Djup" name="djup" value="${a.matt?.djup ?? ""}"></w-textfield></div>
            <div class="rad"><w-textfield aria-label="Lägsta pris" name="lagsta" value=""></w-textfield></div>
            <div class="rad"><label for="pris-falt">Pris</label><input id="pris-falt" type="number" inputmode="numeric" value="${lage.prisNu[a.id] ?? a.pris}"></div>
            <div class="rad"><w-textfield aria-label="Postnummer" name="postnummer" value="11122"></w-textfield></div>
@@ -316,7 +324,7 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
              /* Etiketten "Pris" är ett <label for> till ett vanligt <input>, som uppmätt: getByLabel träffar <input> direkt. */
              document.getElementById("spara").addEventListener("click", function () {
                var hamta = function (n) { var el = document.querySelector('w-textfield[name="' + n + '"]'); return el ? el.varde : ""; };
-               fetch("/spara-redigering", { method: "POST", body: JSON.stringify({ id: "${a.id}", pris: document.getElementById("pris-falt").value, lagsta: hamta("lagsta") }) })
+               fetch("/spara-redigering", { method: "POST", body: JSON.stringify({ id: "${a.id}", pris: document.getElementById("pris-falt").value, lagsta: hamta("lagsta"), beskrivning: document.querySelector('w-textarea[aria-label="Beskrivning"]').varde, hojd: hamta("hojd"), bredd: hamta("bredd"), djup: hamta("djup"), rubrik: hamta("title"), postnummer: hamta("postnummer") }) })
                  .then(function () { location.href = "/recommerce/delivery/${a.id}?editMode=true"; });
              });
            </script>`,
@@ -491,7 +499,7 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
       return jsonKropp((data) => {
         const id = String(data.id ?? "");
         const pris = String(data.pris ?? "");
-        lage.redigeringar.push({ id, pris, lagsta: String(data.lagsta ?? "") });
+        lage.redigeringar.push({ id, pris, lagsta: String(data.lagsta ?? ""), beskrivning: String(data.beskrivning ?? ""), hojd: String(data.hojd ?? ""), bredd: String(data.bredd ?? ""), djup: String(data.djup ?? ""), rubrik: String(data.rubrik ?? ""), postnummer: String(data.postnummer ?? "") });
         lage.prisNu[id] = pris;
       });
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getAnnons, imageUrl, patchAnnons, startaGranskning } from "../api";
+import { getAnnons, imageUrl, patchAnnons, provRedigering, startaGranskning } from "../api";
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
@@ -289,6 +289,7 @@ export default function AdminAdScreen({
       {annons.blocketPaket && <BlocketPaketRuta paket={annons.blocketPaket} jobId={annons.jobId} loopaId={annons.id} />}
       <KanalStatus annons={annons} />
       <FacebookRuta annons={annons} onKoad={() => getAnnons(loopaId).then(ladda).catch(() => undefined)} setFel={setFel} />
+      <ProvRuta annons={annons} onUppdaterad={ladda} />
 
       {/* ---------------- Läget ---------------- */}
       <h2 className="profile-section-title">Läge</h2>
@@ -873,6 +874,108 @@ function FacebookRuta({ annons, onKoad, setFel }: { annons: AdminAnnonsDetalj; o
           <button className="btn btn-outline btn-small" disabled={koar} onClick={koa}>Köa till Facebook</button>
         </div>
       )}
+    </section>
+  );
+}
+
+/**
+ * Provkörning av redigeringsrobotarna på den här annonsen: ett ord i beskrivningen byts mot en synonym
+ * och förs ut till Blocket och Facebook på riktigt — ingenting tas bort, Tradera rörs inte. Ångra
+ * lägger tillbaka ordet samma väg. Robotarna tar några minuter; rutan frågar servern var femte sekund.
+ */
+function ProvRuta({ annons, onUppdaterad }: { annons: AdminAnnonsDetalj; onUppdaterad: (a: AdminAnnonsDetalj) => void }) {
+  const [skickar, setSkickar] = useState(false);
+  const [fel, setFel] = useState<string | null>(null);
+  const prov = annons.prov;
+  const senaste = prov?.senaste ?? null;
+  const pagar = senaste?.status === "pagar";
+
+  useEffect(() => {
+    if (!pagar) return;
+    const t = setInterval(() => {
+      getAnnons(annons.id).then(onUppdaterad).catch(() => undefined);
+    }, 5000);
+    return () => clearInterval(t);
+  }, [pagar, annons.id, onUppdaterad]);
+
+  if (!prov || (!prov.forslag.blocket && !prov.forslag.facebook)) return null;
+  const f = prov.forslag;
+  const kanaler = [f.blocket ? "Blocket" : null, f.facebook ? "Facebook" : null].filter(Boolean).join(" och ");
+  const arAndrad = senaste?.riktning === "andra";
+
+  const kor = async (riktning: "andra" | "angra") => {
+    setSkickar(true);
+    setFel(null);
+    try {
+      await provRedigering(annons.id, riktning);
+      onUppdaterad(await getAnnons(annons.id));
+    } catch (err) {
+      setFel(err instanceof Error ? err.message : "Provkörningen gick inte att starta.");
+    } finally {
+      setSkickar(false);
+    }
+  };
+
+  const utfallText: Record<string, string> = {
+    klar: "ändrad",
+    oforandrad: "stod redan så",
+    torrkord: "ifylld men inte sparad",
+    manuell: "måste göras för hand",
+    senare: "upptagen, försök igen",
+    fel: "föll",
+  };
+
+  return (
+    <section className="card-block">
+      <h2 className="profile-section-title">Provkör redigering</h2>
+      {!arAndrad && (
+        <>
+          <p className="admin-note">
+            Byter ett ord i beskrivningen mot en synonym och ändrar annonsen på plats på {kanaler}. Ingenting tas bort.
+            Tradera rörs inte{f.tradera ? " och behåller originalordet" : ""}. Du kan ångra efteråt.
+          </p>
+          {f.byte ? (
+            <p>
+              <strong>{f.byte.fran}</strong> → <strong>{f.byte.till}</strong>
+              <br />
+              <span className="admin-note">…{f.byte.efter}…</span>
+            </p>
+          ) : (
+            <p className="admin-note">Beskrivningen har inget ord med en synonym att byta. Välj en annan annons.</p>
+          )}
+        </>
+      )}
+      {senaste && (
+        <>
+          <p>
+            {senaste.riktning === "andra" ? "Ändrade" : "Ångrade"} <strong>{senaste.fran}</strong> → <strong>{senaste.till}</strong>
+            {pagar ? " · robotarna arbetar (tar några minuter)…" : ` · klart ${datum(senaste.klar)}`}
+          </p>
+          <ul className="admin-kanaler">
+            {(["blocket", "facebook"] as const).map((k) => {
+              const u = senaste.kanaler[k];
+              if (!u) return pagar && (k === "blocket" ? f.blocket : f.facebook) ? <li key={k} className="kanal-torr"><strong>{k === "blocket" ? "Blocket" : "Facebook"}</strong> — väntar</li> : null;
+              return (
+                <li key={k} className={u.status === "klar" || u.status === "oforandrad" ? "kanal-gar" : u.status === "fel" ? "kanal-nej" : "kanal-torr"}>
+                  <strong>{k === "blocket" ? "Blocket" : "Facebook"}</strong> — {utfallText[u.status] ?? u.status}: {u.detalj}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+      {fel && <p className="public-card-error">{fel}</p>}
+      <div className="annons-knappar">
+        {arAndrad ? (
+          <button className="btn btn-outline btn-small" disabled={skickar || pagar} onClick={() => kor("angra")}>
+            Ångra (tillbaka till "{senaste!.fran}")
+          </button>
+        ) : (
+          <button className="btn btn-primary btn-small" disabled={skickar || pagar || !f.byte} onClick={() => kor("andra")}>
+            Ändra på {kanaler}
+          </button>
+        )}
+      </div>
     </section>
   );
 }

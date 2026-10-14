@@ -173,6 +173,11 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
    * Knappen "Ändrat för hand" (`AndringsPatch.kanalPris`) sätter kvittot när en människa gjort det.
    */
   prisKanaler: KanalPrisLage[];
+  /** Provkörningen av redigeringsrobotarna: vad den skulle byta, och hur den senaste gick. */
+  prov: {
+    forslag: Awaited<ReturnType<typeof import("./integrations/provRedigering.js").provForslag>>;
+    senaste: import("./integrations/provRedigering.js").ProvRedigering | null;
+  } | null;
   /** Publiceringen mot Tradera i sin helhet — länken, felet, vem som godkände. */
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
@@ -446,7 +451,7 @@ function summera(rader: AdminAnnonsRad[]): Summering {
  * grinden som gör en borttagning verklig utåt. Men panelen VISAR raden, och en rad som går att klicka
  * på måste gå att öppna — annars är "borttagen" ett läge man ser och inte kan undersöka.
  */
-async function jobbFor(loopaId: string): Promise<ConditionJob | undefined> {
+export async function jobbFor(loopaId: string): Promise<ConditionJob | undefined> {
   const { jobByLoopaId } = await import("./publicCard.js");
   const aktivt = await jobByLoopaId(loopaId);
   if (aktivt) return aktivt;
@@ -502,6 +507,10 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     harleddBeskrivning: harleddBeskrivning(await overrides.medRattelser(job), annonsensFrakt(job, await overrides.kategoriMedRattelse(job))),
     ladder: job.priceLadder ?? null,
     prisKanaler: kanalPrisLagen(job),
+    prov: await (async () => {
+      const { provForslag } = await import("./integrations/provRedigering.js");
+      return { forslag: await provForslag(job), senaste: job.provRedigering ?? null };
+    })().catch(() => null),
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
     postnummer,
@@ -646,6 +655,19 @@ export async function andraAnnons(
 
   if (patch.lage) {
     await bytLage(id, patch.lage, patch.kanal ?? "butik", adminId, job);
+  }
+
+  /**
+   * Ligger annonsen ute ska marknadsplatserna visa samma sak (integrations/annonsUppdatering.ts).
+   * Text, rubrik och postnummer går till alla kanaler; ett nytt pris bara till Facebook — Tradera och
+   * Blocket fick det nyss av synkaKanaler. Varje kanal jämför själv mot det som ligger ute, så en
+   * ändring som inte syns i annonsen rör ingenting.
+   */
+  const textAndrad = Boolean(patch.aterstall) || attAterstalla.length > 0 || Object.keys(patch.falt ?? {}).length > 0 || patch.postnummer !== undefined;
+  const prisAndrat = typeof patch.prisNu === "number" || Boolean(patch.ladder);
+  if (textAndrad || prisAndrat) {
+    const { schemalaggAnnonsUppdatering } = await import("./integrations/annonsUppdatering.js");
+    void schemalaggAnnonsUppdatering(job, undefined, textAndrad ? "text" : "pris");
   }
 
   // Butikens index är härlett och hålls i minnet i 30 sekunder. En admin som rättar en titel ska se

@@ -6085,3 +6085,22 @@ body:has(.grind) .consent { display: none; }
 .guide-kvitto-text span { color: var(--hur-text-svag, rgba(255,255,255,.75)); }
 .guide-kvitto-angra { flex: none; border: 0; background: none; padding: 2px 4px; cursor: pointer;
   font: inherit; font-size: var(--fs-sm); font-weight: 650; color: var(--hur-text, #fff); text-decoration: underline; text-underline-offset: 3px; }
+
+/* "Vi håller på": annonsen är skickad eller ute, och Loopa arbetar med den. Står längst ner på
+   annonsen där "Sälj med Loopa" stod. Pricken andas, som guidens — något pågår. */
+.vid-haller-pa {
+  display: flex; align-items: flex-start; gap: 14px; padding: 16px 18px;
+  border-radius: var(--r-xl); background: var(--surface); box-shadow: var(--shadow-card);
+}
+.vid-haller-pa-prick {
+  flex: none; width: 12px; height: 12px; margin-top: 6px; border-radius: 50%; background: var(--accent);
+  box-shadow: 0 0 0 0 hsl(14 77% 54% / 0.5); animation: vid-haller-pa-andas 1.8s ease-out infinite;
+}
+@keyframes vid-haller-pa-andas {
+  0% { box-shadow: 0 0 0 0 hsl(14 77% 54% / 0.45); }
+  80%, 100% { box-shadow: 0 0 0 10px hsl(14 77% 54% / 0); }
+}
+@media (prefers-reduced-motion: reduce) { .vid-haller-pa-prick { animation: none; } }
+.vid-haller-pa > div { display: flex; flex-direction: column; gap: 3px; }
+.vid-haller-pa strong { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
+.vid-haller-pa span { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }

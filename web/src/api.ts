@@ -533,6 +533,17 @@ export async function startaGranskning(loopaId: string): Promise<void> {
   await json(await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}/granska`, { method: "POST" }));
 }
 
+/** Provkör redigeringsrobotarna: byt ett ord mot en synonym på Blocket och Facebook, eller ångra. */
+export async function provRedigering(loopaId: string, riktning: "andra" | "angra"): Promise<void> {
+  await json(
+    await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}/provredigering`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ riktning }),
+    }),
+  );
+}
+
 export async function patchAnnons(loopaId: string, andring: AnnonsAndring): Promise<AdminAnnonsDetalj> {
   return json(
     await authFetch(`/api/admin/annonser/${encodeURIComponent(loopaId)}`, {
