@@ -32,6 +32,7 @@ import { getTraderaLage, traderaConfigured } from "./integrations/tradera/trader
 import { makePriceLadder, startPriceLadderScheduler } from "./priceLadder.js";
 import { coverFirst, resolveCoverImageId } from "./pipeline/cover.js";
 import { loopaIdFor } from "./loopaId.js";
+import { maRoraJobb } from "./jobbGrind.js";
 import { cutoutOf, jobByLoopaId, publicCardFor, publikaBildrutor } from "./publicCard.js";
 import { publikaGalleribilder } from "./pipeline/bild/omslag.js";
 import { harGodkantOmslag } from "./pipeline/bild/omslag.js";
@@ -1878,26 +1879,13 @@ async function handleAddDamage(jobId: string, req: IncomingMessage, res: ServerR
   sendJson(res, 200, job.result);
 }
 
-/**
- * Annonstexten som den står på Tradera, för säljarens annonsvy.
- *
- * Säljaren ska läsa exakt det köparen läser. Är annonsen publicerad är det blocken som gick upp — de
- * byggs en gång och uppdateras aldrig på Tradera — annars det publiceringen skulle skicka just nu.
- * Samma funktion bygger texten i båda fallen (traderaAdBlocks), så de kan inte börja skilja sig.
- */
+/** Annonstexten för säljarens annonsvy, och om den går att ändra. Se annonsText.ts. */
 async function handleGetAdText(jobId: string, res: ServerResponse) {
   const job = await getJob(jobId);
-  if (!job?.result?.listing?.result) return sendJson(res, 404, { error: "Job or listing not found" });
-
-  const publicerad = job.tradera?.status === "published" ? (job.tradera.adBlocks ?? null) : null;
-  if (publicerad) return sendJson(res, 200, { blocks: publicerad, published: true });
-
-  const { traderaAdBlocks } = await import("./integrations/tradera/publish.js");
-  const { kategoriMedRattelse, medRattelser } = await import("./butik/overrides.js");
-  const { annonsensFrakt } = await import("./hemleverans.js");
-  // Samma frakt som publiceringen skulle baka in — med adminens kategorirättelse.
-  const frakt = annonsensFrakt(job, await kategoriMedRattelse(job));
-  sendJson(res, 200, { blocks: traderaAdBlocks(await medRattelser(job), frakt), published: false });
+  const { annonstextForSaljaren } = await import("./annonsText.js");
+  const svar = job ? await annonstextForSaljaren(job) : null;
+  if (!svar) return sendJson(res, 404, { error: "Job or listing not found" });
+  sendJson(res, 200, svar);
 }
 
 interface ListingEditBody {
@@ -2012,6 +2000,14 @@ async function tillampaAnnonsRattelse(job: ConditionJob, body: ListingEditBody):
     if (nytt !== listing.listing.description) {
       void noteraAnnons({ jobId, omrade: "annons", falt: "beskrivning", fyndId: null, aiSa: listing.listing.description, manniskanSa: nytt, kalla: "saljare", notis: null });
       listing.listing.description = nytt;
+      /**
+       * En rättelse av samma stycke i rättelselagret (adminens, eller en provkörning) hade annars
+       * legat ovanpå och dolt det säljaren nyss skrev — i appen och på marknadsplatserna. Den senaste
+       * ändringen gäller.
+       */
+      const overrides = await import("./butik/overrides.js");
+      const id = loopaIdFor(job.id);
+      if ((await overrides.hamta(id))?.description) await overrides.taBortFalt(id, ["description"], null);
     }
   }
   if (typeof body.conditionText === "string") {
@@ -2775,18 +2771,10 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Not found" });
       }
 
-      /**
-       * Ägarskapet prövas på samma ställe. 404 och inte 403 — ett 403 vore ett besked om att jobbet
-       * finns, vilket är precis vad den som gissar id:n är ute efter.
-       *
-       * En admin får LÄSA vilket jobb som helst, och bara läsa. Panelen finns för att se andras
-       * annonser; att ändra i dem är säljarens sak, och en GET-gräns här gör den skillnaden
-       * strukturell i stället för att lita på att panelen aldrig råkar skicka en POST.
-       */
+      // Ägarskapet prövas på samma ställe, för varje jobbväg. Se jobbGrind.ts.
       if (segments[1] === "jobs" && segments.length >= 3) {
         const job = getJobSync(segments[2]) ?? (await getJob(segments[2]));
-        const mayRead = !!job && (owns(job, identity) || (identity.isAdmin && req.method === "GET"));
-        if (!mayRead) return sendJson(res, 404, { error: "Job not found" });
+        if (!maRoraJobb(job, identity, req.method, segments)) return sendJson(res, 404, { error: "Job not found" });
       }
 
       if (segments[1] === "price" && segments.length === 2 && req.method === "POST") {

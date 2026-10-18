@@ -1263,8 +1263,13 @@ export type AdBlock =
 
 export interface AdText {
   blocks: AdBlock[];
-  /** Sant när texten är den som redan gått upp på Tradera; falskt när den är det som skulle gå upp. */
+  /** Sant när annonsen ligger ute (Tradera eller Blocket); falskt när texten är det som skulle gå upp. */
   published: boolean;
+  /**
+   * Går annonsen att ändra härifrån? På en publicerad annons bara när ändringar förs ut till
+   * marknadsplatserna (server: ANNONS_UPPDATERING). Saknas i svar från äldre servrar = !published.
+   */
+  redigerbar?: boolean;
 }
 
 export interface ListingViewData {

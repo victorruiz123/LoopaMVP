@@ -197,6 +197,17 @@ export default function ListingView({
     setUtkastAttr(card.attributes.map((a) => ({ ...a })));
     setRedigerar("specs");
   };
+  /**
+   * Går annonsen att ändra? Före publiceringen alltid. Ligger den ute bara när ändringen förs ut till
+   * Tradera, Blocket och Facebook — annars hade en rättelse ändrat appen men inte annonsen köparen
+   * läser. Servern avgör (AdText.redigerbar).
+   */
+  const kanAndra = !!onSaveListing && (annonstext?.redigerbar ?? !annonstext?.published);
+  const utAnnons = !!annonstext?.published;
+  const utNotis = utAnnons ? (
+    <p className="listing-edit-notis">{t("Annonsen ligger ute. När du sparar uppdaterar vi den på Tradera, Blocket och Facebook.")}</p>
+  ) : null;
+
   const spara = async (patch: Parameters<NonNullable<typeof onSaveListing>>[0]) => {
     if (!onSaveListing) return;
     setSparar(true);
@@ -534,6 +545,7 @@ export default function ListingView({
                   onChange={(e) => setUtkastText((v) => ({ ...v, conditionText: e.target.value }))}
                 />
               </label>
+              {utNotis}
               <EditFot
                 sparar={sparar}
                 fel={sparfel}
@@ -551,9 +563,8 @@ export default function ListingView({
                   {card.listing.conditionText && <p className="card-listing-condition">{card.listing.conditionText}</p>}
                 </>
               )}
-              {/* Ingen penna på en publicerad annons: texten på Tradera byggs en gång och ändras inte
-                  efteråt, så en rättelse här hade bara ändrat appen och inte annonsen köparen läser. */}
-              {onSaveListing && !annonstext?.published && (
+              {/* Pennan på en publicerad annons bara när ändringen förs ut — se `kanAndra`. */}
+              {kanAndra && (
                 <button type="button" className="listing-edit-knapp" onClick={oppnaText}>
                   {t("Ändra texten")}
                 </button>
@@ -708,6 +719,7 @@ export default function ListingView({
                 >
                   + {t("Lägg till uppgift")}
                 </button>
+                {utNotis}
                 <EditFot
                   sparar={sparar}
                   fel={sparfel}
@@ -751,7 +763,7 @@ export default function ListingView({
                     </div>
                   ))}
                 </dl>
-                {onSaveListing && (
+                {kanAndra && (
                   <button type="button" className="listing-edit-knapp" onClick={oppnaAttr}>
                     {card.attributes.length ? t("Ändra uppgifterna") : t("Fyll i mått och material")}
                   </button>

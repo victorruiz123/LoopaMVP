@@ -2917,6 +2917,8 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 
 .listing-edit { display: flex; flex-direction: column; gap: 12px; }
 .listing-edit-falt { display: flex; flex-direction: column; gap: 5px; }
+/* På en annons som ligger ute: vad som händer när man sparar. */
+.listing-edit-notis { margin: 0; font-size: 13px; line-height: 1.45; color: var(--muted); }
 .listing-edit-falt > span {
   font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
   text-transform: uppercase; color: var(--muted-soft);

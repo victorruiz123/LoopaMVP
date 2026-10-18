@@ -55,6 +55,7 @@ export default function SellWithLoopa({
   onMyListings,
   onSellAnother,
   fastList = false,
+  andrad = 0,
 }: {
   jobId: string;
   /**
@@ -64,6 +65,8 @@ export default function SellWithLoopa({
    * Av som förval; säljarens annonssida (ListingScreen) slår på den.
    */
   fastList?: boolean;
+  /** Räknas upp när annonsen sparats i vyn ovanför: läget hämtas då direkt ("Vi håller på"). */
+  andrad?: number;
   /**
    * Möbelns omslagsbild, till bekräftelsen.
    *
@@ -111,6 +114,10 @@ export default function SellWithLoopa({
         // Båda kanalerna. Blocket-roboten klickar i ett riktigt formulär och tar minuter — slutar
         // pollningen när Tradera är klar står kvittot kvar utan länken, fast annonsen gått upp.
         timer.current = window.setTimeout(refresh, 2500);
+      } else if (next.uppdatering && next.uppdatering.status !== "klar") {
+        // En ändring förs ut till marknadsplatserna. Tar en minut eller några; "Vi håller på" ska
+        // bytas tillbaka när den är klar, utan att säljaren laddar om.
+        timer.current = window.setTimeout(refresh, 15_000);
       } else if (next.publication?.status === "pending") {
         // Granskningen görs av en människa och tar minuter till timmar. Sällan nog att inte belasta,
         // ofta nog att kvittot byts mot länken utan att säljaren behöver ladda om.
@@ -126,7 +133,7 @@ export default function SellWithLoopa({
     return () => {
       if (timer.current) window.clearTimeout(timer.current);
     };
-  }, [refresh]);
+  }, [refresh, andrad]);
 
   /**
    * Gratisförsäljningen: ja som förval när säljaren har en. Den som bjudit in en vän som sålt ska se

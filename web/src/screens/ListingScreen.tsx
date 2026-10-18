@@ -79,6 +79,8 @@ export default function ListingScreen({
    * skickskärmen igen, och det är färskare än vårt.
    */
   const [result, setResult] = useState(initialResult);
+  /** Räknas upp vid varje sparning, så att säljrutan nedanför hämtar läget direkt. */
+  const [andrad, setAndrad] = useState(0);
   useEffect(() => setResult(initialResult), [initialResult]);
 
   /**
@@ -200,7 +202,10 @@ export default function ListingScreen({
             hideChat
             /* Säljaren vet vad det är för bild av sin egen möbel — se `hideCoverNote`. */
             hideCoverNote
-            onSaveListing={async (patch) => setResult(await saveListingDetails(result.jobId, patch))}
+            onSaveListing={async (patch) => {
+              setResult(await saveListingDetails(result.jobId, patch));
+              setAndrad((n) => n + 1);
+            }}
             annonstext={annonstext}
           />
           {/* Sist på kortet, efter allt som ska granskas: vägen ut. Det är det enda på den här
@@ -212,6 +217,7 @@ export default function ListingScreen({
               kunna säga VILKEN annons det här är, men inte göra något åt den. */}
           <SellWithLoopa
             fastList
+            andrad={andrad}
             jobId={result.jobId}
             coverUrl={sellerCover(result)?.url ?? null}
             onMyListings={onMyListings}
