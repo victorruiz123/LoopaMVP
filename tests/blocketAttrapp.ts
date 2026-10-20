@@ -50,6 +50,10 @@ export interface AttrappLage {
   prisNu: Record<string, string>;
   /** Leveransval som sparats från leveranssidan i redigeringsläge. Prisroboten ska lämna den tom. */
   leveransSparad: Array<{ id: string; frakt: string }>;
+  /** Annonser som tagits bort (borttagning.ts), i ordning, med skälet om dialogen frågade. */
+  borttagna: Array<{ id: string; skal: string | null }>;
+  /** Annonser som markerats som sålda. Borttagningsroboten ska ALDRIG hamna här. */
+  markeradeSalda: string[];
 }
 
 export interface AttrappOptions {
@@ -79,6 +83,26 @@ export interface AttrappOptions {
    * fall rubrikvakten finns för, när aktivkontrollen inte räcker.
    */
   redigeringTom?: boolean;
+  /** Sant = bekräftelsen frågar varför annonsen tas bort, med "Såld på Blocket" först bland skälen. */
+  borttagningFragarSkal?: boolean;
+  /** Sant = "Ta bort annonsen" i menyn verkställer direkt, utan bekräftelse. */
+  borttagningUtanDialog?: boolean;
+  /** Sant = bekräftelsen tas emot men annonsen står kvar bland de aktiva. */
+  borttagningFastnar?: boolean;
+  /**
+   * Uppladdningar (1 = den första) som uppladdaren TAPPAR tyst första gången, utan förhandsbild — som
+   * Blocket gjorde med den sjätte bilden 2026-10-20. Ett andra försök med samma fil tas emot.
+   */
+  tappaUppladdning?: number[];
+  /** Sant = uppladdaren tappar ALLA försök med de uppladdningar som står i `tappaUppladdning`. */
+  tappaAlltid?: boolean;
+  /**
+   * Sant = Fortsätt från formuläret landar på Blockets identitetskontroll ("Bekräfta din identitet")
+   * i stället för fraktsidan — som skarpt 2026-10-20. En osynlig webbläsare kommer inte förbi den.
+   */
+  kraverBankID?: boolean;
+  /** Sant = kortets meny saknar "Ta bort annonsen"; valet finns bara på ägarsidan. */
+  borttagningBaraPaAgarsidan?: boolean;
 }
 
 export interface Attrapp {
@@ -186,6 +210,20 @@ customElements.define("w-textarea", WTextarea);
 customElements.define("w-select", WSelect);
 customElements.define("w-button", WButton);
 customElements.define("w-radio", WRadio);
+/* UPPMÄTT 2026-10-20: Warps modal. Den riktiga <dialog> ligger i SKUGGAN med rubriken och "Stäng";
+   texten och knapparna kommer från light-DOM genom slots. Värdelementet har storleken 0×0. */
+class WModal extends HTMLElement {
+  connectedCallback() {
+    if (this.shadowRoot) return;
+    const rot = this.attachShadow({ mode: "open" });
+    rot.innerHTML = '<dialog><header><p>Är du säker?</p><button data-stang>Stäng</button></header><slot name="content"></slot><slot name="footer"></slot></dialog>';
+    rot.querySelector("[data-stang]").addEventListener("click", () => this.gom());
+    this.style.display = "contents";
+  }
+  visa() { this.shadowRoot.querySelector("dialog").showModal(); }
+  gom() { this.shadowRoot.querySelector("dialog").close(); }
+}
+customElements.define("w-modal", WModal);
 </script>`;
 
 function sida(titel: string, kropp: string, extra = ""): string {
@@ -205,6 +243,60 @@ const COOKIE_BANNER = `
   Vi använder kakor. <button onclick="document.getElementById('cookie-banner').remove()">Godkänn alla</button>
 </div>`;
 
+/**
+ * Bekräftelsen vid borttagning — så som Blocket/FINN-plattformen bygger den: en modal med "Avbryt" och
+ * "Ta bort", och valfritt en fråga om skälet där "Såld på Blocket" står först. INTE UPPMÄTT på Blocket:
+ * attrappen bevisar att roboten väljer rätt i de varianter som är troliga, inte att sidan ser ut så.
+ */
+function borttagningsDialog(opts: AttrappOptions): string {
+  const skal = opts.borttagningFragarSkal
+    ? `<p>Varför tar du bort annonsen?</p>
+       ${["Såld på Blocket", "Såld någon annanstans", "Vill inte sälja längre"]
+         .map((t, i) => `<div><w-radio name="skal" aria-labelledby="skal-${i}" data-varde="${t}"></w-radio> <span id="skal-${i}">${t}</span></div>`)
+         .join("")}`
+    : "";
+  // UPPMÄTT 2026-10-20: en <dialog> PER KORT, dolda tills de öppnas — den första i sidan är alltså inte
+  // den som syns. Två dolda attrapper först, med samma knappar, så att en robot som tar `.first()` faller.
+  const text = "Annonsen kommer att tas bort från Blocket, och den kan inte återställas om du raderar den.";
+  const dold = `<w-modal><div slot="content">${text}</div><div slot="footer"><w-button>Avbryt</w-button> <w-button variant="primary">Ta bort</w-button></div></w-modal>`;
+  return `${dold}${dold}<w-modal id="ta-bort-dialog">
+     <div slot="content" style="text-align:left">${text}${skal}</div>
+     <div slot="footer" style="margin-top:12px"><w-button data-avbryt>Avbryt</w-button> <w-button variant="primary" data-bekrafta>Ta bort</w-button></div>
+   </w-modal>`;
+}
+
+const BORTTAGNING_SKRIPT = `<script>
+  var attrappUtanDialog = %UTAN%;
+  function attrappTaBort(id, skal) {
+    fetch("/ta-bort-annons", { method: "POST", body: JSON.stringify({ id: id, skal: skal }) })
+      .then(function () { location.href = "/my-items"; });
+  }
+  document.addEventListener("click", function (e) {
+    var el = e.target && e.target.closest ? e.target.closest("w-button, a[data-ta-bort]") : null;
+    if (!el) return;
+    if (el.hasAttribute("data-sald")) {
+      fetch("/markera-sald", { method: "POST", body: JSON.stringify({ id: el.getAttribute("data-sald") }) });
+    }
+    if (el.getAttribute("data-meny") === "agare") {
+      var m = document.getElementById("meny-agare"); m.style.display = m.style.display === "none" ? "block" : "none";
+    }
+    if (el.hasAttribute("data-ta-bort")) {
+      var id = el.getAttribute("data-ta-bort");
+      if (attrappUtanDialog) return attrappTaBort(id, null);
+      var d = document.getElementById("ta-bort-dialog");
+      d.setAttribute("data-id", id);
+      d.visa();
+    }
+    if (el.hasAttribute("data-avbryt")) document.getElementById("ta-bort-dialog").gom();
+    if (el.hasAttribute("data-bekrafta")) {
+      var d2 = document.getElementById("ta-bort-dialog");
+      var valt = d2.querySelector("w-radio[checked]");
+      if (d2.querySelector("w-radio") && !valt) return;
+      attrappTaBort(d2.getAttribute("data-id"), valt ? valt.getAttribute("data-varde") : null);
+    }
+  });
+</script>`;
+
 /** Startar attrappen på en ledig port. `lage` fylls i medan flödet går framåt. */
 const attr = (t: string): string => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
 
@@ -223,6 +315,8 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
     redigeringar: [],
     prisNu: {},
     leveransSparad: [],
+    borttagna: [],
+    markeradeSalda: [],
   };
   const annonser = opts.annonser ?? [];
 
@@ -336,7 +430,7 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
     if (/^\/recommerce\/create\//.test(vag) && req.method === "GET") {
       lage.formularVisningar += 1;
       const visaUtkast = Boolean(opts.utkastRubrik) && (!opts.utkastForsvinner || lage.formularVisningar === 1);
-      return html(formularSida(visaUtkast ? opts.utkastRubrik! : ""));
+      return html(formularSida(visaUtkast ? opts.utkastRubrik! : "", opts));
     }
 
     if (vag === "/skicka-formular" && req.method === "POST") {
@@ -355,6 +449,9 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
     // FÄLLA 6: w-radio utan inre input, etikett via aria-labelledby, och "Stor" är FÖRVALT. Den som
     // bara klickar och går vidare utan att verifiera lägger ut möbeln med paketfrakt.
     if (vag === "/shipping" && req.method === "GET") {
+      if (opts.kraverBankID) {
+        return html(sida("Logga in", "<h1>Bekräfta din identitet</h1><p>Legitimera dig med BankID för att fortsätta.</p>"));
+      }
       return html(
         sida(
           "Frakt och leverans",
@@ -489,7 +586,10 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
           "Blocket – Mina annonser",
           `<main><h1>Hantera annons</h1><h2>${a.rubrik}</h2><p>${annonsLage}</p><p>331 dagar kvar</p>
            <p>${a.rubrik}</p><p>Torget säljes ${prisNu},−</p>
-           <w-button>Markera som såld</w-button> <a href="/recommerce/create/${a.id}">Ändra annonsen</a></main>`,
+           <w-button data-sald="${a.id}">Markera som såld</w-button> <a href="/recommerce/create/${a.id}">Ändra annonsen</a>
+           ${opts.borttagningBaraPaAgarsidan ? `<w-button data-meny="agare">Fler val</w-button><div id="meny-agare" style="display:none"><w-button data-ta-bort="${a.id}">Ta bort annonsen</w-button></div>` : ""}
+           ${borttagningsDialog(opts)}</main>
+           ${BORTTAGNING_SKRIPT.replace("%UTAN%", String(!!opts.borttagningUtanDialog))}`,
         ),
       );
     }
@@ -501,6 +601,21 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
         const pris = String(data.pris ?? "");
         lage.redigeringar.push({ id, pris, lagsta: String(data.lagsta ?? ""), beskrivning: String(data.beskrivning ?? ""), hojd: String(data.hojd ?? ""), bredd: String(data.bredd ?? ""), djup: String(data.djup ?? ""), rubrik: String(data.rubrik ?? ""), postnummer: String(data.postnummer ?? "") });
         lage.prisNu[id] = pris;
+      });
+    }
+
+    // ── Borttagning och "Markera som såld" ─────────────────────────────────
+    if (vag === "/ta-bort-annons" && req.method === "POST") {
+      return jsonKropp((data) => {
+        const id = String(data.id ?? "");
+        lage.borttagna.push({ id, skal: data.skal ? String(data.skal) : null });
+        const a = annonser.find((x) => x.id === id);
+        if (a && !opts.borttagningFastnar) a.aktiv = false;
+      });
+    }
+    if (vag === "/markera-sald" && req.method === "POST") {
+      return jsonKropp((data) => {
+        lage.markeradeSalda.push(String(data.id ?? ""));
       });
     }
 
@@ -546,12 +661,13 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
         .map(
           (a) => `<article data-annons="${a.id}">
              <h3><a href="/my-items/details/${a.id}">${a.rubrik}</a></h3><p>${lage.prisNu[a.id] ?? a.pris} kr</p>
-             <w-button>Markera som såld</w-button>
+             <w-button data-sald="${a.id}">Markera som såld</w-button>
              <w-button data-meny="${a.id}">Meny till genvägar för annonsen</w-button>
              <div id="meny-${a.id}" style="display:none">
                <a href="/recommerce/create/${a.id}">Ändra annonsen</a>
                <a href="/${a.id}">Visa annonsen</a>
                <a href="/recommerce/statistics/${a.id}">Se statistik</a>
+               ${opts.borttagningBaraPaAgarsidan ? "" : `<a role="button" tabindex="0" title="Ta bort" data-ta-bort="${a.id}">Ta bort</a>`}
              </div>
            </article>`,
         )
@@ -561,6 +677,8 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
           "Mina annonser",
           `${COOKIE_BANNER}<h1>Mina annonser</h1>
            ${annonser.length === 0 ? "<p>Du har 0 annonser.</p>" : kort}
+           ${borttagningsDialog(opts)}
+           ${BORTTAGNING_SKRIPT.replace("%UTAN%", String(!!opts.borttagningUtanDialog))}
            <script>
              document.querySelectorAll("w-button[data-meny]").forEach(function (b) {
                b.addEventListener("click", function () {
@@ -598,7 +716,7 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
  * formulär är byggt, och det är hela orsaken till att `getByLabel(...).fill()` dör med "Element is
  * not an <input>". Sitthöjden ligger FÖRE höjden, så en luddig etikettsökning fyller fel fält.
  */
-function formularSida(utkastRubrik: string): string {
+function formularSida(utkastRubrik: string, opts: AttrappOptions = {}): string {
   const kategorier = JSON.stringify([
     { value: "", label: "Välj kategori" },
     { value: "78", label: "Möbler och inredning" },
@@ -665,12 +783,26 @@ function formularSida(utkastRubrik: string): string {
 
      <script>
        var bilder = [];
-       // Uppladdaren tar en fil i taget och TÖMMER fältet efteråt, precis som Blockets gör.
+       var forsokNr = 0;
+       var tappade = {};
+       var tappa = ${JSON.stringify(opts.tappaUppladdning ?? [])};
+       var tappaAlltid = ${opts.tappaAlltid ? "true" : "false"};
+       // Uppladdaren tar en fil i taget och TÖMMER fältet efteråt, precis som Blockets gör. Varje bild som
+       // tas emot får en förhandsbild (Blocket: CDN-adressen /item/<id>/<uuid>); en TAPPAD får ingen.
        document.getElementById("filfalt").addEventListener("change", function () {
          for (var i = 0; i < this.files.length; i++) {
-           bilder.push(this.files[i].name);
+           forsokNr++;
+           var namn = this.files[i].name;
+           var nr = bilder.length + 1;
+           if (tappa.indexOf(nr) >= 0 && (tappaAlltid || !tappade[nr])) { tappade[nr] = true; continue; }
+           bilder.push(namn);
            var rad = document.createElement("li");
-           rad.textContent = this.files[i].name;
+           rad.textContent = namn;
+           var img = document.createElement("img");
+           img.setAttribute("data-forhandsbild", "");
+           img.width = 40; img.height = 40;
+           img.src = "data:image/svg+xml," + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><text y="20">' + nr + '</text></svg>');
+           rad.appendChild(img);
            document.getElementById("bildlista").appendChild(rad);
          }
          this.value = "";

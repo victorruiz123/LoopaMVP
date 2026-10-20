@@ -354,3 +354,103 @@ dem, och frysningen återinträder.
 | Catch-up sänker flera steg på en gång vid utrullningen | Bara för annonser som legat nere, som förut; frusna startar om från i dag |
 | Säljaren ändrar spannet efter publicering | Låst i säljarvyn när någon kanal är uppe (var bara Tradera); panelen kan |
 | Blockets villkor om automatisering | Oförändrat läge sedan publiceringsroboten (BLOCKET-PLAN.md); prisroboten gör färre och mindre handlingar än den |
+
+---
+
+## 8. Omläggning i stället för prisändring — 2026-10-20
+
+Uppdraget: när veckans sänkning kommer ska annonsen inte få priset ändrat på plats, utan **tas ner och
+läggas upp på nytt** med det lägre priset (en ny annons hamnar överst).
+
+**Beslut (med användaren):** båda kanalerna; Blockets borttagning mäts först genom att bara läsa;
+kommer annonsen inte upp igen → nytt försök om 20 min och sedan var 6:e timme, plus ett brev till admin.
+
+**Så går det till** (`priceLadder.ts synkaKanaler`, `integrations/omlaggning.ts`):
+
+```
+veckosänkning nyare än kanalens kvitto, inte tvinga, kanalen kan läggas om?
+  Tradera: läs läget — bud, såld eller oläsbar → ändra priset på plats som förut
+  ta ner  (Tradera DELETE / Blocket-robot)       kastar → gamla annonsen kvar, vanligt prisfel
+  ladder.omlaggning[kanal] = { nedtagenAt, tidigareUrl, … }      ← står kvar tills annonsen är uppe
+  publicera igen (runTraderaPublish / runBlocketPublish, priset ur stegen)
+    uppe   → kvitto via "omlaggning", raden i ladder.omlaggningar
+    fel    → brev (ett per nedtagning), försök igen om 20 min, sedan 6 h
+    senare → (Blocket upptaget) igen om 20 min, inget brev
+```
+
+Adminens "Sätt priset" lägger aldrig om (ingen post i `drops`, och `tvinga`). En utgången, osåld
+Tradera-annons läggs upp på nytt i stället för att bli "för hand". `annonsenLever` räknar en annons som
+är nere för omläggning som levande, så varvet slutar inte försöka.
+
+**Brytare:** `PRIS_OMLAGGNING` (osatt = tradera,blocket, `0` = av). Blocket kräver dessutom
+`BLOCKET_PUBLICERA=1` — en nedtagning följd av en torrkörd publicering vore en försvunnen annons.
+`BLOCKET_TA_BORT_ROBOT` osatt följer den (som prisroboten), `0` stänger av omläggningen på Blocket ensam.
+
+### Blocket: så går omläggningen
+
+Uppläggningen är **samma** som första gången (`runBlocketPublish` → `driveBlocketForm`, paketet "Bas",
+som är gratis). Skillnaden är bara priset: `planBlocketPublish` läser `resolveAdPrice` = stegens
+`currentPrice`, plus hemleveransen annonsen gick ut med — alltså det sänkta priset.
+
+Nedtagningen (`blocket/borttagning.ts`) är byggd på det som är känt, inte uppmätt i sin helhet:
+
+| Källa | Vad den säger |
+|---|---|
+| Uppmätt 2026-10-02 | Kortet på `/my-items` har "Markera som såld" och en dold meny ("Meny till genvägar för annonsen"); ägarsidan `/my-items/details/<id>` |
+| Blockets hjälp (statusar) | En avslutad annons flyttas till historiken och försvinner ur sökresultaten direkt |
+| FINN (samma plattform) | "Mine annonser → de tre prickarna på annonsen → Slette" |
+
+Roboten: aktiv? (annars redan borta → publicera direkt) → vårt kort, rubrikvakt → kortets meny →
+"Ta bort" (exakt text; reserv: ägarsidan) → bekräftelsen → frågar den om skäl väljs ett som inte säger
+"såld", och det VALDA läses av före och direkt före bekräftelsen → kontroll att annonsen inte står bland
+de aktiva. Torrkörningen klickar inte på valet alls.
+
+Attrappen fångade en riktig fälla: ett klick på RADEN runt "Vill inte sälja längre" valde "Såld på
+Blocket". Därför klickas bara själva alternativet eller den innersta etiketten, och valet verifieras.
+
+Tester: `tests/blocketBorttagning.test.ts` (11, mot attrappen) och `tests/blocketOmlaggning.test.ts`
+(hela vägen: veckovarvet sänker 2 400 → 2 040, gamla annonsen tas ner, priset ändras INTE på den, och
+det nya formuläret fylls i med 2 040 + 600 kr).
+
+### Skarpt prov 2026-10-20: barstolen 21946768 → 27573064, 380 → 320 kr
+
+Gjort på användarens begäran, med scripts/blocket-las-annons.mts (innehållet läst av, bilderna i full
+storlek från CDN:n `…/dynamic/1600w/…`) och scripts/blocket-lagg-om-annons.mts. Resultat: den gamla
+annonsen borta (404), den nya Aktiv, överst i Mina annonser, 320 kr, alla fält identiska. Fyra fel hittades
+och är rättade, med en fälla i attrappen för vart och ett:
+
+| Vad hände | Orsak | Rättat |
+|---|---|---|
+| "Ta bort" klickades, annonsen stod kvar | Bekräftelsen är en `<w-modal>`: `<dialog open>` i skuggan, knapparna i light-DOM — och varje kort har en egen dold modal; roboten tog den första | `oppenDialog`: den w-modal vars skugga har en öppen dialog, knapparna i hela komponenten |
+| Gamla annonsen nere, nya fastnade på BankID | BankID begärdes vid Fortsätt — EFTER nedtagningen | **Förbered först**: nya annonsen fylls i till sista knappen medan den gamla ligger kvar (`forberedBlocketPublicering`); BankID där → inget tas ner, "för hand" + brev |
+| "Ingen fraktsida", fastnade | Fraktsidan laddade långsamt efter BankID; `pageHasText` väntar aldrig (Playwrights isVisible bortser från timeout) | På /recommerce/delivery/ väntar roboten upp till 20 s med waitFor |
+| "6 av 6 bilder uppe" — annonsen fick 5 | Bilderna räknades när filen lämnats, inte när den syntes | Förhandsbilderna räknas (uppmätt: CDN-adress inom 1–2 s), en tappad laddas upp igen, fattas den ändå publiceras inget. Bild 6 lades till på 27573064 i efterhand |
+
+Ordningen i drift är nu: **förbered → ta ner → sista knappen**. Allt som kan stoppa en publicering
+(BankID, frakt, paket, bilder) händer medan den gamla annonsen ligger uppe; efter nedtagningen återstår ett
+klick på en sida som redan är ifylld.
+
+### Utrullningen (ersätter prisändringen på plats)
+
+```
+# på servern
+ssh <oracle>
+cd /opt/loopa && ./deploy/rulla-ut.sh
+journalctl -u loopa-server -n 200 --no-pager | grep -E "pris-steg|blocket-omlaggning|blocket-ta-bort"
+```
+
+Ingen `.env`-ändring behövs: servern har `BLOCKET_PUBLICERA=1`, så omläggningen är på för Blocket, och
+`PRIS_OMLAGGNING` osatt lägger om Tradera också. Vid nästa veckosänkning per annons syns i loggen:
+`Förbereder den nya annonsen` → `nertagen för omläggning` → `omlagd: <gammal> → <ny>`.
+Backa: `PRIS_OMLAGGNING=0` i `.env` + `sudo systemctl restart loopa-server` (priset ändras då på plats
+som förut), eller `BLOCKET_TA_BORT_ROBOT=0` för bara Blocket.
+
+Blocket-sessionen på servern måste vara inloggad. Kräver Blocket BankID vid en omläggning tas ingenting
+ner; admin får brevet "Blocket kräver BankID …" och logga-in görs om (BLOCKET-PLAN.md, fas B).
+
+**Kvar:**
+1. Två övergivna utkast från provet (27572807, 27572846) ligger under Utkast på kontot.
+2. **Regelfrågan.** Varken Blockets eller Traderas villkor säger klart om veckovis omläggning av samma
+   vara är tillåten. Blocket granskar varje ny annons (och har nekat kontot förut, BLOCKET-PLAN.md) —
+   en nekad omläggning är en möbel som inte ligger ute. Tradera: en omläggning tappar bevakarna.
+3. Panelen visar en kanal som är nere bara via `lastError`; `ladder.omlaggning` har ingen egen ruta än.

@@ -18,6 +18,9 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+// En tappad bild väntas in i 15 s i drift; här räcker det med en kort stund.
+process.env.BLOCKET_BILD_VANTA_MS = "2500";
+
 import { startaAttrapp, type Attrapp, type AttrappOptions } from "./blocketAttrapp.js";
 import { startBrowser } from "../server/src/integrations/blocket/browser.js";
 import { driveBlocketForm, type BlocketPublishPlan } from "../server/src/integrations/blocket/publish.js";
@@ -235,4 +238,21 @@ test("kategorival: exakt träff i ALLA listor prövas före luddig i någon", as
     await session.browser.close().catch(() => null);
     await attrapp.stang();
   }
+});
+
+// Skarpt 2026-10-20 loggade roboten "6 av 6 bilder uppe" och annonsen fick fem: den sista syntes aldrig
+// i Blockets uppladdare. Bilderna räknas nu i uppladdaren, en tappad laddas upp igen, och fattas det
+// ändå publiceras ingenting.
+test("en bild som uppladdaren tappar laddas upp igen — annonsen får alla bilder", async () => {
+  const { attrapp, fel, steg } = await kor({ plan: { dryRun: false }, attrapp: { tappaUppladdning: [2] } });
+  assert.equal(fel, null, fel?.message);
+  assert.deepEqual(attrapp.lage.bilder, BILDER.map((b) => path.basename(b)), "båda bilderna, i ordning");
+  assert.ok(steg.some((s) => /syntes inte i uppladdaren — laddar upp den igen/.test(s.name)), "omförsöket syns i loggen");
+  assert.equal(attrapp.lage.publicerad, true);
+});
+
+test("en bild som aldrig kommer upp stoppar publiceringen — ingen annons med tappade bilder", async () => {
+  const { attrapp, fel } = await kor({ plan: { dryRun: false }, attrapp: { tappaUppladdning: [2], tappaAlltid: true } });
+  assert.match(fel?.message ?? "", /Bara 1 av 2 bilder kom upp/);
+  assert.equal(attrapp.lage.publicerad, false);
 });

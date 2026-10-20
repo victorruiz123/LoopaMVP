@@ -1035,6 +1035,7 @@ function PrisKanaler({
     robot: "ändrat av roboten",
     manuellt: "ändrat för hand",
     antaget: "antaget",
+    omlaggning: "annonsen lagd om",
   };
   return (
     <ul className="admin-kanaler">

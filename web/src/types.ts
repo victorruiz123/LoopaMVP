@@ -387,7 +387,7 @@ export interface PriceDrop {
 export interface KanalPris {
   bekraftat: number;
   bekraftatAt: string;
-  via: "publicering" | "api" | "robot" | "manuellt" | "antaget";
+  via: "publicering" | "api" | "robot" | "manuellt" | "antaget" | "omlaggning";
   fel: string | null;
   felAt: string | null;
   forsok: number;

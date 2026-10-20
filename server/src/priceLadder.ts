@@ -17,6 +17,14 @@
  *      Blocket genom prisroboten (integrations/blocket/pris.ts) eller en människa som ändrar för hand
  *      och markerar det i panelen. Kvittot per kanal bor på publiceringen (`KanalPris` i types.ts).
  *
+ *      VECKANS SÄNKNING LÄGGER OM ANNONSEN (sedan 2026-10-20): i stället för att priset ändras på den
+ *      annons som ligger ute tas annonsen ner och publiceras på nytt med det nya priset — en ny annons
+ *      hamnar överst. Bara vid en veckosänkning; adminens "Sätt priset" och kanaler som inte kan läggas
+ *      om (bud på Tradera, Blocket-borttagningsroboten av, brytaren av) ändrar priset på plats som
+ *      förut. Kommer annonsen inte upp igen står omläggningen kvar på stegen (`ladder.omlaggning`),
+ *      admin får ett brev, och varvet försöker igen om 20 minuter och sedan var sjätte timme.
+ *      Se integrations/omlaggning.ts.
+ *
  * FÖRE 2026-10-02 var halvorna hopvävda, och det gav tre tysta fel: priset sänktes bara om Tradera
  * tog emot sänkningen, schemaläggaren startade bara om Tradera var konfigurerat, och hela stegen
  * stod stilla så länge Blocket-annonsen låg uppe (`ladderFrozenByBlocket`) — för Blocket gick inte
@@ -31,7 +39,8 @@ import { annonsensFrakt, prisMedHemleverans } from "./hemleverans.js";
 import { kategoriMedRattelse } from "./butik/overrides.js";
 import { store } from "./butik/store.js";
 import { loopaIdFor } from "./loopaId.js";
-import type { BlocketPublication, ConditionJob, KanalPris, PriceLadder, TraderaPublication } from "./types.js";
+import type { BlocketPublication, ConditionJob, KanalOmlaggning, KanalPris, PriceLadder, TraderaPublication } from "./types.js";
+import type { PubliceringsUtfall } from "./integrations/omlaggning.js";
 
 /** 15 % i veckan. Kan sättas per annons, men det här är förvalet hela funktionen är byggd kring. */
 export const DEFAULT_WEEKLY_DROP = 0.15;
@@ -374,8 +383,22 @@ export interface SynkBeroenden {
   traderaLage: (itemId: number) => Promise<TraderaLage | null>;
   blocket: (job: ConditionJob, annonspris: number) => Promise<FlyttUtfall>;
   larma: (job: ConditionJob, lage: KanalPrisLage, annonspris: number) => Promise<void>;
+  /** Får kanalen läggas om på den här servern? Nej = priset ändras på plats. */
+  kanOmlaggas: (kanal: PrisKanal) => Promise<boolean>;
+  /**
+   * Tar ner annonsen. Kastar när den inte togs ner; "senare" = roboten var upptagen, "manuell" = en
+   * människa behövs innan det går (BankID) — i båda fallen är ingenting rört.
+   */
+  taNer: (job: ConditionJob, kanal: PrisKanal) => Promise<void | { status: "senare" | "manuell"; skal: string }>;
+  /** Publicerar den nertagna annonsen igen, med stegens pris. */
+  publicera: (job: ConditionJob, kanal: PrisKanal) => Promise<PubliceringsUtfall>;
+  /** Brevet om en annons som är nere. */
+  larmaNere: (job: ConditionJob, kanal: PrisKanal, fel: string, tidigareUrl: string | null) => Promise<void>;
   nu: () => number;
 }
+
+// Lat import av omläggningen av samma skäl som roboten nedan.
+const omlaggning = () => import("./integrations/omlaggning.js");
 
 const standardBeroenden: SynkBeroenden = {
   tradera: updateTraderaPrice,
@@ -386,8 +409,81 @@ const standardBeroenden: SynkBeroenden = {
     return flyttaBlocketPris(job, annonspris);
   },
   larma: mejlaOmManuellt,
+  kanOmlaggas: async (kanal) => (await omlaggning()).kanOmlaggas(kanal),
+  taNer: async (job, kanal) => (await omlaggning()).taNerForOmlaggning(job, kanal),
+  publicera: async (job, kanal) => (await omlaggning()).publiceraEfterOmlaggning(job, kanal),
+  larmaNere: async (job, kanal, fel, url) => (await omlaggning()).mejlaOmNere(job, kanal, fel, url),
   nu: () => Date.now(),
 };
+
+/** Ligger någon kanal nere, mitt i en omläggning? */
+export function omlaggningPagar(job: ConditionJob): boolean {
+  return Object.keys(job.priceLadder?.omlaggning ?? {}).length > 0;
+}
+
+/**
+ * Ska kanalen läggas om nu, och inte bara få priset ändrat? Bara när en VECKOSÄNKNING är nyare än
+ * kanalens kvitto. Adminens "Sätt priset" lägger ingen sänkning i `drops`, och dess omförsök (via
+ * varvet) blir därför prisändringar, inte omläggningar.
+ */
+export function veckosankningVantar(ladder: PriceLadder, kp: KanalPris): boolean {
+  const senaste = ladder.drops.at(-1);
+  return !!senaste && Date.parse(senaste.at) > Date.parse(kp.bekraftatAt);
+}
+
+const MAX_OMLAGGNINGAR = 30;
+
+/**
+ * Publicerar en nertagen kanal igen och bokför utfallet. Lyckas den: omläggningen stryks och kanalen
+ * får ett kvitto på stegens pris. Annars: brev till admin (ett per nedtagning), nytt försök om 20 min
+ * första gången och sedan var sjätte timme.
+ */
+async function publiceraNertagen(
+  job: ConditionJob,
+  kanal: PrisKanal,
+  om: KanalOmlaggning,
+  d: SynkBeroenden,
+  now: number,
+  resultat: SynkResultat,
+  kvar: string[],
+): Promise<void> {
+  const ladder = job.priceLadder!;
+  const mal = Math.round(ladder.currentPrice);
+  const utfall = await d.publicera(job, kanal);
+  const pub = publikation(job, kanal);
+
+  if (utfall.status === "uppe" && pub) {
+    pub.pris = nyttKanalPris(mal, "omlaggning", now);
+    delete ladder.omlaggning![kanal];
+    ladder.omlaggningar = [
+      ...(ladder.omlaggningar ?? []),
+      { at: iso(now), kanal, fran: om.tidigareUrl, till: pub.url ?? null, pris: mal },
+    ].slice(-MAX_OMLAGGNINGAR);
+    resultat.flyttade.push(kanal);
+    console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} omlagd: ${om.tidigareUrl ?? "?"} → ${pub.url ?? "?"} (möbeln ${mal} kr)`);
+    return;
+  }
+
+  if (utfall.status === "senare") {
+    om.fel = utfall.skal;
+    om.nastaForsokAt = iso(now + SENARE_MS);
+    resultat.vantar.push(kanal);
+  } else {
+    const fel = utfall.status === "fel" ? utfall.fel : "Publiceringen gav ingen annons.";
+    om.forsok += 1;
+    om.fel = fel;
+    om.nastaForsokAt = iso(now + (om.forsok === 1 ? SENARE_MS : RETRY_MS));
+    resultat.fel.push(kanal);
+    console.warn(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} är NERE — omläggningen kom inte upp (försök ${om.forsok}): ${fel}`);
+    if (!om.larmatAt) {
+      await d.larmaNere(job, kanal, fel, om.tidigareUrl).catch((err) =>
+        console.warn(`[pris-steg] ${job.id.slice(0, 8)} brevet om ${KANALNAMN[kanal]} gick inte iväg — ${err}`),
+      );
+      om.larmatAt = iso(now);
+    }
+  }
+  kvar.push(`${KANALNAMN[kanal]}-annonsen är nere och läggs upp igen med det nya priset.`);
+}
 
 export interface SynkResultat {
   flyttade: PrisKanal[];
@@ -425,8 +521,26 @@ export async function synkaKanaler(
   let frakt: number | null = null;
   const kvar: string[] = [];
 
+  // Kanaler som togs ner för en omläggning och inte kom upp igen. FÖRE resten: de är inte
+  // publicerade, så huvudloopen nedan ser dem inte alls.
   for (const kanal of KANALER) {
-    if (!kanalPublicerad(job, kanal)) continue;
+    const om = ladder.omlaggning?.[kanal];
+    if (!om) continue;
+    if (kanalPublicerad(job, kanal)) {
+      // Upplagd på annat sätt, t.ex. för hand från panelen. Huvudloopen tar priset därifrån.
+      delete ladder.omlaggning![kanal];
+      continue;
+    }
+    if (!opts.tvinga && om.nastaForsokAt && Date.parse(om.nastaForsokAt) > now) {
+      resultat.vantar.push(kanal);
+      kvar.push(`${KANALNAMN[kanal]}-annonsen är nere och läggs upp igen med det nya priset.`);
+      continue;
+    }
+    await publiceraNertagen(job, kanal, om, d, now, resultat, kvar);
+  }
+
+  for (const kanal of KANALER) {
+    if (!kanalPublicerad(job, kanal) || ladder.omlaggning?.[kanal]) continue;
     const pub = publikation(job, kanal)!;
     const kp = pub.pris!;
 
@@ -452,8 +566,47 @@ export async function synkaKanaler(
     }
 
     try {
+      /**
+       * VECKANS SÄNKNING LÄGGER OM ANNONSEN, när kanalen kan. Tradera inte när annonsen har bud (att ta
+       * ner den vore att dra undan en affär), är såld, eller inte går att läsa — då ändras priset på
+       * plats nedan. En utgången, osåld Tradera-annons läggs däremot upp på nytt: det är just vad den
+       * behöver. Nedtagningen kastar när den inte gick, och då ligger den gamla annonsen kvar och felet
+       * bokförs som vilket prisfel som helst.
+       */
+      let forcerat: FlyttUtfall | null = null;
+      if (!opts.tvinga && veckosankningVantar(ladder, kp) && (await d.kanOmlaggas(kanal))) {
+        let laggOm = true;
+        if (kanal === "tradera") {
+          const lage = await d.traderaLage(job.tradera!.itemId!);
+          laggOm = !!lage && lage.totalBids === 0 && !lage.gotWinner;
+        }
+        if (laggOm) {
+          const om: KanalOmlaggning = {
+            nedtagenAt: iso(now),
+            tidigareUrl: pub.url ?? null,
+            forsok: 0,
+            fel: null,
+            nastaForsokAt: null,
+            larmatAt: null,
+          };
+          const nedtagning = await d.taNer(job, kanal);
+          if (nedtagning) {
+            // Ingenting togs ner. Bokförs nedan som en flytt som väntar ("senare") eller kräver en människa.
+            forcerat = nedtagning;
+          } else {
+            ladder.omlaggning = { ...(ladder.omlaggning ?? {}), [kanal]: om };
+            await persist(job);
+            console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} nertagen för omläggning (${liggerPa} → ${annonspris} kr)`);
+            await publiceraNertagen(job, kanal, om, d, now, resultat, kvar);
+            continue;
+          }
+        }
+      }
+
       let utfall: FlyttUtfall;
-      if (kanal === "tradera") {
+      if (forcerat) {
+        utfall = forcerat;
+      } else if (kanal === "tradera") {
         if (!traderaConfigured()) {
           utfall = { status: "manuell", skal: "Tradera är inte konfigurerat på servern, så priset där går inte att ändra härifrån." };
         } else {
@@ -579,6 +732,8 @@ export async function annonsenLever(job: ConditionJob): Promise<boolean> {
   }
   if (rec && SLUTLAGEN.has(rec.state)) return false;
   if (KANALER.some((k) => kanalPublicerad(job, k))) return true;
+  // Nere för en omläggning: möbeln är inte borta, annonsen är på väg upp igen.
+  if (omlaggningPagar(job)) return true;
   return rec?.state === "live" || rec?.state === "reserved";
 }
 
@@ -672,7 +827,7 @@ export async function tickPriceLadders(
         const { schemalaggPrisUppdatering } = await import("./integrations/annonsUppdatering.js");
         void schemalaggPrisUppdatering(job);
       }
-      if (prisUrFas(job)) {
+      if (prisUrFas(job) || omlaggningPagar(job)) {
         const r = await synkaKanaler(job, { nu: () => now, ...beroenden });
         flyttade += r.flyttade.length;
       }

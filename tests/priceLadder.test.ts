@@ -48,6 +48,7 @@ const {
   makePriceLadder,
   nextRung,
   nyttKanalPris,
+  omlaggningPagar,
   plannedDrop,
   prisUrFas,
   startaKlockan,
@@ -309,6 +310,13 @@ function rigg(
     larma: async (job, lage, annonspris) => {
       r.larm.push({ jobId: job.id, lage, annonspris });
     },
+    // Omläggningen är av i riggen: testerna ovanför omläggningsavsnittet prövar prisändringen på plats.
+    kanOmlaggas: async () => false,
+    taNer: async () => {
+      throw new Error("taNer anropades utan att omläggningen slagits på i testet");
+    },
+    publicera: async () => ({ status: "fel", fel: "publicera anropades utan att omläggningen slagits på i testet" }),
+    larmaNere: async () => undefined,
   };
   return r;
 }
@@ -622,4 +630,233 @@ test("en utgången Tradera-annons får inget prisanrop — den bokförs 'för ha
   } finally {
     delete process.env.TRADERA_APP_ID;
   }
+});
+
+// ---------------------------------------------------------------------------
+// Omläggningen — veckans sänkning tar ner annonsen och lägger upp den på nytt
+// ---------------------------------------------------------------------------
+//
+// Fyra saker måste hålla: (1) bara en VECKOSÄNKNING lägger om, inte adminens pris; (2) en annons med
+// bud tas aldrig ner; (3) går nedtagningen inte ligger den gamla annonsen kvar och ingen ny läggs upp;
+// (4) kommer den nya inte upp står omläggningen kvar, admin får ETT brev, och varvet försöker igen
+// om 20 minuter och sedan var sjätte timme — även fast kanalen inte längre räknas som publicerad.
+
+const { kanOmlaggas } = await import("../server/src/integrations/omlaggning.js");
+
+function medTraderaNycklar<T>(fn: () => Promise<T>): Promise<T> {
+  process.env.TRADERA_APP_ID = "x";
+  process.env.TRADERA_APP_KEY = "x";
+  process.env.TRADERA_USER_ID = "x";
+  process.env.TRADERA_USER_TOKEN = "x";
+  return fn().finally(() => {
+    delete process.env.TRADERA_APP_ID;
+  });
+}
+
+interface OmRigg extends Rigg {
+  nertagna: string[];
+  publiceringar: string[];
+  nere: Array<{ kanal: string; fel: string }>;
+}
+
+/** Riggen med omläggningen på. `svar` styr publiceringarna, i tur och ordning; förval: den kommer upp. */
+function omRigg(opts: Parameters<typeof rigg>[0] & { svar?: Array<"uppe" | "fel" | "senare">; taNerFel?: string } = {}): OmRigg {
+  const bas = rigg(opts);
+  const r: OmRigg = { ...bas, nertagna: [], publiceringar: [], nere: [] };
+  const svar = [...(opts.svar ?? [])];
+  let nyttId = 9000;
+  r.beroenden = {
+    ...bas.beroenden,
+    kanOmlaggas: async () => true,
+    taNer: async (job, kanal) => {
+      if (opts.taNerFel) throw new Error(opts.taNerFel);
+      r.nertagna.push(kanal);
+      // Som markTraderaPublishing / markBlocketPublishing: kanalen är på väg, inte uppe.
+      if (kanal === "tradera") job.tradera = { ...job.tradera!, status: "publishing", itemId: null, url: null, pris: null };
+      else job.blocket = { ...job.blocket!, status: "publishing", url: null, pris: null };
+    },
+    publicera: async (job, kanal) => {
+      r.publiceringar.push(kanal);
+      const s = svar.shift() ?? "uppe";
+      if (s === "senare") return { status: "senare", skal: "En annan Blocket-körning pågår." };
+      if (s === "fel") {
+        if (kanal === "tradera") job.tradera = { ...job.tradera!, status: "error", error: "Tradera svarade 500" };
+        else job.blocket = { ...job.blocket!, status: "error", error: "Blocket nekade" };
+        return { status: "fel", fel: kanal === "tradera" ? "Tradera svarade 500" : "Blocket nekade" };
+      }
+      nyttId += 1;
+      if (kanal === "tradera") {
+        job.tradera = { ...job.tradera!, status: "published", itemId: nyttId, url: `https://www.tradera.com/item/${nyttId}`, error: null };
+      } else {
+        job.blocket = { ...job.blocket!, status: "published", url: `https://www.blocket.se/2${nyttId}000`, error: null };
+      }
+      return { status: "uppe" };
+    },
+    larmaNere: async (_job, kanal, fel) => {
+      r.nere.push({ kanal, fel });
+    },
+  };
+  // Varvets egen klocka: riggens fasta `nu` hade skrivit över den, och omförsöken ska prövas över tid.
+  delete r.beroenden.nu;
+  return r;
+}
+
+test("veckans sänkning lägger om Tradera-annonsen: ner, upp med det nya priset, inget prisanrop", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg();
+  await tickPriceLadders(NU, r.beroenden);
+
+  assert.equal(job.priceLadder!.currentPrice, 2040);
+  assert.deepEqual(r.nertagna, ["tradera"]);
+  assert.deepEqual(r.publiceringar, ["tradera"]);
+  assert.equal(r.tradera.length, 0, "priset ändras inte på den gamla annonsen");
+  assert.equal(job.tradera!.status, "published");
+  assert.equal(job.tradera!.itemId, 9001, "en ny annons");
+  assert.equal(job.tradera!.pris!.bekraftat, 2040);
+  assert.equal(job.tradera!.pris!.via, "omlaggning");
+  assert.equal(omlaggningPagar(job), false);
+  assert.equal(job.priceLadder!.omlaggningar!.length, 1);
+  assert.equal(job.priceLadder!.omlaggningar![0].fran, "https://www.tradera.com/item/4711");
+  assert.equal(job.priceLadder!.lastError, null);
+  assert.equal(prisUrFas(job), false);
+
+  // Ett varv till samma dag gör ingenting: kvittot är nyare än sänkningen.
+  await tickPriceLadders(NU + 60_000, r.beroenden);
+  assert.deepEqual(r.nertagna, ["tradera"]);
+});
+
+test("Blocket läggs om på samma sätt, och kanalerna läggs om var för sig", async () => {
+  const job = await jobb({ tradera: true, blocket: true });
+  const r = omRigg();
+  await tickPriceLadders(NU, r.beroenden);
+  assert.deepEqual(r.nertagna, ["tradera", "blocket"]);
+  assert.equal(job.blocket!.status, "published");
+  assert.equal(job.blocket!.pris!.via, "omlaggning");
+  assert.equal(job.blocket!.pris!.bekraftat, 2040);
+  assert.equal(r.blocket.length, 0, "prisroboten körs inte");
+});
+
+test("en Tradera-annons med bud tas inte ner — priset ändras på plats som förut", async () => {
+  await medTraderaNycklar(async () => {
+    const job = await jobb({ tradera: true });
+    const r = omRigg({ traderaLage: { totalBids: 2, maxBidSek: 1800, ended: false, gotBidders: true, gotWinner: false, endDate: null } });
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(r.nertagna.length, 0);
+    assert.equal(r.tradera.length, 1, "prisanropet görs i stället");
+    assert.equal(job.tradera!.itemId, 4711);
+  });
+});
+
+test("Tradera som inte går att läsa läggs inte om — ett läsfel är ingen grund för att ta ner en annons", async () => {
+  await medTraderaNycklar(async () => {
+    const job = await jobb({ tradera: true });
+    const r = omRigg({ traderaLage: null });
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(r.nertagna.length, 0);
+    assert.equal(job.tradera!.pris!.via, "api");
+  });
+});
+
+test("en utgången, osåld Tradera-annons läggs upp på nytt i stället för att bli 'för hand'", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg({ traderaLage: { totalBids: 0, maxBidSek: null, ended: true, gotBidders: false, gotWinner: false, endDate: "2026-09-29T13:12:08.11" } });
+  await tickPriceLadders(NU, r.beroenden);
+  assert.deepEqual(r.publiceringar, ["tradera"]);
+  assert.equal(job.tradera!.status, "published");
+  assert.equal(r.larm.length, 0);
+});
+
+test("adminens pris lägger inte om: utan en ny veckosänkning ändras priset på plats", async () => {
+  await medTraderaNycklar(async () => {
+    // Ingen förfallen vecka; priset är satt för hand (utan post i drops) och kanalen ligger på det gamla.
+    const job = await jobb({ tradera: true, ladder: { nextDropAt: new Date(NU + WEEK).toISOString() } });
+    job.priceLadder!.currentPrice = 2100;
+    const r = omRigg();
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(r.nertagna.length, 0);
+    assert.equal(r.tradera.length, 1);
+    assert.equal(job.tradera!.pris!.bekraftat, 2100);
+
+    // Och tvinga (panelens "Sätt priset") lägger aldrig om, även med en sänkning som väntar.
+    const job2 = await jobb({ tradera: true });
+    await tickPriceLadders(NU, { ...rigg().beroenden });
+    job2.tradera!.pris = nyttKanalPris(2400, "publicering", NU - WEEK);
+    const r2 = omRigg();
+    await synkaKanaler(job2, r2.beroenden, { tvinga: true });
+    assert.equal(r2.nertagna.length, 0);
+    assert.equal(r2.tradera.length, 1);
+  });
+});
+
+test("går nedtagningen inte ligger den gamla annonsen kvar, och ingen ny läggs upp", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg({ taNerFel: "Tradera svarade 503" });
+  await tickPriceLadders(NU, r.beroenden);
+  assert.equal(r.publiceringar.length, 0);
+  assert.equal(job.tradera!.status, "published");
+  assert.equal(job.tradera!.itemId, 4711);
+  assert.equal(omlaggningPagar(job), false);
+  assert.match(job.tradera!.pris!.fel!, /503/);
+  assert.equal(job.tradera!.pris!.nastaForsokAt, new Date(NU + RETRY_MS).toISOString());
+  assert.equal(r.nere.length, 0, "inget 'nere'-brev — annonsen är uppe");
+});
+
+test("kommer den nya annonsen inte upp: ett brev, nytt försök om 20 min, sedan var sjätte timme, tills den är uppe", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg({ svar: ["fel", "fel", "uppe"] });
+
+  await tickPriceLadders(NU, r.beroenden);
+  assert.equal(job.tradera!.status, "error");
+  assert.equal(omlaggningPagar(job), true);
+  const om = job.priceLadder!.omlaggning!.tradera!;
+  assert.equal(om.forsok, 1);
+  assert.equal(om.nastaForsokAt, new Date(NU + SENARE_MS).toISOString());
+  assert.equal(om.tidigareUrl, "https://www.tradera.com/item/4711");
+  assert.equal(r.nere.length, 1);
+  assert.match(job.priceLadder!.lastError!, /nere och läggs upp igen/);
+  assert.equal(await annonsenLever(job), true, "en annons som är nere för omläggning lever");
+
+  // Före utsatt tid: inget försök.
+  await tickPriceLadders(NU + 60_000, r.beroenden);
+  assert.equal(r.publiceringar.length, 1);
+
+  // Efter 20 min: andra försöket faller — sex timmar till nästa, inget nytt brev, ingen ny nedtagning.
+  await tickPriceLadders(NU + SENARE_MS + 1, r.beroenden);
+  assert.equal(r.publiceringar.length, 2);
+  assert.equal(r.nertagna.length, 1);
+  assert.equal(job.priceLadder!.omlaggning!.tradera!.forsok, 2);
+  assert.equal(job.priceLadder!.omlaggning!.tradera!.nastaForsokAt, new Date(NU + SENARE_MS + 1 + RETRY_MS).toISOString());
+  assert.equal(r.nere.length, 1, "ett brev per nedtagning");
+
+  // Tredje försöket går igenom.
+  await tickPriceLadders(NU + SENARE_MS + 2 + RETRY_MS, r.beroenden);
+  assert.equal(job.tradera!.status, "published");
+  assert.equal(omlaggningPagar(job), false);
+  assert.equal(job.tradera!.pris!.bekraftat, 2040);
+  assert.equal(job.priceLadder!.lastError, null);
+});
+
+test("en upptagen Blocket-robot efter nedtagningen är ett kort omtag, inget brev", async () => {
+  const job = await jobb({ blocket: true });
+  const r = omRigg({ svar: ["senare"] });
+  await tickPriceLadders(NU, r.beroenden);
+  assert.equal(omlaggningPagar(job), true);
+  assert.equal(job.priceLadder!.omlaggning!.blocket!.nastaForsokAt, new Date(NU + SENARE_MS).toISOString());
+  assert.equal(job.priceLadder!.omlaggning!.blocket!.forsok, 0);
+  assert.equal(r.nere.length, 0);
+});
+
+test("brytarna: Blocket läggs inte om förrän borttagningen är uppmätt; PRIS_OMLAGGNING=0 stänger av allt", async () => {
+  assert.equal(await kanOmlaggas("blocket"), false);
+  await medTraderaNycklar(async () => {
+    assert.equal(await kanOmlaggas("tradera"), true);
+    process.env.PRIS_OMLAGGNING = "0";
+    try {
+      assert.equal(await kanOmlaggas("tradera"), false);
+    } finally {
+      delete process.env.PRIS_OMLAGGNING;
+    }
+  });
+  delete process.env.TRADERA_APP_ID;
+  assert.equal(await kanOmlaggas("tradera"), false, "Tradera utan nycklar kan inte läggas om");
 });

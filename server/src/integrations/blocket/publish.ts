@@ -42,7 +42,7 @@ import {
   sessionFileExists,
   skrivHalsa,
 } from "./blocket.js";
-import { ensureSession, handleBankID, openTorgetForm, reopenTorgetForm, saveSessionIfReal, startBrowser, ON_FORM } from "./browser.js";
+import { ensureSession, goAndSettle, handleBankID, openTorgetForm, reopenTorgetForm, saveSessionIfReal, startBrowser, ON_FORM } from "./browser.js";
 import { MAX_STEPS, nyttSteg, type Logga } from "./diag.js";
 import { saljarensPostnummer } from "./saljare.js";
 import { markeraUpptagen } from "./vakt.js";
@@ -498,6 +498,22 @@ export async function driveBlocketForm(
     return { status: "dry-run", url: null, receiptUrl: page.url() };
   }
 
+  return tryckSistaKnappen(page, logga);
+}
+
+/**
+ * Publicerar en annons som förberetts till paketsidan (en torrkörning av `driveBlocketForm`): öppnar
+ * paketsidan, väljer "Bas" igen och trycker sista knappen. Ingenting här känner till ett jobb.
+ */
+export async function publiceraForberedd(page: Page, context: BrowserContext, paketUrl: string, logga: Logga): Promise<BlocketRunResult> {
+  await goAndSettle(page, paketUrl);
+  await handleBankID(page, context, logga);
+  await handlePackagePage(page, logga);
+  return tryckSistaKnappen(page, logga);
+}
+
+/** Sista knappen på paketsidan, och kvittot efteråt. Delad av formulärkörningen och `slutforBlocketPublicering`. */
+async function tryckSistaKnappen(page: Page, logga: Logga): Promise<BlocketRunResult> {
   await clickFirstVisible(
     page,
     [
@@ -678,6 +694,103 @@ export async function runBlocketPublish(jobId: string): Promise<void> {
   }
 }
 
+// ---------- Omläggningen: förbered först, ta ner sedan, publicera sist ----------
+
+/**
+ * Fyller i en NY annons för jobbet hela vägen till sista knappen — formuläret, Fortsätt (där Blocket kan
+ * begära BankID), fraktsidan och paketsidan — och stannar där. Jobbets Blocket-publicering rörs inte:
+ * den gamla annonsen ligger uppe. Returnerar paketsidans adress, där `slutforBlocketPublicering`
+ * trycker sista knappen.
+ *
+ * VARFÖR. Skarpt 2026-10-20 togs den gamla annonsen ner och den nya fastnade sedan på BankID — möbeln låg
+ * inte ute förrän en människa legitimerat sig. Allt som kan stoppa en publicering händer här, MEDAN den
+ * gamla annonsen ligger kvar. Kastar när förberedelsen inte gick; då ska ingenting tas ner.
+ */
+export async function forberedBlocketPublicering(jobId: string): Promise<{ paketUrl: string; steps: BlocketStep[] }> {
+  const job = await getJob(jobId);
+  if (!job) throw new Error(`Jobbet ${jobId} finns inte.`);
+  const steps: BlocketStep[] = [];
+  const logga: Logga = (name, status, details) => {
+    steps.push(nyttSteg(name, status, details));
+    console.info(`[blocket-omlaggning] ${jobId} ${status.toUpperCase()} ${name}`);
+  };
+  const readiness = await planBlocketPublish(job);
+  if (!readiness.ok) throw new Error(readiness.reason);
+  const plan = { ...readiness.plan, dryRun: true };
+  const description = buildBlocketDescription(await medRattelser(job), plan.shippingSek);
+  const files = await imagePaths(job);
+
+  let session: Awaited<ReturnType<typeof startBrowser>> | null = null;
+  markeraUpptagen(true);
+  try {
+    logga("Förbereder den nya annonsen (den gamla ligger kvar)", "running", { pris: plan.price });
+    session = await startBrowser();
+    await ensureSession(session.page, logga);
+    await handleBankID(session.page, session.context, logga);
+    const r = await driveBlocketForm(session.page, session.context, { plan, description, files }, logga);
+    if (await saveSessionIfReal(session.context).catch(() => false)) logga("Sessionen sparades om", "ok", {});
+    logga("Förberedd — väntar på sista knappen", "ok", { url: r.receiptUrl });
+    return { paketUrl: r.receiptUrl, steps };
+  } catch (err) {
+    if (session && !session.page.isClosed()) {
+      const fil = path.join(blocketDataDir(), `forbered-fel-${jobId}.png`);
+      mkdirSync(path.dirname(fil), { recursive: true, mode: 0o700 });
+      await session.page.screenshot({ path: fil, fullPage: true }).catch(() => undefined);
+    }
+    throw err;
+  } finally {
+    markeraUpptagen(false);
+    await session?.browser.close().catch(() => undefined);
+  }
+}
+
+/**
+ * Trycker sista knappen på en förberedd annons (`forberedBlocketPublicering`) och bokför publiceringen på
+ * jobbet precis som `runBlocketPublish` gör. Kastar aldrig: ett fel står på jobbet som status "error".
+ */
+export async function slutforBlocketPublicering(jobId: string, paketUrl: string): Promise<void> {
+  const job = await getJob(jobId);
+  if (!job) return;
+  const steps: BlocketStep[] = [];
+  const logga: Logga = (name, status, details) => {
+    steps.push(nyttSteg(name, status, details));
+    console.info(`[blocket-omlaggning] ${jobId} ${status.toUpperCase()} ${name}`);
+  };
+  let session: Awaited<ReturnType<typeof startBrowser>> | null = null;
+  markeraUpptagen(true);
+  try {
+    const readiness = await planBlocketPublish(job);
+    if (!readiness.ok) throw new Error(readiness.reason);
+    const plan = readiness.plan;
+    const description = buildBlocketDescription(await medRattelser(job), plan.shippingSek);
+    session = await startBrowser();
+    await ensureSession(session.page, logga);
+    const result = await publiceraForberedd(session.page, session.context, paketUrl, logga);
+    if (await saveSessionIfReal(session.context).catch(() => false)) logga("Sessionen sparades om", "ok", {});
+    await update(jobId, (current) => ({
+      ...current,
+      status: "published",
+      dryRun: false,
+      url: result.url,
+      receiptUrl: result.receiptUrl,
+      error: null,
+      publishedAt: new Date().toISOString(),
+      steps: [...steps],
+      shippingSek: plan.shippingSek,
+      pris: nyttKanalPris(plan.itemPrice, "publicering"),
+      innehall: blocketInnehall(plan, description),
+    }));
+    console.info(`[blocket] job ${jobId} publicerad från förberedd annons — ${result.url ?? result.receiptUrl}`);
+  } catch (err) {
+    const message = felText(err);
+    steps.push(nyttSteg("Sista knappen gick inte", "error", { fel: message, url: paketUrl }));
+    await update(jobId, (current) => ({ ...current, status: "error", error: message, steps: [...steps] })).catch(() => undefined);
+  } finally {
+    markeraUpptagen(false);
+    await session?.browser.close().catch(() => undefined);
+  }
+}
+
 // ---------- Delar av körningen ----------
 
 /**
@@ -708,6 +821,33 @@ async function guardAgainstForeignDraft(page: Page, title: string, logga: Logga)
 }
 
 /**
+ * Förhandsbilderna uppladdaren visar just nu: adresserna till synliga bilder som är annonsens (Blockets
+ * CDN under /item/, eller en lokal blob:/data:-förhandsvisning medan uppladdningen pågår). Även i skuggor.
+ * INGA namngivna funktioner i kroppen — tsx lindar dem i `__name`, som inte finns i webbläsaren.
+ */
+export async function forhandsbilder(page: Page): Promise<string[]> {
+  return page
+    .evaluate(() => {
+      const ut: string[] = [];
+      const ko: Array<Document | ShadowRoot> = [document];
+      while (ko.length) {
+        const r = ko.pop()!;
+        r.querySelectorAll("*").forEach((el) => {
+          if (el.shadowRoot) ko.push(el.shadowRoot);
+          if (el.tagName !== "IMG") return;
+          const img = el as HTMLImageElement;
+          const src = img.currentSrc || img.src || "";
+          const rr = img.getBoundingClientRect();
+          if (rr.width === 0 && rr.height === 0) return;
+          if (/\/item\/\d+\/|^blob:|^data:image\//.test(src) || img.hasAttribute("data-forhandsbild")) ut.push(src.replace(/\/dynamic\/[^/]+\//, "/dynamic/*/"));
+        });
+      }
+      return [...new Set(ut)];
+    })
+    .catch(() => []);
+}
+
+/**
  * En bild i taget med en paus emellan, aldrig alla på en gång.
  *
  * Blockets uppladdare tappar bilder som kommer för tätt — de försvinner tyst, och annonsen publiceras
@@ -717,23 +857,50 @@ async function guardAgainstForeignDraft(page: Page, title: string, logga: Logga)
  * omslaget först.
  */
 async function uploadImages(page: Page, files: string[], logga: Logga): Promise<void> {
-  let uploaded = 0;
+  /**
+   * RÄKNAT, INTE ANTAGET. Förut räknades en bild som uppe när filen lämnats till fältet. Skarpt
+   * 2026-10-20 loggade roboten "6 av 6 bilder uppe" — och annonsen fick fem: den sista syntes aldrig i
+   * uppladdaren. Nu räknas förhandsbilderna (uppmätt: Blockets CDN-adress /item/<id>/<uuid> inom 1–2 s)
+   * före och efter varje fil. En som inte syns laddas upp en gång till; fattas det ändå bilder när alla
+   * försökt avbryts körningen — en annons publiceras inte med bilder som tappats.
+   */
+  // 15 s i drift (uppmätt: förhandsbilden syns inom 1–2 s). Testerna kortar den med BLOCKET_BILD_VANTA_MS.
+  const VANTA_MS = Number(process.env.BLOCKET_BILD_VANTA_MS ?? 15_000);
+  const fran = (await forhandsbilder(page)).length;
+  let uppe = 0;
   for (const [i, file] of files.entries()) {
-    try {
-      const input = page.locator('input[type="file"]').first();
-      if ((await input.count()) === 0) throw new Error("Sidan har inget filfält");
-      await input.setInputFiles(file, { timeout: 20_000 });
-      await page.waitForTimeout(1500);
-      uploaded++;
-    } catch (err) {
-      logga(`Bild ${i + 1} misslyckades`, "warning", { fil: path.basename(file), fel: felText(err) });
+    let syns = false;
+    for (let forsok = 1; forsok <= 2 && !syns; forsok++) {
+      try {
+        const input = page.locator('input[type="file"]').first();
+        if ((await input.count()) === 0) throw new Error("Sidan har inget filfält");
+        const fore = (await forhandsbilder(page)).length;
+        await input.setInputFiles(file, { timeout: 20_000 });
+        const slut = Date.now() + VANTA_MS;
+        while (Date.now() < slut) {
+          await page.waitForTimeout(500);
+          if ((await forhandsbilder(page)).length > fore) {
+            syns = true;
+            break;
+          }
+        }
+        if (!syns) logga(`Bild ${i + 1} syntes inte i uppladdaren${forsok === 1 ? " — laddar upp den igen" : ""}`, "warning", { fil: path.basename(file) });
+      } catch (err) {
+        logga(`Bild ${i + 1} misslyckades`, "warning", { fil: path.basename(file), fel: felText(err), forsok });
+      }
     }
+    if (syns) uppe++;
+    // Blockets uppladdare tappar bilder som kommer för tätt.
+    await page.waitForTimeout(800);
   }
-  if (uploaded === 0) {
-    logga("Ingen bild kom upp", "error", {});
-    throw new Error("Ingen av bilderna gick att ladda upp. Blocket kräver minst en bild.");
+  const iFormularet = (await forhandsbilder(page)).length - fran;
+  if (uppe < files.length || iFormularet < files.length) {
+    logga(`Bara ${Math.min(uppe, iFormularet)} av ${files.length} bilder syns i uppladdaren`, "error", { uppe, iFormularet });
+    throw new Error(
+      `Bara ${Math.min(uppe, iFormularet)} av ${files.length} bilder kom upp hos Blocket — publicerar inte en annons med bilder som tappats.`,
+    );
   }
-  logga(`${uploaded} av ${files.length} bilder uppe`, uploaded === files.length ? "ok" : "warning", {});
+  logga(`${files.length} av ${files.length} bilder uppe (räknade i uppladdaren)`, "ok", {});
 }
 
 /** Skicket, provat i fallande träffsäkerhet. Blocket har skrivit om etiketterna minst en gång. */

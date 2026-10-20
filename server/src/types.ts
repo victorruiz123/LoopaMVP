@@ -578,7 +578,7 @@ export interface KanalPris {
    * Antagandet håller för att stegen dittills bara flyttade priset när Tradera tagit emot det, och
    * stod helt stilla medan Blocket-annonsen låg uppe.
    */
-  via: "publicering" | "api" | "robot" | "manuellt" | "antaget";
+  via: "publicering" | "api" | "robot" | "manuellt" | "antaget" | "omlaggning";
   /** Varför senaste försöket att flytta kanalen inte gick. Null när det gick, eller inte behövts. */
   fel: string | null;
   felAt: string | null;
@@ -637,6 +637,28 @@ export interface PriceLadder {
    * då hade vi skrivit fel fält på en annons som redan ligger uppe.
    */
   listingMode: "auction" | "fixed" | null;
+  /**
+   * Veckans omläggning som inte är klar: annonsen är NERTAGEN på kanalen och ska upp igen med stegens
+   * pris (priceLadder.ts `synkaKanaler`). Står kvar tills publiceringen gått igenom, och är det som
+   * får varvet att försöka igen — kanalens egen publicering står då på "error" och räknas inte som
+   * uppe. Saknas eller tom = ingenting är nere.
+   */
+  omlaggning?: Partial<Record<"tradera" | "blocket", KanalOmlaggning>> | null;
+  /** De senaste omläggningarna, äldst först, kapade till 30. För panelen och felsökningen. */
+  omlaggningar?: Array<{ at: string; kanal: "tradera" | "blocket"; fran: string | null; till: string | null; pris: number }>;
+}
+
+/** En kanal vars annons tagits ner för veckans omläggning och väntar på att publiceras igen. */
+export interface KanalOmlaggning {
+  nedtagenAt: string;
+  /** Adressen annonsen hade innan den togs ner. */
+  tidigareUrl: string | null;
+  /** Misslyckade publiceringar i rad sedan nedtagningen. */
+  forsok: number;
+  fel: string | null;
+  nastaForsokAt: string | null;
+  /** När brevet om att annonsen är nere gick. Ett per nedtagning. */
+  larmatAt: string | null;
 }
 
 /** En bit text i ett annonsstycke. Se adContent.ts, som bygger annonsen av sådana block. */

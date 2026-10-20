@@ -36,6 +36,18 @@ export async function handleShippingPage(page: Page, logga: Logga): Promise<void
     await page.waitForTimeout(2000);
     visible = await pageHasText(page, /frakt och leverans/i, 2000);
   }
+  // UPPMÄTT 2026-10-20: efter BankID landar Fortsätt på /recommerce/delivery/<id> — fraktsidan — men den
+  // laddade långsammare än de fyra sekunderna ovan, roboten sa "Ingen fraktsida" och letade sedan efter
+  // en betalknapp som inte fanns. Står adressen på leveranssidan ÄR det fraktsidan: vänta på den.
+  // (`pageHasText` väntar inte: Playwrights isVisible bortser från sin timeout. Därför waitFor här.)
+  if (!visible && /\/recommerce\/delivery\//.test(page.url())) {
+    visible = await page
+      .getByText(/frakt och leverans/i)
+      .first()
+      .waitFor({ state: "visible", timeout: 20_000 })
+      .then(() => true)
+      .catch(() => false);
+  }
   if (!visible) {
     // Fraktsidan visas inte för alla kategorier och konton. Att den saknas är inget fel.
     logga("Ingen fraktsida — går vidare", "ok", { url: page.url() });
