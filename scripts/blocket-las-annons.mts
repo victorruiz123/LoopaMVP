@@ -83,7 +83,9 @@ try {
   );
   const bilder: string[] = [];
   for (const [i, u] of bildUrl.entries()) {
-    const stor = u.replace(/\/(default|thumbs?|\d+x\d+)\//, "/default/");
+    // Full storlek: Blockets CDN ger originalet (1280 px bred) under /dynamic/1600w/. Formulärets
+    // miniatyrer är 220x220 och hade gjort den omlagda annonsen sämre.
+    const stor = u.replace(/\/dynamic\/[^/]+\//, "/dynamic/1600w/");
     const svar = await page.context().request.get(stor).catch(() => null);
     const typ = svar?.headers()["content-type"] ?? "";
     if (!svar || !svar.ok() || !/image\//.test(typ)) continue;
