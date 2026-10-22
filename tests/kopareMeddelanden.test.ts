@@ -15,7 +15,8 @@ process.env.LOOPA_JOBS_DIR = mkdtempSync(path.join(tmpdir(), "loopa-meddelanden-
 process.on("exit", () => rmSync(process.env.LOOPA_JOBS_DIR!, { recursive: true, force: true }));
 
 const { bedomMeddelanden, raknareUrText, rubrikIText } = await import("../server/src/integrations/blocket/meddelanden.js");
-const { fragorOmAnnonsen } = await import("../server/src/integrations/tradera/fragor.js");
+const { bedomTraderaFragor } = await import("../server/src/integrations/tradera/fragor.js");
+const { tradarOmAnnonsen } = await import("../server/src/integrations/tradera/inkorg.js");
 const { matchJob } = await import("../server/src/integrations/tradera/mailwatch.js");
 import type { ConditionJob } from "../server/src/types.js";
 
@@ -43,14 +44,24 @@ test("konversationens rad känns igen på rubriken, inte på sista meddelandet",
   assert.equal(rubrikIText("Soffa mörkblå 3-sits\nPing", "Svart IKEA NORDVIKEN barstol (62 cm)"), false);
 });
 
-test("Tradera: bara frågor om JUST den annonsen räknas", () => {
-  const poster = [
-    { kind: "fraga" as const, itemId: 756963802 },
-    { kind: "fraga" as const, itemId: 750200316 },
-    { kind: "bud" as const, itemId: 756963802 },
+test("Tradera: bara köparnas trådar om JUST den annonsen räknas, som inkorgen såg ut skarpt 2026-10-22", () => {
+  const hrefs = [
+    "/messaging/threads/u4695783_u6557094_l751514068?show=ALL&limit=15",
+    "/messaging/threads/u6557094_u6781143_l709216235?show=ALL&limit=15",
+    "/messaging/threads/u5570449_u6557094_l709216235?show=ALL&limit=15",
+    "/messaging/threads/xcs_u6557094_l684061442?show=ALL&limit=15",
+    "/messaging/threads/u5570449_u6557094_l709216235?show=ALL&limit=15",
   ];
-  assert.equal(fragorOmAnnonsen(poster, 756963802), 1);
-  assert.equal(fragorOmAnnonsen(poster, 111), 0);
+  assert.equal(tradarOmAnnonsen(hrefs, 751514068), 1);
+  assert.equal(tradarOmAnnonsen(hrefs, 709216235), 2, "två köpare, samma tråd länkad två gånger räknas en gång");
+  assert.equal(tradarOmAnnonsen(hrefs, 684061442), 0, "kundtjänstens tråd är ingen köpare");
+  assert.equal(tradarOmAnnonsen(hrefs, 7515140), 0, "id:t ska stämma helt, inte bara i slutet");
+});
+
+test("Tradera: en oläslig inkorg räknas som att köpare skrivit", () => {
+  assert.equal(bedomTraderaFragor(null, "Tradera-sessionen har gått ut.").harFragor, true);
+  assert.equal(bedomTraderaFragor(0).harFragor, false);
+  assert.equal(bedomTraderaFragor(1).harFragor, true);
 });
 
 test("ett mejl om en kvarlämnad Tradera-annons kopplas till möbeln", () => {

@@ -30,6 +30,7 @@ LoopaMVP-main/
 # historiken, hur privat repot än är.
 blocket-session.json
 blocket-session.b64
+tradera-session.json
 
 # Blockets webbläsare. rulla-ut.sh installerar Chromium hit (PLAYWRIGHT_BROWSERS_PATH), alltså inuti
 # repot, för att tjänsten och skriptet ska leta på samma ställe oavsett vem som kör. Utan den här

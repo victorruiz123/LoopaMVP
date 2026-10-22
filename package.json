@@ -24,6 +24,7 @@
     "blocket:pris": "tsx server/src/integrations/blocket/pris-prov.ts",
     "blocket:ta-bort": "tsx server/src/integrations/blocket/borttagning-prov.ts",
     "tradera:pris": "tsx server/src/integrations/tradera/pris-prov.ts",
+    "tradera:logga-in": "tsx server/src/integrations/tradera/logga-in.ts",
     "blocket:logga-in": "tsx server/src/integrations/blocket/logga-in.ts",
     "facebook:login": "tsx server/src/integrations/facebook/login.ts",
     "annons:visa": "tsx scripts/visa-redigering.ts",

@@ -471,7 +471,7 @@ Inget brev; loggen säger `<kanal> gamla annonsen ligger kvar — <skäl> Den ny
 | Kanal | Källa | Fil |
 |---|---|---|
 | Blocket | Ägarsidans "Skickade meddelanden N" (uppmätt 2026-10-21), och inkorgen: konversationer vars rad bär rubriken öppnas och räknas bara om de länkar till JUST annonsens id | `blocket/meddelanden.ts`, i `driveBlocketBorttagning` före kortets meny |
-| Tradera | Frågemejlen (`fraga` i mejlbevakningen) med annonsens id; inkorgen läses en gång till precis innan | `tradera/fragor.ts` |
+| Tradera | Meddelandefunktionen på tradera.com (uppmätt 2026-10-22): varje konversation länkar till `/messaging/threads/<köpare>_<säljare>_l<annons-id>`, och trådar med just annonsens id räknas (kundtjänstens `xcs_` inte). Säljarens sparade inloggning, `npm run tradera:logga-in` | `tradera/inkorg.ts`, `tradera/fragor.ts` |
 
 Går källan inte att läsa räknas det som att köpare skrivit (en dubblett är billigare än en tappad köpare).
 Id och inte rubrik: en äldre kvarlämnad annons har samma rubrik och hade annars hållit kvar varje ny.

@@ -3,39 +3,38 @@
  * (integrations/omlaggning.ts). Har den det får den ligga kvar, och den nya läggs upp bredvid — en
  * avslutad annons tar frågorna och köparens bevakning med sig.
  *
- * KÄLLAN ÄR MEJLEN. Tradera-API:t har ingen läsning av frågor eller meddelanden, men varje fråga kommer
- * som ett mejl ("Du har fått ett nytt meddelande. Angående: <rubrik> (<annons-id>) …"), och
- * mejlbevakningen (mailwatch.ts) sparar dem som `fraga` med annonsens id. Inkorgen läses en gång till
- * precis innan, så att en fråga från de senaste minuterna också räknas.
+ * KÄLLAN ÄR MEDDELANDEFUNKTIONEN på tradera.com (inkorg.ts), läst med säljarens sparade inloggning.
+ * Tradera-API:t har ingen läsning av frågor eller meddelanden. Varje konversation i inkorgen bär
+ * annonsens id i sin adress, så en tråd om just den här annonsen räknas — prisförslag också.
  *
- * GÅR MEJLEN INTE ATT LÄSA räknas annonsen som att den har frågor: en dubblett är billigare än en köpare
- * som blir utan svar.
+ * GÅR INKORGEN INTE ATT LÄSA räknas annonsen som att den har frågor: en dubblett är billigare än en
+ * köpare som blir utan svar.
  */
 
-import type { TraderaPost } from "./mailwatch.js";
+import { lasTraderaInkorg, traderaInkorgKonfigurerad, tradarOmAnnonsen } from "./inkorg.js";
 
 export interface TraderaFragor {
   harFragor: boolean;
   skal: string;
 }
 
-/** Frågorna om just den annonsen. Ren funktion. */
-export function fragorOmAnnonsen(poster: Pick<TraderaPost, "kind" | "itemId">[], itemId: number): number {
-  return poster.filter((p) => p.kind === "fraga" && p.itemId === itemId).length;
+/** Utfallet som regel. Null = inkorgen gick inte att läsa. Ren funktion. */
+export function bedomTraderaFragor(antal: number | null, fel?: string): TraderaFragor {
+  if (antal === null) {
+    return { harFragor: true, skal: `Tradera-inkorgen gick inte att läsa (${fel ?? "okänt fel"}) — räknas som att köpare skrivit.` };
+  }
+  return antal > 0
+    ? { harFragor: true, skal: `Annonsen har ${antal} ${antal === 1 ? "konversation" : "konversationer"} med köpare i Tradera-inkorgen.` }
+    : { harFragor: false, skal: "Inga konversationer om annonsen i Tradera-inkorgen." };
 }
 
 export async function lasTraderaFragor(itemId: number): Promise<TraderaFragor> {
-  const { listTraderaPost, pollTraderaMail, traderaMailConfigured } = await import("./mailwatch.js");
-  if (!traderaMailConfigured()) {
-    return { harFragor: true, skal: "Tradera-mejlen läses inte på servern (GMAIL_* saknas) — frågorna går inte att se, räknas som att de finns." };
+  if (!traderaInkorgKonfigurerad()) {
+    return bedomTraderaFragor(null, "ingen Tradera-session på servern, kör npm run tradera:logga-in");
   }
-  const poll = await pollTraderaMail().catch((err) => ({ error: err instanceof Error ? err.message : String(err) }));
-  if (poll.error) {
-    return { harFragor: true, skal: `Tradera-mejlen gick inte att läsa just nu (${poll.error}) — räknas som att frågor finns.` };
+  try {
+    return bedomTraderaFragor(tradarOmAnnonsen(await lasTraderaInkorg(), itemId));
+  } catch (err) {
+    return bedomTraderaFragor(null, err instanceof Error ? err.message : String(err));
   }
-  const { poster } = await listTraderaPost(Number.MAX_SAFE_INTEGER);
-  const antal = fragorOmAnnonsen(poster, itemId);
-  return antal > 0
-    ? { harFragor: true, skal: `Annonsen har ${antal} ${antal === 1 ? "fråga" : "frågor"} från köpare.` }
-    : { harFragor: false, skal: "Inga frågor från köpare." };
 }
