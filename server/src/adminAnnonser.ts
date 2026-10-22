@@ -53,7 +53,7 @@ import {
   type KanalPrisLage,
   type PrisKanal,
 } from "./priceLadder.js";
-import type { BlocketPublication, ConditionJob, PriceLadder, TraderaPublication } from "./types.js";
+import type { BlocketPublication, ConditionJob, KvarlamnadAnnons, PriceLadder, TraderaPublication } from "./types.js";
 import { markApproved, traderaAdBlocks } from "./integrations/tradera/publish.js";
 import { renderAdPlain, resolveAdPrice } from "./adContent.js";
 import { beskrivKanaler, markChannelsPublishing, planAutoPublish, runAutoPublish, type ChannelPlan } from "./integrations/autoPublish.js";
@@ -182,6 +182,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. Null = aldrig försökt. */
   blocket: BlocketPublication | null;
+  /** Äldre annonser som ligger kvar efter en omläggning, för att en köpare skrivit till dem. */
+  kvarlamnadeAnnonser: KvarlamnadAnnons[];
   /**
    * Säljarens postnummer — det Blocket-annonsen läggs på — och var det kom ifrån.
    *
@@ -513,6 +515,7 @@ export async function annonsDetalj(loopaId: string): Promise<AdminAnnonsDetalj |
     })().catch(() => null),
     tradera: job.tradera ?? null,
     blocket: job.blocket ?? null,
+    kvarlamnadeAnnonser: job.kvarlamnadeAnnonser ?? [],
     postnummer,
     postnummerKalla: postnummer ? (normaliseraPostnummer(job.sellerPostalCode) ? "jobb" : "konto") : null,
     blocketPaket: job.tradera ? await blocketPaket(job) : null,

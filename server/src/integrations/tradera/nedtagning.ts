@@ -61,3 +61,37 @@ export async function taNerTraderaAnnons(job: ConditionJob, loopaId: string, ors
   await endTraderaItem(itemId);
   console.log(`[tradera] ${loopaId}: annons ${itemId} togs ner — ${orsak}.`);
 }
+
+/**
+ * Tar ner jobbets KVARLÄMNADE Tradera-annonser — äldre annonser som fick ligga kvar vid veckans
+ * omläggning för att en köpare skrivit till dem (types.ts `KvarlamnadAnnons`). De är samma möbel: när
+ * den säljs eller tas bort får ingen av dem ligga kvar och gå att köpa.
+ *
+ * `utom` = annonsen som just sålts; den är redan avslutad hos Tradera. Samma grindar som ovan: utan
+ * nycklar loggas det och hoppas över, en utgången annons räknas som nere. KASTAR när Tradera svarade
+ * fel på en annons som kan vara köpbar — den som anropar avgör vad det betyder, som ovan.
+ */
+export async function taNerKvarlamnadeTradera(job: ConditionJob, loopaId: string, orsak: string, utom: number | null = null): Promise<void> {
+  const kvar = (job.kvarlamnadeAnnonser ?? []).filter((k) => k.kanal === "tradera" && k.itemId && !k.nedtagenAt && k.itemId !== utom);
+  if (kvar.length === 0) return;
+
+  const { endTraderaItem, getTraderaLage, traderaConfigured } = await import("./tradera.js");
+  const { persist } = await import("../../jobStore.js");
+  if (!traderaConfigured()) {
+    console.error(
+      `[tradera] ${loopaId}: ${kvar.length} kvarlämnad(e) annons(er) (${kvar.map((k) => k.itemId).join(", ")}) kunde INTE tas ner — ` +
+        "Tradera är inte konfigurerat på servern. Ta ner dem för hand hos Tradera.",
+    );
+    return;
+  }
+  try {
+    for (const k of kvar) {
+      const lage = await getTraderaLage(k.itemId!);
+      if (!lage?.ended) await endTraderaItem(k.itemId!);
+      k.nedtagenAt = new Date().toISOString();
+      console.log(`[tradera] ${loopaId}: kvarlämnad annons ${k.itemId} ${lage?.ended ? "hade redan löpt ut" : "togs ner"} — ${orsak}.`);
+    }
+  } finally {
+    await persist(job);
+  }
+}

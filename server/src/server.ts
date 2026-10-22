@@ -310,8 +310,9 @@ async function handleDeleteJob(id: string, res: ServerResponse) {
   //    nedtagning.ts, så att adminens radering av ett konto tar ner på samma sätt.
   const itemId = job.tradera?.itemId ?? null;
   try {
-    const { taNerTraderaAnnons } = await import("./integrations/tradera/nedtagning.js");
+    const { taNerKvarlamnadeTradera, taNerTraderaAnnons } = await import("./integrations/tradera/nedtagning.js");
     await taNerTraderaAnnons(job, loopaId, "säljaren tog bort annonsen");
+    await taNerKvarlamnadeTradera(job, loopaId, "säljaren tog bort annonsen");
   } catch (err) {
     const detalj = err instanceof Error ? err.message : String(err);
     console.error(`[tradera] ${loopaId}: kunde inte ta ner annons ${itemId}:`, detalj);

@@ -454,3 +454,36 @@ ner; admin får brevet "Blocket kräver BankID …" och logga-in görs om (BLOCK
    vara är tillåten. Blocket granskar varje ny annons (och har nekat kontot förut, BLOCKET-PLAN.md) —
    en nekad omläggning är en möbel som inte ligger ute. Tradera: en omläggning tappar bevakarna.
 3. Panelen visar en kanal som är nere bara via `lastError`; `ladder.omlaggning` har ingen egen ruta än.
+
+---
+
+## 9. En annons som en köpare skrivit till tas inte ner — 2026-10-21
+
+En borttagen Blocket-annons tappar sin konversation: den står kvar i inkorgen, men med "(Annons)" i
+stället för rubriken och utan länk. Skarpt: barstolen 21946768 togs ner 2026-10-20 med ett obesvarat bud
+("finns stolen kvar? Kan tänka mig att ge 250kr …") från lördagen innan. På Tradera tar en avslutad
+annons frågorna och bevakarna med sig.
+
+**Beslut (med användaren):** har en köpare skrivit tas den gamla annonsen INTE ner, men den nya läggs
+ändå upp med det sänkta priset — omläggningen sker, bara utan nedtagningen. Den gamla behåller sitt pris.
+Inget brev; loggen säger `<kanal> gamla annonsen ligger kvar — <skäl> Den nya läggs upp bredvid`.
+
+| Kanal | Källa | Fil |
+|---|---|---|
+| Blocket | Ägarsidans "Skickade meddelanden N" (uppmätt 2026-10-21), och inkorgen: konversationer vars rad bär rubriken öppnas och räknas bara om de länkar till JUST annonsens id | `blocket/meddelanden.ts`, i `driveBlocketBorttagning` före kortets meny |
+| Tradera | Frågemejlen (`fraga` i mejlbevakningen) med annonsens id; inkorgen läses en gång till precis innan | `tradera/fragor.ts` |
+
+Går källan inte att läsa räknas det som att köpare skrivit (en dubblett är billigare än en tappad köpare).
+Id och inte rubrik: en äldre kvarlämnad annons har samma rubrik och hade annars hållit kvar varje ny.
+Provat skarpt (bara läsning) 2026-10-21 på barstolen 27592622: räknaren 0, konversationer 0.
+
+**Kvarlämnade annonser** (`job.kvarlamnadeAnnonser`) är samma möbel:
+- ett såld- eller frågemejl om en kvarlämnad Tradera-annons kopplas till jobbet (`matchJob`), och säljs
+  möbeln på en av annonserna tas de andra Tradera-annonserna ner;
+- när säljaren tar bort möbeln, när den säljs i Butiken och när kontot raderas tas kvarlämnade
+  Tradera-annonser ner (`taNerKvarlamnadeTradera`);
+- Blocket-annonserna tas ner för hand, som alla Blocket-annonser — panelens annonsvy listar dem under
+  "Äldre annonser som ligger kvar".
+
+**Risk:** samma vara i två annonser samtidigt strider mot både Blockets och Traderas regler om dubbletter.
+Blocket granskar varje ny annons och kan neka den.

@@ -1100,6 +1100,20 @@ export interface BlocketPaket {
   saknas: string[];
 }
 
+/**
+ * En tidigare annons för möbeln som fick ligga kvar vid veckans omläggning, för att en köpare skrivit
+ * till den. Speglar server/src/types.ts. Tradera tas ner automatiskt när möbeln säljs; Blocket för hand.
+ */
+export interface KvarlamnadAnnons {
+  kanal: "tradera" | "blocket";
+  itemId: number | null;
+  url: string | null;
+  pris: number | null;
+  lamnadAt: string;
+  skal: string;
+  nedtagenAt?: string | null;
+}
+
 export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   overstyrdAvEmail: string | null;
   produkt: AnnonsProdukt | null;
@@ -1121,6 +1135,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   tradera: TraderaPublication | null;
   /** Publiceringen mot Blocket: länken, torrkörningsflaggan och robotens steg. */
   blocket: BlocketPublication | null;
+  /** Äldre annonser som ligger kvar efter en omläggning, för att en köpare skrivit till dem. */
+  kvarlamnadeAnnonser?: KvarlamnadAnnons[];
   /** Säljarens postnummer, det Blocket-annonsen läggs på, och var det kom ifrån. Null = saknas. */
   postnummer: string | null;
   postnummerKalla: "jobb" | "konto" | null;

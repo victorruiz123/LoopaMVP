@@ -51,6 +51,7 @@ import { nyttSteg, type Logga } from "./diag.js";
 import { arUpptagen, markeraUpptagen } from "./vakt.js";
 import { capTitle } from "./mapping.js";
 import { adIdFromUrl, annonsenArAktiv, felText, rubrikStammer } from "./pris.js";
+import { lasBlocketMeddelanden, type BlocketMeddelanden } from "./meddelanden.js";
 import { adTitle } from "../../adContent.js";
 import type { BlocketStep, ConditionJob } from "../../types.js";
 
@@ -90,13 +91,23 @@ export interface BlocketBorttagningInput {
   /** Rubriken som den står på Blocket — kortet vaktas mot den. Null bara i torrkörning från provskriptet. */
   title: string | null;
   dryRun: boolean;
+  /**
+   * Läs först om en köpare skrivit till annonsen (meddelanden.ts). Förval: ja. Har den meddelanden
+   * rörs ingenting, och utfallet blir "har-meddelanden".
+   */
+  kontrolleraMeddelanden?: boolean;
 }
 
 export interface BlocketBorttagningResultat {
-  /** borttagen: togs bort nu. redan-borta: stod inte bland de aktiva. torrkorning: valet hittades, inget klickat. */
-  status: "borttagen" | "redan-borta" | "torrkorning";
+  /**
+   * borttagen: togs bort nu. redan-borta: stod inte bland de aktiva. torrkorning: valet hittades, inget
+   * klickat. har-meddelanden: en köpare har skrivit till annonsen — ingenting klickat, den ska ligga kvar.
+   */
+  status: "borttagen" | "redan-borta" | "torrkorning" | "har-meddelanden";
   /** Vägen till valet, för loggen. */
   vag: string | null;
+  /** Vad meddelandekontrollen såg, när den kördes. */
+  meddelanden?: BlocketMeddelanden;
 }
 
 /**
@@ -259,6 +270,22 @@ export async function driveBlocketBorttagning(page: Page, input: BlocketBorttagn
     return { status: "redan-borta", vag: null };
   }
 
+  // ── Har en köpare skrivit? Då ligger annonsen kvar, med konversationen. ─────
+  let meddelanden: BlocketMeddelanden | undefined;
+  if (input.kontrolleraMeddelanden !== false) {
+    meddelanden = await lasBlocketMeddelanden(page, { id, title: input.title }, logga);
+    if (meddelanden.harMeddelanden) {
+      logga("Annonsen har meddelanden — tas inte bort", "ok", { id, skal: meddelanden.skal });
+      return { status: "har-meddelanden", vag: null, meddelanden };
+    }
+    logga(meddelanden.skal, "ok", { id });
+    // Kontrollen lämnade Mina annonser; tillbaka till sidan där vårt kort står.
+    if (!(await annonsenArAktiv(page, id, logga))) {
+      logga("Annonsen står inte längre bland de aktiva — inget att ta ner", "ok", { id });
+      return { status: "redan-borta", vag: null, meddelanden };
+    }
+  }
+
   // ── Kortet och rubrikvakten ──────────────────────────────────────────────
   const hittat = await kortetOchMenyn(page, id);
   if (input.title && hittat && !rubrikStammer(hittat.rubrik, input.title)) {
@@ -317,7 +344,7 @@ export async function driveBlocketBorttagning(page: Page, input: BlocketBorttagn
 
   if (input.dryRun) {
     logga("TORRKÖRNING KLAR — ingenting klickat, annonsen ligger kvar", "ok", { id, val: valText, vag });
-    return { status: "torrkorning", vag };
+    return { status: "torrkorning", vag, meddelanden };
   }
 
   // ── Ta bort, och bekräfta ────────────────────────────────────────────────
@@ -375,7 +402,7 @@ export async function driveBlocketBorttagning(page: Page, input: BlocketBorttagn
   for (let forsok = 0; forsok < 3; forsok++) {
     if (!(await annonsenArAktiv(page, id, () => undefined))) {
       logga("Annonsen står inte längre bland de aktiva", "ok", { id });
-      return { status: "borttagen", vag };
+      return { status: "borttagen", vag, meddelanden };
     }
     await page.waitForTimeout(3000);
   }
@@ -385,11 +412,12 @@ export async function driveBlocketBorttagning(page: Page, input: BlocketBorttagn
 
 // ---------- Jobbet ----------
 
-export type TaNerUtfall = { status: "nere" } | { status: "senare"; skal: string };
+export type TaNerUtfall = { status: "nere" } | { status: "senare"; skal: string } | { status: "har-meddelanden"; skal: string };
 
 /**
  * Tar ner jobbets Blocket-annons. Kastar när den INTE togs ner — anroparen lägger då inte upp någon ny,
- * och den gamla ligger kvar på det gamla priset. "senare" = roboten var upptagen.
+ * och den gamla ligger kvar på det gamla priset. "senare" = roboten var upptagen. "har-meddelanden" =
+ * en köpare har skrivit till annonsen, så den togs inte ner (meddelanden.ts).
  */
 export async function taNerBlocketAnnons(job: ConditionJob): Promise<TaNerUtfall> {
   const pub = job.blocket;
@@ -423,8 +451,9 @@ export async function taNerBlocketAnnons(job: ConditionJob): Promise<TaNerUtfall
       throw err;
     }
     await handleBankID(session.page, session.context, logga);
-    await driveBlocketBorttagning(session.page, { adUrl: pub.url, title: capTitle(adTitle(job)), dryRun: false }, logga);
+    const r = await driveBlocketBorttagning(session.page, { adUrl: pub.url, title: capTitle(adTitle(job)), dryRun: false }, logga);
     if (await saveSessionIfReal(session.context).catch(() => false)) logga("Sessionen sparades om", "ok", {});
+    if (r.status === "har-meddelanden") return { status: "har-meddelanden", skal: r.meddelanden?.skal ?? "Annonsen har meddelanden." };
     return { status: "nere" };
   } catch (err) {
     if (session && !session.page.isClosed()) {

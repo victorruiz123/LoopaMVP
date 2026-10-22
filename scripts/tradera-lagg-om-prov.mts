@@ -127,13 +127,19 @@ try {
     if (!l) throw new Error("Läget gick inte att läsa hos Tradera — ingenting rört.");
     if (l.totalBids > 0 || l.gotWinner) throw new Error(`Annonsen har ${l.totalBids} bud${l.gotWinner ? " och är såld" : ""} — läggs inte om.`);
     console.log(`  Gamla annonsen ${gammal}: ${JSON.stringify(await lasTillbaka(gammal))}`);
-    if (!l.ended) {
+    // Har en köpare skrivit ligger den gamla kvar, som i veckans omläggning (omlaggning.ts).
+    const { lasTraderaFragor } = await import(`${SERVER}/src/integrations/tradera/fragor.ts`);
+    const fragor = await lasTraderaFragor(gammal);
+    console.log(`  Frågor: ${fragor.skal}`);
+    if (l.ended) console.log(`  Gamla annonsen ${gammal} hade redan gått ut.`);
+    else if (fragor.harFragor) console.log(`  Gamla annonsen ${gammal} ligger kvar — en ny läggs upp bredvid.`);
+    else {
       await t.endTraderaItem(gammal);
       console.log(`  ✓ Gamla annonsen ${gammal} avslutad.`);
-    } else console.log(`  Gamla annonsen ${gammal} hade redan gått ut.`);
+    }
     const r = await publicera(pris);
     Object.assign(state, { itemId: r.itemId, url: r.url });
-    state.historik.push({ at: new Date().toISOString(), hande: "omlagd", fran: gammal, itemId: r.itemId, url: r.url, pris });
+    state.historik.push({ at: new Date().toISOString(), hande: "omlagd", fran: gammal, itemId: r.itemId, url: r.url, pris, gamlaKvar: !l.ended && fragor.harFragor });
     spara();
     console.log(`  ✓ Ny annons: ${r.url}`);
     console.log(`  Tillbaka från Tradera (ny):    ${JSON.stringify(await lasTillbaka(r.itemId))}`);

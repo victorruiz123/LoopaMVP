@@ -29,6 +29,7 @@ import {
 import { deliveryQuote, zoneFor } from "./delivery.js";
 import { productById, invalidate } from "./inventory.js";
 import { endTraderaItem } from "../integrations/tradera/tradera.js";
+import { taNerKvarlamnadeTradera } from "../integrations/tradera/nedtagning.js";
 import { getJob } from "../jobStore.js";
 
 const KEY = () => process.env.STRIPE_SECRET_KEY?.trim() || null;
@@ -371,10 +372,14 @@ async function delistFromTradera(productId: string): Promise<void> {
     const record = await store().get(productId);
     if (!record?.jobId) return;
     const job = await getJob(record.jobId);
-    const itemId = job?.tradera?.itemId;
-    if (!itemId || job?.tradera?.status !== "published") return;
-    await endTraderaItem(itemId);
-    console.info(`[butik] ${productId} avpublicerad från Tradera (item ${itemId}) efter försäljning i Butik.`);
+    if (!job) return;
+    const itemId = job.tradera?.itemId;
+    if (itemId && job.tradera?.status === "published") {
+      await endTraderaItem(itemId);
+      console.info(`[butik] ${productId} avpublicerad från Tradera (item ${itemId}) efter försäljning i Butik.`);
+    }
+    // Äldre annonser som fick ligga kvar vid en omläggning (en köpare hade skrivit) är samma möbel.
+    await taNerKvarlamnadeTradera(job, productId, "såld i Butik");
   } catch (err) {
     console.error(
       `[butik] Kunde INTE avpublicera ${productId} från Tradera: ${err instanceof Error ? err.message : err}. ` +

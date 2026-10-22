@@ -645,7 +645,7 @@ export interface PriceLadder {
    */
   omlaggning?: Partial<Record<"tradera" | "blocket", KanalOmlaggning>> | null;
   /** De senaste omläggningarna, äldst först, kapade till 30. För panelen och felsökningen. */
-  omlaggningar?: Array<{ at: string; kanal: "tradera" | "blocket"; fran: string | null; till: string | null; pris: number }>;
+  omlaggningar?: Array<{ at: string; kanal: "tradera" | "blocket"; fran: string | null; till: string | null; pris: number; gamlaKvar?: boolean }>;
 }
 
 /** En kanal vars annons tagits ner för veckans omläggning och väntar på att publiceras igen. */
@@ -659,6 +659,31 @@ export interface KanalOmlaggning {
   nastaForsokAt: string | null;
   /** När brevet om att annonsen är nere gick. Ett per nedtagning. */
   larmatAt: string | null;
+  /**
+   * Sant = den gamla annonsen togs INTE ner, för att en köpare skrivit till den. Den ligger kvar i
+   * `ConditionJob.kvarlamnadeAnnonser`, och möbeln är alltså ute även om den nya inte kommit upp än.
+   */
+  gamlaKvar?: boolean;
+}
+
+/**
+ * En tidigare annons för möbeln som får ligga kvar vid veckans omläggning, för att en köpare skrivit
+ * till den (frågor på Tradera, meddelanden på Blocket). Den nya läggs upp bredvid. Loopa räknar dem som
+ * samma möbel: en försäljning på någon av dem säljer möbeln, och när möbeln säljs eller tas bort tas de
+ * ner tillsammans med den aktuella annonsen (Tradera automatiskt; Blocket för hand, som alltid).
+ */
+export interface KvarlamnadAnnons {
+  kanal: "tradera" | "blocket";
+  /** Traderas annons-id. Null på Blocket, som adresseras med `url`. */
+  itemId: number | null;
+  url: string | null;
+  /** Möbelpriset den var bekräftad på (utan hemleveransen) när den lämnades kvar. */
+  pris: number | null;
+  lamnadAt: string;
+  /** Varför den ligger kvar, för panelen och loggen. */
+  skal: string;
+  /** Sätts när den tagits ner (möbeln såld eller borttagen). */
+  nedtagenAt?: string | null;
 }
 
 /** En bit text i ett annonsstycke. Se adContent.ts, som bygger annonsen av sådana block. */
@@ -893,6 +918,8 @@ export interface ConditionJob {
    * på var Blocket står, och panelen säger till när det inte är i fas.
    */
   blocket?: BlocketPublication | null;
+  /** Äldre annonser som ligger kvar bredvid `tradera`/`blocket` efter en omläggning. Se `KvarlamnadAnnons`. */
+  kvarlamnadeAnnonser?: KvarlamnadAnnons[] | null;
   /**
    * När säljaren tog bort annonsen. Satt = möbeln finns inte längre någonstans utåt.
    *

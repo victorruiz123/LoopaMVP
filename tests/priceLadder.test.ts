@@ -660,7 +660,9 @@ interface OmRigg extends Rigg {
 }
 
 /** Riggen med omläggningen på. `svar` styr publiceringarna, i tur och ordning; förval: den kommer upp. */
-function omRigg(opts: Parameters<typeof rigg>[0] & { svar?: Array<"uppe" | "fel" | "senare">; taNerFel?: string } = {}): OmRigg {
+function omRigg(
+  opts: Parameters<typeof rigg>[0] & { svar?: Array<"uppe" | "fel" | "senare">; taNerFel?: string; behall?: boolean } = {},
+): OmRigg {
   const bas = rigg(opts);
   const r: OmRigg = { ...bas, nertagna: [], publiceringar: [], nere: [] };
   const svar = [...(opts.svar ?? [])];
@@ -674,6 +676,8 @@ function omRigg(opts: Parameters<typeof rigg>[0] & { svar?: Array<"uppe" | "fel"
       // Som markTraderaPublishing / markBlocketPublishing: kanalen är på väg, inte uppe.
       if (kanal === "tradera") job.tradera = { ...job.tradera!, status: "publishing", itemId: null, url: null, pris: null };
       else job.blocket = { ...job.blocket!, status: "publishing", url: null, pris: null };
+      // Som omlaggning.ts när en köpare skrivit: den gamla ligger kvar, kanalen står ändå på "publicerar".
+      if (opts.behall) return { status: "behallen", skal: "Annonsen har 1 fråga från köpare." };
     },
     publicera: async (job, kanal) => {
       r.publiceringar.push(kanal);
@@ -734,6 +738,31 @@ test("Blocket läggs om på samma sätt, och kanalerna läggs om var för sig", 
   assert.equal(job.blocket!.pris!.via, "omlaggning");
   assert.equal(job.blocket!.pris!.bekraftat, 2040);
   assert.equal(r.blocket.length, 0, "prisroboten körs inte");
+});
+
+test("har en köpare skrivit ligger den gamla kvar, och den nya läggs upp bredvid med det nya priset", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg({ behall: true });
+  await tickPriceLadders(NU, r.beroenden);
+
+  assert.deepEqual(r.publiceringar, ["tradera"], "den nya läggs upp");
+  assert.equal(r.tradera.length, 0, "inget prisanrop");
+  assert.equal(job.tradera!.status, "published");
+  assert.equal(job.tradera!.pris!.bekraftat, 2040);
+  assert.equal(omlaggningPagar(job), false);
+  assert.equal(job.priceLadder!.omlaggningar![0].gamlaKvar, true, "historiken säger att den gamla ligger kvar");
+  assert.deepEqual(r.nere, []);
+});
+
+test("kommer den nya inte upp när den gamla ligger kvar skickas inget 'nere'-brev — möbeln är ute", async () => {
+  const job = await jobb({ tradera: true });
+  const r = omRigg({ behall: true, svar: ["fel"] });
+  await tickPriceLadders(NU, r.beroenden);
+
+  assert.deepEqual(r.nere, [], "brevet säger att möbeln inte ligger ute, och det är inte sant");
+  assert.equal(job.priceLadder!.omlaggning!.tradera!.gamlaKvar, true);
+  assert.match(job.priceLadder!.lastError!, /den gamla ligger kvar/);
+  assert.ok(job.priceLadder!.omlaggning!.tradera!.nastaForsokAt, "försöker igen som vanligt");
 });
 
 test("en Tradera-annons med bud tas inte ner — priset ändras på plats som förut", async () => {

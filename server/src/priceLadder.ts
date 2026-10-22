@@ -387,9 +387,10 @@ export interface SynkBeroenden {
   kanOmlaggas: (kanal: PrisKanal) => Promise<boolean>;
   /**
    * Tar ner annonsen. Kastar när den inte togs ner; "senare" = roboten var upptagen, "manuell" = en
-   * människa behövs innan det går (BankID) — i båda fallen är ingenting rört.
+   * människa behövs innan det går (BankID) — i båda fallen är ingenting rört. "behallen" = en köpare har
+   * skrivit till den gamla, så den ligger kvar (job.kvarlamnadeAnnonser) och den nya läggs upp bredvid.
    */
-  taNer: (job: ConditionJob, kanal: PrisKanal) => Promise<void | { status: "senare" | "manuell"; skal: string }>;
+  taNer: (job: ConditionJob, kanal: PrisKanal) => Promise<void | { status: "senare" | "manuell" | "behallen"; skal: string }>;
   /** Publicerar den nertagna annonsen igen, med stegens pris. */
   publicera: (job: ConditionJob, kanal: PrisKanal) => Promise<PubliceringsUtfall>;
   /** Brevet om en annons som är nere. */
@@ -457,7 +458,7 @@ async function publiceraNertagen(
     delete ladder.omlaggning![kanal];
     ladder.omlaggningar = [
       ...(ladder.omlaggningar ?? []),
-      { at: iso(now), kanal, fran: om.tidigareUrl, till: pub.url ?? null, pris: mal },
+      { at: iso(now), kanal, fran: om.tidigareUrl, till: pub.url ?? null, pris: mal, ...(om.gamlaKvar ? { gamlaKvar: true } : {}) },
     ].slice(-MAX_OMLAGGNINGAR);
     resultat.flyttade.push(kanal);
     console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} omlagd: ${om.tidigareUrl ?? "?"} → ${pub.url ?? "?"} (möbeln ${mal} kr)`);
@@ -474,15 +475,24 @@ async function publiceraNertagen(
     om.fel = fel;
     om.nastaForsokAt = iso(now + (om.forsok === 1 ? SENARE_MS : RETRY_MS));
     resultat.fel.push(kanal);
-    console.warn(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} är NERE — omläggningen kom inte upp (försök ${om.forsok}): ${fel}`);
-    if (!om.larmatAt) {
+    console.warn(
+      om.gamlaKvar
+        ? `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]}: den nya annonsen kom inte upp (försök ${om.forsok}), den gamla ligger kvar: ${fel}`
+        : `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} är NERE — omläggningen kom inte upp (försök ${om.forsok}): ${fel}`,
+    );
+    // Brevet säger att möbeln inte ligger ute. Med den gamla kvar är det inte sant, och då räcker loggen.
+    if (!om.larmatAt && !om.gamlaKvar) {
       await d.larmaNere(job, kanal, fel, om.tidigareUrl).catch((err) =>
         console.warn(`[pris-steg] ${job.id.slice(0, 8)} brevet om ${KANALNAMN[kanal]} gick inte iväg — ${err}`),
       );
       om.larmatAt = iso(now);
     }
   }
-  kvar.push(`${KANALNAMN[kanal]}-annonsen är nere och läggs upp igen med det nya priset.`);
+  kvar.push(
+    om.gamlaKvar
+      ? `${KANALNAMN[kanal]}: den nya annonsen läggs upp med det nya priset; den gamla ligger kvar.`
+      : `${KANALNAMN[kanal]}-annonsen är nere och läggs upp igen med det nya priset.`,
+  );
 }
 
 export interface SynkResultat {
@@ -590,13 +600,18 @@ export async function synkaKanaler(
             larmatAt: null,
           };
           const nedtagning = await d.taNer(job, kanal);
-          if (nedtagning) {
+          if (nedtagning && nedtagning.status !== "behallen") {
             // Ingenting togs ner. Bokförs nedan som en flytt som väntar ("senare") eller kräver en människa.
-            forcerat = nedtagning;
+            forcerat = { status: nedtagning.status, skal: nedtagning.skal };
           } else {
+            if (nedtagning) om.gamlaKvar = true;
             ladder.omlaggning = { ...(ladder.omlaggning ?? {}), [kanal]: om };
             await persist(job);
-            console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} nertagen för omläggning (${liggerPa} → ${annonspris} kr)`);
+            console.info(
+              nedtagning
+                ? `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} gamla annonsen ligger kvar — ${nedtagning.skal} Den nya läggs upp bredvid (${annonspris} kr).`
+                : `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} nertagen för omläggning (${liggerPa} → ${annonspris} kr)`,
+            );
             await publiceraNertagen(job, kanal, om, d, now, resultat, kvar);
             continue;
           }

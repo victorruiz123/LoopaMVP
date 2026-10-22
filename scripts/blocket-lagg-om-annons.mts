@@ -90,22 +90,34 @@ try {
     logg.upplagd = { ...r, at: new Date().toISOString() };
     if (await saveSessionIfReal(s.context).catch(() => false)) logga("Sessionen sparades om", "ok");
     console.log(`\n  ✓ Upplagd igen: ${r.status} — ${r.url ?? r.receiptUrl}\n`);
-  } else if (torr.status !== "torrkorning") {
+  } else if (torr.status !== "torrkorning" && torr.status !== "har-meddelanden") {
     throw new Error(`Torrkörningen gav "${torr.status}" — avbryter.`);
   } else if (!skarpt) {
-    console.log(`\n  ✓ Torrkörning klar — "Ta bort" hittades (${torr.vag}). Ingenting klickat.\n`);
+    console.log(
+      torr.status === "har-meddelanden"
+        ? `\n  ✓ Torrkörning klar — annonsen har meddelanden och skulle ligga kvar; en ny läggs upp bredvid. ${torr.meddelanden?.skal ?? ""}\n`
+        : `\n  ✓ Torrkörning klar — "Ta bort" hittades (${torr.vag}). ${torr.meddelanden?.skal ?? ""} Ingenting klickat.\n`,
+    );
   } else {
+    // Har en köpare skrivit ligger den gamla kvar, som i veckans omläggning (omlaggning.ts).
+    const behall = torr.status === "har-meddelanden";
     // FÖRBERED FÖRST, som veckans omläggning: den nya annonsen fylls i hela vägen till sista knappen
     // (BankID, frakt, paket, alla bilder räknade) medan den gamla ligger kvar. Går det inte rörs ingenting.
     console.log(`\n  Förbereder den nya annonsen för ${pris} kr — den gamla ligger kvar …\n`);
     const forberedd = await driveBlocketForm(s.page, s.context, { plan: { ...plan, dryRun: true }, description: beskrivning, files: bilder }, logga);
     logg.forberedd = { paketUrl: forberedd.receiptUrl, at: new Date().toISOString() };
 
-    console.log("\n  Förberedd. Tar bort den gamla annonsen om fem sekunder. Ctrl-C avbryter.\n");
-    await new Promise((r) => setTimeout(r, 5000));
-    const bort = await driveBlocketBorttagning(s.page, { adUrl, title: plan.title, dryRun: false }, logga);
-    logg.borttagen = { status: bort.status, vag: bort.vag, at: new Date().toISOString() };
-    console.log(`\n  ✓ Gamla annonsen: ${bort.status} (${bort.vag ?? "—"}). Publicerar den förberedda …\n`);
+    if (behall) {
+      logg.behallen = { skal: torr.meddelanden?.skal ?? null, at: new Date().toISOString() };
+      console.log(`\n  Den gamla annonsen har meddelanden och ligger kvar (${torr.meddelanden?.skal ?? ""}). Publicerar den förberedda …\n`);
+    } else {
+      console.log("\n  Förberedd. Tar bort den gamla annonsen om fem sekunder. Ctrl-C avbryter.\n");
+      await new Promise((r) => setTimeout(r, 5000));
+      const bort = await driveBlocketBorttagning(s.page, { adUrl, title: plan.title, dryRun: false }, logga);
+      logg.borttagen = { status: bort.status, vag: bort.vag, at: new Date().toISOString() };
+      // Ett meddelande kan ha kommit in under förberedelsen: då ligger den gamla kvar, och den nya går upp ändå.
+      console.log(`\n  ✓ Gamla annonsen: ${bort.status} (${bort.vag ?? "—"}). Publicerar den förberedda …\n`);
+    }
 
     const r = await publiceraForberedd(s.page, s.context, forberedd.receiptUrl, logga);
     logg.upplagd = { ...r, at: new Date().toISOString() };

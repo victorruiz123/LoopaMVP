@@ -104,6 +104,7 @@ try {
     torrkorning: `Torrkörning klar — valet hittades (${r.vag}). Ingenting klickat.`,
     borttagen: `Annonsen togs bort (${r.vag}) och står inte längre bland de aktiva.`,
     "redan-borta": "Annonsen stod inte bland de aktiva — inget att ta bort.",
+    "har-meddelanden": `Annonsen har meddelanden från köpare och togs inte bort — ${r.meddelanden?.skal ?? ""}`,
   }[r.status];
   console.log(`\n  ✓ ${besked}\n`);
 } catch (err) {

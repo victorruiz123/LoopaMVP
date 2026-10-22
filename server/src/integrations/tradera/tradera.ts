@@ -169,6 +169,10 @@ export async function publishToTradera(listing: TraderaListingInput): Promise<Pu
     };
   }
 
+  // Annonser som redan bär referensen: vid en omläggning ligger den gamla (avslutad) kvar i
+  // säljarlistan med samma ownReference. Skarpt 2026-10-21 togs den för den nya.
+  const tidigare = new Set((await sellerItemsByOwnReference(listing.ownReference)).map((i) => i.id));
+
   const queued = await call<QueuedRequestResponse>("POST", "/listings/items", body);
 
   for (const image of listing.images) {
@@ -181,7 +185,7 @@ export async function publishToTradera(listing: TraderaListingInput): Promise<Pu
 
   await call("POST", `/listings/items/${queued.requestId}/commit`);
 
-  const item = await waitForItem(listing.ownReference, queued.requestId);
+  const item = await waitForItem(listing.ownReference, queued.requestId, tidigare);
   return {
     requestId: queued.requestId,
     itemId: item.id,
@@ -194,9 +198,15 @@ export async function publishToTradera(listing: TraderaListingInput): Promise<Pu
  *
  * Sanningskällan är säljarens artikellista, inte kösvaret: matchar ownReferences vet vi att annonsen
  * finns, och vi får både id och den riktiga länken. Kösvarets `message` läses bara för att kunna
- * lämna en orsak i felet när den aldrig dyker upp.
+ * lämna en orsak i felet när den aldrig dyker upp. `tidigare` är de artiklar som bar referensen före
+ * publiceringen — de räknas aldrig som den nya.
  */
-async function waitForItem(ownReference: string, requestId: number, maxWaitMs = 120_000): Promise<SellerItem> {
+async function waitForItem(
+  ownReference: string,
+  requestId: number,
+  tidigare: ReadonlySet<number>,
+  maxWaitMs = 120_000,
+): Promise<SellerItem> {
   const startedAt = Date.now();
   let delay = 2000;
   let lastMessage: string | null = null;
@@ -213,7 +223,7 @@ async function waitForItem(ownReference: string, requestId: number, maxWaitMs = 
       // Kön svarar ibland 404 innan den hunnit registrera requestet. Artikellistan avgör ändå.
     }
 
-    const item = await findItemByOwnReference(ownReference);
+    const item = (await sellerItemsByOwnReference(ownReference)).find((i) => !tidigare.has(i.id));
     if (item) return item;
   }
 
@@ -224,9 +234,9 @@ async function waitForItem(ownReference: string, requestId: number, maxWaitMs = 
   );
 }
 
-async function findItemByOwnReference(ownReference: string): Promise<SellerItem | null> {
+async function sellerItemsByOwnReference(ownReference: string): Promise<SellerItem[]> {
   const items = await call<SellerItem[]>("GET", "/listings/seller-items");
-  return items?.find((i) => (i.ownReferences ?? []).includes(ownReference)) ?? null;
+  return (items ?? []).filter((i) => (i.ownReferences ?? []).includes(ownReference));
 }
 
 function sleep(ms: number): Promise<void> {

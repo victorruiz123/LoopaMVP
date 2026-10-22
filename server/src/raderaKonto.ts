@@ -204,11 +204,12 @@ export async function raderaKonto(userId: string, bekraftelse: unknown, adminId:
    * 1. TRADERA FÖRST, och allt eller inget. En annons som inte gick att ta ner kan fortfarande köpas,
    *    och då ska ingenting ha raderats ännu — annars står en köpbar annons kvar utan jobb bakom sig.
    */
-  const { taNerTraderaAnnons } = await import("./integrations/tradera/nedtagning.js");
+  const { taNerKvarlamnadeTradera, taNerTraderaAnnons } = await import("./integrations/tradera/nedtagning.js");
   for (const job of jobb) {
     const loopaId = loopaIdFor(job.id);
     try {
       await taNerTraderaAnnons(job, loopaId, "kontot raderades av en admin");
+      await taNerKvarlamnadeTradera(job, loopaId, "kontot raderades av en admin");
     } catch (err) {
       console.error(`[radering] ${loopaId}: Tradera-annonsen kunde inte tas ner:`, err instanceof Error ? err.message : err);
       throw new RaderingsFel(

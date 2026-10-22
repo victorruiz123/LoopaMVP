@@ -173,3 +173,51 @@ test("spärren: skarp publicering krävs alltid; BLOCKET_TA_BORT_ROBOT osatt fö
   } as unknown as ConditionJob;
   await assert.rejects(taNerBlocketAnnons(job), /Borttagningsroboten är av/);
 });
+
+// ─── Meddelanden från köpare ────────────────────────────────────────────────
+//
+// En borttagen annons tappar sin konversation ("(Annons)" i inkorgen, skarpt 2026-10-20 med ett bud på
+// barstolen). Har en köpare skrivit rörs annonsen inte; går räknaren inte att läsa räknas det som ja.
+
+test("annonsen har meddelanden: ingenting klickas, utfallet är 'har-meddelanden'", async () => {
+  const k = await kor({ dryRun: false, annonser: [{ ...ANNONS, meddelanden: 2 }, ANNAN] });
+  assert.equal(k.fel, null, k.fel?.message);
+  assert.equal(k.resultat!.status, "har-meddelanden");
+  assert.equal(k.resultat!.meddelanden!.raknare, 2);
+  assert.deepEqual(k.attrapp.lage.borttagna, []);
+});
+
+test("räknaren noll men en konversation i inkorgen länkar till annonsen: ligger kvar", async () => {
+  const k = await kor({
+    dryRun: false,
+    attrapp: { konversationer: [{ nyckel: "k1", annonsId: ANNONS.id, rubrik: ANNONS.rubrik, text: "Finns den kvar? Kan ge 1 500." }] },
+  });
+  assert.equal(k.resultat!.status, "har-meddelanden");
+  assert.equal(k.resultat!.meddelanden!.konversationer, 1);
+  assert.deepEqual(k.attrapp.lage.borttagna, []);
+});
+
+test("en konversation om en ÄLDRE annons med samma rubrik håller inte kvar den här", async () => {
+  // Den äldre fick ligga kvar förra veckan för att en köpare skrev. Samma rubrik, annat id.
+  const k = await kor({
+    dryRun: false,
+    attrapp: { konversationer: [{ nyckel: "k1", annonsId: "19999999", rubrik: ANNONS.rubrik, text: "Finns den kvar?" }] },
+  });
+  assert.equal(k.fel, null, k.fel?.message);
+  assert.equal(k.resultat!.status, "borttagen");
+  assert.equal(k.resultat!.meddelanden!.konversationer, 0);
+  assert.deepEqual(k.attrapp.lage.borttagna, [{ id: ANNONS.id, skal: null }]);
+});
+
+test("räknaren går inte att läsa: räknas som meddelanden, ingenting tas bort", async () => {
+  const k = await kor({ dryRun: false, attrapp: { utanStatistik: true } });
+  assert.equal(k.resultat!.status, "har-meddelanden");
+  assert.equal(k.resultat!.meddelanden!.raknare, null);
+  assert.deepEqual(k.attrapp.lage.borttagna, []);
+});
+
+test("inga meddelanden: torrkörningen säger det och hittar valet som förut", async () => {
+  const k = await kor({ dryRun: true });
+  assert.equal(k.resultat!.status, "torrkorning");
+  assert.equal(k.resultat!.meddelanden!.harMeddelanden, false);
+});

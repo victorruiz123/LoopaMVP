@@ -183,10 +183,15 @@ export async function traderaMailStatus(): Promise<TraderaMailStatus> {
 /**
  * Vilket jobb gäller mejlet? Annons-id:t först; rubriken bara när den pekar på EXAKT ett jobb med
  * en publicerad annons. Två soffor med samma rubrik får hellre bli "okänd annons" än fel möbel såld.
+ *
+ * Id:t matchar också jobbets kvarlämnade annonser — äldre annonser som fick ligga kvar vid en
+ * omläggning för att en köpare skrivit (types.ts `KvarlamnadAnnons`). En försäljning där säljer möbeln.
  */
 export function matchJob(mail: Pick<TraderaMail, "itemId" | "title">, jobs: ConditionJob[]): ConditionJob | null {
   if (mail.itemId) {
-    const hit = jobs.find((j) => j.tradera?.itemId === mail.itemId);
+    const hit =
+      jobs.find((j) => j.tradera?.itemId === mail.itemId) ??
+      jobs.find((j) => (j.kvarlamnadeAnnonser ?? []).some((k) => k.kanal === "tradera" && k.itemId === mail.itemId));
     if (hit) return hit;
   }
   if (mail.title) {
@@ -233,7 +238,28 @@ async function actOn(mail: TraderaMail, jobs: ConditionJob[]): Promise<Omit<Trad
   }
   invalidate();
   console.info(`[tradera-post] ${loopaId} såld på Tradera (item ${itemId ?? "?"}) — markerad såld i butiken.`);
+  await taNerOvrigaTradera(job, loopaId, itemId);
   return { ...mail, loopaId, outcome: "sald", outcomeNote: null };
+}
+
+/**
+ * Möbeln såldes på en av sina Tradera-annonser. Ligger den ute på fler — den aktuella och äldre som
+ * lämnats kvar vid en omläggning — tas de andra ner, så att ingen kan köpa den en gång till. Köpet
+ * gäller oavsett: ett fel här loggas högt i stället för att kastas.
+ */
+async function taNerOvrigaTradera(job: ConditionJob, loopaId: string, saldItemId: number | null): Promise<void> {
+  try {
+    const { taNerKvarlamnadeTradera, taNerTraderaAnnons } = await import("./nedtagning.js");
+    if (saldItemId !== null && job.tradera?.itemId && job.tradera.itemId !== saldItemId) {
+      await taNerTraderaAnnons(job, loopaId, `möbeln såld på Tradera-annonsen ${saldItemId}`);
+    }
+    await taNerKvarlamnadeTradera(job, loopaId, "möbeln såld på Tradera", saldItemId);
+  } catch (err) {
+    console.error(
+      `[tradera-post] ${loopaId}: övriga Tradera-annonser kunde INTE tas ner efter försäljningen — ta ner dem för hand:`,
+      err instanceof Error ? err.message : err,
+    );
+  }
 }
 
 function adminLink(loopaId: string | null): string | null {

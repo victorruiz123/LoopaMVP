@@ -3,7 +3,7 @@ import { getAnnons, imageUrl, patchAnnons, provRedigering, startaGranskning } fr
 import { ArrowLeftIcon, CardIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsGranskning, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan, KanalPrisLage } from "../types";
+import type { AdminAnnonsDetalj, AnnonsAndring, AnnonsGranskning, AnnonsOverstyrning, BlocketPaket, BlocketPublication, ChannelPlan, KanalPrisLage, KvarlamnadAnnons } from "../types";
 
 /**
  * En annons, hela vägen ner — och vägen att ändra den.
@@ -286,6 +286,7 @@ export default function AdminAdScreen({
         </p>
       )}
       <BlocketRuta blocket={annons.blocket} />
+      <KvarlamnadeRuta annonser={annons.kvarlamnadeAnnonser ?? []} />
       {annons.blocketPaket && <BlocketPaketRuta paket={annons.blocketPaket} jobId={annons.jobId} loopaId={annons.id} />}
       <KanalStatus annons={annons} />
       <FacebookRuta annons={annons} onKoad={() => getAnnons(loopaId).then(ladda).catch(() => undefined)} setFel={setFel} />
@@ -520,6 +521,41 @@ function Kanallista({ kanaler }: { kanaler: ChannelPlan[] }) {
         );
       })}
     </ul>
+  );
+}
+
+/**
+ * Äldre annonser som ligger kvar bredvid den aktuella, för att en köpare skrev till dem när veckans
+ * omläggning kom. Samma möbel: Tradera-annonserna tas ner automatiskt när den säljs eller tas bort,
+ * Blocket-annonserna måste tas ner för hand — därför står de här.
+ */
+function KvarlamnadeRuta({ annonser }: { annonser: KvarlamnadAnnons[] }) {
+  const uppe = annonser.filter((a) => !a.nedtagenAt);
+  if (uppe.length === 0) return null;
+  return (
+    <section className="card-block">
+      <h2 className="profile-section-title">Äldre annonser som ligger kvar</h2>
+      <p className="admin-note">
+        En köpare skrev till dem, så de togs inte ner vid omläggningen. Möbeln ligger alltså ute på flera
+        annonser. Blocket-annonserna tas ner för hand när möbeln är såld.
+      </p>
+      <ul className="admin-kanaler">
+        {uppe.map((a, i) => (
+          <li key={`${a.url ?? a.itemId}-${i}`}>
+            {a.kanal === "tradera" ? "Tradera" : "Blocket"}
+            {a.pris !== null ? `, ${formatSek(a.pris)}` : ""}, kvar sedan {datum(a.lamnadAt)}:{" "}
+            {a.url ? (
+              <a href={a.url} target="_blank" rel="noreferrer">
+                {a.url}
+              </a>
+            ) : (
+              a.itemId
+            )}{" "}
+            — {a.skal}
+          </li>
+        ))}
+      </ul>
+    </section>
   );
 }
 

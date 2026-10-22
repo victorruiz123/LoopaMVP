@@ -72,7 +72,24 @@ export interface AttrappOptions {
    * Annonser som redan ligger uppe på kontot — det Mina annonser listar, och det prisroboten
    * (integrations/blocket/pris.ts) ska hitta och redigera. Tom = "Du har 0 annonser."
    */
-  annonser?: Array<{ id: string; rubrik: string; pris: number; aktiv?: boolean; beskrivning?: string; matt?: { hojd?: number; bredd?: number; djup?: number } }>;
+  annonser?: Array<{
+    id: string;
+    rubrik: string;
+    pris: number;
+    aktiv?: boolean;
+    beskrivning?: string;
+    matt?: { hojd?: number; bredd?: number; djup?: number };
+    /** "Skickade meddelanden" i ägarsidans statistikruta. Förval 0. */
+    meddelanden?: number;
+  }>;
+  /** Sant = ägarsidan saknar statistikrutan, så att räknaren inte går att läsa. */
+  utanStatistik?: boolean;
+  /**
+   * Inkorgen (/messages). Varje konversation har en rad i listan (rubriken, eller "(Annons)" när
+   * annonsen är borttagen, och sista meddelandet) och länkar i den öppna vyn till sin annons — när den
+   * finns. Förval: en konversation om någon annans soffa, som på det riktiga kontot.
+   */
+  konversationer?: Array<{ nyckel: string; annonsId: string | null; rubrik: string; text: string }>;
   /**
    * Sant = direktadressen /recommerce/create/<id> ger 404 utan Referer från Mina annonser, så att
    * reservvägen (kortets meny → "Ändra annonsen") blir prövad.
@@ -581,11 +598,15 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
       }
       const prisNu = Number(lage.prisNu[a.id] ?? a.pris);
       const annonsLage = lage.prisNu[a.id] !== undefined && prisNu > a.pris ? "Granskas" : "Aktiv";
+      // UPPMÄTT 2026-10-21: "Statistik · Klick på annonsen 0 · Sparad som favorit 0 · Skickade meddelanden 0".
+      const statistik = opts.utanStatistik
+        ? ""
+        : `<section><h3>Statistik</h3><p>Klick på annonsen</p><p>3</p><p>Sparad som favorit</p><p>0</p><p>Skickade meddelanden</p><p>${a.meddelanden ?? 0}</p></section>`;
       return html(
         sida(
           "Blocket – Mina annonser",
           `<main><h1>Hantera annons</h1><h2>${a.rubrik}</h2><p>${annonsLage}</p><p>331 dagar kvar</p>
-           <p>${a.rubrik}</p><p>Torget säljes ${prisNu},−</p>
+           <p>${a.rubrik}</p><p>Torget säljes ${prisNu},−</p>${statistik}
            <w-button data-sald="${a.id}">Markera som såld</w-button> <a href="/recommerce/create/${a.id}">Ändra annonsen</a>
            ${opts.borttagningBaraPaAgarsidan ? `<w-button data-meny="agare">Fler val</w-button><div id="meny-agare" style="display:none"><w-button data-ta-bort="${a.id}">Ta bort annonsen</w-button></div>` : ""}
            ${borttagningsDialog(opts)}</main>
@@ -690,6 +711,28 @@ export async function startaAttrapp(opts: AttrappOptions = {}): Promise<Attrapp>
         ),
       );
     }
+    // ── Inkorgen ──────────────────────────────────────────────────────────
+    // UPPMÄTT 2026-10-21: /messages skickar vidare till den senaste konversationen. Listan har en länk
+    // per konversation (/messages/id/<nyckel>); den öppna länkar till annonsen som /<id> så länge den finns.
+    const konversationer = opts.konversationer ?? [
+      { nyckel: "k-annan", annonsId: "26128097", rubrik: "Soffa mörkblå 3-sits", text: "Du: Hej! Finns soffan kvar?" },
+    ];
+    if (vag === "/messages") {
+      if (!inloggad) return omdirigera("/email-login");
+      if (konversationer.length) return omdirigera(`/messages/id/${konversationer[0].nyckel}`);
+      return html(sida("Meddelanden", "<h1>Meddelanden</h1>"));
+    }
+    const konv = vag.match(/^\/messages\/id\/([\w-]+)$/);
+    if (konv) {
+      if (!inloggad) return omdirigera("/email-login");
+      const oppen = konversationer.find((k) => k.nyckel === konv[1]);
+      const lista = konversationer
+        .map((k) => `<a href="/messages/id/${k.nyckel}"><div>${k.annonsId === null ? "(Annons)" : k.rubrik}</div><div>${k.text}</div></a>`)
+        .join("");
+      const vy = oppen?.annonsId ? `<a href="/${oppen.annonsId}">${oppen.rubrik}</a><p>${oppen.text}</p>` : `<p>${oppen?.text ?? ""}</p>`;
+      return html(sida("Meddelanden", `<h1>Meddelanden</h1><nav>${lista}</nav><section>${vy}</section>`));
+    }
+
     if (vag === "/email-login") {
       return html(sida("Logga in", "<h1>Logga in</h1><p>Vi skickar en kod till din e-post.</p>"));
     }

@@ -179,3 +179,36 @@ test("en bild som aldrig kommer upp stoppar förberedelsen — den gamla annonse
   assert.match(job.blocket!.pris!.fel!, /gick inte att förbereda.*Bara 1 av 2 bilder/);
   assert.equal(Object.keys(job.priceLadder!.omlaggning ?? {}).length, 0);
 });
+
+test("en köpare har skrivit till Blocket-annonsen: den ligger kvar, och den nya läggs upp bredvid", async () => {
+  const { job, attrapp } = await upplagt({ annonser: [{ id: GAMMALT_ID, rubrik: RUBRIK, pris: 2400 + FRAKT, meddelanden: 1 }] });
+  const post = brevlada();
+  await tickPriceLadders(Date.now(), post.beroenden);
+
+  assert.deepEqual(attrapp.lage.borttagna, [], "den gamla annonsen med konversationen rördes inte");
+  assert.equal(attrapp.lage.publicerad, true, "den nya gick upp");
+  assert.equal(attrapp.lage.formular?.pris, String(2040 + FRAKT), "med det SÄNKTA priset");
+  assert.equal(job.blocket!.status, "published");
+  assert.notEqual(job.blocket!.url, `${attrapp.bas}/${GAMMALT_ID}`);
+  assert.equal(job.blocket!.pris!.bekraftat, 2040);
+
+  const kvar = job.kvarlamnadeAnnonser ?? [];
+  assert.equal(kvar.length, 1, "den gamla står bland de kvarlämnade");
+  assert.equal(kvar[0].kanal, "blocket");
+  assert.equal(kvar[0].url, `${attrapp.bas}/${GAMMALT_ID}`);
+  assert.equal(kvar[0].pris, 2400);
+  assert.match(kvar[0].skal, /meddelanden/);
+  assert.equal(job.priceLadder!.omlaggningar![0].gamlaKvar, true);
+  assert.equal(Object.keys(job.priceLadder!.omlaggning ?? {}).length, 0);
+  assert.deepEqual(post.nere, []);
+});
+
+test("en konversation i inkorgen om annonsen räcker, även när räknaren står på noll", async () => {
+  const { job, attrapp } = await upplagt({
+    konversationer: [{ nyckel: "k1", annonsId: GAMMALT_ID, rubrik: RUBRIK, text: "Finns soffan kvar?" }],
+  });
+  await tickPriceLadders(Date.now(), brevlada().beroenden);
+  assert.deepEqual(attrapp.lage.borttagna, []);
+  assert.equal(attrapp.lage.publicerad, true);
+  assert.equal(job.kvarlamnadeAnnonser?.length, 1);
+});

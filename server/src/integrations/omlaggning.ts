@@ -17,11 +17,15 @@
  *
  * Kanalens egen publicering skriver över `job.tradera` / `job.blocket` helt. Hemleveransen annonsen gick
  * ut med förs därför över för hand, så att annonspriset inte byter fraktbelopp vid omläggningen.
+ *
+ * HAR EN KÖPARE SKRIVIT tas den gamla annonsen INTE ner (frågor på Tradera: tradera/fragor.ts,
+ * meddelanden på Blocket: blocket/meddelanden.ts) — en borttagen annons tar konversationen med sig.
+ * Den läggs i `job.kvarlamnadeAnnonser`, och den nya läggs upp bredvid som vanligt ("behallen").
  */
 
 import { getJob } from "../jobStore.js";
 import { loopaIdFor } from "../loopaId.js";
-import type { ConditionJob } from "../types.js";
+import type { ConditionJob, KvarlamnadAnnons } from "../types.js";
 import type { PrisKanal } from "../priceLadder.js";
 
 export type PubliceringsUtfall = { status: "uppe" } | { status: "fel"; fel: string } | { status: "senare"; skal: string };
@@ -49,13 +53,43 @@ export async function kanOmlaggas(kanal: PrisKanal): Promise<boolean> {
  */
 const forberedda = new Map<string, string>();
 
-export type NedtagningsUtfall = void | { status: "senare"; skal: string } | { status: "manuell"; skal: string };
+export type NedtagningsUtfall =
+  | void
+  | { status: "senare"; skal: string }
+  | { status: "manuell"; skal: string }
+  /** Den gamla annonsen ligger kvar (en köpare har skrivit), och kanalen står på "publicerar". */
+  | { status: "behallen"; skal: string };
+
+/** Lägger kanalens nuvarande annons bland de kvarlämnade, innan publiceringen skriver över den. */
+function lamnaKvar(job: ConditionJob, kanal: PrisKanal, skal: string): void {
+  const pub = kanal === "tradera" ? job.tradera : job.blocket;
+  const post: KvarlamnadAnnons = {
+    kanal,
+    itemId: kanal === "tradera" ? (job.tradera?.itemId ?? null) : null,
+    url: pub?.url ?? null,
+    pris: pub?.pris?.bekraftat ?? null,
+    lamnadAt: new Date().toISOString(),
+    skal,
+  };
+  job.kvarlamnadeAnnonser = [...(job.kvarlamnadeAnnonser ?? []), post];
+}
 
 export async function taNerForOmlaggning(job: ConditionJob, kanal: PrisKanal): Promise<NedtagningsUtfall> {
   if (kanal === "tradera") {
     const { taNerTraderaAnnons } = await import("./tradera/nedtagning.js");
     const { markTraderaPublishing } = await import("./tradera/publish.js");
     const frakt = job.tradera?.shippingSek ?? null;
+    const itemId = job.tradera?.itemId ?? null;
+    if (itemId) {
+      const { lasTraderaFragor } = await import("./tradera/fragor.js");
+      const fragor = await lasTraderaFragor(itemId);
+      if (fragor.harFragor) {
+        lamnaKvar(job, kanal, fragor.skal);
+        await markTraderaPublishing(job);
+        job.tradera!.shippingSek = frakt;
+        return { status: "behallen", skal: fragor.skal };
+      }
+    }
     await taNerTraderaAnnons(job, loopaIdFor(job.id), "veckans omläggning");
     await markTraderaPublishing(job);
     job.tradera!.shippingSek = frakt;
@@ -90,9 +124,11 @@ export async function taNerForOmlaggning(job: ConditionJob, kanal: PrisKanal): P
   const frakt = job.blocket?.shippingSek ?? null;
   const utfall = await taNerBlocketAnnons(job);
   if (utfall.status === "senare") return utfall;
+  if (utfall.status === "har-meddelanden") lamnaKvar(job, kanal, utfall.skal);
   forberedda.set(job.id, paketUrl);
   await markBlocketPublishing(job);
   job.blocket!.shippingSek = frakt;
+  if (utfall.status === "har-meddelanden") return { status: "behallen", skal: utfall.skal };
 }
 
 /** Publicerar annonsen igen, efter en nedtagning. Kastar aldrig: ett fel är ett utfall. */
