@@ -1155,6 +1155,8 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
 export interface PartnerSummering {
   slug: string;
   namn: string;
+  /** Hela länken. Saknas från äldre servrar — då byggs den på loopa.nu. */
+  lank?: string;
   besok: number;
   annonser: number;
   live: number;

@@ -419,6 +419,8 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
 export interface PartnerSummering {
   slug: string;
   namn: string;
+  /** Hela länken, att kopiera ur panelen och skicka till partnern. */
+  lank: string;
   /** Besök via länken. Räknas från driftsättningen; en besökare som laddar om räknas två gånger. */
   besok: number;
   /** Annonser som lagts upp via länken — "Sälj med Loopa" tryckt med partnern. Borttagna räknas med. */
@@ -431,7 +433,7 @@ export interface PartnerSummering {
 
 /** En rad per partner, också för den som inte gett något än — en nolla är också ett svar. */
 async function partnerSummering(rader: AdminAnnonsRad[]): Promise<PartnerSummering[]> {
-  const { PARTNERS, besoksHandelse } = await import("./partner/partners.js");
+  const { PARTNERS, besoksHandelse, partnerLank } = await import("./partner/partners.js");
   const global = await globalStatistik();
   return Object.values(PARTNERS).map((p) => {
     const egna = rader.filter((r) => r.partner === p.slug);
@@ -439,6 +441,7 @@ async function partnerSummering(rader: AdminAnnonsRad[]): Promise<PartnerSummeri
     return {
       slug: p.slug,
       namn: p.namn,
+      lank: partnerLank(p.slug),
       besok: global[besoksHandelse(p.slug)] ?? 0,
       annonser: egna.length,
       live: egna.filter((r) => r.lage === "live").length,

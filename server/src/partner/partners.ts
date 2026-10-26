@@ -18,6 +18,8 @@
  * web/public/partner/.
  */
 
+import { inbjudningsbas } from "../referral/kod.js";
+
 export interface Partner {
   /** Det som står i länken och på möbelns villkor. Byts aldrig — gamla annonser pekar på det. */
   slug: string;
@@ -32,6 +34,14 @@ export const PARTNERS: Record<string, Partner> = {
 export function partnerFor(raw: unknown): Partner | null {
   if (typeof raw !== "string") return null;
   return PARTNERS[raw.trim().toLowerCase()] ?? null;
+}
+
+/**
+ * Länken partnern delar: loopa.nu/p/<slug>. Samma bas som inbjudnings- och affiliate-länkarna
+ * (referral/kod.ts), så att den går att öppna på en telefon också lokalt.
+ */
+export function partnerLank(slug: string): string {
+  return `${inbjudningsbas() ?? "https://loopa.nu"}/p/${encodeURIComponent(slug)}`;
 }
 
 /**

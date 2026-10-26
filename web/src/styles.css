@@ -6118,8 +6118,9 @@ body:has(.grind) .consent { display: none; }
    Se AdminAdsScreen och server/src/partner/partners.ts. */
 .admin-partners { display: grid; gap: 8px; margin: 0 0 18px; }
 .admin-partner { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
-.admin-partner-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
-.admin-partner-head code { font-size: var(--fs-sm); color: var(--muted); }
+.admin-partner-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px; }
+.admin-partner-head code { font-size: var(--fs-sm); color: var(--muted); user-select: all; overflow-wrap: anywhere; }
+.admin-partner-head .btn { margin-left: auto; }
 .admin-partner-tal { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
 .admin-partner-tal b { color: var(--ink); }
 .admin-tag.partner-tag { background: #2f8a1f; }

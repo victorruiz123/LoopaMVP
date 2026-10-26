@@ -64,6 +64,16 @@ test("besöken via länken får skrivas till mätningen", () => {
   assert.equal(besoksHandelse("globalflytt"), "partner_besok_globalflytt");
 });
 
+test("panelens länk är loopa.nu/p/<slug>, att kopiera och skicka till partnern", async () => {
+  const { partnerLank } = await import("../server/src/partner/partners.js");
+  const fore = { r: process.env.REFERRAL_LINK_BASE, l: process.env.LOOPA_PUBLIC_URL };
+  delete process.env.REFERRAL_LINK_BASE;
+  process.env.LOOPA_PUBLIC_URL = "https://loopa.nu";
+  assert.equal(partnerLank("globalflytt"), "https://loopa.nu/p/globalflytt");
+  process.env.REFERRAL_LINK_BASE = fore.r ?? "";
+  if (fore.l === undefined) delete process.env.LOOPA_PUBLIC_URL; else process.env.LOOPA_PUBLIC_URL = fore.l;
+});
+
 test("en partnerannons betalas ut i sin helhet — Loopa tar 0 kr", async () => {
   const { id } = await saldPartnerMobel(randomUUID(), "globalflytt");
   const r = await markeraUtbetald(id, { mobelprisSek: 4500 }, "admin");
@@ -83,4 +93,5 @@ test("panelen märker partnerns annonser och räknar dem", async () => {
   // Två partnermöbler i det här testets lager: den här och den från testet ovan.
   assert.equal(gf.annonser, lista.rader.filter((r) => r.partner === "globalflytt").length);
   assert.ok(gf.annonser >= 1);
+  assert.match(gf.lank, /\/p\/globalflytt$/);
 });
