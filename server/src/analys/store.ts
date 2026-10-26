@@ -26,6 +26,7 @@ import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { createHash, randomBytes } from "node:crypto";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
+import { besoksHandelse, PARTNERS } from "../partner/partners.js";
 
 const ANALYS_DIR = () => process.env.ANALYS_DATA_DIR?.trim() || path.join(DATA_DIR, "analys");
 const EVENTS_FILE = () => path.join(ANALYS_DIR(), "handelser.jsonl");
@@ -62,6 +63,8 @@ export const KLIENTHANDELSER = new Set([
   "efterlysning_saved",
   "notification_clicked",
   "deadline_valve_clicked",
+  // Besöken via en partners länk, ett namn per partner. Se partner/partners.ts.
+  ...Object.keys(PARTNERS).map(besoksHandelse),
 ]);
 
 /** Händelser servern skriver själv. Kan inte komma utifrån — en besökare får inte påstå en visning. */

@@ -91,6 +91,7 @@ export const COMMON: Record<string, Translation> = {
   "annonser": { en: "listings", fr: "annonces" },
   "gratis": { en: "free", fr: "gratuites" },
   "gratisförsäljning": { en: "free sale", fr: "vente gratuite" },
+  "0 % via {partner}": { en: "0 % via {partner}", fr: "0 % via {partner}" },
   "inbjudna": { en: "invited", fr: "invités" },
   "registrerade": { en: "signed up", fr: "inscrits" },
   "sålda": { en: "sold", fr: "vendues" },

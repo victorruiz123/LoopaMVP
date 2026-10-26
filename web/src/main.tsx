@@ -5,6 +5,7 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { initViewMode } from "./lib/viewMode";
 import { fangaInbjudan } from "./lib/referral";
 import { fangaAffiliate } from "./lib/affiliate";
+import { fangaPartner } from "./lib/partner";
 import { LanguageProvider } from "./lib/i18n";
 import "./styles.css";
 
@@ -14,6 +15,8 @@ initViewMode();
 // Inbjudningskoden ur ?ref=, sparad i 30 dagar. Före render, så att ingen vy hinner läsa adressen med
 // koden kvar i. Se lib/referral.ts.
 fangaInbjudan();
+// Partnern ur /p/<slug>, FÖRE affiliate — samma sökväg, se lib/partner.ts.
+fangaPartner();
 // Affiliate-koden ur /p/KOD, i en cookie i 30 dagar. Se lib/affiliate.ts.
 fangaAffiliate();
 

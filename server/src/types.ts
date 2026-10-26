@@ -780,6 +780,11 @@ export interface SaleTerms {
   commissionRate: number;
   /** Krediten som användes, när en användes. Samma kredit står som `used` med den här möbeln. */
   referralCreditId: string | null;
+  /**
+   * Partnern annonsen kom via, när den kom via en (partner/partners.ts). Då är andelen 0 — partnerns
+   * kunder säljer utan provision — och annonsen bär partnerns märkning i panelen. Saknas på äldre jobb.
+   */
+  partner?: string | null;
   decidedAt: string;
 }
 

@@ -39,7 +39,7 @@ import {
 import { invalidate } from "./butik/inventory.js";
 import { allOrders, ordersForProduct, type Order } from "./butik/orders.js";
 import * as overrides from "./butik/overrides.js";
-import { allStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
+import { allStatistik, globalStatistik, handelserFor, statistikFor, tomStatistik, type AnalysHandelse, type AnnonsStatistik } from "./analys/store.js";
 import {
   armPriceLadder,
   bekraftaKanalPris,
@@ -90,6 +90,8 @@ export interface AdminAnnonsRad {
   saknas: string[];
   /** Sant när en admin rättat något på annonsen. */
   overstyrd: boolean;
+  /** Partnern annonsen kom via (ConditionJob.saleTerms.partner), som slug. Null = ingen. */
+  partner: string | null;
 
   // --- pris ---
   /** Priset som ligger nu: prisstegen om den finns, annars prismotorns förslag. */
@@ -325,6 +327,7 @@ function radAv(
     grade: job.result?.grade?.grade ?? null,
     saknas: produkt ? shopReadiness(produkt).missing : ["besiktning"],
     overstyrd: !!overstyrning,
+    partner: job.saleTerms?.partner ?? null,
 
     prisNu: produkt?.priceSek ?? (ladder ? Math.round(ladder.currentPrice) : null),
     prisStart: ladder ? Math.round(ladder.startPrice) : null,
@@ -362,7 +365,7 @@ function radAv(
  * 193 filer i dag, panelen öppnas av en handfull människor, och ett index som kan bli inaktuellt är
  * en sämre affär än en läsning som tar en halv sekund.
  */
-export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summering: Summering }> {
+export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summering: Summering; partners: PartnerSummering[] }> {
   /**
    * De borttagna annonserna står MED i listan, och det är därför de behålls på disk.
    *
@@ -410,7 +413,39 @@ export async function listaAnnonser(): Promise<{ rader: AdminAnnonsRad[]; summer
     });
   }
 
-  return { rader, summering: summera(rader) };
+  return { rader, summering: summera(rader), partners: await partnerSummering(rader) };
+}
+
+export interface PartnerSummering {
+  slug: string;
+  namn: string;
+  /** Besök via länken. Räknas från driftsättningen; en besökare som laddar om räknas två gånger. */
+  besok: number;
+  /** Annonser som lagts upp via länken — "Sälj med Loopa" tryckt med partnern. Borttagna räknas med. */
+  annonser: number;
+  live: number;
+  salda: number;
+  /** Möbelpris för det som sålts, alltså vad partnerns kunder fått ut utan provision. */
+  saltVarde: number;
+}
+
+/** En rad per partner, också för den som inte gett något än — en nolla är också ett svar. */
+async function partnerSummering(rader: AdminAnnonsRad[]): Promise<PartnerSummering[]> {
+  const { PARTNERS, besoksHandelse } = await import("./partner/partners.js");
+  const global = await globalStatistik();
+  return Object.values(PARTNERS).map((p) => {
+    const egna = rader.filter((r) => r.partner === p.slug);
+    const salda = egna.filter((r) => r.soldAt);
+    return {
+      slug: p.slug,
+      namn: p.namn,
+      besok: global[besoksHandelse(p.slug)] ?? 0,
+      annonser: egna.length,
+      live: egna.filter((r) => r.lage === "live").length,
+      salda: salda.length,
+      saltVarde: salda.reduce((s, r) => s + (r.prisNu ?? 0), 0),
+    };
+  });
 }
 
 export interface Summering {

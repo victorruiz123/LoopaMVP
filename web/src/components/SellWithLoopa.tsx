@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { getTraderaState, publishToTradera } from "../api";
+import { sparadPartner } from "../lib/partner";
 import { CheckIcon, CloseIcon } from "./icons";
 import ProcessFeedback from "./ProcessFeedback";
 import LegalLink from "./LegalLink";
@@ -101,6 +102,11 @@ export default function SellWithLoopa({
    */
   const [fragarOmProcessen, setFragarOmProcessen] = useState(false);
   const timer = useRef<number | null>(null);
+  /**
+   * Partnern säljaren kom via (lib/partner.ts), läst en gång. Följer med både när villkoren visas och
+   * när knappen trycks — servern sätter 0 % och märker annonsen. Se server.ts, saljvillkor.
+   */
+  const [partner] = useState(() => sparadPartner()?.slug ?? null);
 
   /** Pollar bara medan marknadsplatsens kö arbetar — annonsen går upp på 10-60 s. */
   const refresh = useCallback(async () => {
@@ -108,7 +114,7 @@ export default function SellWithLoopa({
     // ovanpå den från monteringen, och de två fördubblar varandra för varje varv.
     if (timer.current) window.clearTimeout(timer.current);
     try {
-      const next = await getTraderaState(jobId);
+      const next = await getTraderaState(jobId, partner);
       setState(next);
       if (next.publication?.status === "publishing" || next.blocket?.status === "publishing") {
         // Båda kanalerna. Blocket-roboten klickar i ett riktigt formulär och tar minuter — slutar
@@ -126,7 +132,7 @@ export default function SellWithLoopa({
     } catch {
       timer.current = window.setTimeout(refresh, 4000);
     }
-  }, [jobId]);
+  }, [jobId, partner]);
 
   useEffect(() => {
     void refresh();
@@ -171,7 +177,7 @@ export default function SellWithLoopa({
     setFailure(null);
     try {
       const gratisErbjuden = !!state?.villkor?.gratis;
-      setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis }));
+      setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis, partner }));
       setConfirming(false);
       setNyssSkickad(true);
       // Först när annonsen faktiskt gått iväg. Ett ja som föll på ett serverfel är inte en avslutad
@@ -373,7 +379,9 @@ export default function SellWithLoopa({
                 <strong className="sell-utfall-belopp">{formatSek(utfall.saljarenSek)}</strong>
                 <span className="sell-utfall-not">
                   {utfall.andel === 0
-                    ? t("hela möbelpriset — din gratisförsäljning")
+                    ? villkor?.partner
+                      ? t("hela möbelpriset — 0 kr i avgift via {partner}", { partner: villkor.partner.namn })
+                      : t("hela möbelpriset — din gratisförsäljning")
                     : t("av {pris} — Loopa tar {del}", {
                         pris: formatSek(utfall.mobelprisSek),
                         del: formatSek(utfall.loopaSek),
@@ -801,7 +809,9 @@ function SellConfirm({
                     {t("Loopas del")}
                     <span>
                       {gratis
-                        ? t("gratisförsäljning")
+                        ? saljvillkor?.partner
+                          ? t("0 % via {partner}", { partner: saljvillkor.partner.namn })
+                          : t("gratisförsäljning")
                         : d.tak
                           ? t("{andel} %, högst {tak}", { andel: Math.round(d.andel * 100), tak: formatSek(LOOPA_FEE_CAP_SEK) })
                           : t("{andel} % av priset", { andel: Math.round(d.andel * 100) })}

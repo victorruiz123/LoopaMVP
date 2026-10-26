@@ -165,6 +165,10 @@ export const LISTING: Record<string, Translation> = {
   Bilder: { en: "Photos", fr: "Photos" },
   "Läggs ut på": { en: "Published on", fr: "Publiée sur" },
   // ---- utbetalningen intill knappen ----
+  "hela möbelpriset — 0 kr i avgift via {partner}": {
+    en: "the whole price — no fee via {partner}",
+    fr: "tout le prix du meuble — aucuns frais via {partner}",
+  },
   "hela möbelpriset — din gratisförsäljning": {
     en: "the whole price — your free sale",
     fr: "tout le prix du meuble — votre vente gratuite",

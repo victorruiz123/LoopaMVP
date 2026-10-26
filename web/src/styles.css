@@ -645,6 +645,13 @@ body {
 /* Ordmärket mitt i rubriken: rubrikens storlek och vikt, men märkets eget snitt — annars står
    "loopa" med ett tvåvånings-a mitt i den mening som är sidans löfte. */
 .home-rubrik-loopa { color: var(--accent); font-family: var(--ordmark-font); }
+/* "loopa × partnerns logga" över rubriken, när besökaren kom via en partners länk (lib/partner.ts).
+   Loggan får sin egen höjd och ingen bredd: partnerns proportioner är deras, inte våra. */
+.partner-lockup { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+.partner-lockup .home-wordmark { font-size: 34px; }
+.partner-lockup-x { font-size: 26px; font-weight: 300; color: var(--muted); line-height: 1; }
+/* multiply: loggans vita bakgrund smälter in i sidans varma ton i stället för att stå som en ruta. */
+.partner-lockup-logga { height: 76px; width: auto; display: block; mix-blend-mode: multiply; }
 .home-ingress {
   margin: 14px 0 0; font-size: var(--fs-base); line-height: 1.45; color: var(--muted);
   max-width: 36ch; letter-spacing: -0.012em;
@@ -6106,3 +6113,13 @@ body:has(.grind) .consent { display: none; }
 .vid-haller-pa > div { display: flex; flex-direction: column; gap: 3px; }
 .vid-haller-pa strong { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .vid-haller-pa span { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
+
+/* ---- partnerna i adminpanelens annonslista ----
+   Se AdminAdsScreen och server/src/partner/partners.ts. */
+.admin-partners { display: grid; gap: 8px; margin: 0 0 18px; }
+.admin-partner { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+.admin-partner-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+.admin-partner-head code { font-size: var(--fs-sm); color: var(--muted); }
+.admin-partner-tal { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
+.admin-partner-tal b { color: var(--ink); }
+.admin-tag.partner-tag { background: #2f8a1f; }

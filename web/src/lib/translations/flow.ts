@@ -13,6 +13,10 @@ export const FLOW: Record<string, Translation> = {
   "Loopa AI · Möbler i Stockholm": { en: "Loopa AI · Furniture in Stockholm", fr: "Loopa AI · Meubles à Stockholm" },
   Låt: { en: "Let", fr: "Laissez" },
   "sälja din möbel.": { en: "sell your furniture.", fr: "vendre votre meuble." },
+  "Som kund hos {partner} säljer du utan avgift – Loopa tar 0 kr. Filma möbeln, så skriver vi annonsen, sätter priset och säljer den åt dig.": {
+    en: "As a {partner} customer you sell with no fee – Loopa takes 0 kr. Film your furniture and we write the listing, set the price and sell it for you.",
+    fr: "En tant que client de {partner}, vous vendez sans frais – Loopa prend 0 kr. Filmez votre meuble : nous rédigeons l'annonce, fixons le prix et le vendons pour vous.",
+  },
   "AI identifierar, granskar och säljer din möbel. Möt aldrig köparen!": {
     en: "AI identifies, inspects and sells your furniture. Never meet the buyer!",
     fr: "L'IA identifie, inspecte et vend votre meuble. Ne rencontrez jamais l'acheteur !",

@@ -613,7 +613,7 @@ async function tillampaPrisplan(
  * Allt klienten behöver för att rita knappen: om integrationen ens är påkopplad, vad som skulle
  * publiceras, och var ett pågående försök står.
  */
-async function traderaState(job: ConditionJob) {
+async function traderaState(job: ConditionJob, partnerSlug: unknown = null) {
   const readiness = await planTraderaPublish(job);
   const { planAutoPublish } = await import("./integrations/autoPublish.js");
   const { channels } = await planAutoPublish(job);
@@ -640,7 +640,7 @@ async function traderaState(job: ConditionJob) {
      * Vad säljaren får och vad Loopa tar, uträknat HÄR (provision.ts) och inte i klienten. Bär också
      * gratisförsäljningen när säljaren har en att använda — se saljvillkor.
      */
-    villkor: await saljvillkor(job, readiness.ok ? readiness.plan.itemPrice : null),
+    villkor: await saljvillkor(job, readiness.ok ? readiness.plan.itemPrice : null, partnerSlug),
     /**
      * Hur annonsen går HOS TRADERA: bud och om den gått ut.
      *
@@ -666,10 +666,27 @@ async function traderaState(job: ConditionJob) {
  * `last` är sant när villkoren redan är satta — möbeln har tryckts iväg en gång, och valet står fast.
  * Då visas bara det som gäller. Annars visas förvalet, och `gratis` bredvid när säljaren har en
  * tillgänglig kredit: klienten ritar valet, men beloppen i båda utfallen kommer härifrån.
+ *
+ * PARTNERN. Kom säljaren via en partners länk (partner/partners.ts) är förvalet 0 % och ingenting
+ * annat att välja: krediten erbjuds inte, den sparas till en möbel som inte har partnern bakom sig.
+ * Slugen kommer från klienten tills villkoren är satta, och från villkoren sedan.
  */
-async function saljvillkor(job: ConditionJob, mobelpris: number | null) {
+async function saljvillkor(job: ConditionJob, mobelpris: number | null, partnerSlug: unknown = null) {
   const { STANDARD_ANDEL, GRATIS_ANDEL, uppdelning } = await import("./provision.js");
+  const { partnerFor } = await import("./partner/partners.js");
   const las = job.saleTerms ?? null;
+  const partner = partnerFor(las ? las.partner : partnerSlug);
+  if (partner) {
+    return {
+      last: !!las,
+      valdGratis: false,
+      standard: mobelpris !== null ? uppdelning(mobelpris, las ? las.commissionRate : GRATIS_ANDEL) : null,
+      gratis: null,
+      krediter: 0,
+      forstaUtgang: null,
+      partner: { slug: partner.slug, namn: partner.namn },
+    };
+  }
   let krediter: { antal: number; forstaUtgang: string | null } = { antal: 0, forstaUtgang: null };
   const agare = ownerIdOf(job);
   if (!las && agare) {
@@ -689,13 +706,16 @@ async function saljvillkor(job: ConditionJob, mobelpris: number | null) {
     gratis: !las && krediter.antal > 0 && mobelpris !== null ? uppdelning(mobelpris, GRATIS_ANDEL) : null,
     krediter: krediter.antal,
     forstaUtgang: krediter.forstaUtgang,
+    partner: null,
   };
 }
 
-async function handleGetTradera(jobId: string, res: ServerResponse) {
+async function handleGetTradera(jobId: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(jobId);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  sendJson(res, 200, await traderaState(job));
+  // ?partner=<slug>: säljaren kom via en partners länk. Se saljvillkor.
+  const partner = new URL(req.url ?? "/", "http://x").searchParams.get("partner");
+  sendJson(res, 200, await traderaState(job, partner));
 }
 
 /**
@@ -752,13 +772,19 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
    * Bad säljaren om gratisförsäljningen och den inte går att få (krediten hann gå ut, eller användes
    * i en annan flik) läggs möbeln INTE ut på vanliga villkor i tysthet. Säljaren sa ja till 0 kr i
    * avgift, och ett ja till ett belopp gäller det beloppet.
+   *
+   * Kom säljaren via en partners länk gäller 0 % utan att någon kredit tas — se saljvillkor.
    */
-  const body = await readJsonBody<{ anvandGratis?: unknown }>(req, 1024).catch(() => ({}) as { anvandGratis?: unknown });
+  const body = await readJsonBody<{ anvandGratis?: unknown; partner?: unknown }>(req, 1024).catch(
+    () => ({}) as { anvandGratis?: unknown; partner?: unknown },
+  );
   let nyKredit: { id: string } | null = null;
   if (!job.saleTerms) {
     const { STANDARD_ANDEL, GRATIS_ANDEL } = await import("./provision.js");
+    const { partnerFor } = await import("./partner/partners.js");
     const agare = ownerIdOf(job);
-    if (body.anvandGratis === true) {
+    const partner = partnerFor(body.partner);
+    if (!partner && body.anvandGratis === true) {
       const { anvandKredit } = await import("./referral/regler.js");
       nyKredit = agare ? await anvandKredit(agare, readiness.plan.loopaId) : null;
       if (!nyKredit) {
@@ -769,10 +795,12 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
       }
     }
     job.saleTerms = {
-      commissionRate: nyKredit ? GRATIS_ANDEL : STANDARD_ANDEL,
+      commissionRate: partner || nyKredit ? GRATIS_ANDEL : STANDARD_ANDEL,
       referralCreditId: nyKredit?.id ?? null,
+      partner: partner?.slug ?? null,
       decidedAt: new Date().toISOString(),
     };
+    if (partner) console.info(`[partner] job ${jobId} läggs upp via ${partner.namn} — 0 % provision.`);
   }
 
   try {
@@ -2810,7 +2838,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (segments.length === 4 && segments[3] === "tradera") {
         if (req.method === "POST") return await handlePublishTradera(segments[2], req, res);
-        if (req.method === "GET") return await handleGetTradera(segments[2], res);
+        if (req.method === "GET") return await handleGetTradera(segments[2], req, res);
       }
       if (segments.length === 4 && segments[3] === "cover" && req.method === "GET") {
         return await handleGetCover(segments[2], res);

@@ -216,17 +216,21 @@ export async function savePricePlan(
  * direkt och arbetar vidare i bakgrunden. Namnet på anropet är marknadsplatsens, för det är den
  * servern talar med — men det säljaren beställer är en försäljning, se SellWithLoopa.
  */
-export async function getTraderaState(jobId: string): Promise<TraderaState> {
-  const res = await authFetch(`/api/jobs/${jobId}/tradera`);
+export async function getTraderaState(jobId: string, partner: string | null = null): Promise<TraderaState> {
+  // Partnern säljaren kom via (lib/partner.ts): då räknar servern villkoren med 0 % provision.
+  const res = await authFetch(`/api/jobs/${jobId}/tradera${partner ? `?partner=${encodeURIComponent(partner)}` : ""}`);
   return json(res);
 }
 
 /** Lägger ut möbeln till salu: en riktig Tradera-annons på Loopas konto. Svarar innan den är uppe. */
-export async function publishToTradera(jobId: string, opts: { anvandGratis?: boolean } = {}): Promise<TraderaState> {
+export async function publishToTradera(
+  jobId: string,
+  opts: { anvandGratis?: boolean; partner?: string | null } = {},
+): Promise<TraderaState> {
   const res = await authFetch(`/api/jobs/${jobId}/tradera`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anvandGratis: opts.anvandGratis === true }),
+    body: JSON.stringify({ anvandGratis: opts.anvandGratis === true, partner: opts.partner ?? null }),
   });
   return json(res);
 }
