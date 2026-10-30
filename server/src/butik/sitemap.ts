@@ -18,6 +18,7 @@ import { allProducts } from "./inventory.js";
 import { brandSlug, CATEGORIES } from "./catalog.js";
 import { typeFacetsMerged } from "./inventory.js";
 import { arIndexerbar, baseUrl } from "./seo.js";
+import { INLAGG } from "../../../web/src/lib/blogg.js";
 
 /** XML-escape. Titlar och märkesnamn kommer ur genererad text och kan innehålla vad som helst. */
 function esc(v: string): string {
@@ -131,6 +132,12 @@ export async function sitemapXml(): Promise<string> {
     { loc: `${base}/brands`, changefreq: "monthly", priority: "0.6" },
     { loc: `${base}/secondhand`, changefreq: "monthly", priority: "0.6" },
   ];
+
+  // Bloggen: listan och varje inlägg, med datumet inlägget senast ändrades. Se seo.ts bloggSida.
+  poster.push({ loc: `${base}/blogg`, changefreq: "weekly", priority: "0.7" });
+  for (const i of INLAGG) {
+    poster.push({ loc: `${base}/blogg/${i.slug}`, lastmod: i.uppdaterad, changefreq: "monthly", priority: "0.7" });
+  }
 
   /**
    * Kategorier utan varor står inte med.

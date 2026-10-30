@@ -16,6 +16,7 @@ import { useT } from "../lib/i18n";
 import { useViewMode } from "../lib/viewMode";
 import { sparadInbjudan } from "../lib/referral";
 import { sparadPartner } from "../lib/partner";
+import { BLOGG_RUBRIK, INLAGG } from "../lib/blogg";
 import { hamtaInbjudare, hamtaMinInbjudare } from "../api";
 
 function fold(s: string): string {
@@ -383,6 +384,16 @@ export default function HomeScreen({
             info@loopa.nu
           </a>
         </span>
+        {/* Guiderna, diskret i foten: sidan handlar om att sälja, men varje inlägg behöver en länk
+            härifrån för att sökmotorerna ska hitta och värdera det. Se lib/blogg.ts. */}
+        <nav className="home-guider" aria-label={BLOGG_RUBRIK}>
+          <a className="home-guider-rubrik" href="/blogg">{BLOGG_RUBRIK}</a>
+          {INLAGG.map((i) => (
+            <a key={i.slug} href={`/blogg/${i.slug}`}>
+              {i.titel}
+            </a>
+          ))}
+        </nav>
       </footer>
 
       <HurFungerarDet open={hurOppen} onClose={() => setHurOppen(false)} />

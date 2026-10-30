@@ -20,6 +20,7 @@ import { brandSlug, CATEGORIES, categoryBySlug, categoryLabel, categoryNoun as c
 import { typeFacetsMerged } from "./inventory.js";
 import { allProducts, applyFilter, productById } from "./inventory.js";
 import { BROWSABLE_STATES, type Product } from "./types.js";
+import { BLOGG_BESKRIVNING, BLOGG_RUBRIK, delarAvText, INLAGG, inlaggFor, renText, type BloggInlagg } from "../../../web/src/lib/blogg.js";
 
 const SITE = "Loopa Butik";
 const MOTTO = "Köp begagnat. Handla som nytt.";
@@ -82,7 +83,7 @@ export interface SeoHead {
    * og:type "product", eftersom de bär en ItemList. Ett delningskort som påstår att en lista med
    * fyrtio soffor är en produkt är fel på ett ställe där det syns. Bara produktsidan är en produkt.
    */
-  ogType?: "website" | "product";
+  ogType?: "website" | "product" | "article";
 }
 
 /**
@@ -496,6 +497,103 @@ export function flyttadAdress(host: string | null, pathname: string, search: str
 }
 
 /** Sidhuvudet för en adress under /butik, eller null när adressen inte är butikens. */
+// ---------------------------------------------------------------------------
+// Bloggen
+// ---------------------------------------------------------------------------
+
+/** Text med [länk](/adress) som HTML. Texten escapas; adresserna är interna och kommer ur vår egen fil. */
+function bloggTextHtml(text: string): string {
+  return delarAvText(text)
+    .map((d) => (d.href ? `<a href="${esc(d.href)}">${esc(d.text)}</a>` : esc(d.text)))
+    .join("");
+}
+
+/** Hela inlägget som HTML — samma text appen ritar, så att roboten läser exakt det besökaren ser. */
+function bloggInlaggHtml(i: BloggInlagg): string {
+  const delar = i.delar
+    .map(
+      (d) =>
+        `<h2>${esc(d.rubrik)}</h2>` +
+        d.stycken.map((p) => `<p>${bloggTextHtml(p)}</p>`).join("") +
+        (d.punkter ? `<ul>${d.punkter.map((p) => `<li>${bloggTextHtml(p)}</li>`).join("")}</ul>` : ""),
+    )
+    .join("");
+  const andra = INLAGG.filter((x) => x.slug !== i.slug);
+  return (
+    `<article><h1>${esc(i.titel)}</h1><p>${bloggTextHtml(i.ingress)}</p>${delar}${faqHtml(i.fragor)}</article>` +
+    `<p><a href="/">Sälj din möbel med Loopa</a></p>` +
+    `<h2>Fler guider</h2><ul>${andra.map((x) => `<li><a href="/blogg/${x.slug}">${esc(x.titel)}</a></li>`).join("")}</ul>`
+  );
+}
+
+function bloggInlaggJsonLd(i: BloggInlagg): Record<string, unknown> {
+  const base = baseUrl();
+  const utgivare = { "@type": "Organization", name: SAJTNAMN, url: `${base}/`, logo: { "@type": "ImageObject", url: `${base}/favicon.svg` } };
+  return {
+    "@context": "https://schema.org",
+    "@type": "BlogPosting",
+    headline: i.titel,
+    description: i.beskrivning,
+    datePublished: i.publicerad,
+    dateModified: i.uppdaterad,
+    inLanguage: "sv-SE",
+    mainEntityOfPage: `${base}/blogg/${i.slug}`,
+    author: utgivare,
+    publisher: utgivare,
+    articleBody: [i.ingress, ...i.delar.flatMap((d) => [d.rubrik, ...d.stycken, ...(d.punkter ?? [])])].map(renText).join("\n\n"),
+  };
+}
+
+/**
+ * /blogg och /blogg/<slug>.
+ *
+ * HELA TEXTEN I HTML:EN. Butikens sidor lägger en sammanfattning i kroppen och låter appen rita
+ * resten; ett blogginlägg ÄR sin text, och en robot som inte kör JavaScript ska läsa allt. Samma
+ * fil som appen ritar ur (web/src/lib/blogg.ts), så de två kan inte glida isär.
+ *
+ * En okänd slug får noindex, inte en egen 404: serveStatic skickar alltid 200 för appens vyer, och
+ * appen säger själv att inlägget inte finns.
+ */
+function bloggSida(pathname: string): SeoHead {
+  const slug = pathname.replace(/^\/blogg\/?/, "").replace(/\/+$/, "");
+  const lista = { name: "Guider", path: "/blogg" };
+  if (!slug) {
+    return {
+      title: `${BLOGG_RUBRIK} – ${SAJTNAMN}`,
+      description: BLOGG_BESKRIVNING,
+      canonical: `${baseUrl()}/blogg`,
+      ogType: "website",
+      jsonLd: grafer(breadcrumbJsonLd([{ name: SAJTNAMN, path: "/" }, lista])),
+      body:
+        `<h1>${esc(BLOGG_RUBRIK)}</h1><p>${esc(BLOGG_BESKRIVNING)}</p>` +
+        `<ul>${INLAGG.map((i) => `<li><a href="/blogg/${i.slug}">${esc(i.titel)}</a><p>${esc(i.beskrivning)}</p></li>`).join("")}</ul>` +
+        `<p><a href="/">Sälj din möbel med Loopa</a></p>`,
+    };
+  }
+  const i = inlaggFor(decodeURIComponent(slug));
+  if (!i) {
+    return {
+      title: `Guiden finns inte – ${SAJTNAMN}`,
+      description: BLOGG_BESKRIVNING,
+      canonical: `${baseUrl()}/blogg`,
+      noindex: true,
+      body: `<h1>Guiden finns inte</h1><p><a href="/blogg">Alla guider</a></p>`,
+    };
+  }
+  return {
+    title: `${i.titel} | ${SAJTNAMN}`,
+    description: i.beskrivning,
+    canonical: `${baseUrl()}/blogg/${i.slug}`,
+    ogType: "article",
+    jsonLd: grafer(
+      bloggInlaggJsonLd(i),
+      faqJsonLd(i.fragor),
+      breadcrumbJsonLd([{ name: SAJTNAMN, path: "/" }, lista, { name: i.titel, path: `/blogg/${i.slug}` }]),
+    ),
+    body: bloggInlaggHtml(i),
+  };
+}
+
 export async function seoFor(pathname: string, search: string): Promise<SeoHead | null> {
   /*
    * KÖPSIDANS SIDHUVUD ÄR BORTTAGET MED SIDAN.
@@ -539,9 +637,15 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
         `<li><a href="/butik">Köp begagnade möbler i butiken</a></li>` +
         `<li><a href="/efterlyses">Se vad köpare i Stockholm söker just nu</a></li>` +
         `<li><a href="/company">Om Loopa</a></li>` +
-        `</ul>`,
+        `</ul>` +
+        // Guiderna, så att varje inlägg har en länk från sajtens starkaste sida. Se bloggSida.
+        `<h2>${esc(BLOGG_RUBRIK)}</h2>` +
+        `<ul>${INLAGG.map((i) => `<li><a href="/blogg/${i.slug}">${esc(i.titel)}</a></li>`).join("")}</ul>`,
     };
   }
+
+  /** Bloggen: listan och inläggen. Se bloggSida och web/src/lib/blogg.ts. */
+  if (pathname === "/blogg" || pathname.startsWith("/blogg/")) return bloggSida(pathname);
 
   /**
    * Efterlysningsväggen, renderad per kategori.

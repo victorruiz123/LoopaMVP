@@ -26,6 +26,8 @@ import AffarApp from "./affar/AffarApp";
 import { isAffarPath } from "./affar/router";
 import { legalDocFromPath } from "./lib/legal";
 import LegalScreen from "./screens/LegalScreen";
+import BloggScreen from "./screens/BloggScreen";
+import { bloggVagFranAdress } from "./lib/blogg";
 import CookieConsent from "./components/CookieConsent";
 import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
@@ -146,6 +148,9 @@ export default function App() {
    */
   const legalDoc = legalDocFromPath(pathname);
 
+  /** /blogg och /blogg/<slug> — guiderna om att sälja möbler. Läses ur adressen av samma skäl. */
+  const blogg = bloggVagFranAdress(pathname);
+
   /**
    * /butik/** — köpsidan.
    *
@@ -192,6 +197,8 @@ export default function App() {
         <ButikApp />
       ) : legalDoc ? (
         <LegalScreen doc={legalDoc} />
+      ) : blogg ? (
+        <BloggScreen slug={blogg.slug} />
       ) : publicId ? (
         <PublicCardScreen initialId={publicId} />
       ) : (

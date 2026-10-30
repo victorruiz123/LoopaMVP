@@ -83,6 +83,12 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/efterlyses*"
 zone_name = "loopa.nu"
 
+# Bloggen: /blogg och /blogg/<slug>. Utan rutten svarar marknadssajtens Pages, och guiderna — hela
+# deras poäng är att sökmotorerna läser dem — finns bara på app.loopa.nu. Se server/src/butik/seo.ts.
+[[routes]]
+pattern = "loopa.nu/blogg*"
+zone_name = "loopa.nu"
+
 [[routes]]
 pattern = "loopa.nu/affar*"
 zone_name = "loopa.nu"

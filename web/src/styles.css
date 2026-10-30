@@ -751,7 +751,18 @@ body {
 .home-fot {
   display: flex; align-items: center; justify-content: space-between; gap: 12px;
   padding-top: 20px; border-top: 1px solid var(--border);
+  flex-wrap: wrap;
 }
+/* Guiderna i foten: en egen rad under ordmärket och adressen, liten och dämpad. De finns för den
+   som letar och för sökmotorerna, inte för att tävla med säljflödet. */
+.home-guider {
+  flex-basis: 100%; display: flex; flex-wrap: wrap; gap: 6px 16px;
+  margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--border);
+  font-size: var(--fs-sm); line-height: 1.4;
+}
+.home-guider a { color: var(--muted); text-decoration: none; }
+.home-guider a:hover { color: var(--ink); text-decoration: underline; }
+.home-guider .home-guider-rubrik { flex-basis: 100%; color: var(--ink-soft); font-weight: 600; }
 .home-fot .home-wordmark { font-size: 21px; }
 /* Orten och adressen hör ihop och står till höger som ett block — på smal skärm under varandra,
    så adressen aldrig hamnar utanför kanten. */
@@ -6124,3 +6135,23 @@ body:has(.grind) .consent { display: none; }
 .admin-partner-tal { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 6px; font-size: var(--fs-sm); color: var(--muted); }
 .admin-partner-tal b { color: var(--ink); }
 .admin-tag.partner-tag { background: #2f8a1f; }
+
+/* ---- bloggen (/blogg) ----
+   Lånar de juridiska sidornas läsyta (.legal, .legal-body) — samma sorts sida: lång text att läsa.
+   Se screens/BloggScreen.tsx. */
+.blogg-ingress { margin: 10px 0 0; font-size: var(--fs-lg); line-height: 1.5; color: var(--ink-soft); max-width: 62ch; }
+.blogg-text .blogg-ingress { margin: 0 0 8px; color: var(--ink); }
+.blogg-lista { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; max-width: 62ch; }
+.blogg-lista a {
+  display: grid; gap: 4px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px;
+  text-decoration: none; color: var(--ink);
+}
+.blogg-lista a:hover { border-color: var(--muted-soft); }
+.blogg-lista strong { font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.blogg-lista span { color: var(--muted); font-size: var(--fs-sm); line-height: 1.45; }
+.blogg-fler { margin-top: 30px; max-width: 62ch; }
+.blogg-fler h2 { font-size: var(--fs-lg); margin: 0 0 8px; color: var(--ink); }
+.blogg-fler ul { margin: 0; padding-left: 20px; }
+.blogg-fler li { margin-bottom: 6px; }
+.blogg-fler a { color: var(--accent-ink); }
+.blogg-cta { align-self: flex-start; margin-top: 28px; }
