@@ -3,7 +3,7 @@ import { listAnnonser } from "../api";
 import { ArrowLeftIcon, CardIcon, ChevronRight, SearchIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { usePageTitle } from "../lib/pageTitle";
-import type { AdminAnnonsRad, AdminAnnonser, AnnonsLage } from "../types";
+import type { AdminAnnonsRad, AdminAnnonser, AnnonsLage, PartnerSummering } from "../types";
 
 /**
  * Alla annonser vi fått in.
@@ -146,6 +146,8 @@ export default function AdminAdsScreen({
   }
 
   const s = data?.summering;
+  /** Partnernas namn per slug, för märkningen på raden. Se server/src/partner/partners.ts. */
+  const partnerNamn = new Map((data?.partners ?? []).map((p) => [p.slug, p.namn]));
 
   return (
     <div className={inbaddad ? "admin-flik" : "screen screen-light profile admin"}>
@@ -203,6 +205,19 @@ export default function AdminAdsScreen({
           <div className="profile-stat-label">Median till såld</div>
         </div>
       </section>
+
+      {/*
+        PARTNERNA: företag som skickar sina kunder hit med en egen länk, och vars kunder säljer utan
+        provision. En rad per partner, också när allt är noll — då vet man att länken inte använts.
+        Besöken räknas från driftsättningen av partnerlänken.
+      */}
+      {(data?.partners?.length ?? 0) > 0 && (
+        <section className="admin-partners">
+          {data!.partners!.map((p) => (
+            <PartnerKort key={p.slug} partner={p} />
+          ))}
+        </section>
+      )}
 
       {/*
         Mätningen började när den byggdes, och det måste stå i vyn.
@@ -290,6 +305,7 @@ export default function AdminAdsScreen({
                     {r.titel}
                     <span className={`annons-lage annons-lage-${r.lage}`}>{LAGE_ETIKETT[r.lage]}</span>
                     {r.overstyrd && <span className="admin-tag">Rättad</span>}
+                    {r.partner && <span className="admin-tag partner-tag">Via {partnerNamn.get(r.partner) ?? r.partner}</span>}
                     {/* AI-granskningens besked, så att kön går att läsa utan att öppna varje annons. */}
                     {r.granskning?.status === "klar" && (
                       <span className={`admin-tag ${r.granskning.beslut === "godkann" ? "ai-tag-ok" : "ai-tag-nej"}`}>
@@ -349,4 +365,42 @@ function prisText(r: AdminAnnonsRad): string | null {
   if (r.prisNu === null) return null;
   if (r.prisStart !== null && r.prisStart !== r.prisNu) return `${r.prisStart} → ${formatSek(r.prisNu)}`;
   return formatSek(r.prisNu);
+}
+
+/**
+ * En partner i panelen: länken att kopiera och skicka till dem, och vad den gett.
+ *
+ * Länken står också utskriven och markerbar: faller urklippet (en webbläsare som nekar det) går den
+ * fortfarande att kopiera för hand.
+ */
+function PartnerKort({ partner: p }: { partner: PartnerSummering }) {
+  const lank = p.lank ?? `https://loopa.nu/p/${p.slug}`;
+  const [kopierad, setKopierad] = useState(false);
+  async function kopiera() {
+    try {
+      await navigator.clipboard.writeText(lank);
+      setKopierad(true);
+      window.setTimeout(() => setKopierad(false), 3000);
+    } catch {
+      // Urklippet nekat. Länken står utskriven bredvid.
+    }
+  }
+  return (
+    <div className="admin-partner">
+      <div className="admin-partner-head">
+        <strong>{p.namn}</strong>
+        <code className="admin-partner-lank">{lank}</code>
+        <button type="button" className="btn btn-primary btn-small" onClick={() => void kopiera()}>
+          {kopierad ? "Kopierad ✓" : "Kopiera länk"}
+        </button>
+      </div>
+      <div className="admin-partner-tal">
+        <span><b>{p.besok}</b> besök</span>
+        <span><b>{p.annonser}</b> annonser</span>
+        <span><b>{p.live}</b> uppe</span>
+        <span><b>{p.salda}</b> sålda</span>
+        <span><b>{formatSek(p.saltVarde)}</b> sålt för, 0 % provision</span>
+      </div>
+    </div>
+  );
 }

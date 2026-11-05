@@ -66,7 +66,8 @@ export async function serveStatic(pathname: string, res: ServerResponse, search 
   /**
    * Sidor som ska gå att hitta får sitt huvud ifyllt innan de skickas.
    *
-   * TRE INGÅNGAR: roten, butiken (möbler till salu) och efterlysningsväggen (möbler folk söker). Den
+   * FYRA INGÅNGAR: roten, butiken (möbler till salu), efterlysningsväggen (möbler folk söker) och
+   * bloggen (guiderna om att sälja, se seo.ts bloggSida). Den
    * mellersta kom till med köpsidan och är minst lika viktig för sökmotorer — "sökes string hylla
    * stockholm" är en fråga folk ställer, och varje kategori är en sida som svarar.
    *
@@ -75,7 +76,7 @@ export async function serveStatic(pathname: string, res: ServerResponse, search 
    * via en sökmotor, och en riktig fil serveras som den är.
    * Faller uppslaget skickas skalet orört — en trasig titel får aldrig bli en trasig sida.
    */
-  if (!direct && (pathname === "/" || pathname.startsWith("/butik") || pathname.startsWith("/efterlyses"))) {
+  if (!direct && (pathname === "/" || pathname.startsWith("/butik") || pathname.startsWith("/efterlyses") || pathname.startsWith("/blogg"))) {
     try {
       const head = await seoFor(pathname, search);
       if (head) {

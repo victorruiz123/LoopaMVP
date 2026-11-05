@@ -622,6 +622,8 @@ export interface SaljVillkor {
   gratis: Uppdelning | null;
   krediter: number;
   forstaUtgang: string | null;
+  /** Partnern säljaren kom via — då är `standard` redan 0 % och `gratis` null. Saknas från äldre servrar. */
+  partner?: { slug: string; namn: string } | null;
 }
 
 /** GET /api/salj/inbjudan. */
@@ -1093,6 +1095,8 @@ export interface AdminAnnonsRad {
   ordrar: number;
   /** AI-granskningens senaste besked. Null = aldrig granskad. */
   granskning?: { status: AnnonsGranskning["status"]; beslut: AnnonsGranskning["beslut"] } | null;
+  /** Partnern annonsen kom via, som slug. Saknas från äldre servrar. */
+  partner?: string | null;
 }
 
 export interface AnnonsOverstyrning {
@@ -1239,8 +1243,23 @@ export interface AdminAnnonsDetalj extends AdminAnnonsRad {
   granskningDetalj?: AnnonsGranskning | null;
 }
 
+/** En partners siffror i panelen. Se server/src/adminAnnonser.ts, PartnerSummering. */
+export interface PartnerSummering {
+  slug: string;
+  namn: string;
+  /** Hela länken. Saknas från äldre servrar — då byggs den på loopa.nu. */
+  lank?: string;
+  besok: number;
+  annonser: number;
+  live: number;
+  salda: number;
+  saltVarde: number;
+}
+
 export interface AdminAnnonser {
   rader: AdminAnnonsRad[];
+  /** Saknas från äldre servrar. */
+  partners?: PartnerSummering[];
   summering: {
     antal: number;
     vantar: number;

@@ -16,6 +16,8 @@ import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 import { useViewMode } from "../lib/viewMode";
 import { sparadInbjudan } from "../lib/referral";
+import { sparadPartner } from "../lib/partner";
+import { BLOGG_RUBRIK, INLAGG } from "../lib/blogg";
 import { hamtaInbjudare, hamtaMinInbjudare } from "../api";
 
 function fold(s: string): string {
@@ -117,6 +119,13 @@ export default function HomeScreen({
   const inbjuden = inbjudare !== null;
 
   /**
+   * PARTNERN. Kom besökaren via en partners länk (loopa.nu/p/globalflytt, se lib/partner.ts) står
+   * "loopa × partnerns logga" överst, och ingressen säger det partnern lovat sina kunder: 0 kr i
+   * avgift. Går före inbjudan — länken säljaren nyss klickade på är den som förklarar varför de är här.
+   */
+  const [partner] = useState(() => sparadPartner());
+
+  /**
    * Förifyllningen från affären, hämtad en gång.
    *
    * Går rakt in i filmningen när märket är känt: säljaren kom hit för att filma sin möbel, inte för
@@ -194,7 +203,23 @@ export default function HomeScreen({
         många, och det ska inte ligga tre skärmar ned.
       */}
       <header className="home-hero" data-matt="salj_hero">
-        {inbjuden ? (
+        {partner ? (
+          <>
+            <div className="partner-lockup" aria-label={`loopa × ${partner.namn}`}>
+              <span className="home-wordmark">loopa</span>
+              <span className="partner-lockup-x" aria-hidden>×</span>
+              <img className="partner-lockup-logga" src={partner.logga} alt={partner.namn} />
+            </div>
+            <h1 className="home-rubrik">
+              {t("Låt")} <span className="home-rubrik-loopa">loopa</span> {t("sälja din möbel.")}
+            </h1>
+            <p className="home-ingress">
+              {t("Som kund hos {partner} säljer du utan avgift – Loopa tar 0 kr. Filma möbeln, så skriver vi annonsen, sätter priset och säljer den åt dig.", {
+                partner: partner.namn,
+              })}
+            </p>
+          </>
+        ) : inbjuden ? (
           <>
             <h1 className="home-rubrik">
               {inbjudare.namn ? t("{namn} bjöd in dig!", { namn: inbjudare.namn }) : t("En vän bjöd in dig!")}
@@ -361,6 +386,16 @@ export default function HomeScreen({
             info@loopa.nu
           </a>
         </span>
+        {/* Guiderna, diskret i foten: sidan handlar om att sälja, men varje inlägg behöver en länk
+            härifrån för att sökmotorerna ska hitta och värdera det. Se lib/blogg.ts. */}
+        <nav className="home-guider" aria-label={BLOGG_RUBRIK}>
+          <a className="home-guider-rubrik" href="/blogg">{BLOGG_RUBRIK}</a>
+          {INLAGG.map((i) => (
+            <a key={i.slug} href={`/blogg/${i.slug}`}>
+              {i.titel}
+            </a>
+          ))}
+        </nav>
       </footer>
 
       <HurFungerarDet open={hurOppen} onClose={() => setHurOppen(false)} />
