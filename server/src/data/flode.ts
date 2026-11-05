@@ -90,7 +90,133 @@ export const FLODESHANDELSER = new Set([
   "enhet",
   /** Kontot loggade in. Bär inget eget innehåll — poängen är `uid` på raden. */
   "saljare",
+  /** Ett mikrosteg nåddes — en milstolpe INOM en skärm. Se MIKROSTEG. */
+  "mikro",
+  /** En namngiven knapp trycktes. Se KLICK. */
+  "klick",
+  /** Något gick fel för säljaren. Se FEL. */
+  "fel",
 ]);
+
+/**
+ * Mikrostegen, i den ordning flödet går.
+ *
+ * VARFÖR DE FINNS. De tio skärmarna i STEG säger VAR någon lämnade, inte vad de gjorde där.
+ * Filmningen är en skärm men fem saker — kameran öppnas, inspelningen startar, varvet blir klart,
+ * omslaget tas, bilderna granskas — och den som lämnar efter tre försök att spela in är ett annat
+ * problem än den som aldrig fick igång kameran. Fyra skärmar (frågorna, varianten, väntan på
+ * annonsen och måtten) syntes dessutom som EN, eftersom de ritas av samma grind.
+ *
+ * ORDNINGEN ÄR KARTANS ORDNING. Flödeskartan i panelen läser framåt och bakåt ur den, så ett nytt
+ * mikrosteg läggs in där det hör hemma i flödet, inte sist.
+ */
+export const MIKROSTEG = [
+  "startsida",
+  "marke_valt",
+  "dator_val",
+  "kamera_oppnad",
+  "fotoguide",
+  "inspelning_startad",
+  "varv_klart",
+  "granskar_bilder",
+  "konto",
+  "skickar_in",
+  "uppladdat",
+  "vantar_modell",
+  "valjer_modell",
+  "modell_vald",
+  "fragor",
+  "variant",
+  "vantar_annons",
+  "matt",
+  "pris",
+  "besiktning",
+  "skickrapport",
+  "fardig_annons",
+  "publicerad",
+] as const;
+
+export const MIKRO_INDEX = new Map<string, number>(MIKROSTEG.map((s, i) => [s, i]));
+
+/**
+ * Knapparna som mäts. Namngivna handlingar, inte varje klick på skärmen: ett klick på en koordinat
+ * säger ingenting som går att läsa, "tog om omslagsbilden" gör det.
+ */
+export const KLICK = new Set([
+  "spela_in",
+  "omslag_tagen",
+  "omslag_ta_om",
+  "omslag_godkant",
+  "omslag_hoppat",
+  "vinkel_tagen",
+  "vinkel_fran_fil",
+  "vinkel_hoppad",
+  "bilder_fran_galleri",
+  "ta_bort_bild",
+  "oppna_fotoguide",
+  "dator_video",
+  "dator_omslag",
+  "dator_fortsatt",
+  "skicka_bilder",
+  "tillbaka",
+  "uppladdning_forsok_igen",
+  "uppladdning_tillbaka",
+  "valj_kandidat",
+  "skriv_modell",
+  "hitta_fler",
+  "fragor_skickade",
+  "variant_vald",
+  "matt_nasta",
+  "matt_tillbaka",
+  "annons_fortsatt_anda",
+  "byt_modell",
+  "se_skick",
+  "besiktning_forsok_igen",
+  "besiktning_avbryt",
+  "skada_stammer",
+  "skada_stammer_inte",
+  "skickrapport_vidare",
+  "publicera",
+  "publicera_bekrafta",
+  "publicera_avbryt",
+]);
+
+/**
+ * Felen som mäts. Ett avhopp direkt efter ett fel är ett annat problem än ett avhopp efter tre
+ * minuters tvekan, och utan felen går de två inte att skilja åt.
+ */
+export const FEL = new Set([
+  "kamera_nekad",
+  "kamera_saknas",
+  "kamera_upptagen",
+  "kamera_https",
+  "kamera_start",
+  "kamera_uppspelning",
+  "kamera_avstangd",
+  "inspelning_tom",
+  "video_for_kort",
+  "bildruta_fel",
+  "for_manga_bilder",
+  "fel_filtyp",
+  "bild_olaslig",
+  "dator_video_fel",
+  "uppladdning_misslyckad",
+  "uppladdning_tidsgrans",
+  "modell_hittades_inte",
+  "modell_sok_fel",
+  "modell_val_misslyckat",
+  "fragor_sparfel",
+  "variant_sparfel",
+  "annons_misslyckad",
+  "besiktning_fel",
+  "publicering_misslyckad",
+]);
+
+const NAMNLISTOR: Record<string, ReadonlySet<string>> = {
+  mikro: new Set<string>(MIKROSTEG),
+  klick: KLICK,
+  fel: FEL,
+};
 
 /**
  * Egenskaper som får följa med. Allt annat kastas.
@@ -100,7 +226,7 @@ export const FLODESHANDELSER = new Set([
  * kategori, för panelen ska kunna svara på VAD folk undrar över utan att bli ett läsbart arkiv över
  * vad enskilda personer frågat.
  */
-const TILLATNA_PROPS = new Set(["steg", "ms", "chatt", "kategori", "text", "enhet", "plattform", "bredd", "vy", "varv"]);
+const TILLATNA_PROPS = new Set(["steg", "ms", "chatt", "kategori", "text", "enhet", "plattform", "bredd", "vy", "varv", "namn", "detalj", "varde"]);
 
 export interface FlodesRad {
   at: string;
@@ -147,6 +273,25 @@ export interface FlodesSession {
   enhet: string | null;
   plattform: string | null;
   vy: string | null;
+  /**
+   * Tidslinjen: allt som hände, i ordning — skärmar, mikrosteg, klick, fel, frågor och avhopp.
+   * Det är den panelens "användarens resa" ritar, och den flödeskartan räknas ur.
+   */
+  punkter: Punkt[];
+  /** Mikrostegen i den ordning de nåddes, upprepningar i rad borttagna. */
+  mikro: string[];
+}
+
+export interface Punkt {
+  at: string;
+  typ: "steg" | "mikro" | "klick" | "fel" | "fraga" | "avhopp" | "intygat" | "konto";
+  namn: string;
+  /** Skärmen säljaren stod på. */
+  steg: string | null;
+  /** Ett tal som hör till punkten: sekunder, antal bilder, kilobyte. */
+  varde: number | null;
+  /** En kort kod: vinkeln, felets underart. */
+  detalj: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -177,8 +322,9 @@ function skrivIn(rad: FlodesRad): void {
     rader = [];
     sessioner.set(rad.sess, rader);
   }
-  // Taket per session stoppar en klient som fastnat i en slinga från att äta minnet.
-  if (rader.length < 400) rader.push(rad);
+  // Taket per session stoppar en klient som fastnat i en slinga från att äta minnet. Högre än förr:
+  // klicken och mikrostegen gör en vanlig session ett par hundra rader lång.
+  if (rader.length < 800) rader.push(rad);
 }
 
 async function ladda(): Promise<void> {
@@ -240,6 +386,18 @@ export async function spara(
     if (!/^[A-Za-z0-9_-]{8,40}$/.test(nyckel)) return;
     const rensade = stada(props);
     if (typeof rensade.steg === "string" && !STEG_INDEX.has(rensade.steg)) delete rensade.steg;
+    // Mikrosteg, klick och fel måste bära ett namn ur sin egen lista. Ett okänt namn kastas hela
+    // raden — en öppen väg som tog emot vilket namn som helst vore en fri textrad in i filen.
+    const lista = NAMNLISTOR[event];
+    if (lista) {
+      if (typeof rensade.namn !== "string" || !lista.has(rensade.namn)) return;
+    } else {
+      delete rensade.namn;
+    }
+    if (rensade.detalj !== undefined && !(typeof rensade.detalj === "string" && /^[a-z0-9_-]{1,40}$/.test(rensade.detalj))) {
+      delete rensade.detalj;
+    }
+    if (rensade.varde !== undefined && typeof rensade.varde !== "number") delete rensade.varde;
     await redo();
     const rad: FlodesRad = {
       at: new Date().toISOString(),
@@ -291,13 +449,26 @@ function bygg(sess: string, rader: FlodesRad[]): FlodesSession {
     enhet: null,
     plattform: null,
     vy: null,
+    punkter: [],
+    mikro: [],
   };
 
 
   const sedda = new Set<string>();
   let langst = -1;
+  /** Skärmen som gällde senast — klick och fel ärver den när klienten inte skickat någon egen. */
+  let aktuelltSteg: string | null = null;
   for (const rad of sorterade) {
     const steg = typeof rad.props.steg === "string" ? rad.props.steg : null;
+    if (steg) aktuelltSteg = steg;
+    const punkt = (typ: Punkt["typ"], namn: string): Punkt => ({
+      at: rad.at,
+      typ,
+      namn,
+      steg: steg ?? aktuelltSteg,
+      varde: typeof rad.props.varde === "number" ? rad.props.varde : typeof rad.props.ms === "number" ? rad.props.ms : null,
+      detalj: typeof rad.props.detalj === "string" ? rad.props.detalj : null,
+    });
     if (steg && !sedda.has(steg)) {
       sedda.add(steg);
       ut.besokta.push(steg);
@@ -310,14 +481,34 @@ function bygg(sess: string, rader: FlodesRad[]): FlodesSession {
       }
     }
     switch (rad.event) {
+      case "mikro":
+      case "klick":
+      case "fel": {
+        const namn = typeof rad.props.namn === "string" ? rad.props.namn : null;
+        if (!namn) break;
+        ut.punkter.push(punkt(rad.event, namn));
+        if (rad.event === "mikro" && ut.mikro[ut.mikro.length - 1] !== namn) ut.mikro.push(namn);
+        break;
+      }
+      case "avhopp":
+        ut.punkter.push(punkt("avhopp", steg ?? aktuelltSteg ?? "okänt"));
+        break;
+      case "saljare":
+        ut.punkter.push(punkt("konto", "inloggad"));
+        break;
       case "steg":
         if (steg && typeof rad.props.ms === "number") ut.perSteg[steg] = (ut.perSteg[steg] ?? 0) + rad.props.ms;
+        // En "steg"-rad skickas när ett steg LÄMNAS och bär tiden där. Tidslinjen visar den som att
+        // skärmen lämnades, med tiden — och en rad med ms 0 är bara jobbkopplingen, ingen händelse.
+        if (steg && typeof rad.props.ms === "number" && rad.props.ms > 0) ut.punkter.push(punkt("steg", steg));
         break;
       case "intygat":
+        ut.punkter.push(punkt("intygat", "intygat"));
         ut.intygat = true;
         ut.tidTillIntygat = new Date(rad.at).getTime() - new Date(forsta.at).getTime();
         break;
       case "guide_fraga":
+        ut.punkter.push(punkt("fraga", typeof rad.props.kategori === "string" ? rad.props.kategori : "övrigt"));
         ut.fragor.push({
           at: rad.at,
           steg,

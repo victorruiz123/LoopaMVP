@@ -19,6 +19,8 @@ import AdminAdScreen from "./screens/AdminAdScreen";
 import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
 import ButikApp from "./butik/ButikApp";
+import OmOssScreen from "./screens/OmOssScreen";
+import { isOmOssPath } from "./components/HemFlikar";
 import KopApp from "./kop/KopApp";
 import { isButikPath } from "./butik/router";
 import { isKopPath } from "./kop/router";
@@ -31,12 +33,14 @@ import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchWait from "./components/ModelSearchWait";
 import ListingBuildWait from "./components/ListingBuildWait";
-import { AuthRequiredError, createJob, getJob, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
+import { AuthRequiredError, claimGuestJobs, createJob, getJob, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
 import type { AdminFlik } from "./screens/AdminScreen";
 import * as flode from "./lib/flode";
+import Mikro from "./components/Mikro";
+import * as besok from "./lib/besok";
 import { getViewMode } from "./lib/viewMode";
 
 type Screen =
@@ -174,11 +178,29 @@ export default function App() {
    */
   const affar = isAffarPath(pathname);
 
+  /** /om-oss — startsidans andra flik. Ett vägval på adressen, som de juridiska sidorna. */
+  const omOss = isOmOssPath(pathname);
+
   /**
    * Länken i återställningsmejlet. Före allt annat: besökaren kom hit för att byta lösenord, och den
    * session länken gav ska inte släppa in dem någon annanstans förrän det är gjort. Se LosenordScreen.
    */
-  const { losenordslage } = useAuth();
+  const { losenordslage, user } = useAuth();
+
+  /**
+   * Besöksmätningen: varje sidbyte, och kontot så fort det finns.
+   *
+   * Säljflödet bor på roten och byter skärm utan att byta adress, så där mäter FlowApp själv med
+   * skärmnamnet. Här mäts allt annat — butiken, köpsidan, kortet, Trygg affär, de juridiska sidorna.
+   * Se lib/besok.ts.
+   */
+  const flodetVisas = !losenordslage && !affar && !kop && !butik && !legalDoc && !publicId && !omOss;
+  useEffect(() => {
+    if (!flodetVisas) besok.sidaVisad(pathname, null);
+  }, [pathname, flodetVisas]);
+  useEffect(() => {
+    besok.knytKonto(user?.id ?? null);
+  }, [user?.id]);
 
   return (
     <>
@@ -194,6 +216,8 @@ export default function App() {
         <LegalScreen doc={legalDoc} />
       ) : publicId ? (
         <PublicCardScreen initialId={publicId} />
+      ) : omOss ? (
+        <OmOssScreen />
       ) : (
         <FlowApp />
       )}
@@ -225,8 +249,9 @@ function useMediaSession(userId: string | undefined): boolean {
   // Samma svar bär adminrollen. Den avgörs av servern på adressen Supabase bekräftat — klienten
   // ritar bara ingången efter beskedet, och varje adminväg prövar rollen igen på sin egen sida.
   const [isAdmin, setIsAdmin] = useState(false);
+  // Även för gästen: bilderna i flödet visas innan kontot finns. Kakan utfärdas då åt gäst-id:t, och
+  // på nytt åt kontot när säljaren loggat in.
   useEffect(() => {
-    if (!userId) return;
     void ensureMediaSession()
       .then((session) => setIsAdmin(session.isAdmin))
       .catch((err) => console.warn("[loopa] bildsession:", err));
@@ -321,6 +346,31 @@ function FlowApp() {
   useEffect(() => {
     flode.knytTillSaljare(user?.id ?? null);
   }, [user?.id]);
+  // Den som loggar in efter att ha börjat som gäst tar med sig det de gjort till kontot.
+  useEffect(() => {
+    if (user) void claimGuestJobs().catch((err) => console.warn("[loopa] gästjobb:", err));
+  }, [user?.id]);
+  /**
+   * Skärmen som en sida i besöksmätningen. Adminvyerna räknas inte: den som sitter i panelen är inte
+   * trafik, och servern stryker dessutom adminernas besök vid läsningen.
+   */
+  useEffect(() => {
+    if (!screen.name.startsWith("admin")) besok.sidaVisad(window.location.pathname, screen.name);
+  }, [screen.name]);
+  useEffect(() => {
+    // Skärmarna som ÄR sitt eget mikrosteg. De andra mikrostegen sätts inne i skärmarna och grindarna,
+    // där det som skiljer dem åt syns — se lib/flode.ts, `mikro`.
+    const somMikro: Partial<Record<Screen["name"], flode.Mikrosteg>> = {
+      home: "startsida",
+      signup: "konto",
+      price: "pris",
+      analysis: "besiktning",
+      result: "skickrapport",
+      listing: "fardig_annons",
+    };
+    const m = somMikro[screen.name];
+    if (m) flode.mikro(m);
+  }, [screen.name]);
   useEffect(() => {
     flode.stegIn(screen.name);
     const jobId = "jobId" in screen ? screen.jobId : null;
@@ -383,12 +433,11 @@ function FlowApp() {
           <HomeScreen
             key={homeKey.current}
             dealId={dealId.current}
-            // Grinden ligger på märkesvalet: att välja märke är att börja sälja, och att sälja kräver
-            // ett konto. Den utloggade möts av inloggningen med registreringsfliken uppe, och märket
-            // följer med — efteråt öppnas kameran på det märke de redan tryckt på.
-            onStartScan={(identity) =>
-              setScreen(user ? { name: "capture", identity } : { name: "signup", identity })
-            }
+            // Ingen grind här: kontot frågas efter först när annonsen läggs upp. Se `kontoSteg` i SellWithLoopa.
+            onStartScan={(identity) => {
+              flode.mikro("marke_valt");
+              setScreen({ name: "capture", identity });
+            }}
             // Utan konto finns ingen profil att öppna, och då är knappen vägen in i inloggningen.
             onOpenProfile={() => setScreen(user ? { name: "profile" } : { name: "login" })}
           />
@@ -399,15 +448,8 @@ function FlowApp() {
             identity={screen.identity}
             initialShots={screen.shots}
             onBack={goHome}
-            // HÄR ligger grinden. Jobbet knyts till en säljare på servern, så det kan inte skapas utan
-            // konto — men det är också först nu det saknas något. Den som har konto märker inget.
-            onCaptured={(shots) =>
-              setScreen(
-                user
-                  ? { name: "starting", identity: screen.identity, shots }
-                  : { name: "signup", identity: screen.identity, shots },
-              )
-            }
+            // Utan konto skapas jobbet åt en gäst och flyttas till kontot sist. Se `kontoSteg` i SellWithLoopa.
+            onCaptured={(shots) => setScreen({ name: "starting", identity: screen.identity, shots })}
           />
         );
       case "signup":
@@ -486,9 +528,10 @@ function FlowApp() {
           <PriceScreen
             identity={screen.identity}
             jobId={screen.jobId}
-            onSeeCondition={() =>
-              setScreen({ name: "analysis", jobId: screen.jobId, previewShots: screen.previewShots, identity: screen.identity })
-            }
+            onSeeCondition={() => {
+              flode.klick("se_skick");
+              setScreen({ name: "analysis", jobId: screen.jobId, previewShots: screen.previewShots, identity: screen.identity });
+            }}
           />
         );
       case "analysis":
@@ -675,8 +718,30 @@ function StartingJob({
   useEffect(() => {
     if (startedAttempt.current === attempt) return;
     startedAttempt.current = attempt;
-    createJob(shots, identity, dealId)
-      .then(({ jobId }) => onStarted(jobId))
+    /**
+     * UPPLADDNINGEN HAR EN TIDSGRÄNS. Den hade ingen: på ett dåligt mobilnät kunde snurran stå hur
+     * länge som helst utan att säljaren fick veta något eller kunde göra något åt det. Efter
+     * UPPLADDNING_TAK_MS avbryts anropet och felskärmen nedan tar över, med "Försök igen" — bilderna
+     * ligger kvar i minnet, så omtaget kostar ingen ny filmning.
+     *
+     * Taket är generöst med flit. Sex bilder från en telefon är några megabyte, och ett avbrott som
+     * slår till medan servern redan tar emot dem kostar ett dubblettjobb; ett som slår till för tidigt
+     * kostar en säljare.
+     */
+    const avbryt = new AbortController();
+    let tidenRann = false;
+    const timer = window.setTimeout(() => {
+      tidenRann = true;
+      avbryt.abort();
+    }, UPPLADDNING_TAK_MS);
+    const startadVid = Date.now();
+    const kb = Math.round(shots.reduce((n, s) => n + s.dataUrl.length * 0.75, 0) / 1024);
+    flode.mikro("skickar_in", { varde: shots.length });
+    createJob(shots, identity, dealId, avbryt.signal)
+      .then(({ jobId }) => {
+        flode.mikro("uppladdat", { varde: Math.round((Date.now() - startadVid) / 1000), detalj: `kb-${kb}` });
+        onStarted(jobId);
+      })
       .catch((err) => {
         /**
          * "Bilderna kom inte fram" är fel besked när sessionen är det som saknas: bildrutorna ligger
@@ -684,8 +749,14 @@ function StartingJob({
          * Den vägen leder till inloggningen i stället — och tillbaka hit när den är klar.
          */
         if (err instanceof AuthRequiredError) return onNeedsLogin();
+        if (tidenRann) {
+          flode.fel("uppladdning_tidsgrans", { varde: Math.round((Date.now() - startadVid) / 1000), detalj: `kb-${kb}` });
+          return setError(t("Uppladdningen tog för lång tid. Kontrollera att du har täckning och försök igen."));
+        }
+        flode.fel("uppladdning_misslyckad", { detalj: `kb-${kb}` });
         setError(err instanceof Error ? err.message : t("Kunde inte starta analysen."));
-      });
+      })
+      .finally(() => window.clearTimeout(timer));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [attempt]);
 
@@ -698,13 +769,20 @@ function StartingJob({
         <button
           className="btn btn-primary"
           onClick={() => {
+            flode.klick("uppladdning_forsok_igen");
             setError(null);
             setAttempt((n) => n + 1);
           }}
         >
           {t("Försök igen")}
         </button>
-        <button className="btn btn-text" onClick={onBack}>
+        <button
+          className="btn btn-text"
+          onClick={() => {
+            flode.klick("uppladdning_tillbaka");
+            onBack();
+          }}
+        >
           {t("Tillbaka till bilderna")}
         </button>
       </div>
@@ -718,6 +796,9 @@ function StartingJob({
     </div>
   );
 }
+
+/** Tidsgränsen för uppladdningen. Se StartingJob. */
+const UPPLADDNING_TAK_MS = 150_000;
 
 /** Väntar in identifieringen och visar kandidaterna. Hoppas över när den kunde avgöra modellen själv. */
 function IdentifyGate({
@@ -766,23 +847,41 @@ function IdentifyGate({
 
   /** "Ingen av dem" — be om fyra andra. De avfärdade ligger kvar på jobbet och kommer inte igen. */
   async function findNew() {
+    flode.klick("hitta_fler", { varde: (job?.candidateRound ?? 0) + 1 });
     setStarting(true);
     setSearchError(null);
     try {
       await findMoreModels(jobId);
       setSearchKey((n) => n + 1);
     } catch (err) {
+      flode.fel("modell_sok_fel");
       setStarting(false);
       setSearchError(err instanceof Error ? err.message : t("Vi kunde inte söka efter fler modeller just nu."));
     }
   }
 
   async function choose(choice: { candidate?: ModelCandidate; manualModel?: string }) {
+    flode.klick(choice.candidate ? "valj_kandidat" : "skriv_modell", { varde: job?.candidateRound ?? 0 });
     setVald(choice.candidate?.model ?? choice.manualModel ?? null);
     setSent(true);
+    setSearchError(null);
     // Servern svarar 202 och arbetar vidare i bakgrunden; specifikationsskärmen pollar själv. Att
     // vänta in hela annonsen här hade gjort valet till en tyst paus på tjugo sekunder.
-    await selectModel(jobId, choice);
+    try {
+      await selectModel(jobId, choice);
+    } catch (err) {
+      /**
+       * VALET KAN FALLA, och gjorde förut det tyst: anropet saknade felhantering, skärmen stod kvar
+       * på "bygger annonsen" och säljaren väntade på något som aldrig kom. Nu släpps de tillbaka till
+       * valet med ett besked, och kan välja igen.
+       */
+      flode.fel("modell_val_misslyckat");
+      setSent(false);
+      setVald(null);
+      setSearchError(err instanceof Error ? err.message : t("Vi kunde inte spara valet. Försök igen."));
+      return;
+    }
+    flode.mikro("modell_vald");
     onResolved();
   }
 
@@ -799,13 +898,20 @@ function IdentifyGate({
     // som blir kvar. Skärmen — laddaren, rubriken och jämförelsen "Sälja själv / Med Loopa" — bor i
     // ModelSearchWait, så att förhandsvyn (wait.html) kan rita exakt det säljaren ser.
     const again = starting || round > 0;
-    return <ModelSearchWait brand={identity.brand} again={again} />;
+    return (
+      <>
+        <Mikro namn="vantar_modell" />
+        <ModelSearchWait brand={identity.brand} again={again} />
+      </>
+    );
   }
   // Ett fallet omval säger det med en rad, inte med en tom skärm: säljaren ska veta varför de inte
   // fick några nya förslag.
   const note = searchError ?? (stalled ? null : job?.identityError ?? null);
   return (
     <>
+      <Mikro namn="valjer_modell" />
+      {stalled && <FelEnGang namn="modell_hittades_inte" />}
       {(stalled || note) && (
         <p className="identify-fallback-note identify-fallback-floating">
           {note ??
@@ -899,6 +1005,7 @@ function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }
   }, [jobId]);
 
   async function valj(variant: string) {
+    flode.klick("variant_vald");
     if (failed) return setSvarat(true);
     setSaving(true);
     setError(null);
@@ -906,6 +1013,7 @@ function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }
       await selectVariant(jobId, variant);
       setSvarat(true);
     } catch (err) {
+      flode.fel("variant_sparfel");
       setFailed(true);
       setError(
         `${err instanceof Error ? err.message : "Varianten kunde inte sparas."} Tryck igen för att gå vidare utan den.`,
@@ -919,6 +1027,8 @@ function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }
   const varianter = job?.variantOptions ?? [];
   if (svarat || job?.variantChosen != null || varianter.length < 2) return <>{children}</>;
   return (
+    <>
+    <Mikro namn="variant" />
     <VariantScreen
       brand={job?.identity?.brand ?? null}
       model={job?.identity?.model ?? null}
@@ -927,6 +1037,7 @@ function VariantGate({ jobId, children }: { jobId: string; children: ReactNode }
       saving={saving}
       error={error}
     />
+    </>
   );
 }
 
@@ -956,6 +1067,7 @@ function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNo
   }, [jobId]);
 
   async function done(svar: { pets: boolean; smell: boolean; smellNote: string | null; chairCount: number | null }) {
+    flode.klick("fragor_skickade");
     if (failed) return setAnswered(true);
     setSaving(true);
     setError(null);
@@ -963,6 +1075,7 @@ function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNo
       await saveDisclosures(jobId, svar);
       setAnswered(true);
     } catch (err) {
+      flode.fel("fragor_sparfel");
       setFailed(true);
       setError(
         `${err instanceof Error ? err.message : t("Vi kunde inte spara svaren just nu.")} ${t("Tryck igen för att gå vidare utan dem.")}`,
@@ -976,12 +1089,26 @@ function DisclosuresGate({ jobId, children }: { jobId: string; children: ReactNo
   // värre än en kort väntan. Bygget pågår ändå bakom.
   if (!loaded) return <BuildingListing identity={job?.identity ?? null} />;
   if (answered || job?.sellerDisclosures) return <>{children}</>;
-  return <DisclosuresScreen onDone={done} saving={saving} error={error} chairLike={!!job?.chairLike} />;
+  return (
+    <>
+      <Mikro namn="fragor" />
+      <DisclosuresScreen onDone={done} saving={saving} error={error} chairLike={!!job?.chairLike} />
+    </>
+  );
 }
 
 /** Väntar in annonsen efter modellvalet. */
-function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => void; onBack: () => void }) {
+function SpecsGate({ jobId, onNext: vidare, onBack: tillbaka }: { jobId: string; onNext: () => void; onBack: () => void }) {
   const t = useT();
+  // Varje väg ut ur grinden mäts här, en gång, i stället för vid varje knapp nedan.
+  const onNext = () => {
+    flode.klick("matt_nasta");
+    vidare();
+  };
+  const onBack = () => {
+    flode.klick("byt_modell");
+    tillbaka();
+  };
   const { job, gaveUp, failed } = useJobPoll(jobId, (j) => {
     const l = j.result?.listing ?? j.pendingListing;
     // `improving` betyder att fas 2 fortfarande söker vidare på egen hand. Skärmen visar det den har
@@ -997,6 +1124,7 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
   if (!listing && (gaveUp || failed)) {
     return (
       <div className="screen screen-light center-column">
+        <FelEnGang namn="annons_misslyckad" detalj={gaveUp ? "inget_svar" : "jobbet_foll"} />
         <h2 className="failure-title">{t("Annonsen blev inte klar")}</h2>
         <p className="muted small">{gaveUp ? t("Vi fick inget svar från servern.") : job?.error}</p>
         <button className="btn btn-primary" onClick={onNext}>
@@ -1009,11 +1137,17 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
     );
   }
   if (!listing || listing.status === "pending") {
-    return <BuildingListing identity={job?.identity ?? null} />;
+    return (
+      <>
+        <Mikro namn="vantar_annons" />
+        <BuildingListing identity={job?.identity ?? null} />
+      </>
+    );
   }
   if (!listing.result) {
     return (
       <div className="screen screen-light center-column">
+        <FelEnGang namn="annons_misslyckad" detalj="ingen_annons" />
         <h2 className="failure-title">{t("Annonsen kunde inte skapas")}</h2>
         <p className="muted small">{listing.unavailableReason}</p>
         <button className="btn btn-primary" onClick={onNext}>
@@ -1025,5 +1159,23 @@ function SpecsGate({ jobId, onNext, onBack }: { jobId: string; onNext: () => voi
       </div>
     );
   }
-  return <SpecsScreen jobId={jobId} card={listing.result} onNext={onNext} onBack={onBack} />;
+  return (
+    <>
+      <Mikro namn="matt" />
+      <SpecsScreen jobId={jobId} card={listing.result} onNext={onNext} onBack={onBack} />
+    </>
+  );
+}
+
+/**
+ * Ett fel som en skärm VISAR, mätt en gång när det visas. Ritar ingenting.
+ *
+ * För felskärmarna i grindarna: felet är ett tillstånd som ritas, inte ett ögonblick i en hanterare,
+ * och en omritning av samma felskärm ska inte räknas som ett nytt fel.
+ */
+function FelEnGang({ namn, detalj }: { namn: flode.Fel; detalj?: string }) {
+  useEffect(() => {
+    flode.fel(namn, detalj ? { detalj } : {});
+  }, [namn, detalj]);
+  return null;
 }

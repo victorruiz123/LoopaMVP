@@ -293,6 +293,7 @@ export async function raderaKonto(userId: string, bekraftelse: unknown, adminId:
   raderat.omdomen = await (await import("./feedback.js")).glomKonto(userId, jobIds);
   raderat.chattsamtal = await (await import("./data/samtal.js")).glomKonto(userId);
   raderat.flodessessioner = await (await import("./data/flode.js")).glomKonto(userId, jobIds);
+  raderat.besok = await (await import("./data/besok.js")).glomKonto(userId);
   if (u.email) {
     raderat.utskicksrader = await (await import("./utskick.js")).glomMottagare(u.email);
     raderat.sparadeBrev = await (await import("./notify/outbox.js")).glomMottagare(u.email);

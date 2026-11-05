@@ -1,6 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, AdminAffiliateRad, UtbetalningsRad,
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, RobotHalsaSvar, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, TrafikSvar, Kundresa, KundresaLive, KundresaTidslinje, Kampanj, Kampanjer, Oversikt, ResorSvar, Resa, Mal, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, AdminAffiliateRad, UtbetalningsRad,
   UtskickLista,
   UtskickLage,
 } from "./types";
@@ -58,9 +58,66 @@ async function accessToken(): Promise<string> {
   throw new AuthRequiredError(t("Inloggningen har tagit slut."));
 }
 
+/**
+ * Gästen: säljaren som ännu inte har ett konto.
+ *
+ * Kontot frågas efter först när annonsen ska läggas upp. Fram till dess bär anropen en gästtoken i
+ * stället för en Supabase-token, och jobben ägs av gästen. `claimGuestJobs` flyttar dem till kontot
+ * när det finns. Token sparas i webbläsaren så att en omladdning inte tappar bort det som filmats.
+ */
+const GUEST_KEY = "loopa.guest";
+
+function readGuestToken(): string | null {
+  try {
+    return localStorage.getItem(GUEST_KEY);
+  } catch {
+    return null;
+  }
+}
+
+/** Hämtar en gästtoken om det inte redan finns en. Anropas av flödet innan första jobbet skapas. */
+export async function ensureGuest(): Promise<void> {
+  if (readGuestToken()) return;
+  const res = await fetch("/api/guest", { method: "POST" });
+  const { token } = await json<{ token: string }>(res);
+  try {
+    localStorage.setItem(GUEST_KEY, token);
+  } catch {
+    // Utan lagring lever gästen bara i den här fliken — det räcker för ett flöde.
+    memoryGuest = token;
+  }
+}
+let memoryGuest: string | null = null;
+const guestToken = () => readGuestToken() ?? memoryGuest;
+
+/** Säljaren har nu ett konto: gästens jobb flyttas dit, och gästtoken slängs. */
+export async function claimGuestJobs(): Promise<void> {
+  const guest = guestToken();
+  if (!guest) return;
+  const res = await authFetch("/api/guest/claim", { method: "POST", headers: { "x-loopa-guest": guest } });
+  await json(res);
+  try {
+    localStorage.removeItem(GUEST_KEY);
+  } catch {
+    // Ingen lagring att städa.
+  }
+  memoryGuest = null;
+}
+
+/** Sätter kontots token om säljaren är inloggad, annars gästens. Kastar om ingen av dem finns. */
+async function setAuthHeader(headers: Headers): Promise<void> {
+  try {
+    headers.set("Authorization", `Bearer ${await accessToken()}`);
+  } catch {
+    // Ingen inloggning: flödet körs som gäst fram till annonsen. Se `ensureGuest`.
+    await ensureGuest();
+    headers.set("x-loopa-guest", guestToken()!);
+  }
+}
+
 async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
-  headers.set("Authorization", `Bearer ${await accessToken()}`);
+  await setAuthHeader(headers);
   const res = await fetch(input, { ...init, headers });
   /**
    * 401 här betyder att token fanns och såg giltig ut för klienten, men fick nej av Supabase — en
@@ -113,11 +170,14 @@ export async function createJob(
    * säljare innan den godtar id:t.
    */
   dealId: string | null = null,
+  /** Avbryter uppladdningen. StartingJob sätter en tidsgräns med den — se där. */
+  signal?: AbortSignal,
 ): Promise<{ jobId: string; imageCount: number }> {
   const res = await authFetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null, dealId }),
+    signal,
   });
   return json(res);
 }
@@ -410,7 +470,7 @@ export async function askGuide(
 ): Promise<{ answer: string; andring: GuideAndring | null }> {
   const headers = new Headers({ "Content-Type": "application/json" });
   try {
-    headers.set("Authorization", `Bearer ${await accessToken()}`);
+    await setAuthHeader(headers);
   } catch {
     // Utloggad: en vanlig processguide.
   }
@@ -624,6 +684,16 @@ export async function markeraTraderaPost(id: string, hanterad: boolean): Promise
   );
 }
 
+/** Robotarnas hälsokontroll: senaste rapporten och en månads historik. */
+export async function hamtaRobotHalsa(): Promise<RobotHalsaSvar> {
+  return json(await authFetch("/api/admin/robothalsa"));
+}
+
+/** Kör kontrollen nu. Tar några minuter — Blocket och Facebook öppnas i en webbläsare var. */
+export async function korRobotHalsa(): Promise<RobotHalsaSvar> {
+  return json(await authFetch("/api/admin/robothalsa/kor", { method: "POST" }));
+}
+
 /** Ett kontos jobb, i samma form som profilens egen lista. */
 export async function listUserJobs(userId: string): Promise<JobSummary[]> {
   const res = await authFetch(`/api/admin/users/${encodeURIComponent(userId)}/jobs`);
@@ -740,6 +810,80 @@ export async function addDamage(
  */
 export async function listData(): Promise<DataSvar> {
   return json(await authFetch("/api/admin/data"));
+}
+
+/** Resorna genom uppladdningen: kartan, var de fastnar, och besöken. Se server/src/data/resor.ts. */
+export async function getResor(dagar: number): Promise<ResorSvar> {
+  return json(await authFetch(`/api/admin/resor?dagar=${dagar}`));
+}
+
+/** En resa i sin helhet, punkt för punkt. */
+export async function getResa(sess: string): Promise<Resa> {
+  return json(await authFetch(`/api/admin/resor/${encodeURIComponent(sess)}`));
+}
+
+/** Nordstjärnans mål. Samma för alla admins. Se server/src/data/mal.ts. */
+export async function getMal(): Promise<Mal> {
+  return json(await authFetch("/api/admin/mal"));
+}
+
+export async function sparaMal(mal: Pick<Mal, "matt" | "perVecka">): Promise<Mal> {
+  return json(
+    await authFetch("/api/admin/mal", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(mal),
+    }),
+  );
+}
+
+/** Översikten: hur det går för Loopa, med användarna först. Se server/src/data/oversikt.ts. */
+export async function getOversikt(dagar: number): Promise<Oversikt> {
+  return json(await authFetch(`/api/admin/oversikt?dagar=${dagar}`));
+}
+
+/**
+ * Trafiken: varifrån besökarna kommer och hur de rör sig. Se server/src/data/besok.ts.
+ */
+export async function getTrafik(dagar: number): Promise<TrafikSvar> {
+  return json(await authFetch(`/api/admin/trafik?dagar=${dagar}`));
+}
+
+/** Kundresan för en period, valfritt för en kanal och en enhet. Se server/src/data/kundresa.ts. */
+export async function getKundresa(dagar: number, kanal: string | null, enhet: string | null): Promise<Kundresa> {
+  const q = new URLSearchParams({ dagar: String(dagar) });
+  if (kanal) q.set("kanal", kanal);
+  if (enhet) q.set("enhet", enhet);
+  return json(await authFetch(`/api/admin/kundresa?${q}`));
+}
+
+/** Kampanjlänkarna, med ställena en länk kan ligga på och sidorna den kan leda till. */
+export async function getKampanjer(): Promise<Kampanjer> {
+  return json(await authFetch("/api/admin/kampanjer"));
+}
+
+export async function skapaKampanj(namn: string, plats: string, mal: string): Promise<Kampanj> {
+  return json(
+    await authFetch("/api/admin/kampanjer", {
+      method: "POST",
+      body: JSON.stringify({ namn, plats, mal }),
+      headers: { "Content-Type": "application/json" },
+    }),
+  );
+}
+
+export async function taBortKampanj(kod: string): Promise<void> {
+  await json(await authFetch(`/api/admin/kampanjer/${encodeURIComponent(kod)}`, { method: "DELETE" }));
+}
+
+/** Vilka som är inne just nu, de senaste fem minuterna. */
+export async function getKundresaLive(): Promise<KundresaLive> {
+  return json(await authFetch("/api/admin/kundresa/live"));
+}
+
+/** Ett besök, punkt för punkt: sidorna, butikens händelser, trycken och säljflödet. */
+export async function getKundresaTidslinje(sess: string): Promise<KundresaTidslinje> {
+  return json(await authFetch(`/api/admin/kundresa/${encodeURIComponent(sess)}`));
 }
 
 /**

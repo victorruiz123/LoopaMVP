@@ -595,6 +595,7 @@ const RADERAT_ETIKETT: Record<string, string> = {
   omdomen: "Omdömen",
   chattsamtal: "Chattsamtal",
   flodessessioner: "Flödesloggar",
+  besok: "Besöksloggar",
   utskicksrader: "Utskicksrader",
   sparadeBrev: "Sparade brev",
 };

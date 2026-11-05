@@ -1,20 +1,85 @@
 import { useEffect, useMemo, useState } from "react";
 import { listUsers } from "../api";
-import { ArrowLeftIcon, CardIcon, ChatIcon, ChevronRight, MailIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon } from "../components/icons";
+import { ArrowLeftIcon, CardIcon, ChatIcon, ChevronRight, GlobeIcon, MailIcon, ShieldIcon, VideoIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon, UsersIcon, CheckCircleIcon, SlidersIcon, CopyIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
-import type { AdminAnnonsRad, AdminUser, AdminDirectory } from "../types";
+import type { AdminAnnonsRad, AdminUser, AdminDirectory, UtskickForval } from "../types";
 import AdminAdsScreen from "./AdminAdsScreen";
 import AdminTraderaPostScreen from "./AdminTraderaPostScreen";
 import AdminOrdrarScreen from "./AdminOrdrarScreen";
 import AdminDataScreen from "./AdminDataScreen";
+import AdminKundresaScreen, { type KundresaVy } from "./AdminKundresaScreen";
+import AdminResorScreen from "./AdminResorScreen";
 import AdminEfterlysningarScreen from "./AdminEfterlysningarScreen";
 import AdminFeedbackScreen from "./AdminFeedbackScreen";
 import AdminUtskickScreen from "./AdminUtskickScreen";
 import AdminFacebookScreen from "./AdminFacebookScreen";
+import AdminRobotHalsaScreen from "./AdminRobotHalsaScreen";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
 
-export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback" | "utskick" | "facebook";
+/**
+ * Kundresans vyer är panelens egna flikar. Samma namn som vyerna (AdminKundresaScreen, KundresaVy), så
+ * att en flik och en vy aldrig behöver översättas mellan varandra.
+ */
+const KUNDRESA_FLIKAR = ["laget", "oversikt", "saljflode", "ingangar", "varifran", "lankar", "saljare"] as const satisfies readonly KundresaVy[];
+type KundresaFlik = (typeof KUNDRESA_FLIKAR)[number];
+const arKundresa = (f: AdminFlik): f is KundresaFlik => (KUNDRESA_FLIKAR as readonly string[]).includes(f);
+
+export type AdminFlik = KundresaFlik | "annonser" | "anvandare" | "uppladdning" | "tradera" | "ordrar" | "data" | "efterlysningar" | "feedback" | "utskick" | "facebook" | "robotar";
+
+/**
+ * Panelens flikar, i grupper efter ärende.
+ *
+ * ANVÄNDARDATA först: hur det går, var säljarna fastnar, varifrån de kommer och vilka de är — och
+ * sist fördjupningarna: varje uppladdningsförsök, modellens träffsäkerhet och vad säljarna tycker.
+ * Läget just nu står först och är förvalt — panelen öppnas med frågan "hur går det?". Sedan arbetslistorna i ANNONSER & AFFÄRER, i den ordning en arbetsdag har dem, och
+ * KANALERNA, som läses av den som sköter dem. KONTAKT sist: Utskick är det enda i panelen som når
+ * utåt, till riktiga inkorgar, och en flik man råkar trycka på ska inte vara den.
+ */
+const ADMIN_GRUPPER: Array<{ id: string; namn: string; flikar: Array<{ id: AdminFlik; namn: string; ikon: typeof UserIcon }> }> = [
+  {
+    id: "data",
+    namn: "Användardata",
+    flikar: [
+      { id: "laget", namn: "Läget just nu", ikon: CheckCircleIcon },
+      { id: "oversikt", namn: "Översikt", ikon: CardIcon },
+      { id: "saljflode", namn: "Säljflödet", ikon: SlidersIcon },
+      { id: "ingangar", namn: "Ingångar", ikon: GlobeIcon },
+      { id: "varifran", namn: "Varifrån", ikon: SearchIcon },
+      { id: "lankar", namn: "Kampanjlänkar", ikon: CopyIcon },
+      { id: "saljare", namn: "Säljarna", ikon: UsersIcon },
+      { id: "uppladdning", namn: "Uppladdning", ikon: VideoIcon },
+      { id: "data", namn: "Data", ikon: SparkIcon },
+      { id: "feedback", namn: "Feedback", ikon: ChatIcon },
+    ],
+  },
+  {
+    id: "affar",
+    namn: "Annonser & affärer",
+    flikar: [
+      { id: "annonser", namn: "Annonser", ikon: CardIcon },
+      { id: "ordrar", namn: "Ordrar", ikon: TruckIcon },
+      { id: "efterlysningar", namn: "Efterlysningar", ikon: SearchIcon },
+    ],
+  },
+  {
+    id: "kanaler",
+    namn: "Kanaler",
+    flikar: [
+      { id: "tradera", namn: "Tradera-post", ikon: MailIcon },
+      { id: "facebook", namn: "Facebook", ikon: SparkIcon },
+      { id: "robotar", namn: "Robotar", ikon: ShieldIcon },
+    ],
+  },
+  {
+    id: "kontakt",
+    namn: "Kontakt",
+    flikar: [
+      { id: "anvandare", namn: "Användare", ikon: UserIcon },
+      { id: "utskick", namn: "Utskick", ikon: MailIcon },
+    ],
+  },
+];
 
 /**
  * Adminpanelen: allt vi fått in och alla som lagt upp det, i två flikar.
@@ -24,7 +89,7 @@ export type AdminFlik = "annonser" | "anvandare" | "tradera" | "ordrar" | "data"
  * BLÄDDRA. Annonserna låg tidigare bakom en knapp, alltså ett sidbyte bort, och den som ville jämföra
  * de två fick navigera fram och tillbaka och tappa både sökning och rullposition på vägen.
  *
- * Annonserna är förvald flik: det är den frågan som ställs oftast.
+ * Läget just nu är förvald flik: panelen öppnas med frågan "hur går det?", och den fliken svarar på den.
  *
  * Vem som ser panelen avgörs på servern och bara där (server/src/admin.ts). Klienten får ett ja eller
  * nej i inloggningssvaret och ritar ingången efter det — men varje väg bakom den prövar rollen igen,
@@ -35,7 +100,7 @@ export default function AdminScreen({
   onOpenUser,
   onOpenAd,
   onOpenAdId,
-  flik: initialFlik = "annonser",
+  flik: initialFlik = "laget",
 }: {
   onBack: () => void;
   onOpenUser: (user: AdminUser) => void;
@@ -52,6 +117,8 @@ export default function AdminScreen({
   flik?: AdminFlik;
 }) {
   const [flik, setFlik] = useState<AdminFlik>(initialFlik);
+  /** En grupp som datafliken skickat hit för ett utskick. Töms när den använts eller återställts. */
+  const [utskickForval, setUtskickForval] = useState<UtskickForval | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
   const t = useT();
   usePageTitle("Adminpanel");
@@ -102,109 +169,73 @@ export default function AdminScreen({
         ställe, och det enda som ändras är vad man bläddrar i. Varje lista behåller sitt eget filter
         och sin egen sökning så länge panelen är öppen.
       */}
-      <div className="admin-flikar" role="tablist" aria-label={t("Adminpanel")}>
-        <button
-          role="tab"
-          aria-selected={flik === "annonser"}
-          className={`admin-flik-knapp${flik === "annonser" ? " vald" : ""}`}
-          onClick={() => setFlik("annonser")}
-        >
-          <CardIcon size={16} /> {t("Annonser")}
-        </button>
-        <button
-          role="tab"
-          aria-selected={flik === "anvandare"}
-          className={`admin-flik-knapp${flik === "anvandare" ? " vald" : ""}`}
-          onClick={() => setFlik("anvandare")}
-        >
-          <UserIcon size={16} /> {t("Användare")}
-        </button>
-        {/* Utskicket sist: det är det enda i panelen som når UTÅT, till riktiga inkorgar, och en
-            flik man råkar trycka på ska inte vara den. */}
-        <button
-          type="button"
-          role="tab"
-          aria-selected={flik === "utskick"}
-          className={`admin-flik-knapp${flik === "utskick" ? " vald" : ""}`}
-          onClick={() => setFlik("utskick")}
-        >
-          <MailIcon size={16} /> {t("Utskick")}
-        </button>
-        <button
-          role="tab"
-          aria-selected={flik === "ordrar"}
-          className={`admin-flik-knapp${flik === "ordrar" ? " vald" : ""}`}
-          onClick={() => setFlik("ordrar")}
-        >
-          <TruckIcon size={16} /> {t("Ordrar")}
-        </button>
-        {/*
-          Efterlysningarna står bredvid ordrarna och inte bredvid annonserna.
-          Båda är arbetslistor: något ligger och väntar på att en människa gör en sak. Annonserna och
-          användarna är register man slår upp i. Ordningen i flikraden är den ordning en arbetsdag
-          har, inte den ordning modulerna byggdes.
-        */}
-        <button
-          role="tab"
-          aria-selected={flik === "efterlysningar"}
-          className={`admin-flik-knapp${flik === "efterlysningar" ? " vald" : ""}`}
-          onClick={() => setFlik("efterlysningar")}
-        >
-          <SearchIcon size={16} /> {t("Efterlysningar")}
-        </button>
-        {/*
-          Feedbacken står efter arbetslistorna och före Data.
-          Den är ingendera: inget ska göras med en rad, och den säger ingenting om modellen. Det är
-          vad SÄLJARNA tycker om flödet, och den läses av samma skäl som datafliken läses — för att
-          se om det vi byggt blir bättre — bara med ord i stället för med tal.
-        */}
-        <button
-          role="tab"
-          aria-selected={flik === "feedback"}
-          className={`admin-flik-knapp${flik === "feedback" ? " vald" : ""}`}
-          onClick={() => setFlik("feedback")}
-        >
-          <ChatIcon size={16} /> {t("Feedback")}
-        </button>
-        {/*
-          Datafliken sist bland flikarna och först i ordningen av skäl: den läses inte för att få
-          något gjort idag, utan för att se om modellen blir bättre. Den som öppnar panelen för att
-          jobba ska inte behöva passera den.
-        */}
-        <button
-          role="tab"
-          aria-selected={flik === "data"}
-          className={`admin-flik-knapp${flik === "data" ? " vald" : ""}`}
-          onClick={() => setFlik("data")}
-        >
-          <SparkIcon size={16} /> {t("Data")}
-        </button>
-        <button
-          role="tab"
-          aria-selected={flik === "tradera"}
-          className={`admin-flik-knapp${flik === "tradera" ? " vald" : ""}`}
-          onClick={() => setFlik("tradera")}
-        >
-          <MailIcon size={16} /> {t("Tradera-post")}
-        </button>
-        {/*
-          Facebook-distributionen: sessionen, grupperna, köerna. En arbetslista och ett register i
-          ett — sist bland flikarna för att den läses av den som sköter kanalen, inte av alla.
-        */}
-        <button
-          role="tab"
-          aria-selected={flik === "facebook"}
-          className={`admin-flik-knapp${flik === "facebook" ? " vald" : ""}`}
-          onClick={() => setFlik("facebook")}
-        >
-          <SparkIcon size={16} /> Facebook
-        </button>
-      </div>
+      {/*
+        FLIKARNA I FYRA GRUPPER, MED VAR SIN FÄRG. Tretton flikar på en rad rann över skärmkanten, och
+        de sista gick varken att se eller nå. Nu står de i grupper efter vad man kommer för — förstå
+        användarna, sköta annonserna, sköta kanalerna, nå folk — och raderna bryts i stället för att
+        rinna över. Färgen följer gruppen, och gruppens namn står alltid i text bredvid: färgen hjälper
+        ögat, den bär inte betydelsen ensam.
+      */}
+      <nav className="admin-grupper" aria-label={t("Adminpanel")}>
+        {ADMIN_GRUPPER.map((g) => (
+          <div key={g.id} className={`admin-grupp admin-grupp-${g.id}`} role="tablist" aria-label={t(g.namn)}>
+            <span className="admin-grupp-namn">{t(g.namn)}</span>
+            <div className="admin-grupp-flikar">
+              {g.flikar.map((f) => (
+                <button
+                  key={f.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={flik === f.id}
+                  className={`admin-grupp-flik${flik === f.id ? " vald" : ""}`}
+                  onClick={() => {
+                    // Utskicket öppnat för hand: hela listan, inte en grupp som datafliken skickade hit tidigare.
+                    if (f.id === "utskick") setUtskickForval(null);
+                    setFlik(f.id);
+                  }}
+                >
+                  <f.ikon size={16} /> {f.id === "facebook" ? f.namn : t(f.namn)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
+      </nav>
 
       {flik === "annonser" ? (
         <AdminAdsScreen inbaddad onOpenAd={(rad) => onOpenAd?.(rad)} />
+      ) : flik === "uppladdning" ? (
+        <AdminResorScreen
+          onOpenUserId={(id) => {
+            const u = users?.find((x) => x.id === id);
+            if (u) onOpenUser(u);
+          }}
+        />
+      ) : arKundresa(flik) ? (
+        // En och samma skärm för alla sju flikarna, så att perioden, filtren och den hämtade datan
+        // ligger kvar när man byter mellan dem — bara vyn byts.
+        <AdminKundresaScreen
+          vy={flik}
+          onVisaVy={setFlik}
+          onOpenUserId={(id) => {
+            const u = users?.find((x) => x.id === id);
+            if (u) onOpenUser(u);
+          }}
+          onVisaFlik={setFlik}
+        />
       ) : flik === "data" ? (
-        <AdminDataScreen />
+        <AdminDataScreen
+          onOpenUserId={(id) => {
+            const u = users?.find((x) => x.id === id);
+            if (u) onOpenUser(u);
+          }}
+          onVisaTrafik={() => setFlik("varifran")}
+          onVisaUppladdning={() => setFlik("uppladdning")}
+          onSkickaTill={(forval) => {
+            setUtskickForval(forval);
+            setFlik("utskick");
+          }}
+        />
       ) : flik === "ordrar" ? (
         <AdminOrdrarScreen onOpenAd={onOpenAdId} />
       ) : flik === "efterlysningar" ? (
@@ -212,11 +243,13 @@ export default function AdminScreen({
       ) : flik === "feedback" ? (
         <AdminFeedbackScreen />
       ) : flik === "utskick" ? (
-        <AdminUtskickScreen />
+        <AdminUtskickScreen forval={utskickForval} />
       ) : flik === "tradera" ? (
         <AdminTraderaPostScreen onOpenAd={onOpenAdId} />
       ) : flik === "facebook" ? (
         <AdminFacebookScreen onOpenAd={onOpenAdId} />
+      ) : flik === "robotar" ? (
+        <AdminRobotHalsaScreen />
       ) : (
         <>
       <p className="admin-lede">

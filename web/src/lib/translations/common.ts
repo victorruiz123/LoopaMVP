@@ -10,6 +10,10 @@ export const COMMON: Record<string, Translation> = {
   // ---- knappar och navigering ----
   Tillbaka: { en: "Back", fr: "Retour" },
   "Logga in": { en: "Log in", fr: "Se connecter" },
+  // Startsidans flikar, se components/HemFlikar.
+  "Sälj": { en: "Sell", fr: "Vendre" },
+  "Om oss": { en: "About us", fr: "À propos" },
+  Sidor: { en: "Pages", fr: "Pages" },
   "Logga ut": { en: "Log out", fr: "Se déconnecter" },
   "Skapa konto": { en: "Create account", fr: "Créer un compte" },
   "Din profil": { en: "Your profile", fr: "Votre profil" },

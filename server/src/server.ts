@@ -16,7 +16,7 @@ import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
 import { adminEmails, kontoDetalj, listAccounts } from "./admin.js";
-import { identityFromRequest, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
+import { guestFromRequest, identityFromRequest, issueGuestToken, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
 import { estimatePrice, repriceResult, synkaStolpris } from "./pricing.js";
 import { MAX_ANTAL_STOLAR } from "./stolPris.js";
 import { finalizeWithModel, findMoreCandidates, runIdentify } from "./pipeline/identify.js";
@@ -49,6 +49,8 @@ import { syncFromJobs } from "./butik/inventory.js";
 import { startButikSweeper } from "./butik/sweeper.js";
 import { startTraderaMailWatch } from "./integrations/tradera/mailwatch.js";
 import { startBlocketVakt } from "./integrations/blocket/vakt.js";
+import { startRobotHalsa } from "./robotHalsa.js";
+import { startKanalStatistik, statistikFor } from "./kanalStatistik.js";
 import { onListingLive, startFacebookWorkers } from "./integrations/facebook/queue.js";
 import { onPublished } from "./butik/store.js";
 import { bearerToken } from "./supabaseAuth.js";
@@ -181,6 +183,25 @@ async function handlePreliminaryPrice(req: IncomingMessage, res: ServerResponse)
 function owns(job: { ownerId?: string | null }, identity: Identity): boolean {
   const owner = ownerIdOf(job);
   return owner !== null && owner === identity.id;
+}
+
+/**
+ * Gästens jobb flyttas till kontot som just skapats eller loggats in på.
+ *
+ * Anropet bär BÅDA: kontots token (vem jobben ska till) och gästtoken (vems de är nu). Bara den som
+ * har gästtoken kan alltså flytta gästens jobb, och bara till sitt eget konto.
+ */
+async function handleClaimGuest(req: IncomingMessage, res: ServerResponse, identity: Identity) {
+  if (identity.kind !== "user") return sendJson(res, 401, { error: "Inloggning krävs." });
+  const guest = guestFromRequest(req);
+  if (!guest) return sendJson(res, 400, { error: "Ingen giltig gästsession." });
+  const jobb = (await listJobs()).filter((j) => j.ownerId === guest.id);
+  for (const job of jobb) {
+    job.ownerId = identity.id;
+    job.ownerEmail = identity.email ?? job.ownerEmail ?? null;
+    await persist(job);
+  }
+  return sendJson(res, 200, { claimed: jobb.map((j) => j.id) });
 }
 
 /**
@@ -618,6 +639,10 @@ async function traderaState(job: ConditionJob) {
   const readiness = await planTraderaPublish(job);
   const { planAutoPublish } = await import("./integrations/autoPublish.js");
   const { channels } = await planAutoPublish(job);
+  const lage =
+    job.tradera?.status === "published" && typeof job.tradera.itemId === "number" && traderaConfigured()
+      ? await getTraderaLage(job.tradera.itemId)
+      : null;
   return {
     /**
      * Konfigurerad = NÅGON kanal kan ta emot en beställning.
@@ -652,10 +677,12 @@ async function traderaState(job: ConditionJob) {
      * Visningar går INTE att få (se getTraderaLage). Säljaren ser Loopas visningar och Traderas bud,
      * och det är två olika saker som inte ska ritas som om de vore samma siffra.
      */
-    lage:
-      job.tradera?.status === "published" && typeof job.tradera.itemId === "number" && traderaConfigured()
-        ? await getTraderaLage(job.tradera.itemId)
-        : null,
+    lage,
+    /**
+     * Siffrorna från marknadsplatserna, för säljarens annonsvy (kanalStatistik.ts): robotarnas senaste
+     * avläsning av Traderas och Blockets säljarsidor. Ur lagret — ingen webbläsare startas här.
+     */
+    statistik: statistikFor(job),
     /** Var uppdateringen av marknadsplatserna står efter en ändring. Se annonsUppdatering.ts. */
     uppdatering: job.annonsUppdatering ?? null,
   };
@@ -1434,6 +1461,34 @@ async function handleAnalys(req: IncomingMessage, res: ServerResponse) {
   return res.end();
 }
 
+// ---- besöksmätningen: /api/data/besok ---------------------------------------
+
+/**
+ * Besökens källa och sidbyten. Svarar 204 oavsett utfall, precis som flödet och /api/analys.
+ *
+ * Utanför grinden av samma skäl som flödet: den som kommer från en Facebook-länk har inget konto än,
+ * och det är just hen mätningen finns för. Vitlistan och normaliseringen i data/besok.ts är
+ * säkerheten; `uid` är påstådd av klienten, under samma villkor som i flödet.
+ */
+async function handleBesoksHandelse(req: IncomingMessage, res: ServerResponse) {
+  try {
+    const body = await readJsonBody<{ sess?: string; uid?: string | null; event?: string; props?: Record<string, unknown> }>(
+      req,
+      8 * 1024,
+    );
+    const ua = typeof req.headers["user-agent"] === "string" ? req.headers["user-agent"] : "";
+    if (typeof body.sess === "string" && typeof body.event === "string" && !ROBOT.test(ua)) {
+      const { spara: sparaBesok } = await import("./data/besok.js");
+      const props = body.props && typeof body.props === "object" ? body.props : {};
+      await sparaBesok(body.sess, body.event, props, typeof body.uid === "string" ? body.uid : null);
+    }
+  } catch {
+    // Se handleAnalys.
+  }
+  res.writeHead(204);
+  return res.end();
+}
+
 // ---- flödesmätningen: /api/data/flode ---------------------------------------
 
 /**
@@ -2113,6 +2168,10 @@ const server = http.createServer(async (req, res) => {
       if (segments[1] === "data" && segments[2] === "flode" && segments.length === 3 && req.method === "POST") {
         return await handleFlodesHandelse(req, res);
       }
+      /** Besöksmätningen, utanför grinden av samma skäl. Se handleBesoksHandelse och data/besok.ts. */
+      if (segments[1] === "data" && segments[2] === "besok" && segments.length === 3 && req.method === "POST") {
+        return await handleBesoksHandelse(req, res);
+      }
       /**
        * Startsidans chatt, utanför grinden. Se handleSaljChat för varför den får ligga där.
        */
@@ -2228,11 +2287,34 @@ const server = http.createServer(async (req, res) => {
        * Kontrollen sitter här och inte i varje hanterare med flit: fjorton vägar som var och en
        * måste komma ihåg att fråga är fjorton tillfällen att glömma.
        */
+      /**
+       * En gästtoken åt den som börjar sälja utan konto. Utanför grinden: det är vägen IN genom den.
+       * Se `guestFromRequest` i identity.ts.
+       */
+      if (segments[1] === "guest" && segments.length === 2 && req.method === "POST") {
+        return sendJson(res, 200, { token: issueGuestToken() });
+      }
+
       const identity = await identityFromRequest(req);
       if (!identity) return sendJson(res, 401, { error: "Inloggning krävs." });
 
       if (segments[1] === "session" && segments.length === 2 && req.method === "POST") {
         return handleCreateSession(req, res, identity);
+      }
+
+      if (segments[1] === "guest" && segments[2] === "claim" && segments.length === 3 && req.method === "POST") {
+        return await handleClaimGuest(req, res, identity);
+      }
+
+      /**
+       * Gästen når bara säljflödet fram till annonsen: sitt eget jobb och prisförslaget. Allt som
+       * lägger ut något — Tradera, butiken, affärer, inbjudningar — kräver att kontot finns först.
+       */
+      if (identity.kind === "guest") {
+        const iFlodet =
+          (segments[1] === "jobs" && (segments[3] !== "tradera" || req.method === "GET")) ||
+          (segments[1] === "price" && segments.length === 2);
+        if (!iFlodet) return sendJson(res, 401, { error: "Inloggning krävs." });
       }
 
       /**
@@ -2593,6 +2675,20 @@ const server = http.createServer(async (req, res) => {
          * `hamta` kör en läsning NU i stället för att vänta på halvtimmestimern; svaret är samma
          * räkning som loggen får. Kryssrutan är panelens egen: mejlet i Gmail rörs aldrig.
          */
+        /**
+         * Robotarnas dagliga hälsokontroll (robotHalsa.ts). GET läser senaste rapporten och historiken;
+         * `kor` startar en kontroll NU och svarar när den är klar — den tar några minuter, för den
+         * öppnar Blocket och Facebook i en webbläsare var.
+         */
+        if (segments[2] === "robothalsa" && segments.length === 3 && req.method === "GET") {
+          const { lasRobotHalsa, korPagar } = await import("./robotHalsa.js");
+          return sendJson(res, 200, { ...lasRobotHalsa(), pagar: korPagar() });
+        }
+        if (segments[2] === "robothalsa" && segments[3] === "kor" && segments.length === 4 && req.method === "POST") {
+          const { korOchRapportera, lasRobotHalsa } = await import("./robotHalsa.js");
+          await korOchRapportera({ mejla: false });
+          return sendJson(res, 200, { ...lasRobotHalsa(), pagar: false });
+        }
         if (segments[2] === "tradera-post" && segments.length === 3 && req.method === "GET") {
           const { listTraderaPost } = await import("./integrations/tradera/mailwatch.js");
           return sendJson(res, 200, await listTraderaPost());
@@ -2631,6 +2727,211 @@ const server = http.createServer(async (req, res) => {
             return res.end(tillCsv(svar.objekt));
           }
           return sendJson(res, 200, svar);
+        }
+        /**
+         * Trafiken: varifrån besökarna kommer, vad de gör, och vilka av dem som blev konton.
+         *
+         * Egen väg och inte ett fält i datasetet: den svarar på intaget, inte på möblerna, och den
+         * tar en period. Kontona hämtas med adminens egen token, som användarlistan gör, så att nya
+         * registreringar kan få sin källa. Se data/besok.ts.
+         */
+        /**
+         * Översikten: hur det går för Loopa, med användarna först — nya konton, aktiva, vilka som
+         * blir säljare, varifrån de kom och vad affären gav. Se data/oversikt.ts.
+         *
+         * Hämtar ur sex källor och lagrar ingenting. Kontona hämtas med adminens egen token, som
+         * användarlistan gör.
+         */
+        /**
+         * Resorna: hur säljarna rör sig genom uppladdningen — kartan, var de fastnar, och en resa i
+         * taget. Se data/resor.ts. Adminernas egna försök räknas inte; kontona hämtas för att veta
+         * vilka de är.
+         */
+        if (segments[2] === "resor" && segments.length === 3 && req.method === "GET") {
+          const { resor } = await import("./data/resor.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const dagar = Math.min(365, Math.max(1, Number(url.searchParams.get("dagar")) || 30));
+          const [sessioner, konton] = await Promise.all([
+            allaSessioner(),
+            listAccounts(bearerToken(req)).then((r) => r.users).catch(() => []),
+          ]);
+          return sendJson(res, 200, resor(sessioner, dagar, new Set(konton.filter((k) => k.isAdmin).map((k) => k.id))));
+        }
+        if (segments[2] === "resor" && segments.length === 4 && req.method === "GET") {
+          const { resaFor } = await import("./data/resor.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const s = (await allaSessioner()).find((x) => x.sess === segments[3]);
+          if (!s) return sendJson(res, 404, { error: "Resan finns inte." });
+          return sendJson(res, 200, resaFor(s));
+        }
+        /**
+         * Nordstjärnans mål: läses av alla admins, sätts av vem som helst av dem. Se data/mal.ts.
+         */
+        /**
+         * Kampanjlänkarna: listan, en ny, och borttagning. Se data/kampanjer.ts. Resultaten per länk
+         * räknas i kundresan, inte här — en länk är ett namn på en källa, inte en mätning.
+         */
+        if (segments[2] === "kampanjer" && segments.length === 3 && req.method === "GET") {
+          const { allaKampanjer, PLATSER, MAL } = await import("./data/kampanjer.js");
+          return sendJson(res, 200, {
+            kampanjer: await allaKampanjer(),
+            platser: Object.entries(PLATSER).map(([id, p]) => ({ id, namn: p.namn })),
+            mal: Object.entries(MAL).map(([id, namn]) => ({ id, namn })),
+          });
+        }
+        if (segments[2] === "kampanjer" && segments.length === 3 && req.method === "POST") {
+          const { skapaKampanj } = await import("./data/kampanjer.js");
+          const body = await readJsonBody<{ namn?: unknown; plats?: unknown; mal?: unknown }>(req, 4 * 1024);
+          try {
+            return sendJson(res, 200, await skapaKampanj(body, identity.email ?? null));
+          } catch (err) {
+            return sendJson(res, 400, { error: err instanceof Error ? err.message : "Länken kunde inte skapas." });
+          }
+        }
+        if (segments[2] === "kampanjer" && segments.length === 4 && req.method === "DELETE") {
+          const { taBortKampanj } = await import("./data/kampanjer.js");
+          if (!(await taBortKampanj(segments[3]))) return sendJson(res, 404, { error: "Länken finns inte." });
+          return sendJson(res, 200, { ok: true });
+        }
+        if (segments[2] === "mal" && segments.length === 3 && req.method === "GET") {
+          const { lasMal } = await import("./data/mal.js");
+          return sendJson(res, 200, await lasMal());
+        }
+        if (segments[2] === "mal" && segments.length === 3 && req.method === "PUT") {
+          const { sparaMal } = await import("./data/mal.js");
+          const body = await readJsonBody<{ matt?: unknown; perVecka?: unknown }>(req, 4 * 1024);
+          try {
+            return sendJson(res, 200, await sparaMal(body, identity.email ?? null));
+          } catch (err) {
+            return sendJson(res, 400, { error: err instanceof Error ? err.message : "Målet kunde inte sparas." });
+          }
+        }
+        if (segments[2] === "oversikt" && segments.length === 3 && req.method === "GET") {
+          const { oversikt } = await import("./data/oversikt.js");
+          const { allaBesok } = await import("./data/besok.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const { referralStore } = await import("./referral/store.js");
+          const { store: butikStore } = await import("./butik/store.js");
+          const { allOrders } = await import("./butik/orders.js");
+          const dagar = Math.min(365, Math.max(1, Number(url.searchParams.get("dagar")) || 30));
+          const [konton, jobb, lager, ordrar, besok, floden, inbjudningar] = await Promise.all([
+            listAccounts(bearerToken(req)).then((r) => r.users).catch(() => []),
+            listJobs(),
+            butikStore().all().catch(() => []),
+            allOrders().catch(() => []),
+            allaBesok(),
+            allaSessioner(),
+            referralStore().handelser().catch(() => []),
+          ]);
+          return sendJson(
+            res,
+            200,
+            oversikt({
+              konton,
+              // Samma regel för "färdig annons" som kontolistans cardCount (admin.ts), så att de två
+              // flikarna aldrig räknar olika.
+              jobb: jobb.map((j) => {
+                const listing = j.result?.listing ?? j.listing ?? j.pendingListing ?? null;
+                return { ownerId: ownerIdOf(j), createdAt: j.createdAt, fardig: listing?.status === "ok" && !!listing.result };
+              }),
+              butiksLagen: lager.map((r) => r.state),
+              ordrar,
+              besok,
+              floden,
+              inbjudningar,
+              dagar,
+            }),
+          );
+        }
+        /**
+         * Kundresan: från besöket till en såld möbel, och hur folk rör sig på vägen. Se
+         * data/kundresa.ts.
+         *
+         * Annonsen sätts ihop här ur två källor — jobbet (överlämnad, godkänd) och butiken (såld) —
+         * så att resan själv kan vara en ren funktion.
+         */
+        if (segments[2] === "kundresa" && segments.length === 3 && req.method === "GET") {
+          const { helaResan } = await import("./data/kundresa.js");
+          const { allaBesok } = await import("./data/besok.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const { store: butikStore } = await import("./butik/store.js");
+          const dagar = Math.min(365, Math.max(1, Number(url.searchParams.get("dagar")) || 30));
+          const kanal = url.searchParams.get("kanal")?.trim().slice(0, 40) || null;
+          const enhet = url.searchParams.get("enhet");
+          const { allaKampanjer } = await import("./data/kampanjer.js");
+          const [konton, jobb, lager, besok, floden, kampanjer] = await Promise.all([
+            listAccounts(bearerToken(req)).then((r) => r.users).catch(() => []),
+            listJobs(),
+            butikStore().all().catch(() => []),
+            allaBesok(),
+            allaSessioner(),
+            allaKampanjer(),
+          ]);
+          const postPerJobb = new Map(lager.filter((r) => r.jobId).map((r) => [r.jobId!, r]));
+          return sendJson(
+            res,
+            200,
+            helaResan({
+              besok,
+              floden,
+              admins: new Set(konton.filter((k) => k.isAdmin).map((k) => k.id)),
+              dagar,
+              kanal,
+              kampanjkoder: kampanjer.map((k) => k.kod),
+              enhet: enhet === "mobil" || enhet === "dator" ? enhet : null,
+              annonser: jobb.map((j) => {
+                const listing = j.result?.listing ?? j.listing ?? j.pendingListing ?? null;
+                const post = postPerJobb.get(j.id);
+                const t = j.tradera;
+                return {
+                  jobId: j.id,
+                  ownerId: ownerIdOf(j),
+                  skapad: j.createdAt,
+                  // Samma regel som översikten och kontolistan.
+                  fardig: listing?.status === "ok" && !!listing.result,
+                  overlamnad: t?.startedAt ?? null,
+                  // Äldre annonser publicerades innan godkännandet fanns; att de ligger uppe är godkännandet.
+                  godkand: t?.approvedAt ?? (t?.status === "published" ? (t.publishedAt ?? t.startedAt) : null),
+                  sald: post?.soldAt ?? null,
+                };
+              }),
+            }),
+          );
+        }
+        /**
+         * Just nu: vilka som är inne de senaste fem minuterna, och var. Panelen frågar var tjugonde
+         * sekund. Måste ligga före /kundresa/:sess, som annars tar "live" för ett besöks id.
+         */
+        if (segments[2] === "kundresa" && segments[3] === "live" && segments.length === 4 && req.method === "GET") {
+          const { justNu } = await import("./data/kundresa.js");
+          const { allaBesok } = await import("./data/besok.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const [besok, floden, konton] = await Promise.all([
+            allaBesok(),
+            allaSessioner(),
+            listAccounts(bearerToken(req)).then((r) => r.users).catch(() => []),
+          ]);
+          return sendJson(res, 200, justNu(besok, floden, new Set(konton.filter((k) => k.isAdmin).map((k) => k.id))));
+        }
+        if (segments[2] === "kundresa" && segments.length === 4 && req.method === "GET") {
+          const { tidslinje } = await import("./data/kundresa.js");
+          const { allaBesok } = await import("./data/besok.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const b = (await allaBesok()).find((x) => x.sess === segments[3]);
+          if (!b) return sendJson(res, 404, { error: "Besöket finns inte." });
+          const f = (await allaSessioner()).find((x) => x.sess === b.sess) ?? null;
+          return sendJson(res, 200, tidslinje(b, f));
+        }
+        if (segments[2] === "trafik" && segments.length === 3 && req.method === "GET") {
+          const { allaBesok, trafik } = await import("./data/besok.js");
+          const { allaSessioner } = await import("./data/flode.js");
+          const dagar = Math.min(365, Math.max(1, Number(url.searchParams.get("dagar")) || 30));
+          const [besok, floden, konton] = await Promise.all([
+            allaBesok(),
+            allaSessioner(),
+            listAccounts(bearerToken(req)).then((r) => r.users).catch(() => []),
+          ]);
+          return sendJson(res, 200, trafik(besok, floden, konton, dagar));
         }
         /**
          * Chatten över datan. POST och inte GET: frågan och samtalet ligger i kroppen, och en fråga
@@ -2905,6 +3206,34 @@ const server = http.createServer(async (req, res) => {
       return res.end();
     }
 
+    /**
+     * Kampanjlänken: /k/KOD. Se data/kampanjer.ts.
+     *
+     * TILL SÄLJSIDAN svarar appskalet direkt här, precis som inbjudans /i/KOD: roten går inte att nå
+     * med en query (wrangler.toml), så koden måste bäras av sökvägen. Klienten läser den, skickar den
+     * med besökets landning och byter adressen till roten.
+     *
+     * TILL ANDRA SIDOR räcker en omdirigering — /butik bär en query hela vägen — och koden följer med
+     * som `?k=`. En okänd kod leder till säljsidan utan märkning: en tryckt affisch ska aldrig ge ett fel.
+     *
+     * 302 och inte 301: en webbläsare som cachat svaret skulle aldrig mer fråga, och länkens mål får
+     * gå att ändra.
+     */
+    const kampanjVag = /^\/k\/([a-z0-9]{5})\/?$/.exec(url.pathname);
+    if (kampanjVag && req.method === "GET") {
+      const { kampanjFor } = await import("./data/kampanjer.js");
+      const k = await kampanjFor(kampanjVag[1]);
+      if (!k) {
+        res.writeHead(302, { Location: "/" });
+        return res.end();
+      }
+      if (k.mal !== "/") {
+        res.writeHead(302, { Location: `${k.mal}?k=${k.kod}` });
+        return res.end();
+      }
+      // Faller igenom till appskalet nedan.
+    }
+
     // Allt som inte är API är UI. Ligger bygget inte där svarar vi som förut, med 404 i JSON — det
     // är läget i utveckling, där sidan kommer från vite.
     if (req.method === "GET" && (await serveStatic(url.pathname, res, url.search))) return;
@@ -2957,6 +3286,14 @@ startTraderaMailWatch();
 // där panelen läser det, och mejlar adminadresserna när den gått ut — innan en säljare upptäcker
 // det. Av av sig själv när ingen session finns i server/.env.
 startBlocketVakt();
+
+// Robotarnas dagliga hälsokontroll: Blocket, Tradera och Facebook klockan sju, med rapport i panelen
+// och brev till adminadresserna när något inte är grönt. Se robotHalsa.ts.
+startRobotHalsa();
+
+// Säljarens siffror från marknadsplatserna: Traderas och Blockets säljarsidor, lästa av robotarna var
+// tredje timme. Se kanalStatistik.ts.
+startKanalStatistik();
 
 /**
  * Facebook-distributionen: Marketplace och Stockholms köp/sälj-grupper.

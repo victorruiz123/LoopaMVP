@@ -11,6 +11,7 @@ import PhotoGuide from "../components/PhotoGuide";
 import GuideScene from "../components/GuideScene";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
+import * as flode from "../lib/flode";
 
 const MAX_UPLOAD_WIDTH = 1280;
 /**
@@ -172,6 +173,21 @@ export default function CaptureScreen({
    * på `true` hoppade fästningen över omtaget — bilden frös på den döda strömmen.
    */
   const [streamEpoch, setStreamEpoch] = useState(0);
+
+  /**
+   * Läget som mikrosteg i flödesmätningen.
+   *
+   * "Kameran öppnades" räknas först när strömmen faktiskt finns (streamEpoch), inte när läget
+   * sattes: den som nekade kameran ska synas som ett fel i filmläget, inte som en öppnad kamera.
+   * Omslagsläget mäts inte här — varvet som tog dit skickar "varv_klart" själv, med sekunderna.
+   */
+  useEffect(() => {
+    if (mode === "choose") flode.mikro("dator_val");
+    else if (mode === "guided" || mode === "photo") flode.mikro("fotoguide");
+    else if (mode === "review") flode.mikro("granskar_bilder", { varde: shots.length });
+    else if (mode === "video" && streamEpoch > 0) flode.mikro("kamera_oppnad");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, streamEpoch]);
   const cameraStarted = streamEpoch > 0;
   const [recording, setRecording] = useState(false);
   const [recordMs, setRecordMs] = useState(0);
@@ -228,6 +244,15 @@ export default function CaptureScreen({
       // vilket läge det är.
       console.warn("[capture] getUserMedia misslyckades", err);
       const name = err instanceof DOMException ? err.name : "";
+      flode.fel(
+        name === "NotAllowedError"
+          ? "kamera_nekad"
+          : name === "NotFoundError"
+            ? "kamera_saknas"
+            : name === "NotReadableError" || name === "AbortError"
+              ? "kamera_upptagen"
+              : "kamera_start",
+      );
       setCameraError(
         name === "NotAllowedError"
           ? t("Kameran är blockerad för den här sidan. Tillåt kameran i webbläsarens inställningar och försök igen.")
@@ -269,6 +294,7 @@ export default function CaptureScreen({
       if (aborted) {
         window.setTimeout(() => {
           if (videoRef.current === el && el.srcObject === stream && el.paused) {
+            flode.fel("kamera_uppspelning");
             setCameraError(t("Kameran kunde inte spelas upp."));
           }
         }, 400);
@@ -277,6 +303,7 @@ export default function CaptureScreen({
       // Webbläsarens egen text är engelsk och säger ingenting till en säljare — den hör hemma i
       // konsolen, inte över sökaren.
       console.warn("[capture] play() misslyckades", err);
+      flode.fel("kamera_uppspelning");
       setCameraError(t("Kameran kunde inte spelas upp."));
     });
   }, [mode, streamEpoch]);
@@ -294,6 +321,7 @@ export default function CaptureScreen({
 
   async function enterMode(next: "photo" | "video") {
     if (!cameraAvailable) {
+      flode.fel("kamera_https");
       setCameraError(
         t(
           "Kameran kan bara användas över HTTPS eller på localhost. Den här sidan körs över vanlig http, så webbläsaren blockerar den.",
@@ -333,6 +361,7 @@ export default function CaptureScreen({
    * ritas innan strömmen ska fästas på den.
    */
   async function enterGuided() {
+    flode.klick("oppna_fotoguide");
     setProcessingError(null);
     setActiveStation(nextOpenStation(stationsDone(shots), -1) ?? PHOTO_STATIONS[0].id);
     setMode("guided");
@@ -341,6 +370,7 @@ export default function CaptureScreen({
 
   /** I mobilvyn finns ingen valskärm bakom kameran — vägen bakåt går hela vägen ut. */
   function leaveCamera() {
+    flode.klick("tillbaka");
     if (videoOnly) onBack();
     else setMode("choose");
   }
@@ -441,6 +471,7 @@ export default function CaptureScreen({
   const bildrutorKlaraRef = useRef(false);
 
   function fangaOmslag() {
+    flode.klick("omslag_tagen");
     const dataUrl = grabFrame();
     if (dataUrl) setOmslagsforslag(dataUrl);
   }
@@ -462,6 +493,7 @@ export default function CaptureScreen({
    * väljs omslaget ur filmen precis som förut: sämre bild, aldrig ett stoppat jobb.
    */
   async function slutforVarvet(dataUrl: string | null) {
+    flode.klick(dataUrl ? "omslag_godkant" : "omslag_hoppat");
     let frames: Awaited<ReturnType<typeof extractBestFrames>> = [];
     const uttag = bildrutorRef.current;
     if (uttag) {
@@ -471,6 +503,7 @@ export default function CaptureScreen({
       try {
         frames = await uttag;
       } catch (err) {
+        flode.fel("bildruta_fel");
         setProcessingError(err instanceof Error ? err.message : t("Kunde inte bearbeta videon."));
         setMode("video");
         return;
@@ -512,6 +545,7 @@ export default function CaptureScreen({
     if (!station) return;
     const others = shots.filter((s) => s.stationId !== stationId);
     if (bedomda(others).length >= MAX_IMAGES) {
+      flode.fel("for_manga_bilder");
       setProcessingError(t("Högst {max} bilder bedöms — ta bort någon i granskningen först.", { max: MAX_IMAGES }));
       return;
     }
@@ -526,6 +560,7 @@ export default function CaptureScreen({
   }
 
   function captureStation() {
+    flode.klick("vinkel_tagen", { detalj: activeStation });
     const dataUrl = grabFrame();
     if (dataUrl) fillStation(activeStation, dataUrl, "manual");
   }
@@ -535,6 +570,7 @@ export default function CaptureScreen({
     const file = e.target.files?.[0];
     e.target.value = ""; // så samma fil kan väljas igen efter ett misslyckat försök
     if (!file) return;
+    flode.klick("vinkel_fran_fil", { detalj: activeStation });
     fillStation(activeStation, await fileToResizedDataUrl(file), "manual");
   }
 
@@ -558,8 +594,10 @@ export default function CaptureScreen({
   async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const picked = Array.from(e.target.files ?? []);
     e.target.value = ""; // så samma filer kan väljas igen efter ett misslyckat försök
+    if (picked.length) flode.klick("bilder_fran_galleri", { varde: picked.length });
     const room = MAX_IMAGES - bedomda(shots).length;
     if (room <= 0) {
+      flode.fel("for_manga_bilder");
       setProcessingError(t("Redan {max} bilder valda — ta bort någon först.", { max: MAX_IMAGES }));
       return;
     }
@@ -578,7 +616,9 @@ export default function CaptureScreen({
   async function startRecording() {
     const stream = streamRef.current;
     if (!stream) return;
+    flode.klick("spela_in");
     if (!hasLiveCamera()) {
+      flode.fel("kamera_avstangd");
       setProcessingError(t("Kameran hade stängts av. Startar om den — tryck igen när bilden är tillbaka."));
       await startCamera();
       return;
@@ -627,6 +667,7 @@ export default function CaptureScreen({
       // bildruteuttaget och kom ut som "kunde inte läsa någon bildruta ur videon" — sant, men det
       // pekar på uttaget i stället för på inspelningen.
       if (blob.size < MIN_CLIP_BYTES || recordedMs < MIN_CLIP_MS) {
+        flode.fel(blob.size < MIN_CLIP_BYTES ? "inspelning_tom" : "video_for_kort", { varde: Math.round(recordedMs / 1000) });
         setProcessingError(
           blob.size < MIN_CLIP_BYTES
             ? t("Inspelningen blev tom — kameran verkar ha stängts av. Försök igen.")
@@ -646,6 +687,9 @@ export default function CaptureScreen({
        * se bildrutorRef — så uttaget kostar ingen väntan alls i det vanliga fallet. Steget går att
        * hoppa över, se `slutforVarvet(null)`.
        */
+      // Varvet är klart: sekunderna och om sensorn själv avslutade det följer med. Ett varv som alltid
+      // avslutas för hand på en viss telefon säger att rotationssensorn inte gör sitt där.
+      flode.mikro("varv_klart", { varde: Math.round(recordedMs / 1000) });
       setOmslagsforslag(null);
       setVisaOmslagsguide(true);
       setMode("cover");
@@ -667,6 +711,7 @@ export default function CaptureScreen({
       );
     };
     recorder.start();
+    flode.mikro("inspelning_startad");
     recorderRef.current = recorder;
     recordStartRef.current = Date.now();
     setRecording(true);
@@ -708,6 +753,7 @@ export default function CaptureScreen({
    * säger den genom att inte ge oss några rutor.
    */
   async function taEmotVideo(file: File) {
+    flode.klick("dator_video");
     setProcessingError(null);
     setVideoFel(null);
     setVideoRuta(null);
@@ -721,6 +767,7 @@ export default function CaptureScreen({
       setVideoRuta(frames[0]?.dataUrl ?? null);
     } catch (err) {
       datorRutorRef.current = null;
+      flode.fel("dator_video_fel");
       const bas = err instanceof Error ? err.message : t("Kunde inte bearbeta videon.");
       setVideoFel(
         /bildruta/i.test(bas)
@@ -734,10 +781,12 @@ export default function CaptureScreen({
 
   /** Omslagsbilden. Skalas ned på samma sätt som varje annan vald bild. */
   async function taEmotOmslag(file: File) {
+    flode.klick("dator_omslag");
     setProcessingError(null);
     try {
       setDatorOmslag(await fileToResizedDataUrl(file));
     } catch {
+      flode.fel("bild_olaslig");
       setProcessingError(t("Bilden gick inte att läsa. Prova en JPEG eller PNG."));
     }
   }
@@ -747,6 +796,7 @@ export default function CaptureScreen({
     if (!file) return;
     const arVideo = file.type.startsWith("video/");
     const arBild = file.type.startsWith("image/");
+    if ((fack === "video" && !arVideo) || (fack === "omslag" && !arBild)) flode.fel("fel_filtyp", { detalj: fack });
     if (fack === "video" && !arVideo) return setProcessingError(t("Det där är ingen filmfil. Släpp filmen i den vänstra rutan."));
     if (fack === "omslag" && !arBild) return setProcessingError(t("Det där är ingen bildfil. Släpp bilden i den högra rutan."));
     void (fack === "video" ? taEmotVideo(file) : taEmotOmslag(file));
@@ -763,6 +813,7 @@ export default function CaptureScreen({
   async function fortsattFranDatorn() {
     const uttag = datorRutorRef.current;
     if (!uttag || !datorOmslag) return;
+    flode.klick("dator_fortsatt");
     if (videoLaser) setMode("processing");
     let frames: Awaited<ReturnType<typeof extractBestFrames>>;
     try {
@@ -784,6 +835,7 @@ export default function CaptureScreen({
   function startAnalysis(payloadOverride?: CapturedShot[]) {
     const payload: CapturedShot[] =
       payloadOverride ?? shots.map((s) => ({ dataUrl: s.dataUrl, viewLabel: s.viewLabel, source: s.source }));
+    flode.klick("skicka_bilder", { varde: payload.length });
     // Kameran släpps här och inte först vid avmonteringen: det som följer är uppladdningen och, för
     // den som inte har konto, inloggningen. Ingen av dem behöver sensorn, och en kamera som ligger
     // kvar och lyser under dem säger att skärmen fortfarande spelar in.
@@ -1016,7 +1068,13 @@ export default function CaptureScreen({
 
         {omslagsforslag ? (
           <div className="guided-controls">
-            <button className="btn btn-ghost guided-side" onClick={() => setOmslagsforslag(null)}>
+            <button
+              className="btn btn-ghost guided-side"
+              onClick={() => {
+                flode.klick("omslag_ta_om");
+                setOmslagsforslag(null);
+              }}
+            >
               {t("Ta om")}
             </button>
             <button className="btn btn-primary btn-green btn-done" onClick={() => void slutforVarvet(omslagsforslag)}>
@@ -1083,7 +1141,13 @@ export default function CaptureScreen({
           ) : (
             <span className="guided-shutter-gap" />
           )}
-          <button className="btn btn-ghost guided-side" onClick={() => advanceFrom(station.id, false)}>
+          <button
+            className="btn btn-ghost guided-side"
+            onClick={() => {
+              if (!taken[station.id]) flode.klick("vinkel_hoppad", { detalj: station.id });
+              advanceFrom(station.id, false);
+            }}
+          >
             {lastLeg ? t("Klar ({antal})", { antal: count }) : taken[station.id] ? t("Nästa") : t("Hoppa över")}
           </button>
         </div>
@@ -1203,7 +1267,14 @@ export default function CaptureScreen({
           <div key={s.id} className="review-thumb">
             <img src={s.dataUrl} alt="" />
             {s.viewLabel && <span className="review-thumb-label">{t(s.viewLabel)}</span>}
-            <button className="review-thumb-remove" onClick={() => setShots((prev) => prev.filter((x) => x.id !== s.id))} aria-label={t("Ta bort")}>
+            <button
+              className="review-thumb-remove"
+              onClick={() => {
+                flode.klick("ta_bort_bild");
+                setShots((prev) => prev.filter((x) => x.id !== s.id));
+              }}
+              aria-label={t("Ta bort")}
+            >
               <CloseIcon size={12} />
             </button>
           </div>

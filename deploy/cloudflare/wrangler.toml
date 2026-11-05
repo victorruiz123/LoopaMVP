@@ -52,6 +52,17 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/i/*"
 zone_name = "loopa.nu"
 
+# ─── Kampanjlänken: /k/KOD ──────────────────────────────────────────────────
+#
+# Samma skäl som inbjudan: en UTM-märkt länk till säljsidan går inte att routa (roten med query, se
+# ovan), så kampanjen bärs av sökvägen och slås upp på servern. Se server/src/data/kampanjer.ts.
+# Verifiera efter deploy:
+#   curl -s -o /dev/null -D - "https://loopa.nu/k/xxxxx" | grep -iE "^HTTP|^location"
+# ska ge 302 till "/" (okänd kod) — inte till /company.
+[[routes]]
+pattern = "loopa.nu/k/*"
+zone_name = "loopa.nu"
+
 # ─── /salj: den gamla adressen, som fortfarande måste svara ────────────────
 #
 # /salj var säljflödets adress den vecka roten ännu gick till företagssidan. Den står i länkar vi
@@ -115,6 +126,11 @@ zone_name = "loopa.nu"
 
 [[routes]]
 pattern = "loopa.nu/cookies"
+zone_name = "loopa.nu"
+
+# Om oss — startsidans andra flik (web/src/screens/OmOssScreen.tsx).
+[[routes]]
+pattern = "loopa.nu/om-oss"
 zone_name = "loopa.nu"
 
 # ─── Sökmotorernas filer ────────────────────────────────────────────────────

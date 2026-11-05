@@ -635,6 +635,26 @@ body {
 }
 .home-bar-profil-inne:hover { background: var(--ink); border-color: var(--accent); }
 
+/* ---- flikarna: Sälj | Om oss ----
+   Står i startsidans topplist och i Om oss egen (se components/HemFlikar). */
+.hem-flikar {
+  display: inline-flex; gap: 2px; padding: 4px;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--border);
+}
+.hem-flik {
+  padding: 8px 16px; border-radius: 999px;
+  font-size: var(--fs-sm); font-weight: 600; color: var(--ink-soft); text-decoration: none;
+  transition: background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+  white-space: nowrap;
+}
+.hem-flik:hover { color: var(--ink); background: var(--field); }
+.hem-flik-aktiv, .hem-flik-aktiv:hover { background: var(--accent); color: #fff; }
+.hem-flik:focus-visible { outline: none; box-shadow: var(--focus); }
+@media (max-width: 380px) {
+  .hem-flik { padding: 7px 12px; }
+}
+
+
 /* ---- heron ---- */
 .home-hero { margin-bottom: 34px; }
 .home-rubrik {
@@ -2156,6 +2176,45 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .sell-ladder-now { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
 .sell-ladder-now strong { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 
+/* Så går annonsen (AnnonsStatistik): marknadsplatsernas egna siffror, en sektion per kanal. */
+.annons-statistik {
+  border: 1px solid var(--hairline); border-radius: var(--r-sm); padding: 12px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.annons-statistik-not { margin: -2px 0 0; }
+.annons-statistik-kanal { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.annons-statistik-kanal + .annons-statistik-kanal { border-top: 1px solid var(--hairline); padding-top: 12px; }
+.annons-statistik-kanal p { margin: 0; }
+.annons-statistik-namn { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+.annons-statistik-namn img { width: 18px; height: 18px; border-radius: 4px; }
+.annons-statistik-tal { display: flex; flex-wrap: wrap; gap: 6px 18px; }
+.annons-statistik-tal-post { display: inline-flex; align-items: baseline; gap: 5px; }
+.annons-statistik-tal-post strong { font-size: 20px; font-weight: 700; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.annons-statistik-tal-post small { color: var(--muted); }
+.annons-statistik-okning { font-size: var(--fs-sm); font-weight: 600; color: var(--green-dark); }
+.annons-statistik-annonser, .annons-statistik-detaljer {
+  list-style: none; margin: 0; padding: 0; display: grid; gap: 4px;
+  font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.45;
+}
+
+/* Stapeldiagrammet: en serie, tunna staplar med rundade toppar, recessiv baslinje. */
+.stapel { margin: 0; display: flex; flex-direction: column; gap: 4px; }
+.stapel-rubrik { display: flex; justify-content: space-between; font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.stapel-max { font-weight: 400; color: var(--muted); }
+.stapel-yta { display: flex; align-items: flex-end; gap: 2px; height: 96px; border-bottom: 1px solid var(--border); touch-action: pan-y; }
+.stapel-kolumn {
+  flex: 1 1 0; min-width: 0; height: 100%; padding: 0; border: none; background: none; cursor: pointer;
+  display: flex; align-items: flex-end;
+}
+.stapel-stapel { display: block; width: 100%; min-height: 3px; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; }
+.stapel-kolumn:hover .stapel-stapel, .stapel-kolumn.vald .stapel-stapel, .stapel-kolumn:focus-visible .stapel-stapel { opacity: 1; background: var(--accent-dark); }
+.stapel-kolumn:focus-visible { outline: 2px solid var(--ink); outline-offset: 1px; }
+.stapel-axel { display: flex; justify-content: space-between; font-size: var(--fs-xs, 12px); color: var(--muted); }
+.stapel-avlasning { min-height: 1.4em; }
+.stapel-tabell summary { cursor: pointer; }
+.stapel-tabell table { margin-top: 6px; border-collapse: collapse; font-size: var(--fs-sm); color: var(--ink-soft); }
+.stapel-tabell th, .stapel-tabell td { text-align: left; padding: 2px 12px 2px 0; font-weight: 400; font-variant-numeric: tabular-nums; }
+
 /* ==========================================================================
    Annonsen
    ========================================================================== */
@@ -2332,6 +2391,8 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
    ovanför som konkurrens. Här är granskningen den enda bilden: rubriken står stilla, kroppen
    rullar, och "Ja, sälj den" ligger kvar i underkanten hela vägen. */
 .sell-modal-root { position: fixed; inset: 0; z-index: 70; display: flex; justify-content: center; }
+/* Kontosteget, ovanpå annonsen och bekräftelsen: det sista som händer före publiceringen. */
+.sell-konto-steg { position: fixed; inset: 0; z-index: 80; overflow-y: auto; background: var(--bg); }
 .sell-modal-scrim {
   position: absolute; inset: 0; background: hsl(var(--scrim) / 0.5);
   animation: sell-modal-fade var(--t-slow) var(--ease-ui) both;
@@ -3449,6 +3510,28 @@ html:not([data-view="desktop"]) body:has(.hur-overlay) { background: #1e1d1b; }
 .admin-flik-knapp:not(.vald):hover { color: var(--ink); }
 /* Listan som flik: den ärver skärmens spalt och ska inte lägga en egen ram runt sig. */
 .admin-flik { display: contents; }
+
+/* Robotarnas hälsokontroll (AdminRobotHalsaScreen). Ett kort per robot, felen överst. */
+.robothalsa-kort { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.robothalsa-robot { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r); padding: 14px 16px; }
+.robothalsa-robot.robothalsa-fel { border-color: var(--danger); }
+.robothalsa-robot.robothalsa-varning { border-color: var(--amber); }
+.robothalsa-robot h3 { display: flex; align-items: center; justify-content: space-between; margin: 0 0 10px; font-size: var(--fs-md); }
+.robothalsa-robot ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.robothalsa-robot li { display: flex; gap: 8px; align-items: baseline; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.4; overflow-wrap: anywhere; }
+.robothalsa-robot li.robothalsa-av { color: var(--muted-soft); }
+.robothalsa-bricka { font-size: var(--fs-xs, 12px); font-weight: 600; padding: 2px 8px; border-radius: 999px; }
+.robothalsa-bricka.robothalsa-ok { background: var(--green-light); color: var(--green-dark); }
+.robothalsa-bricka.robothalsa-varning { background: var(--amber-light); color: var(--amber-ink); }
+.robothalsa-bricka.robothalsa-fel { background: var(--danger-light); color: var(--danger-dark); }
+.robothalsa-bricka.robothalsa-av { background: var(--field); color: var(--muted); }
+.robothalsa-prick { flex: none; width: 9px; height: 9px; border-radius: 50%; background: var(--muted-soft); }
+.robothalsa-prick.robothalsa-ok { background: var(--green); }
+.robothalsa-prick.robothalsa-varning { background: var(--amber); }
+.robothalsa-prick.robothalsa-fel { background: var(--danger); }
+.robothalsa-historik { margin-top: 16px; }
+.robothalsa-remsa { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+.robothalsa-remsa .robothalsa-prick { width: 14px; height: 14px; border-radius: 4px; }
 
 /* --------------------------------------------------------------------------
    Efterlysningsfliken
@@ -6106,3 +6189,750 @@ body:has(.grind) .consent { display: none; }
 .vid-haller-pa > div { display: flex; flex-direction: column; gap: 3px; }
 .vid-haller-pa strong { font-size: var(--fs-lg); font-weight: 700; letter-spacing: -0.02em; color: var(--ink); }
 .vid-haller-pa span { font-size: var(--fs-sm); line-height: 1.45; color: var(--muted); }
+
+/* ---- Trafikfliken (AdminTrafikScreen) ------------------------------------
+   Tre frågor uppifrån och ned, svaret först. Lånar datafliken staplar och tabeller. */
+.trafik-topp { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.trafik-topp .admin-lede { margin: 0; }
+.trafik-period { margin: 0; }
+.trafik-period .admin-flik-knapp { white-space: nowrap; }
+.trafik-text { margin: 0 0 8px; font-size: var(--fs-sm); line-height: 1.45; }
+.trafik-dampad { color: var(--muted); font-weight: 400; }
+
+.trafik-kortsagt {
+  margin-top: 16px; padding: 14px 16px; border-radius: 14px;
+  background: var(--accent-light); color: var(--ink);
+}
+.trafik-kortsagt-rubrik { margin: 0 0 6px; font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-ink); }
+.trafik-kortsagt ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); line-height: 1.45; }
+
+.trafik-fraga { margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--field); }
+.trafik-fraga-rubrik { display: flex; align-items: center; gap: 10px; margin: 0 0 4px; font-size: var(--fs-lg); color: var(--ink); }
+.trafik-fraga-nr {
+  flex: 0 0 auto; width: 24px; height: 24px; border-radius: 999px; display: inline-grid; place-items: center;
+  background: var(--ink); color: #fff; font-size: var(--fs-xs); font-weight: 700;
+}
+
+.trafik-kanaler { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.trafik-kanal {
+  display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(120px, 1fr) minmax(150px, 1fr);
+  gap: 6px 16px; align-items: center; padding: 10px 0; border-bottom: 1px solid var(--field);
+}
+.trafik-kanal:last-child { border-bottom: none; }
+.trafik-kanal-namn { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); min-width: 0; }
+.trafik-kanal-namn .trafik-dampad { font-size: var(--fs-2xs); }
+.trafik-kanal-stapel { display: flex; align-items: center; gap: 8px; font-size: var(--fs-xs); }
+.trafik-kanal-stapel .data-tratt-stapel { flex: 1; }
+.trafik-kanal-tal { white-space: nowrap; font-variant-numeric: tabular-nums; }
+.trafik-kanal-utfall { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .trafik-kanal { grid-template-columns: 1fr; }
+}
+
+.trafik-tratt { list-style: none; margin: 8px 0 18px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.trafik-tratt-steg { display: grid; grid-template-columns: minmax(150px, 1fr) 2fr auto; gap: 12px; align-items: center; }
+.trafik-tratt-text { display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-sm); }
+.trafik-tratt-text .trafik-dampad { font-size: var(--fs-2xs); }
+.trafik-tratt-stapel { height: 12px; }
+.trafik-tratt-tal { min-width: 76px; text-align: right; font-size: var(--fs-sm); font-variant-numeric: tabular-nums; white-space: nowrap; }
+@media (max-width: 640px) {
+  .trafik-tratt-steg { grid-template-columns: 1fr auto; }
+  .trafik-tratt-stapel { grid-column: 1 / -1; grid-row: 2; }
+}
+
+.trafik-tvaspalt { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 0 24px; }
+.trafik-toplista { margin-bottom: 16px; min-width: 0; }
+.trafik-toplista h4, .trafik-underrubrik { margin: 0 0 2px; font-size: var(--fs-sm); color: var(--ink); }
+.trafik-underrubrik { margin-top: 14px; }
+.trafik-stapel-rad .trafik-stapel-namn {
+  flex: 0 1 50%; min-width: 0; color: var(--ink-soft);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.trafik-underrad { display: block; font-weight: 400; color: var(--muted-soft); font-size: var(--fs-2xs); }
+
+.trafik-hopfallt { margin-top: 8px; border: 1px solid var(--field); border-radius: 12px; background: var(--surface); }
+.trafik-hopfallt > summary { cursor: pointer; padding: 10px 14px; font-size: var(--fs-sm); font-weight: 600; color: var(--ink-soft); }
+.trafik-hopfallt > summary:hover { color: var(--ink); }
+.trafik-hopfallt-inne { padding: 0 14px 12px; }
+.trafik-kod { display: block; margin: 0 0 8px; font-size: var(--fs-xs); word-break: break-all; background: var(--field); padding: 8px 10px; border-radius: 8px; }
+
+.trafik-dagar { display: flex; align-items: flex-end; gap: 2px; height: 96px; border-bottom: 1px solid var(--field); }
+.trafik-dag { flex: 1; height: 100%; display: flex; align-items: flex-end; cursor: pointer; min-width: 0; }
+.trafik-dag-stapel { display: block; width: 100%; background: var(--accent); border-radius: 4px 4px 0 0; opacity: 0.85; }
+.trafik-dag.aktiv .trafik-dag-stapel, .trafik-dag:hover .trafik-dag-stapel { opacity: 1; background: var(--accent-dark); }
+.trafik-dag-axel { display: flex; justify-content: space-between; font-size: var(--fs-2xs); color: var(--muted-soft); margin-top: 4px; }
+
+.trafik-konton { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.trafik-konto {
+  display: flex; flex-direction: column; gap: 6px; width: 100%; text-align: left;
+  background: var(--surface); border: 1px solid var(--field); border-radius: 12px; padding: 10px 12px;
+  color: var(--ink); font: inherit; cursor: pointer;
+}
+.trafik-konto:disabled { cursor: default; }
+.trafik-konto:not(:disabled):hover { border-color: var(--muted-soft); }
+.trafik-konto-topp { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; font-size: var(--fs-sm); }
+.trafik-konto-topp .trafik-dampad { font-size: var(--fs-xs); }
+.trafik-konto-rad { display: flex; align-items: baseline; gap: 8px; font-size: var(--fs-xs); }
+.trafik-etikett { flex: 0 0 84px; color: var(--muted); }
+.trafik-vag { display: flex; flex-wrap: wrap; gap: 4px; }
+.trafik-vag-steg { font-size: var(--fs-2xs); color: var(--ink-soft); background: var(--field); border-radius: 999px; padding: 2px 8px; }
+.trafik-vag-steg + .trafik-vag-steg::before { content: "→ "; color: var(--muted-soft); }
+
+/* ---- Rapportflikarna (adminRapport.tsx): nyckeltal, trend, status, AI-raderna ---- */
+.rapport-tal-rad { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin: 10px 0 18px; }
+.rapport-tal { background: var(--surface); border: 1px solid var(--field); border-radius: 14px; padding: 12px 14px; display: flex; flex-direction: column; gap: 2px; }
+.rapport-tal-varde { font-size: 26px; font-weight: 700; color: var(--ink); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; }
+.rapport-tal-etikett { font-size: var(--fs-sm); font-weight: 600; color: var(--ink); }
+.rapport-tal-forklaring { font-size: var(--fs-xs); color: var(--muted); line-height: 1.4; margin-top: 2px; }
+.rapport-trend { font-size: var(--fs-xs); font-weight: 600; color: var(--muted); }
+.rapport-trend.upp { color: #2f6b3a; }
+.rapport-trend.ned { color: #96271C; }
+.rapport-status { font-size: var(--fs-2xs); font-weight: 700; border-radius: 999px; padding: 2px 8px; }
+.rapport-status-annons { background: #e3f0e4; color: #2f6b3a; }
+.rapport-status-borjat { background: var(--accent-light); color: var(--accent-ink); }
+.rapport-status-inget { background: var(--field); color: var(--ink-soft); }
+.rapport-lank { padding-left: 0; }
+.trafik-dag { flex-direction: column; justify-content: flex-end; align-items: stretch; }
+.rapport-stapel-tal { text-align: center; font-size: var(--fs-2xs); color: var(--muted); font-variant-numeric: tabular-nums; margin-bottom: 2px; pointer-events: none; }
+.rapport-ai { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.rapport-ai li { display: grid; grid-template-columns: 90px 70px 1fr; gap: 12px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--field); font-size: var(--fs-sm); }
+.rapport-ai li:last-child { border-bottom: none; }
+.rapport-ai-rubrik { font-weight: 600; color: var(--ink); }
+.rapport-ai-varde { font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
+.rapport-ai-text { color: var(--muted); }
+@media (max-width: 640px) {
+  .rapport-ai li { grid-template-columns: 1fr auto; }
+  .rapport-ai-text { grid-column: 1 / -1; }
+}
+
+/* ---- Uppladdningsfliken (AdminResorScreen) --------------------------------
+   Kartan som en lista i flödets ordning, fastnar-korten, och tidslinjen för en resa. */
+.resor-dampad { color: var(--muted); font-weight: 400; }
+.resor-karta { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; }
+.resor-kart-steg { padding: 10px 0; border-bottom: 1px solid var(--field); }
+.resor-kart-steg:last-child { border-bottom: none; }
+.resor-kart-topp { display: grid; grid-template-columns: minmax(160px, 1fr) 2fr auto; gap: 12px; align-items: center; font-size: var(--fs-sm); }
+.resor-kart-namn { color: var(--ink); }
+.resor-kart-stapel { height: 10px; }
+.resor-kart-tal { min-width: 40px; text-align: right; font-variant-numeric: tabular-nums; }
+.resor-kart-vidare { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin-top: 6px; font-size: var(--fs-xs); }
+.resor-kart-tid { margin-left: 4px; }
+.resor-chip { border-radius: 999px; padding: 2px 9px; background: var(--field); color: var(--ink-soft); white-space: nowrap; }
+.resor-chip b { font-variant-numeric: tabular-nums; }
+.resor-chip-fram { background: #e3f0e4; color: #24502c; }
+.resor-chip-bak { background: #fdf0d8; color: #6b4a0e; }
+.resor-chip-ut { background: #f8e1dc; color: #7a2016; }
+@media (max-width: 640px) {
+  .resor-kart-topp { grid-template-columns: 1fr auto; }
+  .resor-kart-stapel { grid-column: 1 / -1; grid-row: 2; }
+}
+
+.resor-fastnar { list-style: none; margin: 8px 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.resor-fastnar-kort { background: var(--surface); border: 1px solid var(--field); border-left: 4px solid #c0392b; border-radius: 12px; padding: 12px 14px; }
+.resor-fastnar-rubrik { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: var(--fs-sm); margin-bottom: 8px; }
+.resor-fastnar-fakta { display: grid; grid-template-columns: 110px 1fr; gap: 4px 12px; margin: 0; font-size: var(--fs-xs); }
+.resor-fastnar-fakta dt { color: var(--muted); }
+.resor-fastnar-fakta dd { margin: 0; color: var(--ink-soft); }
+@media (max-width: 640px) {
+  .resor-fastnar-fakta { grid-template-columns: 1fr; }
+  .resor-fastnar-fakta dd { margin-bottom: 4px; }
+}
+
+.resor-filter { margin: 4px 0 10px; }
+.resor-filter .admin-flik-knapp { white-space: nowrap; }
+.resor-fel-text { color: #96271C; }
+.trafik-konto.resor-oppen { border-color: var(--ink-soft); border-bottom-left-radius: 0; border-bottom-right-radius: 0; }
+.resor-tidslinje {
+  border: 1px solid var(--ink-soft); border-top: none; border-radius: 0 0 12px 12px;
+  background: var(--surface); padding: 10px 12px 4px; margin-top: -1px;
+}
+.resor-tidslinje ol { list-style: none; margin: 0 0 8px; padding: 0; }
+.resor-punkt { display: grid; grid-template-columns: 150px 14px 1fr; gap: 8px; align-items: start; font-size: var(--fs-xs); position: relative; padding: 3px 0; }
+.resor-punkt-tid { color: var(--ink-soft); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.resor-punkt-markor { width: 9px; height: 9px; border-radius: 999px; background: var(--muted-soft); margin-top: 4px; justify-self: center; }
+.resor-punkt-mikro .resor-punkt-markor { background: var(--ink); }
+.resor-punkt-klick .resor-punkt-markor { background: var(--field); border: 1.5px solid var(--muted); }
+.resor-punkt-fel .resor-punkt-markor, .resor-punkt-slut .resor-punkt-markor { background: #c0392b; }
+.resor-punkt-intygat .resor-punkt-markor { background: #2f6b3a; }
+.resor-punkt-text { color: var(--ink); line-height: 1.45; }
+.resor-punkt-klick .resor-punkt-text { color: var(--ink-soft); }
+.resor-punkt-slut .resor-punkt-text { color: #96271C; font-weight: 600; }
+@media (max-width: 640px) {
+  .resor-punkt { grid-template-columns: 96px 12px 1fr; }
+  .resor-punkt-tid .resor-dampad { display: block; }
+}
+.utskick-forval {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px;
+  margin: 8px 0 12px; padding: 10px 14px; border-radius: 12px; background: var(--accent-light);
+  color: var(--ink); font-size: var(--fs-sm);
+}
+
+/* ---- Nordstjärnan, kohorterna och grupperna (AdminDataScreen) ------------- */
+.rapport-nordstjarna { margin-top: 16px; padding: 16px 18px; border-radius: 16px; background: var(--surface); border: 1.5px solid var(--ink); }
+.rapport-ns-topp { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.rapport-ns-etikett { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent-ink); }
+.rapport-ns-rubrik { margin: 2px 0 2px; font-size: var(--fs-lg); color: var(--ink); }
+.rapport-ns-forklaring { margin: 0; font-size: var(--fs-xs); color: var(--muted); }
+.rapport-ns-tal { display: grid; grid-template-columns: minmax(150px, 1.2fr) repeat(2, minmax(140px, 1fr)); gap: 10px; align-items: stretch; margin: 14px 0 10px; }
+.rapport-ns-varde { font-size: 44px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; color: var(--ink); font-variant-numeric: tabular-nums; }
+.rapport-ns-progress { margin-top: 8px; height: 8px; border-radius: 999px; background: var(--field); overflow: hidden; }
+.rapport-ns-progress span { display: block; height: 100%; background: var(--accent); border-radius: 999px; }
+.rapport-ns-staplar { position: relative; height: 110px; margin-top: 18px; }
+.rapport-ns-pagaende .trafik-dag-stapel { opacity: 0.45; }
+.rapport-ns-mallinje { position: absolute; left: 0; right: 0; border-top: 1.5px dashed var(--ink-soft); pointer-events: none; z-index: 1; }
+.rapport-ns-mallinje span { position: absolute; left: 0; top: -16px; font-size: var(--fs-2xs); color: var(--ink-soft); background: var(--surface); padding: 0 4px; }
+.rapport-ns-form { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-end; margin-top: 12px; padding: 12px; border-radius: 12px; background: var(--field); }
+.rapport-ns-form label { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-xs); font-weight: 600; color: var(--ink-soft); }
+.rapport-ns-form select, .rapport-ns-form input { font: inherit; font-size: var(--fs-sm); padding: 7px 10px; border-radius: 8px; border: 1px solid var(--muted-soft); background: var(--surface); color: var(--ink); min-width: 120px; }
+.rapport-ns-knappar { display: flex; gap: 6px; }
+.rapport-ns-form .rapport-tal-forklaring { flex-basis: 100%; margin: 0; }
+@media (max-width: 640px) {
+  .rapport-ns-tal { grid-template-columns: 1fr 1fr; }
+  .rapport-ns-tal > div:first-child { grid-column: 1 / -1; }
+}
+
+.rapport-kohort td, .rapport-kohort th { text-align: left; white-space: nowrap; }
+.rapport-kohort-cell b { display: block; font-variant-numeric: tabular-nums; }
+.rapport-kohort-cell span { font-size: var(--fs-2xs); color: var(--ink-soft); }
+.rapport-kohort-tom { color: var(--muted-soft); }
+.rapport-kohort td.rapport-kohort-cell { border-bottom: 2px solid var(--surface); }
+
+.rapport-grupper { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin: 8px 0 12px; }
+.rapport-grupp {
+  display: flex; flex-direction: column; gap: 2px; text-align: left; padding: 12px 14px; border-radius: 14px;
+  border: 1px solid var(--field); background: var(--surface); color: var(--ink); font: inherit; cursor: pointer;
+}
+.rapport-grupp:hover { border-color: var(--muted-soft); }
+.rapport-grupp.vald { border: 1.5px solid var(--ink); box-shadow: var(--shadow-sm, 0 1px 2px rgb(0 0 0 / 0.08)); }
+.rapport-grupp-tal { font-size: 24px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rapport-grupp-namn { font-size: var(--fs-sm); font-weight: 600; line-height: 1.3; }
+.rapport-grupp-andel { font-size: var(--fs-2xs); color: var(--muted); }
+.rapport-grupp-lista { border-top: 1px solid var(--field); padding-top: 12px; }
+.rapport-grupp-huvud { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 8px 16px; margin-bottom: 4px; }
+.rapport-grupp-huvud h4 { margin: 0 0 2px; font-size: var(--fs-sm); color: var(--ink); }
+
+/* ---- Kundresan (AdminKundresaScreen) ---------------------------------------
+   Samma språk som Trafik och Data: tratten är staplar i accentfärgen, texten står alltid i bläck,
+   och läckan markeras med ord och ikon — aldrig bara med färg. */
+/* Underflikarna: fyra frågor, en i taget. Större än filterknapparna — de byter vad sidan handlar om. */
+.resa-vyer { display: flex; gap: 4px; margin: 4px 0 0; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: none; }
+.resa-vyer::-webkit-scrollbar { display: none; }
+.resa-vy {
+  flex: 0 0 auto; font: inherit; font-size: var(--fs-md); font-weight: 600; color: var(--muted);
+  background: none; border: 0; border-bottom: 3px solid transparent; padding: 10px 14px 9px; cursor: pointer; margin-bottom: -1px;
+}
+.resa-vy:hover { color: var(--ink); }
+.resa-vy.vald { color: var(--ink); border-bottom-color: var(--accent); }
+.resa-huvud { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px 16px; margin: 16px 0 4px; }
+.resa-huvud-fraga { margin: 0; font-size: var(--fs-lg); color: var(--ink); }
+.resa-huvud-filter { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.resa-huvud-filter .trafik-period { margin: 0; }
+.resa-val { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); }
+.resa-val select {
+  font: inherit; font-size: var(--fs-sm); color: var(--ink); background: var(--surface);
+  border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; max-width: 180px;
+}
+.resa-vidare { display: flex; flex-wrap: wrap; gap: 8px; margin: 16px 0 4px; }
+.resa-vidare .btn { width: auto; }
+.resa-laddar { opacity: 0.55; transition: opacity 0.15s; pointer-events: none; }
+.resa-underrubrik { margin: 18px 0 4px; font-size: var(--fs-sm); color: var(--ink); }
+
+.resa { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.resa-del { background: var(--surface); border: 1px solid var(--field); border-radius: 16px; padding: 14px 16px 16px; }
+.resa-del-rubrik { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 0 0 12px; font-size: var(--fs-md); color: var(--ink); }
+.resa-del-nr {
+  font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+  background: var(--ink); color: #fff; border-radius: 999px; padding: 2px 8px;
+}
+
+.resa-lacka-etikett {
+  font-size: var(--fs-2xs); font-weight: 700; border-radius: 999px; padding: 2px 8px;
+  background: var(--danger); color: #fff;
+}
+.resa-bro {
+  display: flex; justify-content: center; padding: 4px 0;
+}
+.resa-bro span {
+  font-size: var(--fs-2xs); color: var(--ink-soft); background: var(--field); border-radius: 999px; padding: 4px 12px; text-align: center;
+}
+
+/* Konvertering mot snittet: kanalernas källor, ingångarna, sidorna och vägarna ritas likadant.
+   Stapeln är andelen, det lodräta strecket snittet, och multipeln står i ord bredvid. */
+.resa-konv-lista { list-style: none; margin: 6px 0 14px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+/* Sifferkolumnen har FAST bredd: annars börjar varje rads stapel på ett eget ställe, och snittstrecket
+   — hela poängen med raden — hamnar i sicksack i stället för i en linje. */
+.resa-konv { display: grid; grid-template-columns: minmax(150px, 1.2fr) minmax(120px, 1.6fr) 236px; gap: 12px; align-items: center; font-size: var(--fs-sm); padding: 4px 0; }
+.resa-konv-namn { min-width: 0; overflow-wrap: anywhere; line-height: 1.35; }
+.resa-konv-stapel { position: relative; height: 12px; border-radius: 4px; background: var(--field); }
+.resa-konv-fyllning { position: absolute; inset: 0 auto 0 0; max-width: 100%; border-radius: 4px; background: var(--accent); }
+.resa-konv-snitt { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.resa-konv-osaker .resa-konv-fyllning { background: var(--muted-soft); }
+.resa-konv-tal { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: flex-end; gap: 2px 8px; font-variant-numeric: tabular-nums; }
+.resa-konv-tal .trafik-dampad { font-size: var(--fs-2xs); }
+@media (max-width: 640px) {
+  .resa-konv { grid-template-columns: 1fr; gap: 4px; }
+  .resa-konv-tal { justify-content: flex-start; }
+}
+.resa-mot { font-size: var(--fs-2xs); font-weight: 700; border-radius: 999px; padding: 1px 7px; background: var(--field); color: var(--ink-soft); white-space: nowrap; }
+.resa-mot-upp { background: var(--green-light); color: var(--green-dark); }
+.resa-mot-ned { background: var(--danger-light); color: var(--danger-dark); }
+.resa-mot-osaker { font-weight: 600; font-style: italic; }
+
+.resa-slutsatser { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+.resa-slutsats { display: flex; gap: 10px; align-items: baseline; margin: 0; padding: 10px 14px; border-radius: 12px; font-size: var(--fs-sm); line-height: 1.45; color: var(--ink); }
+.resa-slutsats-upp { background: var(--green-light); }
+.resa-slutsats-upp > span:first-child { color: var(--green-dark); }
+.resa-slutsats-ned { background: var(--amber-light); }
+.resa-slutsats-ned > span:first-child { color: var(--amber-ink); }
+
+.resa-kanal-topp { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 4px 16px; }
+.resa-kanal-snitt { font-size: var(--fs-xs); }
+.resa-kanaler-lista { list-style: none; margin: 6px 0 10px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.resa-kanal { background: var(--surface); border: 1px solid var(--field); border-radius: 14px; overflow: hidden; }
+.resa-kanal-vald { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.resa-kanal-knapp {
+  display: grid; grid-template-columns: minmax(130px, 1fr) minmax(250px, 2fr) minmax(110px, auto) 16px;
+  grid-template-areas: "namn trappa varde pil";
+  gap: 8px 16px; align-items: center; width: 100%; padding: 12px 14px; text-align: left;
+  background: none; border: 0; font: inherit; color: var(--ink); cursor: pointer;
+}
+.resa-kanal-knapp:hover { background: var(--surface-pressed); }
+.resa-kanal-namn { grid-area: namn; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.resa-kanal-namn .trafik-dampad { font-size: var(--fs-2xs); }
+.resa-kanal-namn .rapport-trend { font-size: var(--fs-2xs); }
+
+.resa-kanal-varde { grid-area: varde; display: flex; flex-direction: column; align-items: flex-end; gap: 2px; text-align: right; }
+.resa-kanal-varde b { font-size: 22px; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.resa-kanal-varde .trafik-dampad { font-size: var(--fs-2xs); }
+.resa-kanal-pil { grid-area: pil; color: var(--muted); }
+
+.resa-kanal-inne { padding: 0 14px 14px; border-top: 1px solid var(--field); }
+@media (max-width: 640px) {
+  .resa-kanal-knapp { grid-template-columns: 1fr auto 16px; grid-template-areas: "namn varde pil" "trappa trappa trappa"; }
+}
+
+/* Hur väl kanalerna mäts: en stapel i tre delar — våra länkar, känd källa, okänd. */
+.resa-matning { margin: 10px 0 18px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--field); }
+.resa-matning-svag { border-color: var(--amber); background: var(--amber-light); }
+.resa-matning-topp { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; font-size: var(--fs-sm); }
+.resa-matning-tal { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.resa-matning-stapel { display: flex; gap: 2px; height: 12px; margin: 10px 0 6px; border-radius: 4px; overflow: hidden; background: var(--surface); }
+.resa-matning-stapel > span { display: block; height: 100%; }
+.resa-matning-stapel > span:first-child { border-radius: 4px 0 0 4px; }
+.resa-matning-stapel > span:last-child { border-radius: 0 4px 4px 0; }
+.resa-matning-lank { background: var(--accent-dark); }
+.resa-matning-kand { background: var(--accent); }
+.resa-matning-okand { background: #b5ad9f; }
+.resa-matning .trafik-text { margin: 8px 0 0; }
+
+/* Kampanjlänkarna. */
+.resa-lankar { margin-top: 22px; padding-top: 4px; }
+.resa-lank-ny { display: flex; flex-direction: column; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--bg); border: 1px solid var(--field); margin: 8px 0 12px; }
+.resa-lank-ny > .btn { width: auto; align-self: flex-start; padding-left: 20px; padding-right: 20px; }
+.resa-falt { display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); }
+.resa-falt > span { font-weight: 600; color: var(--ink); }
+.resa-falt input {
+  font: inherit; font-size: var(--fs-sm); padding: 9px 12px; border-radius: 10px;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink); max-width: 420px;
+}
+.resa-falt input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+.resa-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.resa-chip {
+  font: inherit; font-size: var(--fs-xs); padding: 6px 11px; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--ink-soft);
+}
+.resa-chip:hover { border-color: var(--muted-soft); }
+.resa-chip.vald { background: var(--ink); border-color: var(--ink); color: #fff; }
+.resa-lank-lista { list-style: none; margin: 0 0 12px; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.resa-lank { padding: 12px 14px; border-radius: 14px; background: var(--surface); border: 1px solid var(--field); display: flex; flex-direction: column; gap: 10px; }
+.resa-lank-ny-skapad { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.resa-lank-topp { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
+.resa-lank-namn { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.resa-lank-namn .trafik-dampad { font-size: var(--fs-2xs); }
+.resa-lank-adress { display: flex; align-items: center; gap: 8px; }
+.resa-lank-adress code { font-size: var(--fs-sm); padding: 5px 9px; border-radius: 8px; background: var(--field); color: var(--ink); }
+.resa-lank-adress .btn { width: auto; }
+.resa-lank-utfall { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; font-size: var(--fs-xs); }
+.resa-lank-bort { margin-left: auto; color: var(--muted); font-size: var(--fs-xs); }
+.resa-guide { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: var(--fs-sm); line-height: 1.45; }
+
+/* Ingångarna: en rad per sida folk landar på, uppdelad efter hur långt besöket kom. Färgerna är
+   prövade för färgblindhet (blå köpare, orange säljare, grått = inget hände), och varje del står
+   också i ord under stapeln. */
+
+.resa-utfall-lamnade { background: #b5ad9f; }
+
+.resa-ingangar { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.resa-ingang { background: var(--surface); border: 1px solid var(--field); border-radius: 14px; overflow: hidden; }
+.resa-ingang-alla { background: var(--bg); border-style: dashed; }
+.resa-ingang-knapp {
+  display: grid; grid-template-columns: minmax(150px, 1fr) minmax(260px, 2.6fr) 16px;
+  grid-template-areas: "namn tratt pil";
+  gap: 4px 16px; align-items: center; width: 100%; padding: 12px 14px; text-align: left;
+  background: none; border: 0; font: inherit; color: var(--ink); cursor: pointer;
+}
+.resa-ingang-knapp:disabled { cursor: default; }
+.resa-ingang-knapp:not(:disabled):hover { background: var(--surface-pressed); }
+.resa-ingang-namn { grid-area: namn; display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-sm); }
+.resa-ingang-namn .trafik-dampad { font-size: var(--fs-2xs); }
+
+.resa-ingang-knapp .resa-kanal-pil { grid-area: pil; }
+.resa-ingang-inne { padding: 0 14px 12px; border-top: 1px solid var(--field); }
+.resa-nasta { display: grid; grid-template-columns: minmax(150px, 1fr) 2fr 52px; gap: 12px; align-items: center; font-size: var(--fs-sm); }
+.resa-nasta b { text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 640px) {
+  .resa-ingang-knapp { grid-template-columns: 1fr 16px; grid-template-areas: "namn pil" "tratt tratt"; }
+  .resa-nasta { grid-template-columns: 1fr 1fr 44px; }
+}
+
+.resa-valj { flex-wrap: wrap; }
+.resa-valj .admin-flik-knapp { flex: 1 1 auto; }
+.resa-sida { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(280px, 1.6fr); gap: 8px 28px; }
+@media (max-width: 760px) { .resa-sida { grid-template-columns: 1fr; } }
+.resa-djup { list-style: none; margin: 6px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.resa-djup-band {
+  display: grid; grid-template-columns: 82px 1fr 48px; gap: 10px; align-items: center;
+  padding: 8px 10px; background: var(--bg); font-size: var(--fs-xs);
+}
+.resa-djup-band:first-child { border-radius: 10px 10px 0 0; }
+.resa-djup-band:last-child { border-radius: 0 0 10px 10px; }
+.resa-djup-etikett { color: var(--ink-soft); }
+.resa-djup-stapel { height: 10px; border-radius: 4px; background: var(--field); overflow: hidden; }
+.resa-djup-stapel > span { display: block; height: 100%; border-radius: 4px; background: var(--accent); }
+.resa-djup-tal { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink); }
+
+.resa-sektioner { list-style: none; margin: 6px 0 8px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.resa-sektion { display: grid; grid-template-columns: minmax(130px, 1fr) 1.4fr; gap: 4px 12px; align-items: center; font-size: var(--fs-sm); }
+.resa-sektion-stapel { height: 12px; border-radius: 4px; background: var(--field); overflow: hidden; }
+.resa-sektion-sedd { display: block; height: 100%; border-radius: 4px; background: var(--accent-light); box-shadow: inset 0 0 0 1px var(--accent); overflow: hidden; }
+.resa-sektion-klick { display: block; height: 100%; background: var(--accent); }
+.resa-sektion-tal { grid-column: 2; font-size: var(--fs-xs); font-variant-numeric: tabular-nums; }
+.resa-teckenforklaring { display: flex; align-items: center; gap: 6px; margin: 4px 0 0; font-size: var(--fs-2xs); color: var(--ink-soft); }
+.resa-tecken { display: inline-block; width: 14px; height: 8px; border-radius: 2px; margin-left: 8px; }
+.resa-tecken:first-child { margin-left: 0; }
+.resa-tecken-sedd { background: var(--accent-light); box-shadow: inset 0 0 0 1px var(--accent); }
+.resa-tecken-klick { background: var(--accent); }
+
+/* Tidslinjen återanvänder uppladdningsfliken; här bara punkterna den inte har. */
+.resor-punkt-landning .resor-punkt-markor { background: var(--accent); }
+.resor-punkt-sida .resor-punkt-markor { background: var(--surface); border: 1.5px solid var(--ink); }
+.resor-punkt-handling .resor-punkt-markor { background: var(--accent); border-radius: 2px; }
+
+/* Säljflödet skärm för skärm. Raden säger hur många som kom hit; raden under hur många som slutade
+   här och vilka fel de fick. Den värsta skärmen markeras med ord, inte bara med färg. */
+
+.resa-fel-chip { display: inline-flex; gap: 4px; padding: 1px 8px; border-radius: 999px; background: var(--surface); border: 1px solid var(--danger-light); color: #96271C; font-size: var(--fs-2xs); }
+
+/* Användarna. */
+.resa-antal { font-size: var(--fs-2xs); font-weight: 700; color: var(--muted); margin-left: 2px; }
+.admin-flik-knapp.vald .resa-antal { color: var(--accent-ink); }
+.resa-person-fakta { display: flex; flex-direction: column; gap: 2px; font-size: var(--fs-xs); }
+.resa-anonym { font-weight: 500; color: var(--ink-soft); }
+@media (max-width: 640px) {
+  /* Fyra underflikar måste rymmas på en telefon utan att den sista klipps. */
+  .resa-vy { font-size: var(--fs-sm); padding: 9px 9px 8px; }
+}
+
+/* ---- Flödet: sankeydiagram -------------------------------------------------
+   Stegen som staplar, strömmarna som böjda band med samma tjocklek hela vägen. Orange för dem som
+   följer med, grått för dem som lämnar — i ett eget band under, där också etiketterna står. Ritytan
+   har fast proportion; på en smal skärm scrollar diagrammet i sidled inom sin ram. */
+.resa-strom { margin: 10px 0 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+/* Hinten syns bara där diagrammet faktiskt kan vara bredare än skärmen. */
+.resa-strom-svep { display: none; margin: 6px 0 0; font-size: var(--fs-2xs); color: var(--muted); text-align: right; }
+@media (max-width: 760px) { .resa-strom-svep { display: block; } }
+/* Luft under: avhoppens etiketter står under sina staplar och får inte klippas av ramen. */
+.resa-sankey { padding-bottom: 24px; min-width: calc(var(--steg) * 92px); }
+.resa-sankey-yta { position: relative; }
+@media (max-width: 640px) {
+  /* Smalare än så krymper ritytan tills stegnamnen inte får plats ovanför strömmen — då hellre svep. */
+  .resa-sankey { min-width: calc(var(--steg) * 135px); padding-top: 26px; }
+  .resa-sankey-steg strong { font-size: var(--fs-xs); }
+}
+.resa-sankey-bild { display: block; width: 100%; height: auto; }
+.resa-sankey-vidare { fill: var(--accent); opacity: 0.85; }
+.resa-sankey-avhopp { fill: #cfc6b6; opacity: 0.9; }
+.resa-sankey-lacka { fill: var(--danger); opacity: 0.75; }
+.resa-sankey-nod { fill: var(--accent-ink); }
+.resa-sankey-nod-avhopp { fill: #9c9384; }
+.resa-sankey-nod-lacka { fill: var(--danger-dark); }
+.resa-sankey-steg {
+  position: absolute; transform: translate(-50%, -100%); display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 0; font-size: var(--fs-sm); line-height: 1.25; width: max-content;
+}
+.resa-sankey-forsta { transform: translate(0, -100%); align-items: flex-start; text-align: left; }
+.resa-sankey-fel { color: #96271C; font-size: var(--fs-2xs); }
+.resa-sankey-steg .rapport-trend { font-size: var(--fs-2xs); white-space: nowrap; }
+.resa-strom-tal { display: flex; align-items: baseline; gap: 5px; font-variant-numeric: tabular-nums; }
+.resa-strom-tal b { font-size: 20px; letter-spacing: -0.02em; color: var(--ink); }
+.resa-strom-tal .trafik-dampad { font-size: var(--fs-2xs); white-space: nowrap; }
+.resa-sankey-ut { position: absolute; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.3; }
+.resa-strom-avhopp-text { color: var(--ink); font-weight: 600; }
+.resa-strom-lacka .resa-strom-avhopp-text { color: var(--danger-dark); }
+.resa-strom-vidare { color: var(--muted); }
+.resa-strom-vidare b { color: var(--ink); }
+.resa-tratt-extra { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px; color: var(--ink-soft); }
+
+/* Stegkedjan: varje steg ett tal med en egen stapel, pilen mellan dem bär andelen som gick vidare. */
+.resa-kedja { display: grid; align-items: center; gap: 6px; width: 100%; min-width: 0; }
+.resa-kedja-steg { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.resa-kedja-steg b { font-size: 18px; line-height: 1.1; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; color: var(--ink); }
+.resa-kedja-etikett { font-size: var(--fs-2xs); color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.resa-kedja-spar { display: block; height: 6px; border-radius: 3px; background: var(--field); overflow: hidden; margin-top: 2px; }
+.resa-kedja-spar > span { display: block; height: 100%; border-radius: 3px; background: var(--accent); }
+.resa-kedja-noll b { color: var(--muted-soft); }
+.resa-kedja-pil {
+  display: inline-flex; flex-direction: column; align-items: center; gap: 0; padding: 3px 7px; border-radius: 999px;
+  background: var(--bg); border: 1px solid var(--field); font-size: var(--fs-2xs); color: var(--muted); line-height: 1.2;
+}
+.resa-kedja-pil b { font-size: var(--fs-xs); color: var(--ink); font-variant-numeric: tabular-nums; }
+.resa-kanal-trappa { grid-area: trappa; min-width: 0; }
+.resa-lank-utfall .resa-kanal-trappa { flex: 1 1 320px; max-width: 460px; }
+.resa-ingang-tratt { grid-area: tratt; min-width: 0; }
+
+/* Sammanfattat: sektionens svar i siffror, sist. Mörk botten så att den läses som ett slut och inte
+   som ännu en ruta bland de andra. */
+.resa-summering { margin: 20px 0 6px; padding: 14px 16px 16px; border-radius: 14px; background: var(--ink); color: #fff; }
+.resa-summering-rubrik { margin: 0 0 10px; font-size: var(--fs-xs); letter-spacing: 0.06em; text-transform: uppercase; color: var(--on-dark-strong); }
+.resa-summering-rad { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px 18px; margin: 0; }
+.resa-summering-tal { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.resa-summering-tal dd { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.15; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.resa-summering-tal dt { font-size: var(--fs-sm); font-weight: 600; color: #fff; }
+.resa-summering-tal span { font-size: var(--fs-2xs); color: var(--on-dark); line-height: 1.35; }
+
+/* ---- Avhoppen per skärm (säljflödet) ----------------------------------------
+   Liggande staplar mot en gemensam skala från noll. Neutral grå för alla, röd för den svåraste —
+   som också säger det i ord. Skalan och rutnätet gör att längderna går att läsa som tal. */
+.resa-avhopp { margin: 10px 0 4px; }
+.resa-avhopp-huvud, .resa-avhopp-rad, .resa-avhopp-skala {
+  display: grid; grid-template-columns: minmax(130px, 0.9fr) minmax(220px, 2.2fr) minmax(140px, 1fr); gap: 0 16px; align-items: center;
+}
+.resa-avhopp-huvud { padding: 0 12px 6px; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.resa-avhopp-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.resa-avhopp-rad { padding: 10px 12px; border-radius: 12px; background: var(--surface); border: 1.5px solid var(--field); }
+.resa-avhopp-varst { border-color: var(--danger); background: var(--danger-light); }
+.resa-avhopp-skarm { display: flex; flex-direction: column; gap: 1px; font-size: var(--fs-sm); min-width: 0; }
+.resa-avhopp-skarm .trafik-dampad { font-size: var(--fs-2xs); }
+.resa-avhopp-gora { font-size: var(--fs-xs); color: var(--ink-soft); line-height: 1.35; }
+.resa-avhopp-matt { display: grid; grid-template-columns: 1fr 120px; gap: 12px; align-items: center; }
+.resa-avhopp-yta { position: relative; height: 20px; border-radius: 4px; background: var(--field); overflow: hidden; }
+.resa-avhopp-linje { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--surface); opacity: 0.9; }
+.resa-avhopp-stapel { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: #8f877a; }
+.resa-avhopp-varst .resa-avhopp-stapel { background: var(--danger); }
+.resa-avhopp-osaker { background: var(--border); }
+.resa-avhopp-tal { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; font-variant-numeric: tabular-nums; }
+.resa-avhopp-tal b { font-size: 18px; line-height: 1.1; color: var(--ink); }
+.resa-avhopp-varst .resa-avhopp-tal b { color: var(--danger-dark); }
+.resa-avhopp-tal .trafik-dampad { font-size: var(--fs-2xs); white-space: nowrap; }
+.resa-avhopp-tal .resa-lacka-etikett { margin-top: 2px; }
+.resa-avhopp-fel { font-size: var(--fs-xs); color: #96271C; min-width: 0; }
+.resa-avhopp-skala { padding: 4px 12px 0; }
+.resa-avhopp-axel { position: relative; height: 16px; margin-right: 132px; font-size: var(--fs-2xs); color: var(--muted); }
+.resa-avhopp-axel > span { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+.resa-avhopp-axel > span:first-child { transform: none; }
+.resa-avhopp-mal { margin: 12px 0 0; padding: 10px 12px; border-radius: 12px; background: var(--green-light); color: var(--green-dark); font-size: var(--fs-sm); }
+@media (max-width: 640px) {
+  .resa-avhopp-huvud, .resa-avhopp-skala { display: none; }
+  .resa-avhopp-rad { grid-template-columns: 1fr; gap: 6px; }
+  .resa-avhopp-matt { grid-template-columns: 1fr 104px; }
+  .resa-avhopp-tal .trafik-dampad { white-space: normal; }
+  .resa-avhopp-fel-tom { display: none; }
+}
+
+/* ---- Bubbeldiagrammet (ingångarna) ------------------------------------------
+   En färg för bubblorna — placeringen och rutans råd bär betydelsen. Rutorna "skicka mer trafik hit"
+   och "bygg om sidan" tonas svagt, så att de två handlingsbara hörnen syns först. */
+.resa-bubblor { min-width: 560px; }
+.resa-bubblor svg { display: block; width: 100%; height: auto; }
+.resa-ruta-bra { fill: var(--green-light); }
+.resa-ruta-fixa { fill: var(--amber-light); }
+.resa-ruta-text { font-size: 13px; font-weight: 700; fill: var(--ink-soft); letter-spacing: 0.02em; }
+.resa-axel-linje { stroke: var(--field); stroke-width: 1; }
+.resa-axel-text { font-size: 11px; fill: var(--muted); font-variant-numeric: tabular-nums; }
+.resa-axel-titel { font-size: 12px; font-weight: 600; fill: var(--ink-soft); }
+.resa-snittlinje { stroke: var(--ink-soft); stroke-width: 1.5; stroke-dasharray: 5 5; }
+.resa-snitt-text { font-size: 11px; fill: var(--ink-soft); }
+.resa-bubbla circle { fill: var(--accent); fill-opacity: 0.8; stroke: var(--surface); stroke-width: 2; }
+.resa-bubbla:hover circle { fill-opacity: 1; }
+.resa-bubbla-namn { font-size: 13px; font-weight: 700; fill: var(--ink); }
+.resa-bubbla-tal { font-size: 11px; fill: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.resa-bubbla-etikett text { paint-order: stroke; stroke: var(--bg); stroke-width: 3px; stroke-linejoin: round; }
+.resa-ledlinje { stroke: var(--muted-soft); stroke-width: 1; }
+
+/* ---- Andel av besöken mot andel av annonserna (kanalerna) --------------------- */
+.resa-andel { margin: 8px 0 18px; }
+.resa-andel-forklaring { display: flex; flex-wrap: wrap; gap: 4px 16px; margin: 0 0 8px; font-size: var(--fs-xs); color: var(--ink-soft); }
+.resa-andel-forklaring > span { display: inline-flex; align-items: center; gap: 6px; }
+.resa-andel-forklaring .resa-andel-prick { position: static; transform: none; }
+.resa-andel-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.resa-andel-rad, .resa-andel-skala { display: grid; grid-template-columns: minmax(120px, 0.8fr) minmax(200px, 2fr) minmax(190px, 1fr); gap: 0 16px; align-items: center; }
+.resa-andel-rad { padding: 9px 0; border-bottom: 1px solid var(--field); font-size: var(--fs-sm); }
+.resa-andel-namn { font-weight: 600; min-width: 0; }
+.resa-andel-spar { position: relative; height: 22px; }
+.resa-andel-spar::before { content: ""; position: absolute; left: 0; right: 0; top: 50%; height: 2px; margin-top: -1px; background: var(--field); border-radius: 1px; }
+.resa-andel-linje { position: absolute; top: 2px; bottom: 2px; width: 1px; background: var(--field); }
+.resa-andel-band { position: absolute; top: 50%; height: 4px; margin-top: -2px; border-radius: 2px; background: var(--muted-soft); }
+.resa-andel-mer .resa-andel-band { background: var(--green); }
+.resa-andel-mindre .resa-andel-band { background: var(--danger); opacity: 0.7; }
+.resa-andel-prick {
+  position: absolute; top: 50%; width: 14px; height: 14px; border-radius: 999px; transform: translate(-50%, -50%);
+  display: inline-block; box-sizing: border-box;
+}
+.resa-andel-besok { background: var(--surface); border: 2.5px solid var(--ink-soft); }
+.resa-andel-annons { background: var(--accent); border: 2px solid var(--surface); box-shadow: 0 0 0 1px var(--accent-dark); }
+.resa-andel-utfall { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; font-variant-numeric: tabular-nums; }
+.resa-andel-skala { padding-top: 4px; }
+.resa-andel-skala .resa-avhopp-axel { margin-right: 0; }
+@media (max-width: 640px) {
+  .resa-andel-rad { grid-template-columns: 1fr; gap: 4px; }
+  .resa-andel-skala { display: none; }
+}
+
+/* ⓘ vid ett tal: förklaringen visas vid hovring, fokus eller tryck. */
+.rapport-info { position: relative; display: inline-flex; vertical-align: middle; margin-left: 5px; }
+.rapport-info-knapp {
+  width: 16px; height: 16px; padding: 0; border-radius: 999px; border: 1.5px solid currentColor;
+  background: transparent; color: var(--muted); font: italic 700 10px/1 Georgia, serif; cursor: help;
+  display: inline-grid; place-items: center; opacity: 0.8;
+}
+.rapport-info-knapp:hover, .rapport-info-knapp:focus-visible { opacity: 1; color: var(--ink); outline: none; }
+.rapport-info-text {
+  position: absolute; z-index: 30; left: 50%; bottom: calc(100% + 8px); transform: translateX(-50%);
+  width: max-content; max-width: 260px; padding: 9px 11px; border-radius: 10px;
+  background: var(--ink); color: #fff; font-size: var(--fs-xs); font-weight: 400; line-height: 1.45;
+  text-align: left; text-transform: none; letter-spacing: 0; white-space: normal;
+  box-shadow: var(--shadow-raised); display: none; pointer-events: none;
+}
+/* display och inte visibility: en dold ruta som ändå tar plats utanför kanten ger sidan sidscroll. */
+.rapport-info:hover .rapport-info-text, .rapport-info-knapp:focus-visible + .rapport-info-text, .rapport-info.oppen .rapport-info-text { display: block; }
+@media (max-width: 640px) {
+  /* På en telefon står rutan under tecknet och håller sig inom skärmen. */
+  .rapport-info-text { position: fixed; left: 16px; right: 16px; bottom: 24px; transform: none; max-width: none; width: auto; }
+}
+/* På mörk botten (Sammanfattat) blir tecknet ljust och rutan ljus. */
+.resa-summering .rapport-info-knapp { color: var(--on-dark-strong); }
+.resa-summering .rapport-info-text { background: var(--surface); color: var(--ink); }
+
+/* ---- Läget just nu ---------------------------------------------------------
+   Sex tal, var och en med en status i ikon OCH ord. Kanten bär färgen; texten står alltid i bläck. */
+.resa-lage { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; margin: 14px 0 6px; }
+.resa-lage-tal {
+  display: flex; flex-direction: column; gap: 4px; padding: 14px 16px; border-radius: 14px; text-align: left;
+  background: var(--surface); border: 1px solid var(--field); border-left: 5px solid var(--border);
+  font: inherit; color: var(--ink); cursor: pointer;
+}
+.resa-lage-tal:hover { box-shadow: var(--shadow-card); }
+.resa-lage-bra { border-left-color: var(--green); }
+.resa-lage-varning { border-left-color: var(--amber); }
+.resa-lage-dalig { border-left-color: var(--danger); }
+.resa-lage-topp { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.resa-lage-etikett { font-size: var(--fs-sm); font-weight: 600; }
+.resa-lage-status { flex: 0 0 auto; font-size: var(--fs-2xs); font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; }
+.resa-lage-status-bra { background: var(--green-light); color: var(--green-dark); }
+.resa-lage-status-varning { background: var(--amber-light); color: var(--amber-ink); }
+.resa-lage-status-dalig { background: var(--danger-light); color: var(--danger-dark); }
+.resa-lage-status-neutral { background: var(--field); color: var(--ink-soft); }
+.resa-lage-status-litet { background: var(--field); color: var(--ink-soft); font-style: italic; }
+.resa-lage-varde { font-size: 30px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.resa-lage-jamfor { font-size: var(--fs-xs); color: var(--ink-soft); }
+.resa-lage-mer { margin-top: auto; padding-top: 6px; font-size: var(--fs-xs); font-weight: 600; color: var(--accent-ink); }
+
+/* Förslagen: numrerade kort — vad, varför, vad vi borde göra, och knappen dit. */
+.resa-forslag { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.resa-forslag-kort { display: grid; grid-template-columns: 30px 1fr; gap: 12px; padding: 14px 16px; border-radius: 14px; background: var(--surface); border: 1px solid var(--field); }
+.resa-forslag-nr { width: 30px; height: 30px; border-radius: 999px; display: inline-grid; place-items: center; background: var(--accent); color: #fff; font-weight: 700; font-size: var(--fs-sm); }
+.resa-forslag-inne { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.resa-forslag-huvud { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 4px 12px; }
+.resa-forslag-beror { display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-xs); color: var(--muted); white-space: nowrap; }
+.resa-forslag-rubrik { margin: 4px 0 0; font-size: var(--fs-md); font-weight: 600; color: var(--ink); }
+.resa-forslag-varfor { margin: 0; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.45; }
+.resa-forslag-gor { margin: 2px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--accent-light); font-size: var(--fs-sm); line-height: 1.45; color: var(--ink); }
+.resa-forslag-etikett { display: block; font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-ink); margin-bottom: 2px; }
+.resa-forslag-knappar { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
+.resa-forslag-knappar .btn { width: auto; }
+
+/* Just nu: en rad överst i Läget. Den pulserande pricken säger "live" — och orden säger det också. */
+.resa-uppdaterad { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: 6px 0 0; font-size: var(--fs-2xs); color: var(--muted); }
+.resa-live {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; margin: 14px 0 0; padding: 10px 14px;
+  border-radius: 12px; background: var(--surface); border: 1px solid var(--field); font-size: var(--fs-sm);
+}
+.resa-live-av { color: var(--muted); }
+.resa-live-prick { width: 10px; height: 10px; border-radius: 999px; background: var(--green); box-shadow: 0 0 0 0 var(--green); animation: resa-puls 2s infinite; }
+.resa-live-tom .resa-live-prick { background: var(--muted-soft); animation: none; }
+@keyframes resa-puls { 0% { box-shadow: 0 0 0 0 hsl(142 45% 38% / 0.5); } 70% { box-shadow: 0 0 0 8px hsl(142 45% 38% / 0); } 100% { box-shadow: 0 0 0 0 hsl(142 45% 38% / 0); } }
+@media (prefers-reduced-motion: reduce) { .resa-live-prick { animation: none; } }
+.resa-live-platser { display: flex; flex-wrap: wrap; gap: 6px; }
+.resa-live-plats { padding: 2px 9px; border-radius: 999px; background: var(--field); font-size: var(--fs-xs); color: var(--ink-soft); }
+.resa-live-plats b { color: var(--ink); }
+.resa-live-tid { margin-left: auto; font-size: var(--fs-2xs); color: var(--muted); display: inline-flex; align-items: center; }
+
+/* ---- Kanalerna som tabell ---------------------------------------------------
+   Varje kolumn har en skala för alla kanaler, så att de jämförs uppifrån och ned. Talet först, stapeln
+   under — staplarna är tunna och stöder talen, de ersätter dem inte. */
+.resa-kt { margin: 10px 0 8px; border: 1px solid var(--field); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.resa-kt-rad {
+  display: grid; grid-template-columns: minmax(150px, 1.3fr) minmax(110px, 1fr) minmax(110px, 1fr) minmax(170px, 1.4fr);
+  gap: 0 20px; align-items: center; width: 100%; padding: 12px 16px; text-align: left;
+  background: none; border: 0; font: inherit; color: var(--ink);
+}
+button.resa-kt-rad { cursor: pointer; }
+button.resa-kt-rad:hover { background: var(--surface-pressed); }
+.resa-kt-huvud { padding-top: 10px; padding-bottom: 8px; background: var(--bg); border-bottom: 1px solid var(--field); font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.04em; text-transform: uppercase; color: var(--muted); }
+.resa-kt-huvud > span { display: inline-flex; align-items: center; }
+.resa-kt-sort { background: none; border: 0; padding: 0; font: inherit; letter-spacing: inherit; text-transform: inherit; color: inherit; cursor: pointer; }
+.resa-kt-sort:hover, .resa-kt-sort.vald { color: var(--ink); }
+.resa-kt-post { border-bottom: 1px solid var(--field); }
+.resa-kt-post:last-child { border-bottom: none; }
+.resa-kt-post.oppen { background: var(--bg); }
+.resa-kt-kanal { display: flex; align-items: flex-start; gap: 8px; font-size: var(--fs-sm); min-width: 0; }
+.resa-kt-kanal > span:last-child { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.resa-kt-kanal .rapport-trend { font-size: var(--fs-2xs); }
+.resa-kt-kanal .resa-kanal-pil { margin-top: 2px; }
+.resa-kt-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.resa-kt-cell > b { font-size: 18px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.resa-kt-varde { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 6px; }
+.resa-kt-varde b { font-size: 18px; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.resa-kt-varde .trafik-dampad { font-size: var(--fs-2xs); }
+.resa-kt-spar { position: relative; display: block; height: 8px; border-radius: 4px; background: var(--field); }
+.resa-kt-spar > span:first-child { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent); }
+.resa-kt-tom { background: repeating-linear-gradient(90deg, var(--field) 0 6px, transparent 6px 10px); }
+.resa-kt-snitt { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; background: var(--ink); border-radius: 1px; }
+.resa-kt-post .resa-kanal-inne { padding: 4px 16px 16px 40px; border-top: none; }
+@media (max-width: 640px) {
+  .resa-kt-huvud { display: none; }
+  .resa-kt-rad { grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+  .resa-kt-kanal { grid-column: 1 / -1; }
+  .resa-kt-huvudtal { grid-column: 1 / -1; }
+  .resa-kt-cell::before { content: attr(data-etikett); font-size: var(--fs-2xs); color: var(--muted); }
+  .resa-kt-post .resa-kanal-inne { padding-left: 16px; }
+}
+
+/* ---- Adminpanelens flikgrupper -----------------------------------------------
+   Fyra grupper, var och en med sin färg: användardata orange (samma som Kundresan), annonser och
+   affärer grön, kanalerna blå, kontakt lila. Gruppens namn står alltid i text — färgen hjälper ögat,
+   den bär inte betydelsen ensam. Raderna bryts i stället för att rinna över skärmkanten. */
+/* Grupperna står bredvid varandra och bryts när de inte får plats — så få rader som möjligt. */
+.admin-grupper { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 6px; }
+.admin-grupp {
+  --grupp: var(--accent); --grupp-ljus: var(--accent-light); --grupp-mork: var(--accent-ink);
+  display: flex; flex-direction: column; gap: 6px; padding: 8px 10px 10px;
+  background: var(--surface); border: 1px solid var(--field); border-top: 4px solid var(--grupp); border-radius: 14px;
+}
+.admin-grupp-affar { --grupp: hsl(142 45% 36%); --grupp-ljus: hsl(140 40% 94%); --grupp-mork: hsl(142 48% 24%); }
+.admin-grupp-kanaler { --grupp: #2f6fb0; --grupp-ljus: #e6eef8; --grupp-mork: #1d4a7a; }
+.admin-grupp-kontakt { --grupp: #7b4fbf; --grupp-ljus: #efe8f9; --grupp-mork: #4e2c86; }
+.admin-grupp { flex: 1 1 auto; }
+.admin-grupp-namn { font-size: var(--fs-2xs); font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--grupp-mork); }
+.admin-grupp-flikar { display: flex; flex-wrap: wrap; gap: 6px; }
+.admin-grupp-flik {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 10px;
+  font: inherit; font-size: var(--fs-sm); font-weight: 500; color: var(--ink-soft);
+  background: var(--bg); border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+}
+.admin-grupp-flik:hover { color: var(--ink); border-color: var(--grupp-ljus); background: var(--grupp-ljus); }
+.admin-grupp-flik.vald { background: var(--grupp); color: #fff; font-weight: 600; border-color: var(--grupp); }
+.admin-grupp-flik:focus-visible { outline: 2px solid var(--grupp); outline-offset: 2px; }
+@media (max-width: 640px) {
+  .admin-grupp { flex-basis: 100%; }
+}

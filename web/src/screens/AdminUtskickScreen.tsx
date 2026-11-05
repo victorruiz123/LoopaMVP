@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { startaUtskick, utskickLage, utskickMottagare, utskickSkickade } from "../api";
-import type { UtskickLage, UtskickMottagare } from "../types";
+import type { UtskickForval, UtskickLage, UtskickMottagare } from "../types";
 import { SearchIcon } from "../components/icons";
 import { usePageTitle } from "../lib/pageTitle";
 
@@ -86,7 +86,14 @@ function tolkaAdresser(text: string): { giltiga: NyMottagare[]; ogiltiga: string
   return { giltiga, ogiltiga, dubbletter };
 }
 
-export default function AdminUtskickScreen() {
+/**
+ * `forval` kommer från datafliken ("Skicka till de 14 som fastnade"). Gruppen väljs genom att alla
+ * ANDRA väljs bort — samma mekanism som ett handplockat undantag, så att allt annat på skärmen
+ * (räkningen, förhandsvisningen, bekräftelsen) fungerar som vanligt. Ett tryck återställer listan.
+ */
+export default function AdminUtskickScreen({ forval = null }: { forval?: UtskickForval | null } = {}) {
+  /** Sant när förvalet återställts till hela listan. Bannern försvinner, brevet ligger kvar. */
+  const [allaIgen, setAllaIgen] = useState(false);
   usePageTitle("Adminpanel");
   const [mottagare, setMottagare] = useState<UtskickMottagare[] | null>(null);
   const [avsandare, setAvsandare] = useState<string>("");
@@ -110,6 +117,10 @@ export default function AdminUtskickScreen() {
     utskickMottagare()
       .then((d) => {
         setMottagare(d.mottagare);
+        if (forval) {
+          const iGruppen = new Set(forval.epost.map((e) => e.toLowerCase()));
+          setBortvalda(new Set(d.mottagare.filter((m) => !iGruppen.has(m.epost.toLowerCase())).map((m) => m.epost)));
+        }
         setAvsandare(d.avsandare);
         setKonfigurerat(d.konfigurerat);
       })
@@ -233,6 +244,27 @@ export default function AdminUtskickScreen() {
         Ett brev till flera. <code>[namn]</code> byts mot mottagarens förnamn, varje gång det står. Till nya
         adresser skriver du namnet på samma rad som adressen.
       </p>
+
+      {forval && !allaIgen && typ === "anvandare" && (
+        <div className="utskick-forval">
+          <span>
+            Förvalt från Data: <b>{forval.namn}</b> — {valda.length} av {mottagare?.length ?? 0} mottagare ikryssade.
+            {forval.epost.length > valda.length && mottagare && (
+              <> {forval.epost.length - valda.length} i gruppen finns inte i mottagarlistan.</>
+            )}
+          </span>
+          <button
+            type="button"
+            className="btn btn-text btn-inline"
+            onClick={() => {
+              setBortvalda(new Set());
+              setAllaIgen(true);
+            }}
+          >
+            Välj alla igen
+          </button>
+        </div>
+      )}
 
       <div className="admin-flikar admin-underflikar" role="tablist" aria-label="Mottagare">
         {(

@@ -36,7 +36,7 @@ export default function AuthScreen({
   onDone,
   onBack,
 }: {
-  intent?: "account" | "flow" | "sale" | "kop";
+  intent?: "account" | "flow" | "sale" | "kop" | "publish";
   /**
    * Skärmen ligger INUTI en annan sida — butikens spalt, ett ark ovanpå köpsidan.
    *
@@ -55,11 +55,13 @@ export default function AuthScreen({
 }) {
   const { signIn, signUp } = useAuth();
   /** Grinden i eller före flödet — båda öppnar på registreringsfliken. */
-  const flow = intent === "flow" || intent === "sale";
+  const flow = intent === "flow" || intent === "sale" || intent === "publish";
   /** Grinden FÖRE filmningen. Samma grind, men ingenting är gjort än, och det ska texten säga. */
   const sale = intent === "sale";
   /** Grinden i kassan. Köparens ärende, inte säljarens — se resonemanget överst. */
   const kop = intent === "kop";
+  /** Grinden SIST i säljflödet: annonsen är klar och ska läggas upp. Allt före den görs som gäst. */
+  const publish = intent === "publish";
   const [tab, setTab] = useState<"signin" | "signup">(initialTab ?? (flow ? "signup" : "signin"));
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -180,6 +182,10 @@ export default function AuthScreen({
                   {t("Logga in och")} <span className="auth-wordmark-inline">{t("betala")}</span>
                 </>
               )
+            ) : publish ? (
+              <>
+                {t("Annonsen är")} <span className="auth-wordmark-inline">{t("klar")}</span>
+              </>
             ) : sale ? (
               <>
                 {t("Sälj din")} <span className="auth-wordmark-inline">{t("möbel")}</span>
@@ -208,6 +214,10 @@ export default function AuthScreen({
               ? isSignup
                 ? t("Kontot är där ordern, leveranstiden och kvittot hamnar. Möbeln ligger kvar medan du skapar det.")
                 : t("Logga in, så fortsätter vi till betalningen. Möbeln ligger kvar i kassan.")
+              : publish
+              ? isSignup
+                ? t("Skapa ett konto för att lägga upp annonsen. Allt du gjort ligger kvar.")
+                : t("Logga in, så lägger vi upp annonsen. Allt du gjort ligger kvar.")
               : sale
               ? isSignup
                 ? t("Skapa ett konto, så filmar du ett varv runt möbeln — sedan gör vi annonsen och säljer den.")

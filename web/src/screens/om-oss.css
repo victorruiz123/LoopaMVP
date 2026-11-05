@@ -1,0 +1,301 @@
+/* ==========================================================================
+   OM OSS — en marknadssida, inte en skärm i flödet.
+
+   Därför står den utanför `.screen` och telefonkolumnen: den är byggd som en
+   bred sida med sektioner över hela bredden, och smalnar av till en spalt på
+   telefonen. Allt är prefixat `oo-` så att ingenting läcker in i flödet.
+   ========================================================================== */
+
+.om-oss {
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--ink-soft);
+  overflow-x: hidden;
+}
+
+.oo-wrap {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding-inline: 20px;
+}
+@media (min-width: 768px) {
+  .oo-wrap { padding-inline: 40px; }
+}
+
+.oo-accent { color: var(--accent); }
+.oo-tabular { font-variant-numeric: tabular-nums; }
+.oo-mt { margin-top: 20px; }
+
+/* ---- topplisten ---- */
+.oo-bar {
+  position: relative; z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding-top: calc(16px + env(safe-area-inset-top));
+  padding-bottom: 8px;
+}
+.oo-wordmark { text-decoration: none; }
+
+/* ---- typografi ---- */
+.oo-h1 {
+  margin: 16px 0 0; color: var(--ink);
+  font-size: clamp(36px, 6vw, 60px); line-height: 1.04; font-weight: 700; letter-spacing: -0.035em;
+}
+.oo-h2 {
+  margin: 0; color: var(--ink);
+  font-size: clamp(28px, 3.6vw, 38px); line-height: 1.1; font-weight: 700; letter-spacing: -0.03em;
+}
+.oo-h2-sm { font-size: clamp(24px, 2.8vw, 30px); }
+.oo-h2-light { color: #fff; }
+.oo-prose { font-size: 15px; line-height: 1.65; }
+.oo-prose p { margin: 0 0 16px; }
+.oo-prose p:last-child { margin-bottom: 0; }
+
+/* ---- knappar ---- */
+.oo-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 12px 24px; border-radius: 999px;
+  font-size: 15px; font-weight: 600; text-decoration: none;
+  transition: background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.oo-btn-primary { background: var(--accent); color: #fff; }
+.oo-btn-primary:hover { background: var(--accent-dark); }
+.oo-btn-ghost { background: var(--surface); color: var(--ink); border: 1px solid var(--border); }
+.oo-btn-ghost:hover { background: var(--field); }
+.oo-btn-white { background: #fff; color: var(--ink); padding: 10px 20px; font-size: 14px; }
+.oo-btn-white:hover { background: var(--accent); color: #fff; }
+.oo-arrow-down, .oo-arrow-right { display: inline-block; transition: transform var(--t) var(--ease-ui); }
+.oo-btn:hover .oo-arrow-down { transform: translateY(2px); }
+.oo-btn:hover .oo-arrow-right { transform: translateX(4px); }
+
+/* ---- dekor: cirklar och ringar som i personbeskrivningen ---- */
+.oo-blob { position: absolute; pointer-events: none; border-radius: 999px; background: var(--accent); opacity: 0.9; }
+.oo-ring { position: absolute; pointer-events: none; border-radius: 999px; border-style: solid; }
+.oo-blob-hero { top: -160px; right: -160px; width: 420px; height: 420px; }
+@media (min-width: 768px) {
+  .oo-blob-hero { top: -208px; right: -96px; width: 560px; height: 560px; }
+}
+.oo-ring-hero { top: 58%; left: -96px; width: 224px; height: 224px; border-width: 28px; border-color: hsl(14 77% 54% / 0.15); }
+
+/* ---- hero ---- */
+.oo-hero { position: relative; }
+.oo-hero-grid {
+  position: relative; display: grid; align-items: center; gap: 48px;
+  padding-top: 40px; padding-bottom: 56px;
+}
+@media (min-width: 768px) {
+  .oo-hero-grid { grid-template-columns: 1.35fr 1fr; padding-top: 56px; padding-bottom: 72px; }
+}
+.oo-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 4px 12px; border-radius: 999px; background: var(--accent-light);
+  color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.oo-pulse { width: 6px; height: 6px; border-radius: 999px; background: var(--accent); animation: oo-pulse 2s ease-in-out infinite; }
+.oo-underline-wrap { position: relative; display: inline-block; }
+.oo-underline { position: absolute; left: 0; bottom: -8px; width: 100%; height: 12px; color: hsl(14 77% 54% / 0.4); }
+.oo-intro { margin: 24px 0 0; max-width: 36rem; font-size: 18px; line-height: 1.6; }
+.oo-actions { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 12px; }
+
+.oo-collage { position: relative; margin: 0 auto; width: 300px; height: 300px; }
+@media (min-width: 640px) {
+  .oo-collage { width: 360px; height: 360px; }
+}
+.oo-collage-img {
+  position: absolute; border-radius: 999px; object-fit: cover;
+  border: 6px solid #fff; box-shadow: var(--shadow-card), 0 0 0 4px var(--accent);
+  transition: transform 300ms var(--ease-ui);
+}
+.oo-collage-img:hover { z-index: 1; scale: 1.05; }
+.oo-collage-0 { top: 0; left: 0; width: 150px; height: 150px; }
+.oo-collage-1 { top: 24px; right: 0; width: 130px; height: 130px; }
+.oo-collage-2 { bottom: 40px; left: 50%; width: 140px; height: 140px; margin-left: -46px; }
+@media (min-width: 640px) {
+  .oo-collage-0 { width: 180px; height: 180px; }
+  .oo-collage-1 { width: 160px; height: 160px; }
+  .oo-collage-2 { width: 170px; height: 170px; margin-left: -56px; }
+}
+.oo-collage-pill {
+  position: absolute; bottom: -8px; left: 50%; translate: -50% 0; width: max-content;
+  padding: 8px 16px; border-radius: 999px; background: var(--ink); color: #fff;
+  font-size: 14px; font-weight: 500; box-shadow: var(--shadow-card);
+}
+
+/* ---- siffrorna ---- */
+.oo-stats { position: relative; display: grid; gap: 16px; padding-bottom: 64px; }
+@media (min-width: 640px) {
+  .oo-stats { grid-template-columns: repeat(3, 1fr); padding-bottom: 80px; }
+}
+.oo-stat {
+  position: relative; overflow: hidden; padding: 24px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  transition: transform 300ms var(--ease-ui), box-shadow 300ms var(--ease-ui), border-color 300ms var(--ease-ui);
+}
+.oo-stat:hover { transform: translateY(-6px) rotate(-1deg); box-shadow: 0 22px 44px -20px rgba(20, 17, 13, 0.24); border-color: hsl(14 77% 54% / 0.4); }
+.oo-stat-accent { background: var(--accent); border-color: transparent; color: #fff; }
+.oo-stat-accent:hover { border-color: transparent; }
+.oo-stat-bg {
+  position: absolute; right: -16px; bottom: -24px; pointer-events: none; user-select: none;
+  font-size: 110px; line-height: 1; opacity: 0.08; transition: all 500ms var(--ease-ui);
+}
+.oo-stat:hover .oo-stat-bg { transform: rotate(-12deg) scale(1.1); opacity: 0.15; }
+.oo-stat-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+.oo-stat-value { margin: 0; color: var(--ink); font-size: clamp(36px, 4vw, 48px); font-weight: 700; letter-spacing: -0.03em; line-height: 1.1; }
+.oo-stat-accent .oo-stat-value { color: #fff; }
+.oo-stat-icon {
+  display: flex; align-items: center; justify-content: center; width: 48px; height: 48px;
+  border-radius: 999px; background: var(--accent-light); font-size: 24px;
+  transition: transform 300ms var(--ease-ui);
+}
+.oo-stat-accent .oo-stat-icon { background: rgba(255, 255, 255, 0.2); }
+.oo-stat:hover .oo-stat-icon { transform: scale(1.25) rotate(12deg); }
+.oo-stat-label { position: relative; margin: 8px 0 0; font-size: 14px; }
+.oo-stat-accent .oo-stat-label { color: rgba(255, 255, 255, 0.9); }
+
+/* Linjen som sveper fram längs underkanten när pekaren är över kortet. */
+.oo-sweep { position: absolute; left: 0; bottom: 0; height: 4px; width: 0; background: var(--accent); transition: width 500ms var(--ease-ui); }
+.oo-stat-accent .oo-sweep { background: rgba(255, 255, 255, 0.6); }
+.oo-stat:hover .oo-sweep, .oo-award:hover .oo-sweep { width: 100%; }
+
+/* ---- varför ---- */
+.oo-why { border-top: 1px solid var(--border); background: var(--surface-sunk); padding: 64px 0; }
+.oo-why-grid { display: grid; gap: 32px; }
+@media (min-width: 768px) {
+  .oo-why { padding: 80px 0; }
+  .oo-why-grid { grid-template-columns: 1fr 1.6fr; gap: 48px; }
+}
+.oo-why-punch { color: var(--ink); font-size: 18px; font-weight: 600; }
+
+/* ---- grundarna ---- */
+.oo-founders { background: var(--accent); padding: 64px 0; }
+@media (min-width: 768px) {
+  .oo-founders { padding: 80px 0; }
+}
+.oo-founder-grid { margin-top: 40px; display: grid; gap: 24px; }
+@media (min-width: 768px) {
+  .oo-founder-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.oo-founder {
+  display: flex; flex-direction: column; padding: 24px; border-radius: 16px;
+  background: #fff; box-shadow: var(--shadow-card);
+}
+.oo-founder-img { width: 96px; height: 96px; border-radius: 999px; object-fit: cover; border: 4px solid var(--accent); }
+.oo-founder-name { margin: 20px 0 0; color: var(--ink); font-size: 18px; font-weight: 600; }
+.oo-founder-role { margin: 0; color: var(--accent); font-size: 14px; font-weight: 700; }
+.oo-founder-bio { margin: 12px 0 0; font-size: 14px; line-height: 1.6; }
+.oo-founder-traits { margin: 12px 0 0; color: var(--ink); font-size: 14px; line-height: 1.6; font-weight: 500; }
+.oo-link { margin-top: auto; padding-top: 16px; color: var(--ink); font-size: 14px; text-decoration: underline; text-underline-offset: 4px; }
+.oo-together { margin: 40px 0 0; max-width: 48rem; color: rgba(255, 255, 255, 0.95); font-size: 16px; line-height: 1.65; }
+
+/* ---- beslutet + vision ---- */
+.oo-section { padding: 64px 0; }
+@media (min-width: 768px) {
+  .oo-section { padding: 80px 0; }
+}
+.oo-two-col { display: grid; gap: 48px; }
+@media (min-width: 768px) {
+  .oo-two-col { grid-template-columns: 1fr 1fr; }
+}
+.oo-lesson {
+  margin: 24px 0 0; padding-left: 16px; border-left: 4px solid var(--accent);
+  color: var(--ink); font-size: 16px; line-height: 1.6; font-weight: 500;
+}
+
+/* Citatrutan under visionen */
+.oo-quote { position: relative; overflow: hidden; margin-top: 32px; padding: 28px; border-radius: 24px; background: var(--ink); }
+@media (min-width: 640px) {
+  .oo-quote { padding: 32px; }
+}
+.oo-blob-quote { top: -64px; right: -64px; width: 176px; height: 176px; }
+.oo-ring-quote { bottom: -48px; left: -48px; width: 128px; height: 128px; border-width: 16px; border-color: hsl(14 77% 54% / 0.3); }
+.oo-quote-emoji { position: absolute; right: 24px; bottom: 20px; font-size: 24px; pointer-events: none; }
+.oo-quote-inner { position: relative; }
+.oo-quote-mark { display: block; color: var(--accent); font-size: 48px; line-height: 1; font-weight: 700; }
+.oo-quote-text { margin: 4px 0 0; max-width: 22ch; color: #fff; font-size: clamp(22px, 2.4vw, 26px); line-height: 1.2; font-weight: 700; letter-spacing: -0.025em; }
+.oo-quote-foot { margin-top: 24px; display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.oo-quote-brand { color: #fff; font-family: var(--ordmark-font); font-size: 18px; font-weight: 800; letter-spacing: -0.03em; }
+
+/* ---- UF-framgångarna ---- */
+.oo-awards { display: grid; gap: 16px; padding-bottom: 64px; }
+@media (min-width: 640px) {
+  .oo-awards { grid-template-columns: 1fr 1fr; padding-bottom: 96px; }
+}
+.oo-award {
+  position: relative; overflow: hidden; display: flex; align-items: center; gap: 20px;
+  padding: 24px; border-radius: 24px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+  transition: transform 300ms var(--ease-ui), border-color 300ms var(--ease-ui);
+}
+@media (min-width: 768px) {
+  .oo-award { padding: 32px; }
+}
+.oo-award:hover { transform: translateY(-4px); border-color: hsl(14 77% 54% / 0.4); }
+.oo-award-bg {
+  position: absolute; right: -16px; bottom: -32px; pointer-events: none; user-select: none;
+  font-size: 130px; line-height: 1; opacity: 0.07; transition: all 500ms var(--ease-ui);
+}
+.oo-award:hover .oo-award-bg { transform: rotate(-12deg); opacity: 0.14; }
+.oo-medal {
+  display: flex; align-items: center; justify-content: center; width: 64px; height: 64px;
+  border-radius: 999px; background: linear-gradient(135deg, #f1f1f1, #cfcfcf); font-size: 30px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.08); transition: transform 300ms var(--ease-ui);
+}
+.oo-award:hover .oo-medal { transform: scale(1.1) rotate(-12deg); }
+.oo-award-text { position: relative; min-width: 0; }
+.oo-award-meta { margin: 0; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; }
+.oo-award-title { margin: 4px 0 0; color: var(--ink); font-size: clamp(20px, 2vw, 24px); font-weight: 700; letter-spacing: -0.025em; }
+
+/* ---- rådgivare ---- */
+.oo-advisors { border-top: 1px solid var(--border); background: var(--surface-sunk); padding: 64px 0; }
+.oo-advisors-body { max-width: 40rem; }
+.oo-advisor-grid { margin-top: 32px; display: grid; gap: 12px; grid-template-columns: 1fr; }
+@media (min-width: 640px) {
+  .oo-advisor-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (min-width: 960px) {
+  .oo-advisor-grid { grid-template-columns: repeat(3, 1fr); }
+}
+.oo-advisor {
+  display: flex; align-items: center; gap: 14px; padding: 14px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); text-decoration: none;
+  transition: transform 300ms var(--ease-ui), border-color 300ms var(--ease-ui);
+}
+.oo-advisor:hover { transform: translateY(-3px); border-color: hsl(14 77% 54% / 0.4); }
+.oo-advisor-img { width: 56px; height: 56px; border-radius: 999px; object-fit: cover; flex-shrink: 0; }
+.oo-advisor-name { margin: 0; color: var(--ink); font-size: 15px; font-weight: 600; }
+.oo-advisor-role { margin: 2px 0 0; font-size: 13px; }
+
+.oo-footer { padding: 32px 20px calc(32px + env(safe-area-inset-bottom)); text-align: center; font-size: 12px; opacity: 0.7; }
+
+/* ---- rörelse ---- */
+@keyframes oo-rise {
+  from { opacity: 0; transform: translateY(14px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+.oo-rise { animation: oo-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes oo-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-18px) rotate(8deg); }
+}
+.oo-float { animation: oo-float 7s ease-in-out infinite; }
+
+@keyframes oo-bob {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+.oo-bob { display: inline-block; flex-shrink: 0; animation: oo-bob 2.8s ease-in-out infinite; }
+
+@keyframes oo-draw {
+  from { stroke-dashoffset: 320; }
+  to { stroke-dashoffset: 0; }
+}
+.oo-draw { stroke-dasharray: 320; animation: oo-draw 0.9s 0.5s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
+@keyframes oo-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .oo-rise, .oo-float, .oo-bob, .oo-draw, .oo-pulse { animation: none; }
+}

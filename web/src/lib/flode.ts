@@ -214,3 +214,60 @@ function kategori(text: string): string {
   if (/\b(bred|hög|djup|lång)[at]?\b/.test(t)) return "mått";
   return "övrigt";
 }
+
+// ---------------------------------------------------------------------------
+// Mikrostegen, klicken och felen
+// ---------------------------------------------------------------------------
+
+/**
+ * Namnen speglar listorna i server/src/data/flode.ts (MIKROSTEG, KLICK, FEL) och måste göra det:
+ * ett namn servern inte känner igen kastas tyst. Typerna här gör att ett felstavat namn syns redan
+ * när koden byggs, i stället för som ett hål i panelen.
+ */
+export type Mikrosteg =
+  | "startsida" | "marke_valt" | "dator_val" | "kamera_oppnad" | "fotoguide" | "inspelning_startad"
+  | "varv_klart" | "granskar_bilder" | "konto" | "skickar_in" | "uppladdat" | "vantar_modell"
+  | "valjer_modell" | "modell_vald" | "fragor" | "variant" | "vantar_annons" | "matt" | "pris"
+  | "besiktning" | "skickrapport" | "fardig_annons" | "publicerad";
+
+export type Klick =
+  | "spela_in" | "omslag_tagen" | "omslag_ta_om" | "omslag_godkant" | "omslag_hoppat" | "vinkel_tagen"
+  | "vinkel_fran_fil" | "vinkel_hoppad" | "bilder_fran_galleri" | "ta_bort_bild" | "oppna_fotoguide"
+  | "dator_video" | "dator_omslag" | "dator_fortsatt" | "skicka_bilder" | "tillbaka"
+  | "uppladdning_forsok_igen" | "uppladdning_tillbaka" | "valj_kandidat" | "skriv_modell" | "hitta_fler"
+  | "fragor_skickade" | "variant_vald" | "matt_nasta" | "matt_tillbaka" | "annons_fortsatt_anda"
+  | "byt_modell" | "se_skick" | "besiktning_forsok_igen" | "besiktning_avbryt" | "skada_stammer"
+  | "skada_stammer_inte" | "skickrapport_vidare" | "publicera" | "publicera_bekrafta" | "publicera_avbryt";
+
+export type Fel =
+  | "kamera_nekad" | "kamera_saknas" | "kamera_upptagen" | "kamera_https" | "kamera_start"
+  | "kamera_uppspelning" | "kamera_avstangd" | "inspelning_tom" | "video_for_kort" | "bildruta_fel"
+  | "for_manga_bilder" | "fel_filtyp" | "bild_olaslig" | "dator_video_fel" | "uppladdning_misslyckad"
+  | "uppladdning_tidsgrans" | "modell_hittades_inte" | "modell_sok_fel" | "modell_val_misslyckat"
+  | "fragor_sparfel" | "variant_sparfel" | "annons_misslyckad" | "besiktning_fel" | "publicering_misslyckad";
+
+/** Extra uppgifter: ett tal (sekunder, antal bilder, kilobyte) och en kort kod (vinkeln, felets art). */
+type Extra = { varde?: number; detalj?: string };
+
+let senasteMikro: string | null = null;
+
+/**
+ * Ett mikrosteg nåddes.
+ *
+ * Samma steg två gånger i rad skickas inte: en grind som ritas om, eller StrictMode som monterar
+ * dubbelt, är inget nytt steg. Ett steg man KOMMER TILLBAKA till efter ett annat skickas däremot —
+ * det är precis vad kartans "bakåt" räknar.
+ */
+export function mikro(namn: Mikrosteg, extra: Extra = {}): void {
+  if (senasteMikro === namn) return;
+  senasteMikro = namn;
+  skicka("mikro", { steg: aktivt ?? undefined, namn, ...extra });
+}
+
+export function klick(namn: Klick, extra: Extra = {}): void {
+  skicka("klick", { steg: aktivt ?? undefined, namn, ...extra });
+}
+
+export function fel(namn: Fel, extra: Extra = {}): void {
+  skicka("fel", { steg: aktivt ?? undefined, namn, ...extra });
+}

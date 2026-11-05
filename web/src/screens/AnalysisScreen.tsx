@@ -6,6 +6,7 @@ import type { CapturedShot } from "../api";
 import type { AnalysisStage, ConditionJob, FurnitureIdentity } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
+import * as flode from "../lib/flode";
 
 const CHECKLIST: { stage: AnalysisStage; label: string }[] = [
   { stage: "preparing", label: "Bilder förberedda" },
@@ -64,11 +65,16 @@ export default function AnalysisScreen({
         }
         if (j.progress.stage !== "error") {
           setTimeout(poll, 500);
+        } else {
+          flode.fel("besiktning_fel", { detalj: "analysen_foll" });
         }
       } catch {
         if (cancelled) return;
         // Ett tappat svar är brus — mobilen bytte mast. Fem i rad är ett besked.
-        if (++misslyckade >= 5) setTystServer(true);
+        if (++misslyckade >= 5) {
+          if (misslyckade === 5) flode.fel("besiktning_fel", { detalj: "server_tyst" });
+          setTystServer(true);
+        }
         setTimeout(poll, 1000);
       }
     };
@@ -80,6 +86,7 @@ export default function AnalysisScreen({
   }, [jobId, attempt]);
 
   async function handleRetry() {
+    flode.klick("besiktning_forsok_igen");
     setRetrying(true);
     setRetryError(null);
     try {
@@ -114,7 +121,13 @@ export default function AnalysisScreen({
               {retrying ? t("Startar om…") : t("Försök igen")}
             </button>
           )}
-          <button className="btn btn-text failure-secondary" onClick={onAbort}>
+          <button
+            className="btn btn-text failure-secondary"
+            onClick={() => {
+              flode.klick("besiktning_avbryt");
+              onAbort();
+            }}
+          >
             {t("Tillbaka till start")}
           </button>
           {retryError && <p className="error-text">{retryError}</p>}

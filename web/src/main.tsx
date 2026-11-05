@@ -5,12 +5,16 @@ import { AuthProvider } from "./auth/AuthProvider";
 import { initViewMode } from "./lib/viewMode";
 import { fangaInbjudan } from "./lib/referral";
 import { fangaAffiliate } from "./lib/affiliate";
+import { fangaKalla } from "./lib/besok";
 import { LanguageProvider } from "./lib/i18n";
 import "./styles.css";
 
 // Före render: layoutläget ska ligga på <html> när första bildrutan målas, annars ritas
 // telefonkolumnen upp en gång och byter bredd i nästa tick.
 initViewMode();
+// Besökets källa — referrer, UTM, inbjudan — FÖRST, innan koderna nedan städas ur adressfältet.
+// Se lib/besok.ts.
+fangaKalla();
 // Inbjudningskoden ur ?ref=, sparad i 30 dagar. Före render, så att ingen vy hinner läsa adressen med
 // koden kvar i. Se lib/referral.ts.
 fangaInbjudan();

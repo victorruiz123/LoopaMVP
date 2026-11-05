@@ -1,10 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
-import { getTraderaState, publishToTradera } from "../api";
+import { claimGuestJobs, getTraderaState, publishToTradera } from "../api";
+import { useAuth } from "../auth/AuthProvider";
+import AuthScreen from "../screens/AuthScreen";
 import { CheckIcon, CloseIcon } from "./icons";
 import ProcessFeedback from "./ProcessFeedback";
+import AnnonsStatistik from "./AnnonsStatistik";
 import LegalLink from "./LegalLink";
 import { useT } from "../lib/i18n";
+import * as flode from "../lib/flode";
 import { formatSek } from "../lib/price";
 import { LOOPA_FEE_CAP_SEK } from "../lib/fees";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
@@ -87,6 +91,13 @@ export default function SellWithLoopa({
   onSellAnother?: () => void;
 }) {
   const t = useT();
+  const { user } = useAuth();
+  /**
+   * Kontot, det ALLRA sista steget. Gästen har filmat, prissatt och granskat hela annonsen utan konto;
+   * först när "Ja, sälj den" trycks frågar vi efter det. Inloggningen ritas ovanpå annonsen så att
+   * ingenting säljaren valt i bekräftelsen tappas, och publiceringen går iväg direkt efteråt.
+   */
+  const [kontoSteg, setKontoSteg] = useState(false);
   const [state, setState] = useState<TraderaState | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [sending, setSending] = useState(false);
@@ -166,7 +177,14 @@ export default function SellWithLoopa({
     [fastList],
   );
 
-  async function publish() {
+  async function publish(kontoKlart = false) {
+    if (!user && !kontoKlart) {
+      // Gästen möter kontot här, sist — mätt som eget steg, så att panelen kan skilja den som
+      // stannade vid kontot från den som ångrade sig i granskningen.
+      flode.mikro("konto");
+      setKontoSteg(true);
+      return;
+    }
     setSending(true);
     setFailure(null);
     try {
@@ -174,11 +192,13 @@ export default function SellWithLoopa({
       setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis }));
       setConfirming(false);
       setNyssSkickad(true);
+      flode.mikro("publicerad");
       // Först när annonsen faktiskt gått iväg. Ett ja som föll på ett serverfel är inte en avslutad
       // process, och att fråga vad säljaren tyckte om den mitt i felet vore ett hån.
       if (!feedbackAvklarad(jobId)) setFragarOmProcessen(true);
       void refresh();
     } catch (err) {
+      flode.fel("publicering_misslyckad");
       setFailure(err instanceof Error ? err.message : String(err));
     } finally {
       setSending(false);
@@ -239,6 +259,7 @@ export default function SellWithLoopa({
           }
         />
         {state.ladder && <LadderStatus ladder={state.ladder} shippingSek={plan?.shippingSek ?? 0} />}
+        {state.statistik && <AnnonsStatistik statistik={state.statistik} />}
         <a className="btn btn-primary sell-link" href={annonsUrl} target="_blank" rel="noreferrer">
           {t("Se annonsen")}
         </a>
@@ -386,6 +407,7 @@ export default function SellWithLoopa({
             <button
               className="btn btn-primary"
               onClick={() => {
+                flode.klick("publicera");
                 setFailure(null);
                 setConfirming(true);
               }}
@@ -430,6 +452,7 @@ export default function SellWithLoopa({
             className="btn btn-primary"
             tabIndex={rutanNedanfor ? 0 : -1}
             onClick={() => {
+              flode.klick("publicera", { detalj: "fast_list" });
               setFailure(null);
               setConfirming(true);
             }}
@@ -439,15 +462,36 @@ export default function SellWithLoopa({
         </div>
       )}
 
-      {confirming && plan && (
+      {kontoSteg && (
+        <div className="sell-konto-steg">
+          <AuthScreen
+            intent="publish"
+            // Kontot finns nu: gästens jobb flyttas dit först — publiceringen kräver att kontot äger
+            // annonsen — och sedan läggs den upp med samma val som i bekräftelsen.
+            onDone={async () => {
+              await claimGuestJobs().catch((err) => console.warn("[loopa] gästjobb:", err));
+              setKontoSteg(false);
+              await publish(true);
+            }}
+            onBack={() => setKontoSteg(false)}
+          />
+        </div>
+      )}
+      {confirming && plan && !kontoSteg && (
         <SellConfirm
           plan={plan}
           coverUrl={coverUrl ?? null}
           ladder={state.ladder}
           sending={sending}
           error={failure}
-          onCancel={() => setConfirming(false)}
-          onConfirm={publish}
+          onCancel={() => {
+            flode.klick("publicera_avbryt");
+            setConfirming(false);
+          }}
+          onConfirm={() => {
+            flode.klick("publicera_bekrafta");
+            void publish();
+          }}
           saljvillkor={state.villkor ?? null}
           anvandGratis={anvandGratis}
           onAnvandGratis={setAnvandGratis}

@@ -18,6 +18,7 @@ import FlowSteps from "../components/FlowSteps";
 import { DAMAGE_TYPE_OPTIONS, SEVERITY_OPTIONS, typeLabel, severityLabel } from "../lib/labels";
 import { usePageTitle } from "../lib/pageTitle";
 import { t as translate, useT } from "../lib/i18n";
+import * as flode from "../lib/flode";
 
 type Lage = { steg: "granska"; index: number } | { steg: "helhet" };
 
@@ -80,6 +81,7 @@ export default function ResultScreen({
 
   /** Sparar svaret och går vidare till nästa skada — eller till helheten efter den sista. */
   async function svara(d: Damage, action: "confirm" | "reject" | "edit", patch?: Parameters<typeof actOnDamage>[3]) {
+    if (action !== "edit") flode.klick(action === "confirm" ? "skada_stammer" : "skada_stammer_inte");
     if (lage?.steg !== "granska") return;
     setSparar(true);
     try {
@@ -283,7 +285,13 @@ export default function ResultScreen({
       {besked && <p className="v2-dampad v2-besked">{besked}</p>}
 
       <div className="v2-h-knappar">
-        <button className="btn btn-primary next-step" onClick={() => onContinue(result)}>
+        <button
+          className="btn btn-primary next-step"
+          onClick={() => {
+            flode.klick("skickrapport_vidare");
+            onContinue(result);
+          }}
+        >
           <span>{t("Till annonsen")}</span>
           <ChevronRight size={18} />
         </button>

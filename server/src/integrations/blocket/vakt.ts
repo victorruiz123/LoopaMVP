@@ -19,7 +19,12 @@ import { adminEmails } from "../../admin.js";
 import { blocketConfigured, lasHalsa, skrivHalsa, type BlocketHalsa } from "./blocket.js";
 import { ensureSession, startBrowser } from "./browser.js";
 
-let upptagen = false;
+/**
+ * Hur många Blocket-körningar som pågår. En RÄKNARE och inte en flagga: publiceringen väntar inte på
+ * låset (den går först), så två körningar kan överlappa — och med en flagga släppte den som slutade
+ * först låset åt den som fortfarande körde. Varje `true` paras med ett `false` i en finally.
+ */
+let upptagen = 0;
 
 /**
  * Sätts av `runBlocketPublish` runt en körning. Vakten startar ingen webbläsare bredvid en
@@ -27,12 +32,17 @@ let upptagen = false;
  * BankID-väntan kan rotera sessionen under fötterna på roboten.
  */
 export function markeraUpptagen(varde: boolean): void {
-  upptagen = varde;
+  upptagen = Math.max(0, upptagen + (varde ? 1 : -1));
 }
 
 /** Pågår en Blocket-körning just nu? Prisroboten (pris.ts) frågar innan den startar en egen webbläsare. */
 export function arUpptagen(): boolean {
-  return upptagen;
+  return upptagen > 0;
+}
+
+/** Pågår fler än den egna körningen? Ett långt svep (kanalStatistik.ts) frågar och lämnar plats. */
+export function andraKorningar(): number {
+  return Math.max(0, upptagen - 1);
 }
 
 export type SessionsUtfall = Pick<BlocketHalsa, "ok" | "url" | "fel">;
@@ -79,7 +89,7 @@ const standard: VaktBeroenden = {
  */
 export async function korBlocketVakt(beroenden: Partial<VaktBeroenden> = {}): Promise<BlocketHalsa | null> {
   const d = { ...standard, ...beroenden };
-  if (upptagen) return null;
+  if (arUpptagen()) return null;
 
   const fore = d.las();
   const utfall = await d.kontroll();

@@ -522,6 +522,82 @@ export interface TraderaState {
   ladder: PriceLadder | null;
   /** Vad säljaren får och vad Loopa tar. Räknat på servern (server/src/provision.ts). Saknas i äldre svar. */
   villkor?: SaljVillkor;
+  /** Siffrorna från Tradera och Blocket (server/src/kanalStatistik.ts). Saknas i äldre svar. */
+  statistik?: KanalStatistik;
+}
+
+export interface TraderaAnnonsSiffror {
+  itemId: number;
+  /** Den annons som gäller nu, och inte en som ligger kvar efter en omläggning. */
+  aktuell: boolean;
+  aktiv: boolean;
+  /** Traderas eget ord: "Active", "Unsold", "Sold" … */
+  status: string;
+  visningar: number;
+  bevakare: number;
+  bud: number;
+  prisSek: number | null;
+  slutar: string | null;
+  typ: string | null;
+  url: string | null;
+  /** Köparkonversationer i Tradera-inkorgen. Null = gick inte att läsa. */
+  konversationer: number | null;
+}
+
+export interface TraderaSumma {
+  visningar: number;
+  bevakare: number;
+  bud: number;
+}
+
+export interface BlocketDag {
+  datum: string;
+  klick: number;
+  chattsvar: number;
+  mejlsvar: number;
+  favoriter: number;
+  nyaFavoriter: number;
+  klickStartsidan: number;
+  klickMarknadsforing: number;
+  klickTopplacering: number;
+  klickRekommendation: number;
+}
+
+export interface BlocketAnnonsSiffror {
+  adId: string;
+  aktuell: boolean;
+  url: string | null;
+  status: string | null;
+  dagarKvar: number | null;
+  klick: number;
+  kontakter: number;
+  favoriter: number;
+  klickOkadSynlighet: number | null;
+  mejlnotiser: number | null;
+  pushnotiser: number | null;
+  besokare: number | null;
+  besokFordelning: { enGang: number; tvaTillFem: number; flerAnFem: number } | null;
+  /** Blockets egen historik, äldst först. */
+  perDag: BlocketDag[];
+}
+
+/**
+ * Hur annonsen går på marknadsplatserna (server/src/kanalStatistik.ts) — allt Tradera och Blocket
+ * visar säljaren, läst av robotarna var tredje timme. `at` är när siffrorna lästes.
+ */
+export interface KanalStatistik {
+  tradera: {
+    at: string;
+    annonser: TraderaAnnonsSiffror[];
+    /** En punkt per dag, äldst först. */
+    historik: Array<TraderaSumma & { at: string }>;
+    /** Summan i slutet av gårdagen. Null när annonsen är ny i dag. */
+    igar: (TraderaSumma & { at: string }) | null;
+  } | null;
+  blocket: {
+    at: string;
+    annonser: BlocketAnnonsSiffror[];
+  } | null;
 }
 
 /** Loopas del av ett möbelpris, uträknad av servern. */
@@ -2031,4 +2107,379 @@ export interface ProvRedigering {
   startad: string;
   klar: string | null;
   kanaler: Partial<Record<"blocket" | "facebook", ProvKanalUtfall>>;
+}
+
+// ---------------------------------------------------------------------------
+// Trafiken — speglar server/src/data/besok.ts, TrafikSvar
+// ---------------------------------------------------------------------------
+
+export interface TrafikKanalRad {
+  kanal: string;
+  besok: number;
+  medKonto: number;
+  nyaKonton: number;
+  paborjade: number;
+  intygade: number;
+  sidorMedian: number;
+  /** Andel besök med en enda sida, 0–1. */
+  studs: number;
+}
+
+export interface TrafikSidRad {
+  sida: string;
+  visningar: number;
+  besok: number;
+  ingang: number;
+  utgang: number;
+  tidMedianMs: number | null;
+}
+
+export interface TrafikNyttKonto {
+  id: string;
+  namn: string | null;
+  registrerad: string;
+  ungefarligt: boolean;
+  kanal: string | null;
+  kalla: string | null;
+  kampanj: string | null;
+  landning: string | null;
+  vag: string[];
+  intygat: boolean;
+}
+
+export interface TrafikSvar {
+  dagar: number;
+  fran: string;
+  summering: {
+    besok: number;
+    sidvisningar: number;
+    nyaKonton: number;
+    nyaKontonUtanKalla: number;
+    paborjade: number;
+    intygade: number;
+    flerSidor: number;
+    medKonto: number;
+    atervandande: number;
+  };
+  kanaler: TrafikKanalRad[];
+  kallor: Array<TrafikKanalRad & { kalla: string }>;
+  kampanjer: Array<{ kampanj: string; besok: number; nyaKonton: number; intygade: number }>;
+  sidor: TrafikSidRad[];
+  overgangar: Array<{ fran: string; till: string; antal: number }>;
+  vagar: Array<{ vag: string[]; antal: number }>;
+  perDag: Array<{ dag: string; besok: number; nyaKonton: number; intygade: number }>;
+  nyaKonton: TrafikNyttKonto[];
+  matningSedan: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Översikten — speglar server/src/data/oversikt.ts
+// ---------------------------------------------------------------------------
+
+export interface Jamforelse {
+  nu: number;
+  forra: number | null;
+}
+
+export interface Oversikt {
+  dagar: number;
+  fran: string;
+  konton: {
+    totalt: number;
+    nya: Jamforelse;
+    aktiva: Jamforelse;
+    nyaBorjade: number;
+    nyaMedAnnons: number;
+    medianDygnTillForstaAnnons: number | null;
+    saljare: number;
+    saljareFlera: number;
+  };
+  perVecka: Array<{ vecka: string; nyaKonton: number; nyaAnnonser: number; nyaSaljare: number; salda: number }>;
+  kohorter: Array<{ vecka: string; konton: number; inom1: number; inom7: number; inom30: number; flera: number; klar7: boolean; klar30: boolean }>;
+  kohorterUtanDatum: number;
+  grupper: Array<{ nyckel: GruppNyckel; antal: number; medlemmar: GruppMedlem[] }>;
+  kanaler: Array<{ kanal: string; nyaKonton: number; medAnnons: number }>;
+  inbjudningar: { lankarDelade: Jamforelse; registrerade: Jamforelse; gavAnnons: number };
+  affar: { nyaAnnonser: Jamforelse; uteNu: number; kop: Jamforelse; varde: Jamforelse };
+  nyaKontonLista: Array<{
+    id: string;
+    namn: string;
+    registrerad: string;
+    kanal: string | null;
+    status: "annons" | "borjat" | "inget";
+    telefon: string | null;
+  }>;
+}
+
+// ---------------------------------------------------------------------------
+// Resorna — speglar server/src/data/resor.ts
+// ---------------------------------------------------------------------------
+
+export interface KartSteg {
+  namn: string;
+  nadde: number;
+  lamnade: number;
+  vidare: Array<{ namn: string; antal: number; riktning: "fram" | "bak" }>;
+  medianMs: number | null;
+  fel: Array<{ namn: string; antal: number }>;
+  klick: Array<{ namn: string; antal: number }>;
+  felForeAvhopp: Array<{ namn: string; antal: number }>;
+  mobil: { nadde: number; lamnade: number };
+  dator: { nadde: number; lamnade: number };
+}
+
+export interface ResaRad {
+  sess: string;
+  uid: string | null;
+  jobId: string | null;
+  start: string;
+  slut: string;
+  varaktighetMs: number;
+  enhet: string | null;
+  sistaMikro: string | null;
+  iMal: boolean;
+  pagar: boolean;
+  antalFel: number;
+  antalKlick: number;
+  sistaFel: string | null;
+}
+
+export interface ResorSvar {
+  dagar: number;
+  fran: string;
+  matningSedan: string | null;
+  summering: { besok: number; iMal: number; lamnade: number; pagar: number; medFel: number; medianMsTillMal: number | null };
+  karta: KartSteg[];
+  fel: Array<{ namn: string; antal: number; besok: number; ledTillAvhopp: number }>;
+  resor: ResaRad[];
+}
+
+export interface ResaPunkt {
+  at: string;
+  typ: "steg" | "mikro" | "klick" | "fel" | "fraga" | "avhopp" | "intygat" | "konto";
+  namn: string;
+  steg: string | null;
+  varde: number | null;
+  detalj: string | null;
+}
+
+export interface Resa {
+  sess: string;
+  uid: string | null;
+  jobId: string | null;
+  start: string;
+  slut: string;
+  enhet: string | null;
+  plattform: string | null;
+  iMal: boolean;
+  pagar: boolean;
+  punkter: ResaPunkt[];
+}
+
+export type GruppNyckel = "nya" | "fastnade" | "aktiva" | "sovande" | "aldrig";
+
+export interface GruppMedlem {
+  id: string;
+  namn: string;
+  epost: string | null;
+  telefon: string | null;
+  registrerad: string | null;
+  senast: string | null;
+  annonser: number;
+  stannadeVid: string | null;
+}
+
+/** Nordstjärnans mål. Se server/src/data/mal.ts. */
+export interface Mal {
+  matt: "nyaAnnonser" | "nyaSaljare" | "salda";
+  perVecka: number | null;
+  andradAv: string | null;
+  andradAt: string | null;
+}
+
+/** En grupp som skickas från datafliken till Utskick, förvald. */
+export interface UtskickForval {
+  namn: string;
+  epost: string[];
+}
+
+/** Kundresan: från besöket till utbetalningen. Se server/src/data/kundresa.ts. */
+export interface KundresaSteg {
+  nyckel: string;
+  antal: number;
+  forra: number | null;
+  medianMs: number | null;
+}
+
+export type KundresaUtfall = "lamnade" | "tittade" | "mobler" | "salja" | "annons";
+
+export interface KundresaIngang {
+  sida: string;
+  besok: number;
+  utfall: Record<KundresaUtfall, number>;
+  nasta: Array<{ sida: string | null; antal: number }>;
+}
+
+export interface KundresaKalla {
+  kalla: string;
+  besok: number;
+  borjade: number;
+  fardigaBesok: number;
+  annonser: number;
+  salda: number;
+}
+
+export interface KundresaKanal extends Omit<KundresaKalla, "kalla"> {
+  kanal: string;
+  forraBesok: number | null;
+  forraFardigaBesok: number | null;
+  kallor: KundresaKalla[];
+}
+
+export interface KundresaKampanj {
+  kod: string;
+  besok: number;
+  borjade: number;
+  fardigaBesok: number;
+  annonser: number;
+  salda: number;
+  senast: string | null;
+}
+
+export interface KundresaMatning {
+  besok: number;
+  utanKalla: number;
+  viaLank: number;
+  annonser: number;
+  annonserOkand: number;
+}
+
+/** En kampanjlänk. Se server/src/data/kampanjer.ts. */
+export interface Kampanj {
+  kod: string;
+  namn: string;
+  plats: string;
+  mal: string;
+  skapad: string;
+  av: string | null;
+}
+
+export interface Kampanjer {
+  kampanjer: Kampanj[];
+  platser: Array<{ id: string; namn: string }>;
+  mal: Array<{ id: string; namn: string }>;
+}
+
+export interface KundresaSida {
+  sida: string;
+  besok: number;
+  medDjup: number;
+  djup: { 25: number; 50: number; 75: number; 100: number };
+  sektioner: Array<{ namn: string; sedd: number; klick: number }>;
+}
+
+export interface KundresaFlodesSteg {
+  steg: string;
+  nadde: number;
+  lamnade: number;
+  medianMs: number | null;
+  fel: Array<{ namn: string; antal: number }>;
+}
+
+export interface KundresaSession {
+  sess: string;
+  uid: string | null;
+  start: string;
+  slut: string;
+  kanal: string;
+  kalla: string;
+  enhet: string | null;
+  landning: string | null;
+  sista: string | null;
+  sidor: number;
+  sistaSteg: string | null;
+  fel: number;
+  borjade: boolean;
+  intygat: boolean;
+  kassa: boolean;
+  kop: boolean;
+}
+
+export interface Kundresa {
+  dagar: number;
+  fran: string;
+  kanal: string | null;
+  enhet: string | null;
+  kanaler: string[];
+  besoksdel: KundresaSteg[];
+  annonsdel: KundresaSteg[];
+  ligger: number;
+  ko: { vantar: number; aldstaSedan: string | null; medianMs: number | null };
+  perKanal: KundresaKanal[];
+  perKampanj: KundresaKampanj[];
+  matning: KundresaMatning;
+  beteende: {
+    saljflode: KundresaFlodesSteg[];
+    alla: KundresaIngang;
+    ingangar: KundresaIngang[];
+    sidor: KundresaSida[];
+    sessioner: KundresaSession[];
+  };
+  matningSedan: string | null;
+}
+
+export interface KundresaPunkt {
+  at: string;
+  typ: "landning" | "sida" | "handling" | "klick" | "flode";
+  namn: string;
+  sida: string | null;
+  ms: number | null;
+  djup: number | null;
+  objekt: string | null;
+  flode: ResaPunkt | null;
+}
+
+export interface KundresaTidslinje {
+  sess: string;
+  uid: string | null;
+  start: string;
+  slut: string;
+  kanal: string;
+  kalla: string;
+  kampanj: string | null;
+  enhet: string | null;
+  punkter: KundresaPunkt[];
+}
+
+/** Vilka som är inne just nu. Se server/src/data/kundresa.ts, `justNu`. */
+export interface KundresaLive {
+  nu: string;
+  minuter: number;
+  besokare: number;
+  iSaljflodet: number;
+  perPlats: Array<{ plats: string; antal: number }>;
+  rader: Array<{ sess: string; kanal: string; kalla: string; enhet: string | null; plats: string; sedan: string; senast: string }>;
+}
+
+/** Robotarnas dagliga hälsokontroll. Speglar server/src/robotHalsa.ts. */
+export type RobotUtfall = "ok" | "varning" | "fel" | "av";
+
+export interface RobotKontroll {
+  namn: string;
+  utfall: RobotUtfall;
+  text: string;
+}
+
+export interface RobotRapport {
+  kordAt: string;
+  sekunder: number;
+  utfall: RobotUtfall;
+  robotar: Array<{ robot: "blocket" | "tradera" | "facebook"; utfall: RobotUtfall; kontroller: RobotKontroll[] }>;
+}
+
+export interface RobotHalsaSvar {
+  senaste: RobotRapport | null;
+  /** Äldst först, högst 30. */
+  historik: RobotRapport[];
+  pagar: boolean;
 }

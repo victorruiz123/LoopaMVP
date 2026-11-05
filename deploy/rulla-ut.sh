@@ -139,6 +139,14 @@ else
   echo "✗ /kop omdirigerar inte"; BRISTER=1
 fi
 
+# Kampanjlänkarna (server/src/data/kampanjer.ts). En okänd kod ska ge 302 till roten — svarar
+# servern 200 med appskalet i stället finns vägen inte i koden som kör.
+if [ "$(curl -so /dev/null -w '%{http_code} %{redirect_url}' "http://127.0.0.1:$PORT/k/xxxxx")" = "302 http://127.0.0.1:$PORT/" ]; then
+  echo "✓ /k/KOD svarar"
+else
+  echo "✗ /k/KOD svarar inte som kampanjlänk"; BRISTER=1
+fi
+
 [ "$BRISTER" = 0 ] || fel "Servern kör inte den kod som just hämtades. Läs: journalctl -u $TJANST -n 50"
 
 # ── 6. Vägen ut, genom Cloudflare ───────────────────────────────────────────
@@ -158,5 +166,20 @@ else
   echo "  Cloudflare serverar troligen sin egen robots.txt. Stäng av den hanterade filen"
   echo "  (Cloudflare → Settings → Content Signals / robots.txt) så tar vår egen över."
 fi
+
+# Kampanjlänkarna når servern bara om Cloudflare-routern äger /k/* — en rutt i
+# deploy/cloudflare/wrangler.toml som INTE rullas ut av det här skriptet. Saknas den svarar
+# marknadssajten och skickar besökaren till /company: varje affisch och varje Instagram-länk leder
+# då fel, och mätningen ser ingenting. Därför prövas vägen utifrån.
+MARKNAD=${MARKNAD:-https://loopa.nu}
+KAMPANJ=$(curl -s -o /dev/null --max-time 20 -w '%{http_code} %{redirect_url}' "$MARKNAD/k/xxxxx")
+case "$KAMPANJ" in
+  "302 $MARKNAD/") echo "✓ $MARKNAD/k/KOD når servern" ;;
+  *)
+    echo "⚠ $MARKNAD/k/KOD når inte servern (svarade: $KAMPANJ)."
+    echo "  Cloudflare-rutten för kampanjlänkarna saknas. Rulla ut routern från en dator med wrangler:"
+    echo "    cd deploy/cloudflare && npx wrangler deploy"
+    ;;
+esac
 
 printf '\n\033[32m✓ Utrullat: %s\033[0m\n' "$(git rev-parse --short HEAD)"

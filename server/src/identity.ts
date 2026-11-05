@@ -11,7 +11,7 @@ import { userFromRequest } from "./supabaseAuth.js";
  */
 export interface Identity {
   id: string;
-  kind: "user" | "service";
+  kind: "user" | "service" | "guest";
   /** Adressen Supabase bekräftat. Null för maskinkontot och för anrop som kommer med bildkakan. */
   email: string | null;
   /** Får LÄSA andras annonser, aldrig skriva i dem. Se admin.ts för vem det är och varför. */
@@ -140,7 +140,41 @@ function userFromCookie(req: IncomingMessage): Identity | null {
 }
 
 /**
- * Ordningen är avsiktlig: token först, sedan maskinnyckel, sedan kakan — och kakan bara för GET.
+ * Gästen: säljaren som ännu inte skapat ett konto.
+ *
+ * Kontot frågas efter först när annonsen ska läggas upp. Fram till dess filmar, prissätter och
+ * besiktigar säljaren som gäst, och jobben ägs av gäst-id:t. När kontot finns flyttas de över till
+ * det (se `handleClaimGuest` i server.ts) — samma ägarskapskontroll gäller hela vägen, bara med ett
+ * annat id.
+ *
+ * Token är signerad med samma hemlighet som bildkakan och skickas i `x-loopa-guest`. Den bär inget
+ * annat än ett slumpat id och ett utgångsdatum, så den går inte att skriva ihop för någon annans jobb.
+ */
+const GUEST_HEADER = "x-loopa-guest";
+const GUEST_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+export function issueGuestToken(): string {
+  const payload = `g${randomBytes(16).toString("hex")}.${Date.now() + GUEST_TTL_MS}`;
+  return `${payload}.${sign(payload)}`;
+}
+
+/** Gästens identitet ur huvudet, eller null om det saknas, är förfalskat eller har gått ut. */
+export function guestFromRequest(req: IncomingMessage): Identity | null {
+  const header = req.headers[GUEST_HEADER];
+  const value = Array.isArray(header) ? header[0] : header;
+  if (!value) return null;
+  const cut = value.lastIndexOf(".");
+  if (cut < 0) return null;
+  const payload = value.slice(0, cut);
+  if (!sameSecret(value.slice(cut + 1), sign(payload))) return null;
+  const [id, expires] = payload.split(".");
+  if (!id || !Number(expires) || Number(expires) < Date.now()) return null;
+  return { id: `guest:${id}`, kind: "guest", email: null, isAdmin: false };
+}
+
+/**
+ * Ordningen är avsiktlig: token först, sedan maskinnyckel, sedan gästen, sedan kakan — och kakan
+ * bara för GET.
  *
  * Faller stängt. Är Supabase onåbart returnerar `userFromRequest` null och anropet avvisas; det är
  * skillnaden mot hur den används på andra ställen, där ett okänt anrop får fortsätta som utloggat.
@@ -155,6 +189,9 @@ export async function identityFromRequest(req: IncomingMessage): Promise<Identit
   if (key && provided && sameSecret(provided, key)) {
     return { id: serviceOwner(), kind: "service", email: null, isAdmin: false };
   }
+
+  const guest = guestFromRequest(req);
+  if (guest) return guest;
 
   if (req.method === "GET") return userFromCookie(req);
   return null;

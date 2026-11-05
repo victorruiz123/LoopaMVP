@@ -10,6 +10,7 @@ import { POPULAR_BRANDS, VITRIN } from "../lib/brandSeed";
 import { brandLook, brandNameStyle, harEgenIdentitet } from "../lib/brandLook";
 import HurFungerarDet from "../components/HurFungerarDet";
 import LetarDuMobel from "../components/LetarDuMobel";
+import HemFlikar from "../components/HemFlikar";
 import MobelParad from "../components/MobelParad";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
@@ -164,6 +165,7 @@ export default function HomeScreen({
       */}
       <div className="home-bar">
         <span className="home-wordmark">loopa</span>
+        <HemFlikar aktiv="salj" />
         <div className="home-bar-hoger">
           {dator && !inbjuden && <LetarDuMobel varifran="/" variant="bar" />}
           {/* Ingen knapp alls medan sessionen läses: att gissa fel i en tiondels sekund byter ut
@@ -191,7 +193,7 @@ export default function HomeScreen({
         Ingressen bär invändningen direkt efter löftet. "Möt aldrig köparen" är det som avgör för
         många, och det ska inte ligga tre skärmar ned.
       */}
-      <header className="home-hero">
+      <header className="home-hero" data-matt="salj_hero">
         {inbjuden ? (
           <>
             <h1 className="home-rubrik">
@@ -214,7 +216,7 @@ export default function HomeScreen({
         )}
         {/* Vägen till förklaringen. En knapp och inte en textlänk: det är sidans andra handling
             efter att välja märke, och den som tvekar ska se att det finns någonstans att fråga. */}
-        <button className="home-hur-knapp" onClick={() => setHurOppen(true)}>
+        <button className="home-hur-knapp" data-matt="salj_hur" onClick={() => setHurOppen(true)}>
           {t("Hur fungerar det?")}
         </button>
 
@@ -223,7 +225,7 @@ export default function HomeScreen({
         {!inbjuden && <MobelParad />}
       </header>
 
-      <section className="home-marken">
+      <section className="home-marken" data-matt="salj_marken">
         <h2 className="home-marken-rubrik">{t("Vilket märke har din möbel?")}</h2>
 
         <div className="home-sok">
@@ -328,7 +330,7 @@ export default function HomeScreen({
       {/* TAKET STÅR MED HÄR OCH INTE BARA I SÄLJBEKRÄFTELSEN. Utan det läser raden som att en soffa
           för 12 000 kr kostar 2 400 kr att sälja — vilket är fel åt det håll som gör att man inte
           provar, och just på de möbler där det är mest värt att göra det. */}
-      <section className="home-avgift">
+      <section className="home-avgift" data-matt="salj_avgift">
         <span className="home-avgift-tal">{LOOPA_PERCENT} %</span>
         <p>
           {t(
@@ -349,7 +351,7 @@ export default function HomeScreen({
       */}
       {!dator && !inbjuden && <LetarDuMobel varifran="/" />}
 
-      <footer className="home-fot">
+      <footer className="home-fot" data-matt="salj_fot">
         <span className="home-wordmark">loopa</span>
         {/* Adressen står här och inte bara i villkoren: den som undrar något som sidan inte svarar
             på ska hitta ett sätt att fråga utan att leta. */}

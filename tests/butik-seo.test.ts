@@ -30,6 +30,18 @@ const SHELL = `<!doctype html>
   </body>
 </html>`;
 
+/**
+ * Ligger det stolar ute just nu? Kategorisidans tester läser det riktiga lagret, och en kategori utan
+ * varor är med rätta noindex och utan produktlänkar. Saknas varorna i den här körningen — en ren
+ * utcheckning, en datamapp utan jobb — finns inget att pröva mot, och testet hoppas över i stället
+ * för att rapportera ett fel som inte finns. Samma regel som produktsidans tester längre ned.
+ */
+async function liveLoopa(kategori?: string): Promise<boolean> {
+  const { allProducts } = await import("../server/src/butik/inventory.js");
+  return (await allProducts()).some((p) => p.source === "loopa" && p.state === "live" && (!kategori || p.categorySlug === kategori));
+}
+const TOMT_LAGER = "inga Loopa-varor ute i den här körningen — inget att pröva mot";
+
 const HEAD = {
   title: "Sits Impulse – 2633 kr – Loopa Butik",
   description: "Sits Impulse, 2633 kr.",
@@ -81,7 +93,8 @@ test("landningssidan beskriver butiken, inte säljverktyget", async () => {
   assert.ok(head.body?.includes("/butik/kategori/"), "kategorierna ska vara länkade för en robot");
 });
 
-test("kategorisidan får en egen titel med orten i", async () => {
+test("kategorisidan får en egen titel med orten i", async (t) => {
+  if (!(await liveLoopa("stolar"))) return t.skip(TOMT_LAGER);
   const head = await seoFor("/butik/kategori/stolar", "");
   assert.ok(head);
   assert.match(head.title, /stolar/i);
@@ -173,13 +186,15 @@ test("startsidans kropp skiljer företaget Loopa från verbet loopa", async () =
 // utan att JavaScript kört. Kategorisidan och märkessidan bar tidigare bara en rubrik: adresserna
 // fanns, men ingen väg gick dit. Testerna nedan låser fast att vägen finns.
 
-test("kategorisidan listar varorna som riktiga länkar", async () => {
+test("kategorisidan listar varorna som riktiga länkar", async (t) => {
+  if (!(await liveLoopa("stolar"))) return t.skip(TOMT_LAGER);
   const head = await seoFor("/butik/kategori/stolar", "");
   assert.ok(head);
   assert.match(head.body ?? "", /href="\/butik\/objekt\//, "utan produktlänkar hittar en robot aldrig till en möbel");
 });
 
-test("kategorisidan säger i strukturerad data att den ÄR en lista av produkter", async () => {
+test("kategorisidan säger i strukturerad data att den ÄR en lista av produkter", async (t) => {
+  if (!(await liveLoopa("stolar"))) return t.skip(TOMT_LAGER);
   const head = await seoFor("/butik/kategori/stolar", "");
   assert.ok(head?.jsonLd);
   const grafer = JSON.parse(head.jsonLd);
@@ -248,7 +263,8 @@ test("sitemapen är välformad XML med bilderna på plats", async () => {
   assert.match(xml, /^<\?xml version="1\.0" encoding="UTF-8"\?>/);
   assert.equal((xml.match(/<urlset/g) ?? []).length, 1);
   assert.equal((xml.match(/<url>/g) ?? []).length, (xml.match(/<\/url>/g) ?? []).length);
-  assert.ok(xml.includes("/butik/kategori/"));
+  // Kategorierna står bara med när de har varor; formen ovan prövas alltid.
+  if (await liveLoopa()) assert.ok(xml.includes("/butik/kategori/"));
 });
 
 

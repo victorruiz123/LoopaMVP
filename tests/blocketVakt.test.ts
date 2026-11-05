@@ -18,7 +18,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 
-const { korBlocketVakt, markeraUpptagen } = await import("../server/src/integrations/blocket/vakt.js");
+const { andraKorningar, arUpptagen, korBlocketVakt, markeraUpptagen } = await import("../server/src/integrations/blocket/vakt.js");
 import type { BlocketHalsa } from "../server/src/integrations/blocket/blocket.js";
 
 const NU = new Date("2026-09-18T06:00:00.000Z");
@@ -95,6 +95,27 @@ test("under en publicering hoppar vakten över varvet helt", async () => {
   // Och när körningen är klar går varvet som vanligt.
   await korBlocketVakt(r.beroenden);
   assert.equal(r.kontroller(), 1);
+});
+
+// LÅSET ÄR EN RÄKNARE. Publiceringen väntar inte på låset, så två körningar kan överlappa — och den som
+// slutar först får inte släppa låset åt den som fortfarande kör.
+test("två överlappande körningar: låset släpps först när båda är klara", () => {
+  markeraUpptagen(true); // statistiksvepet
+  markeraUpptagen(true); // en publicering som kom under svepet
+  try {
+    assert.equal(andraKorningar(), 1, "svepet ser att någon annan kört igång");
+    markeraUpptagen(false); // svepet slutar först
+    assert.equal(arUpptagen(), true, "publiceringen pågår fortfarande");
+    assert.equal(andraKorningar(), 0);
+  } finally {
+    markeraUpptagen(false);
+  }
+  assert.equal(arUpptagen(), false);
+  markeraUpptagen(false); // ett extra släpp får inte göra räknaren negativ
+  markeraUpptagen(true);
+  assert.equal(arUpptagen(), true);
+  markeraUpptagen(false);
+  assert.equal(arUpptagen(), false);
 });
 
 test("ett larm som inte går iväg fäller inte vakten", async () => {
