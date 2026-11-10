@@ -3,8 +3,9 @@
  *
  * BAKGRUNDEN. Identifieringen hade tre olika klockor: 80 s för anropet, 56 s för första försöket, 50 s för eskaleringen, och ett
  * omförsök som startade EFTER att det första fallit. De lades ovanpå varandra: en körning kunde ta 74–80 s, ett svar kunde komma
- * efter att säljaren gett upp, och ett avbrutet anrop kunde fortsätta kosta pengar efter att resultatet var skrivet. Produktkravet
- * är nu enkelt: säljaren får aldrig vänta mer än 60 s på identifieringen. Det kräver EN klocka som alla delar.
+ * efter att säljaren gett upp, och ett avbrutet anrop kunde fortsätta kosta pengar efter att resultatet var skrivet. Kravet är
+ * att identifieringen har ETT tak som aldrig överskrids, och det kräver EN klocka som alla delar. Taket var 60 s tills det togs bort 2026-10-24
+ * (se pipeline/identifieringsval.ts); standardvärdet är nu 180 s (IDENTIFY_DEADLINE_MS i research/config.ts, LOOPA_IDENTIFY_DEADLINE_MS).
  *
  * VAD KLOCKAN GÖR.
  *  - `remaining()` är tiden kvar för ALLT — modellanrop, sökning, verktyg och efterbehandling — räknad från att identifieringen startade.
@@ -12,7 +13,7 @@
  *  - `canStart(minMs)` svarar på "hinner det här bli klart?" INNAN arbetet startas. Ett anrop som inte kan hinna startas inte.
  *  - `budget(reserveMs)` är det ett anrop får av tiden när något ska hända EFTER det (tolkning, skrivning till jobbet).
  *
- * Klockan har en liten marginal inbyggd av den som skapar den (se IDENTIFY_DEADLINE_MS): 60 s är det säljaren ser, och
+ * Klockan har en liten marginal inbyggd av den som skapar den (se IDENTIFY_DEADLINE_MS): taket är det säljaren ser, och
  * leveransen till skärmen (pollning, rendering) ligger utanför servern.
  */
 

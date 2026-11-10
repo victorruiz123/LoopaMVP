@@ -55,11 +55,14 @@ export const FAST_REVIEW_MODEL = 'gemini-3.5-flash-lite'
  * a new endpoint.
  */
 /**
- * Standardnivån (fältet utelämnas). Förut 'priority', som kostar 1,8 gånger standardpriset på varje token (ai.google.dev/gemini-api/docs/pricing,
- * 2026-10-23) för en snabbare kö. Annonstexten byggs numera medan säljaren gör annat i flödet, så kön är ingen väntan någon står och tittar på —
- * och omgången har ett kostnadstak (server/src/cost/ledger.ts). Sätt 'priority' här för att få tillbaka den.
+ * VILKEN NIVÅ som används beror på vem som kör modulen (se `serviceTier` nedan):
+ *  - den publika generatorn på Cloudflare (loopa.nu) behåller 'priority', precis som förut;
+ *  - Node-servern (Loopa Condition) kör standardnivån (fältet utelämnas). 'priority' kostar 1,8 gånger standardpriset på varje token
+ *    (ai.google.dev/gemini-api/docs/pricing, 2026-10-23) för en snabbare kö. Annonstexten byggs där medan säljaren gör annat i flödet, så kön är
+ *    ingen väntan någon står och tittar på, och omgången har ett kostnadstak (server/src/cost/ledger.ts).
+ * Servern känns igen på att den kopplat en kostnadsmottagare (`setGeminiUsageListener`); Cloudflare gör det aldrig.
  */
-const SERVICE_TIER: string | undefined = undefined
+const PUBLIC_SERVICE_TIER = 'priority'
 
 /**
  * VAD som gick fel, inte bara om det får göras om.
@@ -88,13 +91,17 @@ let usageListener: ((u: GeminiUsage) => void) | null = null
 export function setGeminiUsageListener(fn: ((u: GeminiUsage) => void) | null): void {
   usageListener = fn
 }
+/** Nivån för det här anropet: standard (undefined) för servern med kostnadsbok, annars 'priority'. Se PUBLIC_SERVICE_TIER. */
+function serviceTier(): string | undefined {
+  return usageListener ? undefined : PUBLIC_SERVICE_TIER
+}
 function reportUsage(model: string, parsed: any): void {
   if (!usageListener) return
   try {
     const m = parsed?.usageMetadata ?? {}
     usageListener({
       model,
-      serviceTier: SERVICE_TIER ?? 'standard',
+      serviceTier: serviceTier() ?? 'standard',
       // Verktygsresultat (sökträffar, hämtade sidor) faktureras som indata.
       inputTokens: (m.promptTokenCount ?? 0) + (m.toolUsePromptTokenCount ?? 0),
       outputTokens: m.candidatesTokenCount ?? 0,
@@ -150,7 +157,8 @@ async function callGeminiOnce(
     ? `${gatewayUrl.replace(/\/$/, '')}/google-ai-studio/v1beta/models/${model}:generateContent`
     : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-  const requestBody = { ...(body as Record<string, unknown>), ...(SERVICE_TIER ? { serviceTier: SERVICE_TIER } : {}) }
+  const tier = serviceTier()
+  const requestBody = { ...(body as Record<string, unknown>), ...(tier ? { serviceTier: tier } : {}) }
 
   const controller = new AbortController()
   // An externally-supplied signal (the seller pipeline's single overall
