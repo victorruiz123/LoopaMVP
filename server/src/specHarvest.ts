@@ -298,7 +298,7 @@ const TRIPLE_VALUE = /\d+\s*[x×*]\s*\d+\s*[x×*]\s*\d+/i;
  * ("Mått: 81 x 92 x 82 cm"), och då är bredden redan sagd. Utan den här läsningen hade sidskörden
  * lagt till Bredd, Djup och Höjd bredvid ett fält som redan innehöll dem.
  */
-function rowsCovered(attribute: ListingAttribute): string[] {
+export function rowsCovered(attribute: ListingAttribute): string[] {
   const head = `${attribute.key} ${attribute.label}`;
   const direct = ROWS.find((r) => r.re.test(head));
   if (direct) return [direct.key];

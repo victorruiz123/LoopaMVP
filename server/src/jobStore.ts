@@ -75,6 +75,18 @@ export function getJobSync(id: string): ConditionJob | undefined {
   return jobs.get(id);
 }
 
+/**
+ * Jobbet en klient redan skapat med den här nyckeln, av samma ägare. Skyddar mot dubbla betalda omgångar när en uppladdning skickas om (ett
+ * tappat svar, en omladdning, ett dubbeltryck): den andra begäran får det första jobbet i stället för ett nytt. Läser bara jobb i minnet — en
+ * omstart glömmer nycklarna, vilket är rimligt: en uppladdning som skickas om efter en omstart är ett nytt försök.
+ */
+export function findJobByClientKey(ownerId: string | null, clientKey: string): ConditionJob | undefined {
+  for (const job of jobs.values()) {
+    if (job.clientKey === clientKey && (job.ownerId ?? null) === ownerId) return job;
+  }
+  return undefined;
+}
+
 export async function getJob(id: string): Promise<ConditionJob | undefined> {
   const inMemory = jobs.get(id);
   if (inMemory) return inMemory;

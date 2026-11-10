@@ -11,15 +11,21 @@ try {
 }
 import { createJob, failOrphanedJobs, getJob, getJobSync, jobDir, listJobs, ownerIdOf, persist, markJobRemoved, getDebugTrace, watchJobDeadline } from "./jobStore.js";
 import { createConditionJob, readIdentity, type CreateJobBody } from "./jobCreate.js";
+import { missingForPublish } from "./pipeline/tasks.js";
+import { costSummary } from "./cost/jobCost.js";
+import { CONDITION_RETRY_MIN_SEK, canSpend, newJobCost } from "./cost/ledger.js";
+import { slugKey } from "./research/normalize.js";
 import { runConditionGrading } from "./pipeline/run.js";
 import { gradeCondition } from "./pipeline/grade.js";
 import { adjudicateDispute } from "./pipeline/dispute.js";
 import { checkApiKey } from "./apiAuth.js";
 import { adminEmails, kontoDetalj, listAccounts } from "./admin.js";
 import { guestFromRequest, identityFromRequest, issueGuestToken, issueMediaCookie, mediaSecretIsEphemeral, type Identity } from "./identity.js";
+import { AuthUnavailableError } from "./supabaseAuth.js";
 import { estimatePrice, repriceResult, synkaStolpris } from "./pricing.js";
 import { MAX_ANTAL_STOLAR } from "./stolPris.js";
-import { finalizeWithModel, findMoreCandidates, runIdentify } from "./pipeline/identify.js";
+import { classifyAttribute } from "./research/attributeKinds.js";
+import { applyExternalIdentification, applyExternalImages, applyExternalSpecs, expectExternalSpecs, failExternalIdentification, finalizeWithModel, findMoreCandidates, furnitureTypeOf, runIdentify } from "./pipeline/identify.js";
 import type { Resolution } from "./listing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
 import { mapRawDefect } from "./pipeline/inspect.js";
@@ -256,7 +262,13 @@ async function handleCreateJob(req: IncomingMessage, res: ServerResponse, identi
     dealId = deal.id;
   }
 
-  const out = await createConditionJob(body, identity.id, dealId, false, false, identity.email);
+  // Klientens nyckel (rubriken Idempotency-Key): en uppladdning som skickas om får tillbaka sitt jobb i stället för en andra betald omgång.
+  const key = req.headers["idempotency-key"];
+  if (typeof key === "string" && key.trim()) body.clientKey = key;
+  // Testläget (appens flagga onlyIdentifySpecs) hoppar över skickbedömningen; det gäller bara jobb som redan är externa (appskalet i testläge), aldrig en vanlig uppladdning.
+  // SerpApi-flödet i drift sätter inte flaggan: där körs skickbedömning, pris och annons som vanligt.
+  const skipGrading = body.externalIdentify === true && body.identifyOnly === true;
+  const out = await createConditionJob(body, identity.id, dealId, false, skipGrading, identity.email);
   if ("error" in out) return sendJson(res, 400, out);
 
   // Affären får veta vilket jobb som är dess. Skanningen är igång; tillståndsbytet till `scanned`
@@ -271,7 +283,12 @@ async function handleGetJob(id: string, res: ServerResponse) {
   if (!job) return sendJson(res, 404, { error: "Job not found" });
   // Loopa-ID:t läggs på i svaret i stället för att sparas i jobbet: det är härlett ur id:t (se
   // loopaId.ts), så ett sparat fält hade bara varit en kopia som kan bli inaktuell.
-  sendJson(res, 200, { ...job, loopaId: loopaIdFor(job.id) });
+  // Kostnadsboken är driftens, inte säljarens: posterna (modell, tokens, sökfrågor) följer inte med i det som pollas varje 600 ms.
+  // Läget säljaren behöver veta om — att omgången inte blev komplett — ligger i `incomplete`.
+  const { cost: _cost, clientKey: _clientKey, ...forClient } = job;
+  void _cost;
+  void _clientKey;
+  sendJson(res, 200, { ...forClient, loopaId: loopaIdFor(job.id) });
 }
 
 /**
@@ -380,6 +397,10 @@ async function handleRetry(id: string, res: ServerResponse) {
   if (job.progress.stage !== "error" && job.progress.stage !== "done") {
     return sendJson(res, 409, { error: "Analysen pågår redan." });
   }
+  // Ett omtag är betalt arbete och måste rymmas i omgångens budget (cost/ledger.ts). Det rymmer det inte: inget startas, och säljaren får veta det.
+  if (!canSpend(job.cost ?? newJobCost(), CONDITION_RETRY_MIN_SEK)) {
+    return sendJson(res, 409, { error: "Kostnadstaket för den här omgången är nått, så skicket bedöms inte om. Starta en ny analys." });
+  }
 
   job.error = null;
   job.progress = { stage: "queued", message: "I kö…" };
@@ -395,7 +416,7 @@ async function handleRetry(id: string, res: ServerResponse) {
 async function handleSelectModel(id: string, req: IncomingMessage, res: ServerResponse) {
   const job = await getJob(id);
   if (!job) return sendJson(res, 404, { error: "Job not found" });
-  const body = await readJsonBody<{ candidate?: ModelCandidate; manualModel?: string }>(req);
+  const body = await readJsonBody<{ candidate?: ModelCandidate; manualModel?: string; externalSpecs?: boolean }>(req);
 
   let resolution: Resolution;
   if (body.candidate?.model) resolution = { kind: "seller_selected", selected: body.candidate };
@@ -429,6 +450,14 @@ async function handleSelectModel(id: string, req: IncomingMessage, res: ServerRe
     });
   }
 
+  // Samma val en gång till medan specsökningen redan pågår (ett dubbeltryck, en omladdning): inget nytt betalt arbete. Ett ANNAT val går igenom.
+  const chosen = resolution.kind === "manual" ? resolution.manualModel : resolution.selected.model;
+  if (job.identityStatus === "resolved" && slugKey(job.identity?.model ?? "") === slugKey(chosen) && job.tasks?.specs?.status === "running") {
+    return sendJson(res, 202, { ok: true, duplicate: true });
+  }
+
+  // PROTOTYP (appen): AI-läget frågas efter varianten, måtten, materialet och nypriset för DEN HÄR modellen. Väntan sätts före bygget, så att specsteget inte hinner före svaret.
+  if (body.externalSpecs === true) await expectExternalSpecs(id, chosen);
   void finalizeWithModel(id, resolution);
   sendJson(res, 202, { ok: true });
 }
@@ -444,6 +473,13 @@ async function handleFindMoreCandidates(id: string, res: ServerResponse) {
   const out = await findMoreCandidates(id);
   if ("error" in out) return sendJson(res, out.error === "Job not found" ? 404 : 409, out);
   sendJson(res, 202, out);
+}
+
+/** Omgångens kostnad: läget, per steg, och posterna (modell, tokens, sökfrågor). Ägargrinden ovanför släpper bara ägaren och admin hit. */
+async function handleGetCost(id: string, res: ServerResponse) {
+  const job = await getJob(id);
+  if (!job) return sendJson(res, 404, { error: "Job not found" });
+  sendJson(res, 200, { summary: costSummary(job.cost), entries: job.cost?.entries ?? [] });
 }
 
 async function handleGetDebug(id: string, res: ServerResponse) {
@@ -465,11 +501,13 @@ async function handleGetDebug(id: string, res: ServerResponse) {
 /**
  * Säljarens variant: "2-sitssoffa", "fåtölj", eller något de skrivit själva.
  *
- * SVARET ÄR INTE BARA ETT SPARAT FÄLT. Varianten ändrar vilken produktsida annonsen ska läsa måtten
- * ur, och därmed rubriken, specifikationerna och omslaget. Därför körs identifieringens fas 2 om med
- * varianten isatt — samma väg som när modellen valdes, bara med ett mer exakt namn. Det tar ungefär
- * lika lång tid som första bygget och sker medan säljaren läser specifikationsskärmen, som pollar
- * och byter ut texten när den nya kommer.
+ * SVARET ÄR INTE BARA ETT SPARAT FÄLT. Varianten ändrar vilka mått och vilket material annonsen ska
+ * visa, och därmed rubriken, specifikationerna och omslaget. Därför körs fas 2 om med varianten isatt —
+ * men sedan 2026-10-17 UTAN ny forskning när jobbet redan bär fakta om utförandena (`job.productFacts`,
+ * se research/productFacts.ts och byggAnnonsFranFakta): det valda utförandet filtreras fram och bara
+ * texten skrivs om, några sekunder. Före det tog omsökningen 103–108 s och tappade alla mått. Saknar
+ * fakta det valda utförandet görs ett riktat omtag som förut. Skärmen pollar och byter ut texten när
+ * den nya kommer.
  *
  * Svaret går tillbaka direkt, innan omskrivningen är klar: säljaren ska inte vänta på en annons som
  * ändå byggs om i bakgrunden.
@@ -778,6 +816,16 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
   if (token) {
     const { skrivSaljarensPostnummer } = await import("./integrations/blocket/saljare.js");
     await skrivSaljarensPostnummer(job, token);
+  }
+
+  /**
+   * Ett kort som inte är komplett publiceras inte: bekräftad modell, skickbedömning och annonstext är obligatoriska, och annonsen får inte
+   * fortfarande vara på väg att kompletteras. Kostnadstak som nåtts eller en uppgift som föll lämnar kortet markerat ofullständigt (job.incomplete),
+   * men det som SAKNAS avgör — en ofullständig annons med allt obligatoriskt på plats får publiceras.
+   */
+  const saknas = missingForPublish(job);
+  if (saknas.length > 0) {
+    return sendJson(res, 409, { error: `Kortet är inte komplett än: ${saknas.join(", ")} saknas.`, saknas, ...(await traderaState(job)) });
   }
 
   const { bestallningsGrind } = await import("./integrations/autoPublish.js");
@@ -2074,7 +2122,22 @@ async function tillampaAnnonsRattelse(job: ConditionJob, body: ListingEditBody):
          * bara det som ÄR en mätning, tyst i övrigt, och kan aldrig fälla rättelsen ovan.
          */
         void noteraMatt({ jobId, brand: identitet?.brand ?? null, model: identitet?.model ?? null, attr: { key, label, value } });
-        return { key, label, value, sourceUrl: null, estimated: false, sellerEdited: true };
+        /**
+         * Raden behåller vad den ÄR (mått, material, uppgift) när etiketten inte ändrats — annars klassas
+         * den på sin nya etikett. En rättad rad får aldrig tappa sin plats i Mått / Material / Övriga.
+         */
+        const kind = fore && fore.label === label && fore.kind ? { kind: fore.kind, type: fore.type, component: fore.component } : classifyAttribute({ key, label, value });
+        return {
+          key,
+          label,
+          value,
+          sourceUrl: null,
+          estimated: false,
+          sellerEdited: true,
+          ...(kind.kind ? { kind: kind.kind } : {}),
+          ...(kind.type ? { type: kind.type } : {}),
+          ...(kind.component ? { component: kind.component } : {}),
+        };
       })
       .filter((a): a is NonNullable<typeof a> => a !== null);
   }
@@ -2223,6 +2286,13 @@ const server = http.createServer(async (req, res) => {
       if (segments[1] === "kandidatbild" && segments.length === 3 && req.method === "GET") {
         return await handleKandidatbild(segments[2], res);
       }
+      /**
+       * SerpApi-flödet: omslagsbilden på en kortlivad, ogissningsbar adress, utanför grinden. SerpApi har inget konto hos oss och hämtar bilden själv (`image_url`). Se serpapi/session.ts.
+       */
+      if (segments[1] === "serpapi" && segments[2] === "img" && segments.length === 4 && (req.method === "GET" || req.method === "HEAD")) {
+        const { handleSerpApiImage } = await import("./serpapi/routes.js");
+        return handleSerpApiImage(segments[3], req, res);
+      }
       if (segments[1] === "cards" && segments.length === 4 && segments[3] === "chat" && req.method === "POST") {
         return await handleCardChat(segments[2], req, res);
       }
@@ -2323,7 +2393,15 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 200, { token: issueGuestToken() });
       }
 
-      const identity = await identityFromRequest(req);
+      let identity: Identity | null;
+      try {
+        identity = await identityFromRequest(req);
+      } catch (err) {
+        // Supabase gick inte att fråga. 503, inte 401: klienten städar bort sessionen på 401, och den är här inte ogiltig. Loggen bär orsaken, aldrig token.
+        if (!(err instanceof AuthUnavailableError)) throw err;
+        console.warn(`[auth] verifieringen otillgänglig (${err.reason}) — ${req.method} ${url.pathname}`);
+        return sendJson(res, 503, { error: "Inloggningen kunde inte kontrolleras just nu. Försök igen om en stund." });
+      }
       if (!identity) return sendJson(res, 401, { error: "Inloggning krävs." });
 
       if (segments[1] === "session" && segments.length === 2 && req.method === "POST") {
@@ -3111,6 +3189,15 @@ const server = http.createServer(async (req, res) => {
         return await handlePreliminaryPrice(req, res);
       }
 
+      /**
+       * SerpApi-flödet: Googles AI-läge och bildsök via SerpApi (identifiering, mått och referensbilder). INNANFÖR grinden — varje anrop kostar en sökning. Se serpapi/routes.ts.
+       */
+      if (segments[1] === "serpapi") {
+        const { handleSerpApi } = await import("./serpapi/routes.js");
+        if (await handleSerpApi(segments.slice(2), req, res, identity.id, sendJson, readJsonBody)) return;
+        return sendJson(res, 404, { error: "Not found" });
+      }
+
       if (segments[1] === "jobs") {
       if (segments.length === 2 && req.method === "POST") return await handleCreateJob(req, res, identity);
       if (segments.length === 2 && req.method === "GET") return await handleListJobs(res, identity);
@@ -3120,8 +3207,44 @@ const server = http.createServer(async (req, res) => {
       if (segments.length === 4 && segments[3] === "debug" && req.method === "GET") {
         return await handleGetDebug(segments[2], res);
       }
+      if (segments.length === 4 && segments[3] === "cost" && req.method === "GET") return await handleGetCost(segments[2], res);
       if (segments.length === 4 && segments[3] === "model" && req.method === "POST") {
         return await handleSelectModel(segments[2], req, res);
+      }
+      // PROTOTYP: identifieringen gjordes av appens webbvy mot Googles AI-läge. Se externalIdentify.ts.
+      if (segments.length === 4 && segments[3] === "external-identification" && req.method === "POST") {
+        const body = await readJsonBody<{ answer?: unknown; links?: unknown; failed?: unknown; specsPending?: unknown; imagesPending?: unknown }>(req, 400 * 1024);
+        if (typeof body.failed === "string") return sendJson(res, 200, { ok: await failExternalIdentification(segments[2], body.failed) });
+        const answer = typeof body.answer === "string" ? body.answer : "";
+        const links = Array.isArray(body.links) ? body.links.filter((l): l is string => typeof l === "string") : [];
+        if (answer.trim().length < 40) return sendJson(res, 400, { error: "answer krävs" });
+        const r = await applyExternalIdentification(segments[2], answer, links, { specsPending: body.specsPending === true, imagesPending: body.imagesPending === true });
+        return sendJson(res, "error" in r ? 409 : 200, r);
+      }
+      // PROTOTYP: möbeltypen ur säljarens omslagsbild, innan appen ställer frågan till AI-läget.
+      if (segments.length === 4 && segments[3] === "furniture-type" && req.method === "POST") {
+        return sendJson(res, 200, await furnitureTypeOf(segments[2]));
+      }
+      // PROTOTYP: mått och material för förslag 1 (appens uppföljningsfråga) kommer efter korten.
+      if (segments.length === 4 && segments[3] === "external-specs" && req.method === "POST") {
+        const body = await readJsonBody<{ answer?: unknown; links?: unknown; failed?: unknown; model?: unknown }>(req, 400 * 1024);
+        // `model`: modellen frågan gällde. Ett sent svar på en tidigare fråga (säljaren hann byta modell) ignoreras i applyExternalSpecs.
+        const model = typeof body.model === "string" && body.model.trim() ? body.model.trim() : undefined;
+        if (typeof body.failed === "string") return sendJson(res, 200, await applyExternalSpecs(segments[2], { failed: body.failed, model }));
+        const answer = typeof body.answer === "string" ? body.answer : "";
+        const links = Array.isArray(body.links) ? body.links.filter((l): l is string => typeof l === "string") : [];
+        if (answer.trim().length < 40) return sendJson(res, 400, { error: "answer krävs" });
+        return sendJson(res, 200, await applyExternalSpecs(segments[2], { answer, links, model }));
+      }
+      // PROTOTYP: referensbilder ur Googles bildsök (appens webbvy). Servern väljer och kontrollerar; se externalImages.ts.
+      if (segments.length === 4 && segments[3] === "external-images" && req.method === "POST") {
+        const body = await readJsonBody<{ groups?: unknown; final?: unknown }>(req, 600 * 1024);
+        const groups = Array.isArray(body.groups)
+          ? (body.groups as Array<{ model?: unknown; rows?: unknown }>)
+              .filter((g) => typeof g?.model === "string" && Array.isArray(g.rows))
+              .map((g) => ({ model: g.model as string, rows: g.rows }))
+          : [];
+        return sendJson(res, 200, await applyExternalImages(segments[2], groups, { final: body.final === true }));
       }
       if (segments.length === 5 && segments[3] === "model" && segments[4] === "more" && req.method === "POST") {
         return await handleFindMoreCandidates(segments[2], res);

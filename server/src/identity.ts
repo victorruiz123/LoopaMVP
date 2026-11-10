@@ -1,7 +1,7 @@
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 import type { IncomingMessage } from "node:http";
 import { isAdminEmail } from "./admin.js";
-import { userFromRequest } from "./supabaseAuth.js";
+import { AuthUnavailableError, userFromRequest } from "./supabaseAuth.js";
 
 /**
  * Vem ett anrop mot /api kommer ifrån.
@@ -180,7 +180,12 @@ export function guestFromRequest(req: IncomingMessage): Identity | null {
  * skillnaden mot hur den används på andra ställen, där ett okänt anrop får fortsätta som utloggat.
  */
 export async function identityFromRequest(req: IncomingMessage): Promise<Identity | null> {
-  const user = await userFromRequest(req);
+  let unavailable: AuthUnavailableError | null = null;
+  const user = await userFromRequest(req).catch((err) => {
+    if (err instanceof AuthUnavailableError) unavailable = err;
+    else throw err;
+    return null;
+  });
   if (user) return { id: user.id, kind: "user", email: user.email, isAdmin: isAdminEmail(user.email) };
 
   const header = req.headers["x-api-key"];
@@ -193,6 +198,9 @@ export async function identityFromRequest(req: IncomingMessage): Promise<Identit
   const guest = guestFromRequest(req);
   if (guest) return guest;
 
-  if (req.method === "GET") return userFromCookie(req);
+  const fromCookie = req.method === "GET" ? userFromCookie(req) : null;
+  if (fromCookie) return fromCookie;
+  // Ingen identitet, och orsaken var att Supabase inte gick att fråga: det är inget besked om att sessionen är ogiltig. Anroparen avgör (grinden svarar 503).
+  if (unavailable) throw unavailable;
   return null;
 }

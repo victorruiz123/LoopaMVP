@@ -14,9 +14,11 @@
 import path from "node:path";
 import { mkdir, writeFile } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
-import { createJob, getJob, jobDir, persist, watchJobDeadline } from "./jobStore.js";
+import { createJob, findJobByClientKey, getJob, jobDir, persist, watchJobDeadline } from "./jobStore.js";
 import { runConditionGrading } from "./pipeline/run.js";
 import { finalizeWithModel, runIdentify } from "./pipeline/identify.js";
+import { initialTasks, setTask } from "./pipeline/tasks.js";
+import { newJobCost } from "./cost/ledger.js";
 import { getImageDimensions } from "./imageUtils.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import type { CapturedImage, FurnitureIdentity } from "./types.js";
@@ -39,6 +41,15 @@ export interface CreateJobBody {
    * skanna åt sin motpart, och en främling ska inte kunna knyta en skanning till någon annans affär.
    */
   dealId?: string | null;
+  /** Klientens nyckel för den här uppladdningen. Samma nyckel från samma ägare ger tillbaka samma jobb — se findJobByClientKey. */
+  clientKey?: string | null;
+  /** PROTOTYP: identifieringen görs av appens webbvy mot Googles AI-läge och skickas in efteråt. Servern söker då inte själv. */
+  externalIdentify?: boolean;
+  /**
+   * PROTOTYP, bara tillsammans med externalIdentify: testläget som bara prövar identifieringen och måttsökningen. Ingen skickbedömning (ingen besiktning, inget omslagsurklipp)
+   * och inget pris — två betalda spår mindre per körning. Se handleCreateJob och appens flagga onlyIdentifySpecs.
+   */
+  identifyOnly?: boolean;
 }
 
 /**
@@ -88,8 +99,17 @@ export async function createConditionJob(
   if (!Array.isArray(body.images) || body.images.length === 0) {
     return { error: "At least one image is required" };
   }
+  const clientKey = body.clientKey?.trim().slice(0, 80) || null;
+  if (clientKey) {
+    const existing = findJobByClientKey(ownerId, clientKey);
+    if (existing) {
+      console.info(`[jobb] ${existing.id.slice(0, 8)} uppladdningen skickades om med samma nyckel — jobbet återanvänds, inget nytt betalt arbete startas`);
+      return { jobId: existing.id, imageCount: existing.images?.length ?? 0 };
+    }
+  }
   const identity = readIdentity(body);
   const job = await createJob(body.productContext ?? null, identity, ownerId, ownerEmail);
+  if (clientKey) job.clientKey = clientKey;
   // Märkningen sätts före allt annat skrivande, så att inget mellanläge finns där jobbet är
   // besiktigat men ännu inte känt som privat.
   if (dealId || adDerived) {
@@ -130,6 +150,13 @@ export async function createConditionJob(
   if (images.length === 0) return { error: "No valid images were decoded" };
 
   job.images = images;
+  // Kostnadsboken och uppgifternas startlägen skrivs INNAN något startar: det som körs direkt (skick, modellförslag) märks som körande, det som väntar på
+  // en bekräftad modell (specar, pris) som väntande. Ingen uppgift låtsas vara oberoende av det den beror på — se pipeline/tasks.ts.
+  job.cost = newJobCost();
+  job.tasks = initialTasks({
+    skipGrading,
+    identify: identity?.brand && !identity.model ? "run" : identity?.model ? "resolved" : "none",
+  });
   await persist(job);
 
   // EN klocka för hela jobbet, startad här. Den enda gräns som binder oavsett fas och oavsett hur
@@ -156,8 +183,15 @@ export async function createConditionJob(
   }
   if (identity?.brand && !identity.model) {
     job.identityStatus = "identifying";
-    await persist(job);
-    void runIdentify(job.id, identity.brand, images);
+    if (body.externalIdentify) {
+      // Inget eget modellsökande anrop: svaret kommer från klienten (externalIdentify.ts). Uppgiften står som pågående tills det kommer.
+      job.externalIdentify = true;
+      await persist(job);
+      await setTask(job.id, "identify", "running", { restart: true });
+    } else {
+      await persist(job);
+      void runIdentify(job.id, identity.brand, images);
+    }
   } else if (identity?.model) {
     // Säljaren angav modellen själv — hoppa identifieringen, gå direkt till annons och pris.
     job.identityStatus = "resolved";

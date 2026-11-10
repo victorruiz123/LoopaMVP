@@ -2,7 +2,20 @@ import type { ListingAttribute, ModelCandidate } from "./types.js";
 import { countDimensions, harvestSpecs } from "./specHarvest.js";
 
 import { fargerI, fargPaslag } from "./pipeline/farg.js";
+import { isMarketplace } from "./research/normalize.js";
 import { lokalKandidatbild, registreradKandidatbild, registreraKandidatbilder } from "./kandidatbild.js";
+import { bekraftarTyp, bildenVisarTypen, engelskTyp, motsagerTyp, typfamilj } from "./candidateType.js";
+
+/**
+ * Straffet för en sida som inte säger vilken TYP av möbel den handlar om, när kandidatens typ är känd. Kollektionssidan ("Stella furniture
+ * collection") handlar om modellen i alla utföranden och bär ofta en soffa som huvudbild; en återförsäljarsida med "armchair" i titeln
+ * gör det inte. Straffet ligger över märkets nivåer (1–3) men under allt annat: den obekräftade sidan används fortfarande när ingen bättre finns,
+ * och då prövas bilden själv (se pickImages).
+ */
+const TYP_OBEKRAFTAD = 6;
+
+/** Så många gånger modellnamnet måste stå i sidans text för att en sida som INTE nämner det i titel eller adress ska få låna ut sin bild. Se rankPages. */
+const MIN_BODY_MENTIONS = 3;
 
 /** En källa den grundade sökningen pekade ut. */
 export interface SourceRef {
@@ -258,6 +271,30 @@ export function extractBodyImages(html: string, finalUrl: string): string[] {
   return absolutiseAll(scanImgTags(html), finalUrl);
 }
 
+/** Så många av sidans bilder vi håller kvar för typvalet. En kategorisida har tjugo, en produktsida trettio. */
+const MAX_ALL_BODY_IMAGES = 60;
+
+/**
+ * ALLA bilder i sidans kropp, utan taket på fyra.
+ *
+ * Ett varumärkes kollektionssida har en huvudbild (hörnsoffan i vardagsrummet) och sedan ett galleri där filerna heter vad de visar:
+ * `IMPULSE_armchair_aniline_1_latte_2.webp`. Huvudbilden är sidans egen; galleriet ligger utanför de fyra första. När kandidatens typ är
+ * känd letar vi i hela galleriet efter den fil vars NAMN säger både modellen och typen (se rankPages) — det är bevis, till skillnad från
+ * en gissning om vilken av trettio bilder som är rätt.
+ */
+export function extractAllBodyImages(html: string, finalUrl: string): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of scanImgTags(html)) {
+    const url = absolutise(raw, finalUrl);
+    if (!url || seen.has(url)) continue;
+    seen.add(url);
+    out.push(url);
+    if (out.length >= MAX_ALL_BODY_IMAGES) break;
+  }
+  return out;
+}
+
 function normalise(s: string): string {
   return s.toLowerCase().normalize("NFKD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9]+/g, " ").trim();
 }
@@ -271,12 +308,16 @@ interface FetchedPage {
   title: string;
   /** Hela sidan, normaliserad — för att kunna se om modellen NÄMNS även utanför titeln. */
   body: string;
+  /** Bara sidans synliga text (utan taggar, attribut, skript och formatmallar), normaliserad. `body` räknar adresser och attribut med; en retailers logotyp-adress "casa-nova-einrichtungen" gav "Nova" tio träffar. */
+  text: string;
   /** Sidans utgående länkar, absoluta. En kategorisida är inte kandidatens sida, men den LÄNKAR dit. */
   links: PageLink[];
   /** Bilderna sidan själv pekar ut, bäst först. Tom lista = sidan deklarerade ingen bild. */
   images: string[];
   /** Bilderna i sidans kropp. Får bara användas när titeln nämner modellen — se rankPages. */
   bodyImages: string[];
+  /** ALLA bilder i kroppen (högst 60), för typvalet i rankPages: filen vars NAMN säger modellen och typen. Se extractAllBodyImages. */
+  bodyAll: string[];
   /** Måtten och materialet sidan själv skriver ut — lästa, inte gissade. Se specHarvest.ts. */
   specs: ListingAttribute[];
 }
@@ -410,6 +451,13 @@ const UA_BROWSER =
 const RETRY_STATUS = new Set([401, 403, 405, 406, 429, 503]);
 
 async function fetchPage(source: SourceRef): Promise<FetchedPage | null> {
+  /**
+   * ALDRIG BEGAGNATSAJTER. Blocket, Tradera, Facebook Marketplace och liknande förbjuder automatiserad
+   * hämtning i sina villkor, och en annons där visar någon annans möbel i någon annans hem — inte
+   * produkten. Googles verktyg får läsa dem för att AVGÖRA modellen; vår server hämtar dem aldrig, och
+   * en bild därifrån visas aldrig som "produktbild". Samma regel som research/verify.ts.
+   */
+  if (isMarketplace(source.url)) return fail(source, "begagnatsajt hämtas aldrig");
   let res: Response | null = null;
   let why = "okänt";
   for (const ua of [UA_CRAWLER, UA_BROWSER]) {
@@ -450,7 +498,7 @@ async function fetchPage(source: SourceRef): Promise<FetchedPage | null> {
   if (contentType.startsWith("image/")) {
     await res.body?.cancel().catch(() => {});
     const finalUrl = res.url || source.url;
-    return { source, finalUrl, title: "", body: normalise(finalUrl), links: [], images: [finalUrl], bodyImages: [], specs: [] };
+    return { source, finalUrl, title: "", body: normalise(finalUrl), links: [], images: [finalUrl], bodyImages: [], bodyAll: [], specs: [], text: "" };
   }
   if (!contentType.includes("text/html")) return fail(source, contentType.split(";")[0] || "okänd typ");
 
@@ -509,15 +557,18 @@ async function fetchPage(source: SourceRef): Promise<FetchedPage | null> {
   // brödtexten — en produktlista heter "Fåtöljer | Sits" i titeln men nämner Impulse i innehållet.
   // Att bara läsa titeln var därför att leta på fel ställe.
   const body = normalise(html);
+  const text = normalise(html.replace(/<(script|style|noscript)\b[\s\S]*?<\/\1>/gi, " ").replace(/<[^>]*>/g, " "));
 
   return {
     source,
     finalUrl,
     title,
     body,
+    text,
     links: extractLinks(html, finalUrl),
     images: extractImages(html, finalUrl),
     bodyImages: extractBodyImages(html, finalUrl),
+    bodyAll: extractAllBodyImages(html, finalUrl),
     specs: harvestSpecs(html, finalUrl),
   };
 }
@@ -547,12 +598,56 @@ const fetchSafely = (source: SourceRef): Promise<FetchedPage | null> =>
  * kandidat — och dess og:image är loggan. Kandidaten fick alltså en bild på allt utom sig själv.
  * Nämns modellen bara i innehållet måste sidan åtminstone vara en undersida.
  */
+/**
+ * En sökresultats- eller listsida: butikens egen träfflista, inte en produkt.
+ *
+ * Mätt i en riktig körning (2026-10-21): kandidaten Quattro fick sin "produktbild" och sitt material ur
+ * `folkhemmet.com/search?…&q=Quattro` — adressen BAR modellnamnet (det var frågan), så namnkontrollen släppte igenom den, och träfflistans
+ * första bild var solstolar. En träfflista handlar om allt som matchade; dess bilder och dess tabeller hör inte till någon enskild
+ * modell. Länkarna därifrån får fortfarande följas (hoppen), men sidan själv lånar aldrig ut något.
+ */
+export function isListingPage(url: string): boolean {
+  try {
+    const u = new URL(url);
+    if (/(?:^|[?&])(?:q|query|search|searchterm|keyword|keywords|text)=/i.test(u.search)) return true;
+    return u.pathname.split("/").some((seg) => /^(?:search|sok|sök|suche|recherche|zoeken|soek)$/i.test(seg));
+  } catch {
+    return false;
+  }
+}
+
 function isSiteRoot(url: string): boolean {
   try {
     return new URL(url).pathname.replace(/\/+$/, "") === "";
   } catch {
     return false;
   }
+}
+
+/** Vad en bildadress säger om bilden: sökvägen, inte värdnamnet ("sofa-world.com" säger inget om vad filen visar). */
+function bildText(u: string): string {
+  try {
+    return decodeURIComponent(new URL(u).pathname);
+  } catch {
+    return u;
+  }
+}
+
+/**
+ * Bilderna en sida ger en kandidat med känd typ: de vars FILNAMN säger typen först, de som säger en annan typ aldrig.
+ *
+ * Kollektionssidan (`/collection/impulse/`) har hörnsoffan som og:image men galleriet innehåller `IMPULSE_armchair_aniline_1_latte_2.webp`.
+ * Filer ur hela galleriet (`alla`) kommer med bara om namnet säger BÅDE modellen och typen — annars hade andra modellers bilder i en
+ * "liknande"-ruta kunnat komma med. Utan känd typ är urvalet exakt det som skickades in.
+ */
+function urvalEfterTyp(egna: string[], alla: string[], model: string, fam: ReturnType<typeof typfamilj>): string[] {
+  if (!fam) return egna;
+  const text = bildText;
+  const namnger = (u: string) => ` ${normalise(text(u))} `.includes(` ${model} `);
+  const typade = alla.filter((u) => bekraftarTyp(text(u), fam) && namnger(u));
+  const seen = new Set<string>();
+  const ordnade = [...typade, ...egna].filter((u) => !seen.has(u) && seen.add(u) && !motsagerTyp(text(u), fam));
+  return [...ordnade.filter((u) => bekraftarTyp(text(u), fam)), ...ordnade.filter((u) => !bekraftarTyp(text(u), fam))];
 }
 
 /**
@@ -577,10 +672,20 @@ export function rankPages(
   const others = rivals.map(normalise).filter((m) => m && m !== model);
   // Är kandidaten SJÄLV ett tillbehör är en tillbehörssida rätt sida, och straffet nedan gäller inte.
   const wantsAccessory = ACCESSORY.test(`${candidate.model} ${candidate.productType ?? ""}`);
+  const fam = typfamilj(candidate.productType);
   const hits: Ranked[] = [];
   for (const p of pages) {
     // En genväg vi själva byggt är ingen produktsida. Den finns här för sina länkars skull.
     if (p.source.linksOnly) continue;
+    // Inte heller en träfflista som en sökmotor lämnat ut: adressen bär modellnamnet, men sidan handlar om allt som matchade.
+    if (isListingPage(p.finalUrl)) continue;
+    /**
+     * TYPEN. En sida som säger "sofa" är ingen sida om en fåtölj, hur väl den än nämner modellen: dess bild och dess mått är soffans.
+     * Säger sidan ingenting om typen får den vara kvar, men sist bland dem som gör det (se TYP_OBEKRAFTAD).
+     */
+    const typText = `${p.title} ${p.finalUrl}`;
+    if (fam && motsagerTyp(typText, fam)) continue;
+    const typFel = fam && !bekraftarTyp(typText, fam) ? TYP_OBEKRAFTAD : 0;
     const titleNamed = normalise(p.title).includes(model);
     const named = titleNamed || normalise(p.finalUrl).includes(model);
     /**
@@ -591,7 +696,7 @@ export function rankPages(
      * att sidans TITEL nämner modellen. Skälet står i extractBodyImages — en adress kan bära
      * modellnamnet och ändå leda till en sortimentssida, och då är varje bild på den fel bild.
      */
-    const images = [...p.images, ...(titleNamed ? p.bodyImages : [])];
+    const images = urvalEfterTyp([...p.images, ...(titleNamed ? p.bodyImages : [])], titleNamed ? p.bodyAll : [], model, fam);
     /**
      * En sida utan bild sorteras SIST, men kastas inte.
      *
@@ -614,7 +719,7 @@ export function rankPages(
     const fargFel = fargPaslag(`${p.title} ${p.finalUrl}`, farg);
     // Nivå 1: modellen står i titeln eller adressen — sidan HANDLAR om den.
     if (named) {
-      hits.push({ page: p, images, rank: noImage + fargFel + accessory + (p.source.qualityTier ?? 3) });
+      hits.push({ page: p, images, rank: noImage + fargFel + accessory + typFel + (p.source.qualityTier ?? 3) });
       continue;
     }
     /**
@@ -626,8 +731,14 @@ export function rankPages(
      * en tom ruta, för bilden är det man väljer på; en tom ruta går fortfarande att klicka på.
      */
     const alsoNamesRivals = others.some((o) => p.body.includes(` ${o} `));
-    if (!isSiteRoot(p.finalUrl) && !alsoNamesRivals && p.body.includes(` ${model} `)) {
-      hits.push({ page: p, images, rank: noImage + fargFel + accessory + 10 + (p.source.qualityTier ?? 3) });
+    /**
+     * Och modellen ska NÄMNAS, inte bara förekomma. Mätt 2026-10-29: "Nova" fick en bild på Sits SIRI ur en Architonic-sida där ordet stod en enda gång — i
+     * återförsäljarnamnet "Casa Nova Einrichtungen" — och "Jenny" fick POLA. En produktsida om modellen säger namnet i rubrik, brödsmula, beskrivning och länkar;
+     * ett enstaka träffat ord är en tillfällighet. Tre gånger är lågt satt: en riktig modellsida klarar det med god marginal.
+     */
+    const mentions = p.text.split(` ${model} `).length - 1;
+    if (!isSiteRoot(p.finalUrl) && !alsoNamesRivals && mentions >= MIN_BODY_MENTIONS) {
+      hits.push({ page: p, images, rank: noImage + fargFel + accessory + typFel + 10 + (p.source.qualityTier ?? 3) });
     }
   }
   hits.sort((a, b) => a.rank - b.rank);
@@ -665,10 +776,18 @@ export function matchPage(
  * Den som ändå blev utan får sin bästa lediga sida efteråt, för måttens skull: en sida utan bild är
  * fortfarande kandidatens sida, och specifikationerna står där.
  */
-function assignPages(candidates: ModelCandidate[], pages: FetchedPage[], farg: string | null = null): Map<string, Ranked> {
+function assignPages(
+  candidates: ModelCandidate[],
+  pages: FetchedPage[],
+  farg: string | null = null,
+  /** Modell -> sidor vars bilder visade fel typ av möbel. De är prövade och förkastade, och kandidaten får gå vidare till nästa sida. */
+  utesluten: Map<string, Set<string>> = new Map(),
+): Map<string, Ranked> {
   const models = candidates.map((c) => c.model);
   const options = new Map<string, Ranked[]>();
-  for (const c of candidates) options.set(c.model, rankPages(c, pages, models, farg));
+  for (const c of candidates) {
+    options.set(c.model, rankPages(c, pages, models, farg).filter((r) => !utesluten.get(c.model)?.has(r.page.finalUrl)));
+  }
   // Den vars bästa sida är starkast får välja först. Parningen blir maximal oavsett ordning, men
   // ordningen avgör VILKEN maximal parning — och då ska den säkraste matchningen få sitt förstahandsval.
   const best = (m: string) => options.get(m)?.[0]?.rank ?? Number.MAX_SAFE_INTEGER;
@@ -737,6 +856,11 @@ export async function resolveCandidateImages(
    * identify.ts prövar om bilden när färgen väl är känd — då med färgen i frågan.
    */
   farg: string | null = null,
+  /**
+   * Läser och skriver registret. Av för appjobb (2026-11-03): där kommer korten bilder ur Googles bildsök (pipeline/identify.ts, applyExternalImages) som kontrollerats mer än den här jakten
+   * gör, och jaktens bilder (en andrahandsannons på secondhand.ikea.com, en kategorisidas stol) fick inte hamna i registret och visas dagar senare. Jakten körs ändå för sidornas mått.
+   */
+  register: boolean = true,
 ): Promise<ModelCandidate[]> {
   const deadline = Date.now() + budgetMs;
   /**
@@ -751,8 +875,9 @@ export async function resolveCandidateImages(
    * slutliga adress måste nämna modellen. En påhittad adress ger alltså ingen bild, inte fel bild.
    */
   const claimed: SourceRef[] = candidates
-    .filter((c) => c.sourceUrl && /^https?:\/\//i.test(c.sourceUrl))
-    .map((c) => ({ title: c.model, url: c.sourceUrl!, qualityTier: 2 as const }));
+    .flatMap((c) => [c.sourceUrl, ...(c.productPages ?? [])].map((url) => ({ c, url })))
+    .filter(({ url }) => !!url && /^https?:\/\//i.test(url) && !isMarketplace(url))
+    .map(({ c, url }) => ({ title: c.model, url: url!, qualityTier: 2 as const }));
   const seen = new Set<string>();
   const toFetch = [...sources, ...claimed].filter((s) => !seen.has(s.url) && seen.add(s.url));
 
@@ -776,9 +901,9 @@ export async function resolveCandidateImages(
    * Delresultatet skickas i samma andetag, före den första hämtningen. Annars låg bilderna färdiga i
    * minnet medan väljaren skimrade i väntan på att jakten skulle bli klar för de ANDRA kandidaterna.
    */
-  const franRegistret = await Promise.all(
-    candidates.map(async (c) => [c.model, await registreradKandidatbild(c.brand, c.model)] as const),
-  );
+  const franRegistret = register
+    ? await Promise.all(candidates.map(async (c) => [c.model, await registreradKandidatbild(c.brand, c.model, typfamilj(c.productType))] as const))
+    : [];
   /**
    * Registrets träffar hålls SKILDA från jaktens.
    *
@@ -809,7 +934,6 @@ export async function resolveCandidateImages(
       (pages.length ? `: ${pages.map((p) => `${p.title.slice(0, 40)}${p.images.length ? " [bild]" : ""}`).join(" | ")}` : ""),
   );
 
-  assigned = assignPages(candidates, pages, farg);
   /**
    * Modeller vars bild kommer från en sida som bekräftar färgen.
    *
@@ -820,7 +944,26 @@ export async function resolveCandidateImages(
   const bekraftad = new Set<string>();
   /** Adress -> är den bevisat död? Delas mellan rundorna, så ingen adress kontrolleras två gånger. */
   const checked = new Map<string, Promise<string | null>>();
-  await pickImages(candidates, assigned, picked, checked, farg, bekraftad, registrerade);
+  /** Modell -> sidor som visade fel typ av möbel. Fylls av pickImages; se assignPages. */
+  const utesluten = new Map<string, Set<string>>();
+  const antalAvslag = () => [...utesluten.values()].reduce((n, set) => n + set.size, 0);
+  /**
+   * Fördela sidorna och välj bilderna — om, tills ingen sida förkastas längre.
+   *
+   * En sida vars bild visar fel typ (kollektionssidans hörnsoffa) tas ur kandidatens val, och kandidaten ska då få sin NÄSTA sida direkt,
+   * inte först när något jakten-steg råkar hämta nya sidor. Varvet är begränsat: varje varv förkastar minst en sida, och sidorna är få.
+   */
+  const valj = async (): Promise<void> => {
+    for (let varv = 0; varv < 8; varv++) {
+      assigned = assignPages(candidates, pages, farg, utesluten);
+      picked.clear();
+      for (const [model, url] of registrerade) picked.set(model, url);
+      const fore = antalAvslag();
+      await pickImages(candidates, assigned, picked, checked, farg, bekraftad, registrerade, utesluten);
+      if (antalAvslag() === fore) return;
+    }
+  };
+  await valj();
 
   /**
    * Hoppen: kandidaten saknar bild, men någon av de hämtade sidorna LEDER till den.
@@ -881,12 +1024,9 @@ export async function resolveCandidateImages(
     // Nästa runda läser de NYA sidornas länkar först, och fyller på med de gamlas som inte fick plats
     // under taket förra rundan. Redan hämtade adresser står i `seen` och tas aldrig om.
     frontier = [...extra, ...pages];
-    assigned = assignPages(candidates, pages, farg);
     // Fördelningen kan ha flyttat sidor mellan kandidaterna, så valet görs om från grunden. Det
     // kostar inga nya anrop: varje redan kontrollerad bildadress ligger kvar i `checked`.
-    picked.clear();
-    for (const [model, url] of registrerade) picked.set(model, url);
-    await pickImages(candidates, assigned, picked, checked, farg, bekraftad, registrerade);
+    await valj();
   }
 
   const out = compose(candidates, assigned, picked, true);
@@ -895,9 +1035,11 @@ export async function resolveCandidateImages(
    * någon som står och tittar — men den här funktionen är redan klar när den anropas, så den kostar
    * ingenting att invänta här och felen syns i loggen i stället för att försvinna.
    */
-  await registreraKandidatbilder(
-    out.filter((c) => c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, url: c.imageUrl! })),
-  );
+  if (register) {
+    await registreraKandidatbilder(
+      out.filter((c) => c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, typ: typfamilj(c.productType), url: c.imageUrl! })),
+    );
+  }
   for (const c of out) {
     const page = assigned.get(c.model)?.page;
     if (!page) {
@@ -959,6 +1101,8 @@ async function pickImages(
   bekraftad: Set<string> = new Set(),
   /** Modeller som redan har en bild ur registret. De letas inte efter — se resolveCandidateImages. */
   registrerade: Map<string, string> = new Map(),
+  /** Modell -> sidor vars bilder visade fel typ av möbel. Fylls i här när varje bild på en obekräftad sida prövats och förkastats. */
+  utesluten: Map<string, Set<string>> = new Map(),
 ): Promise<void> {
   await Promise.all(
     candidates.map(async (c) => {
@@ -983,6 +1127,12 @@ async function pickImages(
        */
       if (picked.has(c.model) && !(sidanBekraftar && !bekraftad.has(c.model))) return;
       const options = hit.images.slice(0, MAX_IMAGE_CHECKS);
+      /**
+       * TYPEN, prövad på bilden. Texten (rankPages) avgör vilken SIDA som väljs; vilken BILD som visas avgör en titt på bilden själv: huvudmotivet ska vara kandidatens typ
+       * och ett foto — inte en måttritning, inte kollektionssidans hörnsoffa. Se candidateType.ts. Går kontrollen inte att göra behålls bilden.
+       */
+      const fam = typfamilj(c.productType);
+      let avvisadeFelTyp = 0;
       for (const url of options) {
         /**
          * HÄMTNINGEN ÄR KONTROLLEN.
@@ -1007,11 +1157,22 @@ async function pickImages(
         }
         const lokal = await hamtad;
         if (lokal) {
+          if (fam && (await bildenVisarTypen(lokal, fam)) === false) {
+            avvisadeFelTyp++;
+            console.info(`[bild] ${c.model}: bilden är inget foto av en ${c.productType} — ${url.slice(0, 80)}`);
+            continue;
+          }
           picked.set(c.model, lokal);
           if (sidanBekraftar) bekraftad.add(c.model);
           return;
         }
         console.info(`[bild] ${c.model}: gick inte att hämta — ${url.slice(0, 80)}`);
+      }
+      // Ingen av sidans bilder visade rätt typ: sidan lämnas, och kandidaten får nästa. En bild på en soffa är värre än en tom ruta.
+      if (avvisadeFelTyp > 0) {
+        const set = utesluten.get(c.model) ?? new Set<string>();
+        set.add(hit.page.finalUrl);
+        utesluten.set(c.model, set);
       }
     }),
   );
@@ -1181,7 +1342,9 @@ async function searchTargets(
        * och frågar bara märke och modell — samma trappa som förut: precis fråga först, större nät
        * sedan. Att köra bredare först hade gjort den smala frågan meningslös.
        */
-      const query = [c.brand, c.model, round === 0 ? c.productType : "", round === 0 ? (farg ?? "") : ""]
+      // Första omgången frågar på svenska ("fåtölj"), nästa på engelska ("armchair"): märkets återförsäljare finns i båda språken, och typen
+      // i frågan är det som skiljer fåtöljens sida från kollektionssidan med soffan (se candidateType.ts).
+      const query = [c.brand, c.model, round === 0 ? c.productType : engelskTyp(c.productType), round === 0 ? (farg ?? "") : ""]
         .filter((s) => s && s.trim())
         .join(" ")
         .trim();

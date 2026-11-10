@@ -74,6 +74,22 @@ const HAMTA_TIMEOUT_MS = 6000;
 const MIN_SIDA_PX = 200;
 
 /**
+ * Bredaste förhållandet (bredd / höjd) en produktbild får ha.
+ *
+ * Mätt i en riktig körning (2026-10-21, Sits): kandidaten Brandon fick som "produktbild" en 1200 × 630 pixlar bred reklambanner med
+ * tillverkarens logga och texten "Making furniture for people" — sidans og:image är bolagets, inte produktens. Produktbilder är
+ * kvadratiska, stående eller högst 3:2 (1,5); bannrar och hjältebilder är 1,9 eller bredare. 1,75 släpper igenom varje produktbild vi
+ * mätt och stoppar varje banner.
+ */
+export const MAX_BREDD_MOT_HOJD = 1.75;
+
+/** Duger en bild av den här storleken som produktbild? Ikoner och spårpixlar (MIN_SIDA_PX) och bannrar (MAX_BREDD_MOT_HOJD) gör det inte. */
+export function dugerSomProduktbild(width: number, height: number): boolean {
+  if (Math.max(width, height) < MIN_SIDA_PX) return false;
+  return width / Math.max(1, height) <= MAX_BREDD_MOT_HOJD;
+}
+
+/**
  * Taket för vad vi läser in. Produktbilder är sällan över några megabyte; en sida som skickar mer
  * skickar något annat än en bild, och den ska inte få äta minne medan den bevisar det.
  */
@@ -96,6 +112,16 @@ function filnamn(url: string): string {
  */
 const pagar = new Map<string, Promise<string | null>>();
 
+/** Går miniatyren på disken att läsa, och duger den som produktbild? Miniatyrens förhållande är källbildens (skalad med `fit: inside`). */
+async function miniatyrDuger(abs: string): Promise<boolean> {
+  try {
+    const m = await sharp(abs).metadata();
+    return dugerSomProduktbild(m.width ?? 0, m.height ?? 0);
+  } catch {
+    return false;
+  }
+}
+
 /**
  * Källadress in, lokal adress ut. Null när bilden inte gick att hämta eller inte var en bild.
  *
@@ -107,8 +133,9 @@ export async function lokalKandidatbild(url: string, referer: string | null = nu
   const namn = filnamn(url);
   const abs = path.join(kandidatbilderDir(), namn);
 
-  // Redan hämtad. Det vanliga fallet så fort en modell setts en gång tidigare.
-  if (existsSync(abs)) return `${URL_PREFIX}/${namn}`;
+  // Redan hämtad. Det vanliga fallet så fort en modell setts en gång tidigare — men en miniatyr som lades på disk innan bannerspärren
+  // fanns (eller en som skadats) ska inte få vara kvar: den prövas på samma villkor som en ny.
+  if (existsSync(abs) && (await miniatyrDuger(abs))) return `${URL_PREFIX}/${namn}`;
 
   const pagaende = pagar.get(namn);
   if (pagaende) return await pagaende;
@@ -160,8 +187,8 @@ async function hamta(url: string, referer: string | null, abs: string, namn: str
      */
     const bild = sharp(ra);
     const matt = await bild.metadata();
-    // Mätt storlek, inte påstådd. Se MIN_SIDA_PX.
-    if (Math.max(matt.width ?? 0, matt.height ?? 0) < MIN_SIDA_PX) return null;
+    // Mätt storlek, inte påstådd. Se MIN_SIDA_PX och MAX_BREDD_MOT_HOJD.
+    if (!dugerSomProduktbild(matt.width ?? 0, matt.height ?? 0)) return null;
 
     const miniatyr = await bild
       .resize(MINIATYR_PX, MINIATYR_PX, { fit: "inside", withoutEnlargement: true })
@@ -203,7 +230,20 @@ async function hamta(url: string, referer: string | null, abs: string, namn: str
  * MISSLYCKANDEN SPARAS INTE. En modell som inte gav någon bild i dag kan ge en i morgon, när sidan
  * finns eller sökmotorn svarar. Att skriva ned ett nej hade gjort en tillfällig tystnad permanent.
  */
-const REGISTER_FIL = () => path.join(kandidatbilderDir(), "register.json");
+/**
+ * `register.v4.json`, inte `register.v3.json`/`register.v2.json`: den första versionen bar bilder som valts utan bannerspärren och utan spärren mot
+ * sökresultatsidor (Sits Brandon fick en reklambanner, Sits Quattro solstolar från en butiks träfflista). Den andra bar bilder som valts
+ * utan att möbeltypen prövats (Sits Stella, Brandon, Quattro och Hugo — fåtöljer — stod med hörnsoffor, se candidateType.ts) och nycklades på
+ * märke och modell bara, så en modell som finns som både soffa och fåtölj delade en bild. Ett nytt namn gör att de gamla posterna slutar
+ * gälla utan att någon fil tas bort — modellerna letas upp på nytt, med reglerna som gäller nu. Den tredje levde några timmar och bar bilder som valts utan fotokontrollen
+ * (candidateType.ts): Sits Impulse stod med en måttritning.
+ */
+/**
+ * `register.v5.json` (2026-11-03): v4 bar bilder som valts före kontrollerna i candidateType.ts och externalImages.ts. Appens kort visade därför, dagar senare och utan ny kontroll, en
+ * andrahandsannons källarbild för IKEA NORRNÄS och matstolen för IKEA NORDVIKEN-BARSTOLEN. Ett nytt namn gör att alla gamla poster slutar gälla. Appens (Googles bildsök) poster ligger
+ * under egna nycklar ("g:…", se pipeline/identify.ts) och skrivs bara av bilder som klarat ALLA kontroller.
+ */
+const REGISTER_FIL = () => path.join(kandidatbilderDir(), "register.v5.json");
 
 let register: Map<string, string> | null = null;
 
@@ -212,8 +252,9 @@ export function slappKandidatbildsregister(): void {
   register = null;
 }
 
-function nyckel(brand: string | null | undefined, model: string): string {
-  return `${(brand ?? "").trim().toLowerCase()}|${model.trim().toLowerCase()}`;
+/** Typen är med i nyckeln när den är känd: Brandon som fåtölj och Brandon som soffa är två bilder. Okänd typ ger samma nyckel som förut. */
+function nyckel(brand: string | null | undefined, model: string, typ?: string | null): string {
+  return `${(brand ?? "").trim().toLowerCase()}|${model.trim().toLowerCase()}${typ ? `|${typ}` : ""}`;
 }
 
 async function laddaRegister(): Promise<Map<string, string>> {
@@ -236,26 +277,28 @@ async function laddaRegister(): Promise<Map<string, string>> {
 export async function registreradKandidatbild(
   brand: string | null | undefined,
   model: string,
+  typ?: string | null,
 ): Promise<string | null> {
-  const träff = (await laddaRegister()).get(nyckel(brand, model));
+  const träff = (await laddaRegister()).get(nyckel(brand, model, typ));
   if (!träff) return null;
   /**
    * Filen måste ligga kvar. Registret pekar på disk, och disken kan ha städats — en post som pekar
    * på en borttagen fil är värre än ingen post: den ger säljaren en trasig ruta i stället för ett
    * letande som hade kunnat lyckas.
    */
-  return existsSync(path.join(kandidatbilderDir(), path.basename(träff))) ? träff : null;
+  const fil = path.join(kandidatbilderDir(), path.basename(träff));
+  return existsSync(fil) && (await miniatyrDuger(fil)) ? träff : null;
 }
 
 /** Skriver ned det som hittats. Tyst vid fel: ett register som inte kan skrivas är en långsam nästa gång. */
 export async function registreraKandidatbilder(
-  poster: Array<{ brand: string | null | undefined; model: string; url: string }>,
+  poster: Array<{ brand: string | null | undefined; model: string; typ?: string | null; url: string }>,
 ): Promise<void> {
   const reg = await laddaRegister();
   let nytt = false;
   for (const p of poster) {
     if (!p.url.startsWith(URL_PREFIX)) continue;
-    const k = nyckel(p.brand, p.model);
+    const k = nyckel(p.brand, p.model, p.typ);
     if (reg.get(k) === p.url) continue;
     reg.set(k, p.url);
     nytt = true;

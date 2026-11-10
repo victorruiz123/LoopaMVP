@@ -42,6 +42,21 @@ export function bearerToken(req: IncomingMessage): string | null {
   return value.slice(7).trim() || null;
 }
 
+/**
+ * Supabase gick inte att fråga — nätet, en timeout, 5xx eller 429. Det är INTE samma sak som en ogiltig token: sessionen kan vara fullt giltig.
+ *
+ * Förut gav båda null, och grinden svarade 401 på båda. Klienten läser 401 som "sessionen är återkallad" och städar bort den lokala inloggningen, så ett hicka hos Supabase
+ * (eller en kall cache efter en omstart av servern) loggade ut säljaren mitt i uppladdningen. Nu skiljs de åt: ogiltig token → null (401), onåbart → detta fel (503).
+ */
+export class AuthUnavailableError extends Error {
+  constructor(public reason: string) {
+    super(`Supabase gick inte att fråga: ${reason}`);
+    this.name = "AuthUnavailableError";
+  }
+}
+
+const VERIFY_TIMEOUT_MS = 8_000;
+
 export async function userFromRequest(req: IncomingMessage): Promise<SupabaseUser | null> {
   const token = bearerToken(req);
   if (!token) return null;
@@ -49,19 +64,22 @@ export async function userFromRequest(req: IncomingMessage): Promise<SupabaseUse
   const hit = cache.get(token);
   if (hit && hit.expires > Date.now()) return hit.user;
 
+  let res: Response;
   try {
-    const res = await fetch(`${supabaseUrl()}/auth/v1/user`, {
+    res = await fetch(`${supabaseUrl()}/auth/v1/user`, {
       headers: { Authorization: `Bearer ${token}`, apikey: supabaseAnonKey() },
+      signal: AbortSignal.timeout(VERIFY_TIMEOUT_MS),
     });
-    if (!res.ok) return null;
-    const body = (await res.json()) as { id?: string; email?: string | null };
-    if (!body.id) return null;
-    const user: SupabaseUser = { id: body.id, email: body.email ?? null };
-    cache.set(token, { user, expires: Date.now() + TTL_MS });
-    return user;
-  } catch {
-    // Supabase onåbart. Anropet får gå vidare som utloggat i stället för att fällas — besiktningen
-    // är det som betyder något, och den ska inte stå still för att inloggningstjänsten hostar.
-    return null;
+  } catch (err) {
+    throw new AuthUnavailableError(err instanceof Error && err.name === "TimeoutError" ? "timeout" : "nätverksfel");
   }
+  // Tillfälligt hos Supabase: inte ett besked om tokens.
+  if (res.status === 429 || res.status >= 500) throw new AuthUnavailableError(`HTTP ${res.status}`);
+  // Allt annat som inte är 200 (400, 401, 403) är Supabases nej till just den här token.
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => ({}))) as { id?: string; email?: string | null };
+  if (!body.id) return null;
+  const user: SupabaseUser = { id: body.id, email: body.email ?? null };
+  cache.set(token, { user, expires: Date.now() + TTL_MS });
+  return user;
 }

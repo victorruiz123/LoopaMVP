@@ -35,7 +35,9 @@ import GratisPopup from "./components/GratisPopup";
 import { useAuth } from "./auth/AuthProvider";
 import ModelSearchWait from "./components/ModelSearchWait";
 import ListingBuildWait from "./components/ListingBuildWait";
-import { AuthRequiredError, claimGuestJobs, createJob, getJob, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
+import { AuthRequiredError, claimGuestJobs, createJob, fetchFurnitureType, getJob, postExternalIdentification, postExternalImages, postExternalSpecs, selectModel, findMoreModels, saveDisclosures, selectVariant, type CapturedShot, ensureMediaSession } from "./api";
+import { inApp, sendAllImages, type LoopaAppBridge } from "./lib/appBridge";
+import { syncSerpApiBridge } from "./lib/serpApiBridge";
 import { useJobPoll } from "./lib/useJobPoll";
 import { useT } from "./lib/i18n";
 import type { AdminUser, ConditionJob, ConditionResult, FurnitureIdentity, ModelCandidate } from "./types";
@@ -744,9 +746,14 @@ function StartingJob({
     const startadVid = Date.now();
     const kb = Math.round(shots.reduce((n, s) => n + s.dataUrl.length * 0.75, 0) / 1024);
     flode.mikro("skickar_in", { varde: shots.length });
-    createJob(shots, identity, dealId, avbryt.signal)
+    // Först: ska SerpApi-flödet användas för det här jobbet? Det avgör om jobbet märks som externt (createJob läser inApp()), så det måste vara avgjort innan jobbet skapas.
+    // Faller statusfrågan eller är flödet av tar uppladdningen den vanliga vägen (servern identifierar själv).
+    syncSerpApiBridge()
+      .then(() => createJob(shots, identity, dealId, avbryt.signal))
       .then(({ jobId }) => {
         flode.mikro("uppladdat", { varde: Math.round((Date.now() - startadVid) / 1000), detalj: `kb-${kb}` });
+        // Googles AI-läge frågas i bakgrunden medan säljaren går vidare; svaret går till servern. Görs inget om flödet inte är på.
+        startAiModeInApp(jobId, identity.brand ?? "", shots);
         onStarted(jobId);
       })
       .catch((err) => {
@@ -807,6 +814,98 @@ function StartingJob({
 /** Tidsgränsen för uppladdningen. Se StartingJob. */
 const UPPLADDNING_TAK_MS = 150_000;
 
+/** Hur länge väljarskärmen väntar på bildsökningen för modellkorten (SerpApi-flödet) innan korten visas som de är. */
+const EXTERNAL_IMAGES_WAIT_MS = 120_000;
+/**
+ * Hur länge modellkorten hålls tillbaka i väntan på bilderna innan de visas ändå. Se IdentifyGate. Att vänta i laddningsskärmen är mindre irriterande än kort som byter innehåll medan man tittar:
+ * bildsökning, nedladdning och bildkontroller tar ~50 s (fyra förslag).
+ */
+const REVEAL_CAP_MS = 90_000;
+
+/**
+ * SerpApi-flödet (och appskalet): skickar omslagsbilden (som standard bara den, se nedan) till Googles AI-läge i webbvyn och lämnar svaret till servern. Görs inget i den vanliga webben.
+ * Faller webbvyn får servern veta det, så att väljarskärmen visar ett ärligt tomt val i stället för att vänta för evigt.
+ *
+ * I ETAPPER, så att korten visas så tidigt som möjligt: identifieringen först (korten dyker upp när servern översatt svaret), och sedan, medan säljaren tittar på korten,
+ * referensbilderna (Googles bildsök, egen dold webbvy). Faller den gör servern det den gjorde förut (egen bildjakt).
+ *
+ * Variant, mått, material och nypris frågas INTE här: de gäller modellen säljaren VÄLJER, och frågan ställs först då (askSpecsForChoice, anropad av väljarskärmen). Förut frågades
+ * det för förslag 1 direkt, så att säljaren som valde en annan modell fick en betald sökning i stället för svaret (2026-11-02).
+ */
+function startAiModeInApp(jobId: string, brand: string, shots: CapturedShot[]) {
+  const app = window.loopaApp;
+  if (!app) return;
+  /**
+   * BARA OMSLAGSBILDEN till AI-läget (finns ingen, den skarpaste bilden). Mätt 2026-10-30, samma möbel, frågan "vilka Sits-fåtöljer kan det vara?", fyra körningar per rad:
+   * omslaget ensamt gav rätt modell FÖRST i 4 av 4; omslaget plus sex videoramar gav den bland de fyra i 4 av 4 men först i 1 av 4. Ramarna är lägre upplösning och visar
+   * möbeln delvis från sidorna, och AI-läget verkar väga dem lika tungt som det skarpa fotot. Videon används till annat (skickbedömningen, när den är på); inte till modellfrågan.
+   *
+   * Mätt igen 2026-11-01 på en annan möbel (en IKEA-barstol vars rätta modell, enligt säljaren, är en utgången INGEMAR; ramarna där 480×854 — lika små som videon de kommer ur), samma fråga,
+   * "INGEMAR bland de fyra förslagen": bara omslaget 9 av 11 körningar; omslaget plus en videoram 0 av 4; plus två ramar 0 av 4; plus alla sex 0 av 7. Alla sju bilderna kommer fram i
+   * AI-läget ("Du skickade: 7 bilder") — uppladdningen är inte felet, det är vad Google gör av dem. Vill man ändå skicka alla: LOOPA_AIMODE_ALL_IMAGES=1 när appen startas.
+   */
+  // Saknas omslaget (sex vinklar ur galleriet) tas den skarpaste bilden: den med flest bytes är den med mest detalj.
+  const cover = shots.find((s) => s.role === "cover") ?? shots.reduce<CapturedShot | undefined>((a, b) => (!a || b.dataUrl.length > a.dataUrl.length ? b : a), undefined);
+  const ordered = cover ? (sendAllImages() ? [cover, ...shots.filter((s) => s !== cover)] : [cover]) : [];
+  void (async () => {
+    let items: Array<{ model: string; productType: string | null; undertyp?: string | null }>;
+    try {
+      // Bilderna läggs in i AI-läget (cirka 10 s) medan servern läser vilken sorts möbel det är (cirka 3 s): frågan kan då säga "vilka Sits-fåtöljer", som är det som ger rätt förslag.
+      const typeP = fetchFurnitureType(jobId).catch(() => null);
+      await app.prepare({ images: ordered.map((s) => s.dataUrl) });
+      const r = await app.identify({ brand, furnitureType: await typeP });
+      // `imagesPending`: bildsökningen nedan är på väg, så väljarskärmen väntar på den även om serverns egen bildjakt hunnit ge upp.
+      ({ items } = await postExternalIdentification(jobId, { answer: r.answer, links: r.links, imagesPending: true }));
+    } catch (err) {
+      console.warn("[loopa-app] AI-läget gav inget svar:", err);
+      void postExternalIdentification(jobId, { failed: err instanceof Error ? err.message : String(err) }).catch(() => undefined);
+      return;
+    }
+    // Måttfrågan ställs INTE här. Den ställs först när säljaren valt modell (askSpecsForChoice): varianten, måtten, materialet och nypriset gäller DEN modellen, inte förslag 1.
+    // Alla modeller hade redan en kontrollerad bild i registret: ingen sökning behövs (servern lämnar bara de som saknar bild).
+    if (items.length > 0) void findReferenceImages(app, jobId, brand, items);
+  })();
+}
+
+/**
+ * Referensbilderna till korten, ur Googles bildsök. Modeller som inte fick någon godkänd bild får ETT andra försök med en annan sökfråga ("… produktbild") innan väljarskärmen
+ * slutar vänta. Faller sökningen helt meddelas servern ändå (en tom lista), så att skärmen inte väntar på bilder som aldrig kommer. Säljarens egen bild används aldrig i stället.
+ */
+async function findReferenceImages(app: LoopaAppBridge, jobId: string, brand: string, items: Array<{ model: string; productType: string | null; undertyp?: string | null }>) {
+  try {
+    const first = await app.findImages({ brand, queries: items });
+    // Bildkedjan (SerpApi-flödet): det här är den enda och slutgiltiga bildsökningen. Servern kör steg B (Gemini med webbsök) för de modeller som fortfarande saknar bild och släpper väntan när allt är klart.
+    if (app.flags?.referenceChain) {
+      await postExternalImages(jobId, first, true);
+      return;
+    }
+    const { none } = await postExternalImages(jobId, first, false);
+    const again = items.filter((i) => none.includes(i.model));
+    if (again.length === 0) return;
+    const second = await app.findImages({ brand, queries: again.map((i) => ({ ...i, retry: true })) });
+    await postExternalImages(jobId, second, true);
+  } catch (err) {
+    console.warn("[loopa-app] bildsökningen gav inget:", err);
+    void postExternalImages(jobId, [], true).catch(() => undefined);
+  }
+}
+
+/**
+ * Säljaren har valt modell i appen: AI-läget (samma samtal som identifieringen) får avgöra vilken EXAKT variant det är ur bilderna och ange mått, material och nypris för just den.
+ * Svaret går till servern, där specsteget redan väntar på det (selectModel med externalSpecs). Faller frågan meddelas servern ändå, så att den går sin egen väg direkt.
+ */
+function askSpecsForChoice(jobId: string, brand: string, model: string, furnitureType: string | null) {
+  const app = window.loopaApp;
+  if (!app) return;
+  void app
+    .askSpecs({ brand, model, furnitureType })
+    .then((s) => postExternalSpecs(jobId, { answer: s.answer, links: s.links, model }))
+    .catch((err) => {
+      console.warn("[loopa-app] måttfrågan gav inget svar:", err);
+      void postExternalSpecs(jobId, { failed: err instanceof Error ? err.message : String(err), model }).catch(() => undefined);
+    });
+}
+
 /** Väntar in identifieringen och visar kandidaterna. Hoppas över när den kunde avgöra modellen själv. */
 function IdentifyGate({
   jobId,
@@ -831,20 +930,74 @@ function IdentifyGate({
   /** Bryggar glappet mellan trycket på "hitta nya" och serverns besked om att sökningen börjat. */
   const [starting, setStarting] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
-  const { job, gaveUp, failed } = useJobPoll(
+  /** När väljarskärmen först såg att bildsökningen (SerpApi-flödet) var på väg. Se väntans tak nedan. */
+  const imagesPendingSince = useRef<number | null>(null);
+  const { job, gaveUp, failed: jobFailed } = useJobPoll(
     jobId,
     // Slutar först när bilderna landat också — annars stannar pollningen i samma ögonblick som
     // kandidaterna kommer, och bilderna som hämtas strax efter når aldrig skärmen.
-    (j) =>
-      j.identityStatus === "unavailable" ||
-      j.identityStatus === "resolved" ||
-      (j.identityStatus === "needs_selection" && (j.candidates ?? []).every((c) => c.imageUrl !== undefined)),
+    (j) => {
+      // Bildsökningen är på väg: ett kort med `imageUrl: null` från serverns egen bildjakt är inte "ingen bild" än. Väntan har ett tak, så att en sökning som aldrig svarar inte håller skärmen.
+      if (j.externalImagesPending) imagesPendingSince.current ??= Date.now();
+      const imagesPending = !!j.externalImagesPending && Date.now() - (imagesPendingSince.current ?? Date.now()) < EXTERNAL_IMAGES_WAIT_MS;
+      return (
+        j.identityStatus === "unavailable" ||
+        j.identityStatus === "resolved" ||
+        (j.identityStatus === "needs_selection" && !imagesPending && (j.candidates ?? []).every((c) => c.imageUrl !== undefined))
+      );
+    },
     // Tätare än standardintervallet. Det här är den enda skärm där pollningen ÄR väntan: kandidaterna
     // ligger färdiga på servern och syns först vid nästa hämtning, så halva intervallet är halva den
     // sista fördröjningen. Ett jobb som identifieras är kortlivat, så det blir ett fåtal extra GET.
     600,
     searchKey,
+    // SerpApi-flödet: skickbedömningen är en egen uppgift, och att den föll får inte stoppa väntan på modellerna.
+    inApp(),
   );
+  const failed = jobFailed && !inApp();
+
+  /**
+   * SerpApi-flödet: modellkorten visas inte förrän bilderna är klara OCH inladdade i webbläsaren — annars står korten och skimrar och bilder poppar in en och en. Under tiden visar
+   * skärmen samma väntan som under modellsökningen. Tak: efter REVEAL_CAP_MS från att korten fanns visas de ändå, med det som saknas som tomma rutor, så att en bildsökning som aldrig
+   * svarar inte håller säljaren från att välja. Bara när flödet är på: annars visas korten som förut.
+   */
+  const cardsSeenAt = useRef<number | null>(null);
+  const hasCards = job?.identityStatus === "needs_selection" && (job.candidates?.length ?? 0) > 0;
+  if (hasCards) cardsSeenAt.current ??= Date.now();
+  else cardsSeenAt.current = null;
+  const imagesSettled = hasCards && !job!.externalImagesPending && job!.candidates!.every((c) => c.imageUrl !== undefined);
+  const imageUrls = hasCards ? job!.candidates!.map((c) => c.imageUrl).filter((u): u is string => !!u) : [];
+  const imageKey = imageUrls.join("|");
+  const [preloadedKey, setPreloadedKey] = useState<string | null>(null);
+  useEffect(() => {
+    if (!inApp() || !imagesSettled) return;
+    let alive = true;
+    const urls = imageKey ? imageKey.split("|") : [];
+    // Varje bild laddas in i webbläsarens cache (samma adress som kortet använder). Ett fel eller 6 s räknas som klart: en trasig bild ska inte hålla kvar skärmen.
+    void Promise.all(
+      urls.map(
+        (u) =>
+          new Promise<void>((resolve) => {
+            const img = new Image();
+            img.onload = img.onerror = () => resolve();
+            window.setTimeout(resolve, 6000);
+            img.src = u;
+          }),
+      ),
+    ).then(() => alive && setPreloadedKey(imageKey));
+    return () => {
+      alive = false;
+    };
+  }, [imagesSettled, imageKey]);
+  const overRevealCap = cardsSeenAt.current !== null && Date.now() - cardsSeenAt.current > REVEAL_CAP_MS;
+  const holdForImages = inApp() && hasCards && !overRevealCap && !(imagesSettled && preloadedKey === imageKey);
+  // Efter taket ska skärmen ändå ritas om vid sin tid (en ny ritning krävs, pollningen går vidare till alla har besked).
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!inApp() || !hasCards || overRevealCap) return;
+    const id = window.setTimeout(() => setTick((n) => n + 1), Math.max(0, REVEAL_CAP_MS - (Date.now() - (cardsSeenAt.current ?? Date.now()))) + 50);
+    return () => window.clearTimeout(id);
+  }, [hasCards, overRevealCap]);
 
   // Servern flippar jobbet till sökläge INNAN den svarar, så det beskedet är allt som behövs för att
   // lämna över väntan till pollningen.
@@ -875,7 +1028,12 @@ function IdentifyGate({
     // Servern svarar 202 och arbetar vidare i bakgrunden; specifikationsskärmen pollar själv. Att
     // vänta in hela annonsen här hade gjort valet till en tyst paus på tjugo sekunder.
     try {
-      await selectModel(jobId, choice);
+      // SerpApi-flödet: AI-läget frågas först NU, för modellen som valdes. Servern får veta det (externalSpecs) innan annonsen börjar byggas, och väntar på svaret.
+      const model = choice.candidate?.model ?? choice.manualModel ?? null;
+      const viaApp = inApp() && !!model;
+      await selectModel(jobId, choice, viaApp ? { externalSpecs: true } : {});
+      // Möbeltypen: kandidatens egen, annars den servern redan läst ur omslagsbilden (ett handskrivet namn har ingen kandidat; svaret är redan sparat, så det kostar inget).
+      if (viaApp) askSpecsForChoice(jobId, identity.brand ?? "", model!, choice.candidate?.productType ?? (await fetchFurnitureType(jobId).catch(() => null)));
     } catch (err) {
       /**
        * VALET KAN FALLA, och gjorde förut det tyst: anropet saknade felhantering, skärmen stod kvar
@@ -900,7 +1058,7 @@ function IdentifyGate({
   // En misslyckad identifiering ska kosta ett handgrepp, inte en omstart.
   const stalled = gaveUp || failed || job?.identityStatus === "unavailable";
   const round = job?.candidateRound ?? 0;
-  if (starting || (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus))) {
+  if (starting || holdForImages || (!stalled && (!job || job.identityStatus === "identifying" || !job.identityStatus))) {
     // Samma väntan, annan mening: första gången letas modellen upp, sedan letas den vidare bland de
     // som blir kvar. Skärmen — laddaren, rubriken och jämförelsen "Sälja själv / Med Loopa" — bor i
     // ModelSearchWait, så att förhandsvyn (wait.html) kan rita exakt det säljaren ser.
@@ -915,6 +1073,9 @@ function IdentifyGate({
   // Ett fallet omval säger det med en rad, inte med en tom skärm: säljaren ska veta varför de inte
   // fick några nya förslag.
   const note = searchError ?? (stalled ? null : job?.identityError ?? null);
+  // Medan bildsökningen är på väg skimrar ett kort som serverns egen bildjakt gav upp på, i stället för att visa "Ingen bild" som sedan byts mot en bild.
+  const waitingForImages = !!job?.externalImagesPending && Date.now() - (imagesPendingSince.current ?? Date.now()) < EXTERNAL_IMAGES_WAIT_MS;
+  const candidates = (job?.candidates ?? []).map((c) => (waitingForImages && c.imageUrl === null ? { ...c, imageUrl: undefined } : c));
   return (
     <>
       <Mikro namn="valjer_modell" />
@@ -931,7 +1092,7 @@ function IdentifyGate({
       )}
       <ModelSelectScreen
         brand={identity.brand}
-        candidates={job?.candidates ?? []}
+        candidates={candidates}
         round={round}
         // Bilderna fylls i av pollningen ovan, och den slutar när den fått sitt sista besked eller
         // gett upp. Efter det ska ingen ruta stå och skimra som om något vore på väg.

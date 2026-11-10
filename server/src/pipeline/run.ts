@@ -12,6 +12,8 @@ import { dedupeDamages } from "./dedup.js";
 import { gradeCondition } from "./grade.js";
 import { coverFirst, pickCoverImageId } from "./cover.js";
 import { byggOmslag } from "./bild/omslag.js";
+import { withCostScope } from "../cost/jobCost.js";
+import { setTask } from "./tasks.js";
 
 /**
  * Runs the full ConditionInput -> ConditionResult pipeline. AT MOST 2 Gemini calls: one main inspection
@@ -67,12 +69,23 @@ export function tillBedomning(images: CapturedImage[]): CapturedImage[] {
   return bedomda.length > 0 ? bedomda : images;
 }
 
-export async function runConditionGrading(
+export function runConditionGrading(
   jobId: string,
   images: CapturedImage[],
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
 ): Promise<void> {
+  // Allt betalt som körs härunder bokförs på jobbet som skicksteg (cost/jobCost.ts).
+  return withCostScope({ jobId, stage: "condition" }, () => runConditionGradingInner(jobId, images, productContext, identity));
+}
+
+async function runConditionGradingInner(
+  jobId: string,
+  images: CapturedImage[],
+  productContext: string | null,
+  identity: FurnitureIdentity | null,
+): Promise<void> {
+  await setTask(jobId, "condition", "running", { restart: true });
   const dir = jobDir(jobId);
   const startedAt = Date.now();
   const timer = new StageTimer();
@@ -235,6 +248,7 @@ export async function runConditionGrading(
     // Publiceras UTAN att vänta in annonsen. Skicket och priset är färdiga; att hålla dem inne tills
     // annonsen är klar hade gjort den långsammaste av tre parallella grenar till allas tempo.
     await completeJob(jobId, result);
+    await setTask(jobId, "condition", "completed");
     timer.lap("price_publish");
 
     const trace: DebugTrace = {
@@ -276,6 +290,7 @@ export async function runConditionGrading(
       error: JSON.stringify(err instanceof Error ? err.message.slice(0, 90) : String(err).slice(0, 90)),
     });
     await failJob(jobId, err instanceof Error ? err.message : String(err));
+    await setTask(jobId, "condition", "failed", { note: err instanceof Error ? err.message.slice(0, 160) : String(err).slice(0, 160) });
   }
 }
 

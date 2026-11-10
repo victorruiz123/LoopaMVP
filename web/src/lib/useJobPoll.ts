@@ -11,7 +11,17 @@ import type { ConditionJob } from "../types";
  */
 const CLIENT_GIVE_UP_MS = 300_000;
 
-export function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean, intervalMs = 1200, restartKey = 0) {
+export function useJobPoll(
+  jobId: string,
+  done: (job: ConditionJob) => boolean,
+  intervalMs = 1200,
+  restartKey = 0,
+  /**
+   * Modellväntan (IdentifyGate) pollar jobbet för modellsökningen, medan skickbedömningen är en egen uppgift. Att skickbedömningen föll (`progress.stage === "error"`) får då inte stoppa
+   * pollningen: modellsökningen kan fortfarande ge svar. Anroparen avgör själv när det är klart (`done`).
+   */
+  ignoreError = false,
+) {
   const [job, setJob] = useState<ConditionJob | null>(null);
   const [gaveUp, setGaveUp] = useState(false);
   useEffect(() => {
@@ -24,7 +34,7 @@ export function useJobPoll(jobId: string, done: (job: ConditionJob) => boolean, 
         if (cancelled) return;
         setJob(j);
         // Ett fällt jobb är ett svar. Att fortsätta polla på det är att snurra på ett dött jobb.
-        if (j.progress.stage === "error" || done(j)) return;
+        if ((!ignoreError && j.progress.stage === "error") || done(j)) return;
         setTimeout(poll, intervalMs);
       } catch {
         if (!cancelled) setTimeout(poll, 2000);

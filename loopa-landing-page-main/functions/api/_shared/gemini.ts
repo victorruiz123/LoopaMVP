@@ -54,7 +54,12 @@ export const FAST_REVIEW_MODEL = 'gemini-3.5-flash-lite'
  * centrally here rather than by each call site, so it can't be forgotten on
  * a new endpoint.
  */
-const SERVICE_TIER = 'priority'
+/**
+ * Standardnivån (fältet utelämnas). Förut 'priority', som kostar 1,8 gånger standardpriset på varje token (ai.google.dev/gemini-api/docs/pricing,
+ * 2026-10-23) för en snabbare kö. Annonstexten byggs numera medan säljaren gör annat i flödet, så kön är ingen väntan någon står och tittar på —
+ * och omgången har ett kostnadstak (server/src/cost/ledger.ts). Sätt 'priority' här för att få tillbaka den.
+ */
+const SERVICE_TIER: string | undefined = undefined
 
 /**
  * VAD som gick fel, inte bara om det får göras om.
@@ -66,6 +71,41 @@ const SERVICE_TIER = 'priority'
  *
  * Anroparen kan inte skilja dem åt på `retryable` — båda är sanna — så den får skilja dem åt här.
  */
+/**
+ * Mottagare för vad varje lyckat anrop kostade. Sätts av värden — Node-servern (server/src/listing.ts) kopplar den till kostnadsboken; på
+ * Cloudflare lämnas den tom och ingenting händer. Generatorn känner inte till jobb eller budgetar.
+ */
+export interface GeminiUsage {
+  model: string
+  serviceTier: string
+  inputTokens: number
+  outputTokens: number
+  thoughtTokens: number
+  /** Sökfrågor modellen körde (grounding), räknade ur svaret. */
+  searchQueries: number
+}
+let usageListener: ((u: GeminiUsage) => void) | null = null
+export function setGeminiUsageListener(fn: ((u: GeminiUsage) => void) | null): void {
+  usageListener = fn
+}
+function reportUsage(model: string, parsed: any): void {
+  if (!usageListener) return
+  try {
+    const m = parsed?.usageMetadata ?? {}
+    usageListener({
+      model,
+      serviceTier: SERVICE_TIER ?? 'standard',
+      // Verktygsresultat (sökträffar, hämtade sidor) faktureras som indata.
+      inputTokens: (m.promptTokenCount ?? 0) + (m.toolUsePromptTokenCount ?? 0),
+      outputTokens: m.candidatesTokenCount ?? 0,
+      thoughtTokens: m.thoughtsTokenCount ?? 0,
+      searchQueries: parsed?.candidates?.[0]?.groundingMetadata?.webSearchQueries?.length ?? 0,
+    })
+  } catch {
+    /* mätningen får aldrig fälla ett anrop */
+  }
+}
+
 export type GeminiFailureKind = 'http' | 'timeout' | 'deadline' | 'network'
 
 export class GeminiCallError extends Error {
@@ -110,7 +150,7 @@ async function callGeminiOnce(
     ? `${gatewayUrl.replace(/\/$/, '')}/google-ai-studio/v1beta/models/${model}:generateContent`
     : `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`
 
-  const requestBody = { ...(body as Record<string, unknown>), serviceTier: SERVICE_TIER }
+  const requestBody = { ...(body as Record<string, unknown>), ...(SERVICE_TIER ? { serviceTier: SERVICE_TIER } : {}) }
 
   const controller = new AbortController()
   // An externally-supplied signal (the seller pipeline's single overall
@@ -136,6 +176,7 @@ async function callGeminiOnce(
       throw new GeminiCallError(`gemini ${model} ${res.status}: ${text.slice(0, 300)}`, isRetryableStatus(res.status), 'http', res.status)
     }
     const parsed = await res.json()
+    reportUsage(model, parsed)
     console.log(`[gemini] model=${model} outcome=ok ms=${Date.now() - startedAt} out_tokens=${(parsed as any)?.usageMetadata?.candidatesTokenCount ?? '?'} in_tokens=${(parsed as any)?.usageMetadata?.promptTokenCount ?? '?'}`)
     return parsed
   } catch (err) {

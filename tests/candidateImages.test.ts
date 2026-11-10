@@ -16,8 +16,9 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { createRequire } from "node:module";
-import { resolveCandidateImages, type SourceRef } from "../server/src/candidateImages.js";
-import { slappKandidatbildsregister } from "../server/src/kandidatbild.js";
+import { isListingPage, resolveCandidateImages, type SourceRef } from "../server/src/candidateImages.js";
+import { dugerSomProduktbild, lokalKandidatbild, registreradKandidatbild, slappKandidatbildsregister } from "../server/src/kandidatbild.js";
+import { bekraftarTyp, engelskTyp, familjerI, glomBildtypsavgoranden, motsagerTyp, settBildtypKontroll, typfamilj } from "../server/src/candidateType.js";
 import type { ModelCandidate } from "../server/src/types.js";
 
 const IMAGE = "image/jpeg";
@@ -60,6 +61,8 @@ function lokal(url: string): string {
 
 interface Reply {
   body?: string;
+  /** Bytes för en bildadress, om de ska vara något annat än den vanliga produktbilden (till exempel en bred banner). */
+  bytes?: Buffer;
   status?: number;
   type?: string;
   /** Sidan svarar 403 på allt som inte ser ut som en webbläsare. */
@@ -120,7 +123,7 @@ async function withWeb(routes: Record<string, Reply>, fn: (calls: string[]) => P
     }
     const type = reply.type ?? "text/html";
     // En bildadress lämnar ut riktiga bytes; allt annat sin text. Se BILDBYTES.
-    const kropp = method === "HEAD" ? null : type.startsWith("image/") ? BILDBYTES : (reply.body ?? "");
+    const kropp = method === "HEAD" ? null : type.startsWith("image/") ? (reply.bytes ?? BILDBYTES) : (reply.body ?? "");
     return new Response(kropp, { status: reply.status ?? 200, headers: { "content-type": type } });
   }) as unknown as typeof fetch;
   try {
@@ -545,4 +548,320 @@ test("när tiden är ute får den som saknar bild ett nej, inte fortsatt väntan
       );
     },
   );
+});
+
+// ─── Produktsidor ur forskningen, och aldrig en begagnatsajt ──────────────────
+
+test("modellens egna produktsidor används — och en begagnatannons hämtas aldrig, hur bra bilden än vore", async () => {
+  const katalog = `<html><head><title>NORRNÄS stol | Retro Katalog</title>
+    <meta property="og:image" content="https://retro.se/media/norrnas.jpg"></head><body><h1>NORRNÄS stol</h1></body></html>`;
+  const annons = `<html><head><title>IKEA NORRNÄS stolar | Tradera</title>
+    <meta property="og:image" content="https://img.tradera.net/norrnas-i-nagons-hem.jpg"></head><body>IKEA NORRNÄS</body></html>`;
+  await withWeb(
+    {
+      "https://retro.se/katalog/norrnas": { body: katalog },
+      "https://retro.se/media/norrnas.jpg": { type: IMAGE },
+      "https://www.tradera.com/item/1/ikea-norrnas": { body: annons },
+      "https://img.tradera.net/norrnas-i-nagons-hem.jpg": { type: IMAGE },
+    },
+    async (calls) => {
+      const c0: ModelCandidate = {
+        ...candidate("NORRNÄS"),
+        brand: "IKEA",
+        sourceUrl: "https://www.tradera.com/item/1/ikea-norrnas",
+        productPages: ["https://retro.se/katalog/norrnas", "https://www.blocket.se/annons/x/ikea-norrnas"],
+      };
+      const [c] = await resolveCandidateImages([c0], []);
+      assert.equal(c.imageUrl, lokal("https://retro.se/media/norrnas.jpg"));
+      assert.equal(c.imageSource, "https://retro.se/katalog/norrnas");
+      assert.ok(!calls.some((x) => /tradera|blocket/.test(x)), `begagnatsajter hämtades: ${calls.filter((x) => /tradera|blocket/.test(x)).join(", ")}`);
+    },
+  );
+});
+
+test("finns bara en begagnatannons att gå på blir svaret 'ingen bild' (null) — aldrig en bild ur någon annans hem, aldrig 'letar'", async () => {
+  const annons = `<html><head><title>IKEA NORRNÄS stolar | Tradera</title>
+    <meta property="og:image" content="https://img.tradera.net/x.jpg"></head><body>IKEA NORRNÄS</body></html>`;
+  await withWeb(
+    {
+      "https://www.tradera.com/item/1/ikea-norrnas": { body: annons },
+      "https://img.tradera.net/x.jpg": { type: IMAGE },
+    },
+    async (calls) => {
+      const [c] = await resolveCandidateImages(
+        [{ ...candidate("NORRNÄS"), brand: "IKEA", sourceUrl: "https://www.tradera.com/item/1/ikea-norrnas" }],
+        [],
+        undefined,
+        2_000,
+      );
+      assert.equal(c.imageUrl, null, "null = ingen bild hittades; undefined hade fått rutan att skimra för evigt");
+      assert.ok(!calls.some((x) => /tradera\.(com|net)/.test(x)));
+    },
+  );
+});
+
+// ─── Bilder som inte är produktbilder ────────────────────────────────────────────────────────────
+//
+// Mätt i en riktig körning (2026-10-21, Sits): Brandon fick en reklambanner med tillverkarens logga och Quattro solstolar ur en butiks
+// träfflista. Ingen av dem var en bild av möbeln, och ingenting jämförde dem någonsin med säljarens. Spärrarna nedan är billiga och
+// bygger inte på något anrop till modellen: en bred banner är ingen produktbild, och en träfflista är ingen produktsida.
+
+const BANNER = await sharp({ create: { width: 1200, height: 630, channels: 3, background: { r: 230, g: 225, b: 215 } } }).jpeg().toBuffer();
+
+test("bannerspärren: en bild bredare än 1,75 gånger sin höjd duger inte som produktbild, en 3:2-bild och en stående gör det", () => {
+  assert.equal(dugerSomProduktbild(1200, 630), false, "1,9: en reklambanner");
+  assert.equal(dugerSomProduktbild(1920, 1080), false, "1,78: en hjältebild");
+  assert.equal(dugerSomProduktbild(900, 600), true, "1,5: en vanlig produktbild");
+  assert.equal(dugerSomProduktbild(600, 900), true, "stående");
+  assert.equal(dugerSomProduktbild(500, 500), true, "kvadratisk");
+  assert.equal(dugerSomProduktbild(150, 150), false, "en ikon");
+});
+
+test("en sidas bannerbild lånas inte ut — nästa bild på sidan får chansen", async () => {
+  const produkt = `<html><head><title>Brandon fåtölj | Butiken</title>
+    <meta property="og:image" content="https://butiken.se/img/sits-banner.jpg"></head>
+    <body><img src="https://butiken.se/img/brandon-fatolj.jpg" width="600" height="450" alt="Brandon fåtölj"></body></html>`;
+  await withWeb(
+    {
+      "https://butiken.se/p/brandon-fatolj": { body: produkt },
+      "https://butiken.se/img/sits-banner.jpg": { type: IMAGE, bytes: BANNER },
+      "https://butiken.se/img/brandon-fatolj.jpg": { type: IMAGE },
+    },
+    async () => {
+      const [c] = await resolveCandidateImages([{ ...candidate("Brandon"), sourceUrl: "https://butiken.se/p/brandon-fatolj" }], []);
+      assert.equal(c.imageUrl, lokal("https://butiken.se/img/brandon-fatolj.jpg"), "produktbilden, inte bannern");
+    },
+  );
+});
+
+test("finns bara en banner att gå på blir svaret 'ingen bild' (null) — hellre säljarens egen bild än en reklambanner", async () => {
+  const produkt = `<html><head><title>Brandon fåtölj | Butiken</title>
+    <meta property="og:image" content="https://butiken.se/img/sits-banner.jpg"></head><body></body></html>`;
+  await withWeb(
+    {
+      "https://butiken.se/p/brandon-fatolj": { body: produkt },
+      "https://butiken.se/img/sits-banner.jpg": { type: IMAGE, bytes: BANNER },
+      ...searchAnswers("<html><body>inga träffar</body></html>"),
+    },
+    async () => {
+      const [c] = await resolveCandidateImages([{ ...candidate("Brandon"), sourceUrl: "https://butiken.se/p/brandon-fatolj" }], []);
+      assert.equal(c.imageUrl, null);
+    },
+  );
+});
+
+test("en miniatyr som lades på disk före bannerspärren används inte vid nästa uppslag", async () => {
+  const dir = process.env.LOOPA_KANDIDATBILDER_DIR!;
+  const url = "https://butiken.se/img/gammal-banner.jpg";
+  const namn = `${createHash("sha1").update(url).digest("hex")}.jpg`;
+  const { mkdirSync, writeFileSync } = await import("node:fs");
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(path.join(dir, namn), await sharp({ create: { width: 400, height: 210, channels: 3, background: { r: 200, g: 200, b: 200 } } }).jpeg().toBuffer());
+  await withWeb({ [url]: { type: IMAGE, bytes: BANNER } }, async () => {
+    assert.equal(await lokalKandidatbild(url, null), null, "den kvarliggande bannern gäller inte, och hämtningen av den nya avvisas också");
+  });
+});
+
+test("träfflistan en sökmotor lämnar ut lånas aldrig ut som kandidatens sida, hur tydligt adressen än nämner modellen", async () => {
+  assert.equal(isListingPage("https://folkhemmet.com/search?type=article,page,product&options%5Bprefix%5D=last&q=Quattro&sort_by=relevance"), true);
+  assert.equal(isListingPage("https://butiken.se/sok?q=Oxford"), true);
+  assert.equal(isListingPage("https://butiken.se/search/results"), true);
+  assert.equal(isListingPage("https://www.ikea.com/se/sv/p/nordviken-barstol-svart-s90351234/"), false);
+  assert.equal(isListingPage("https://sits.eu/collection/impulse/"), false);
+
+  const traffar = `<html><body><a href="https://butiken.se/search?q=Quattro">Quattro</a></body></html>`;
+  const lista = `<html><head><title>Quattro – Sök | Butiken</title>
+    <meta property="og:image" content="https://butiken.se/img/solstolar.jpg"></head><body></body></html>`;
+  await withWeb(
+    {
+      ...searchAnswers(traffar),
+      "https://butiken.se/search?q=Quattro": { body: lista },
+      "https://butiken.se/img/solstolar.jpg": { type: IMAGE },
+    },
+    async () => {
+      const [c] = await resolveCandidateImages([candidate("Quattro")], []);
+      assert.equal(c.imageUrl, null, "solstolar ur en träfflista är ingen bild av Quattro");
+      assert.equal(c.pageSpecs ?? undefined, undefined, "och dess tabeller hör inte heller till modellen");
+    },
+  );
+});
+
+// ─── Möbeltypen på bilden (2026-10-29) ───────────────────────────────────────────────────────────────────────────────────────────────────
+//
+// Fältprov med Sits: fyra förslag på FÅTÖLJER visades med hörnsoffor. Märkets kollektionssida bär modellen i alla utföranden och en soffa som huvudbild.
+
+test("typfamilj och texterna: armchair är en fåtölj, inte en stol, och en kollektionssida säger ingenting om typen", () => {
+  assert.equal(typfamilj("fåtölj"), "fatolj");
+  assert.equal(typfamilj("Armchair"), "fatolj");
+  assert.equal(typfamilj("hörnsoffa"), "soffa");
+  assert.equal(typfamilj("matstol"), "stol");
+  assert.equal(typfamilj("soffa och fåtölj"), null, "två typer i ett svar säger inget entydigt");
+  assert.equal(typfamilj(null), null);
+  assert.equal(typfamilj("möbel"), null);
+  assert.deepEqual([...familjerI("Sits Brandon Armchair | Snug")], ["fatolj"]);
+  assert.deepEqual([...familjerI("https://www.snug-interiors.com/sits-brandon-armchair/p661")], ["fatolj"]);
+  assert.equal(familjerI("Stella furniture collection | Sits").size, 0);
+  assert.equal(motsagerTyp("Hugo sofa | Butiken", "fatolj"), true);
+  assert.equal(motsagerTyp("Stella furniture collection", "fatolj"), false);
+  assert.equal(motsagerTyp("Ektorp 3-sits soffa", "soffa"), false);
+  assert.equal(bekraftarTyp("Ektorp 3-sits soffa", "soffa"), true);
+  assert.equal(engelskTyp("fåtölj"), "armchair");
+  assert.equal(engelskTyp(null), null);
+});
+
+const fatolj = (model: string): ModelCandidate => ({ ...candidate(model), productType: "fåtölj" });
+const kollektionssida = (modell: string, bild: string) =>
+  `<html><head><title>${modell} furniture collection | Sits</title><meta property="og:image" content="${bild}"></head><body></body></html>`;
+
+/** Ett eget svar på "är bilden ett foto av en fåtölj?" — ett för alla bilder, eller en funktion av bildens adress hos oss — och en logg över vilka bilder som faktiskt frågades. */
+async function medBildkontroll(svar: boolean | null | ((lokalAdress: string) => boolean | null), fn: (fragade: string[]) => Promise<void>): Promise<void> {
+  const fragade: string[] = [];
+  glomBildtypsavgoranden();
+  settBildtypKontroll(async (_bytes, _fam, lokalAdress) => {
+    fragade.push(lokalAdress);
+    return typeof svar === "function" ? svar(lokalAdress) : svar;
+  });
+  try {
+    await fn(fragade);
+  } finally {
+    settBildtypKontroll(null);
+    glomBildtypsavgoranden();
+  }
+}
+
+test("en återförsäljarsida som säger 'armchair' går före kollektionssidan, så kollektionssidans soffbild behöver aldrig prövas", async () => {
+  await medBildkontroll(() => true, async (fragade) => {
+    await withWeb(
+      {
+        "https://sits.eu/collection/stella/": { body: kollektionssida("Stella", "https://sits.eu/img/stella-horn.jpg") },
+        "https://butiken.se/sits-stella-armchair": { body: `<html><head><title>Sits Stella armchair | Butiken</title><meta property="og:image" content="https://butiken.se/img/stella-fatolj.jpg"></head></html>` },
+        "https://sits.eu/img/stella-horn.jpg": { type: IMAGE },
+        "https://butiken.se/img/stella-fatolj.jpg": { type: IMAGE },
+      },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Stella")], [source("https://sits.eu/collection/stella/", 1), source("https://butiken.se/sits-stella-armchair", 3)]);
+        assert.equal(c.imageUrl, lokal("https://butiken.se/img/stella-fatolj.jpg"));
+        assert.equal(c.imageSource, "https://butiken.se/sits-stella-armchair");
+        assert.deepEqual(fragade, [lokal("https://butiken.se/img/stella-fatolj.jpg")], "bara den valda bilden prövas");
+      },
+    );
+  });
+});
+
+test("en måttritning eller en soffbild på rätt sida förkastas, och sidans nästa bild får chansen", async () => {
+  const sida = `<html><head><title>Sits Impulse armchair | Butiken</title><meta property="og:image" content="https://butiken.se/img/ritning.webp"></head>
+    <body><img src="https://butiken.se/img/foto.jpg" width="900" height="900" alt=""></body></html>`;
+  await medBildkontroll((a) => a === lokal("https://butiken.se/img/foto.jpg"), async (fragade) => {
+    await withWeb(
+      { "https://butiken.se/impulse": { body: sida }, "https://butiken.se/img/ritning.webp": { type: IMAGE }, "https://butiken.se/img/foto.jpg": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Impulse")], [source("https://butiken.se/impulse", 1)]);
+        assert.equal(c.imageUrl, lokal("https://butiken.se/img/foto.jpg"), "ritningen (sidans og:image) visar inte fåtöljen som ett foto");
+        assert.equal(fragade.length, 2);
+      },
+    );
+  });
+});
+
+test("modellnamnet som bara förekommer en gång i en annan produkts sida ('Casa Nova Einrichtungen') ger ingen bild åt Nova", async () => {
+  const sida = `<html><head><title>SIRI - Armchairs from SITS | Architonic</title><meta property="og:image" content="https://arch.se/siri.jpg"></head>
+    <body><a href="https://arch.se/casa-nova-einrichtungen"><img alt="Casa Nova Einrichtungen" src="https://arch.se/logos/casa-nova-einrichtungen-logo.png"></a>
+    <a href="https://arch.se/casa-nova-einrichtungen/kontakt">Kontakt</a><script>var r = {"name":"Casa Nova Einrichtungen","slug":"casa-nova-einrichtungen"};</script>
+    Siri Siri Siri armchair. Retailer: Casa Nova Einrichtungen. Siri</body></html>`;
+  await medBildkontroll(true, async () => {
+    await withWeb(
+      { "https://arch.se/siri": { body: sida }, "https://arch.se/siri.jpg": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Nova")], [source("https://arch.se/siri", 1)]);
+        assert.equal(c.imageUrl, null, "ett ord i ett butiksnamn är ingen sida om Nova");
+      },
+    );
+  });
+});
+
+test("kollektionssidans bild prövas: visar den fel typ används den inte, och kandidaten blir utan bild i stället för med en soffa", async () => {
+  await medBildkontroll(false, async (fragade) => {
+    await withWeb(
+      { "https://sits.eu/collection/stella/": { body: kollektionssida("Stella", "https://sits.eu/img/stella-horn.jpg") }, "https://sits.eu/img/stella-horn.jpg": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Stella")], [source("https://sits.eu/collection/stella/", 1)]);
+        assert.equal(c.imageUrl, null, "en soffa i stället för fåtöljen är värre än en tom ruta");
+        assert.equal(fragade.length, 1, "bilden frågades en gång, inte en gång per jaktsteg");
+      },
+    );
+  });
+});
+
+test("visar kollektionssidans bild rätt typ, eller går kontrollen inte att göra, behålls bilden", async () => {
+  for (const svar of [true, null]) {
+    await medBildkontroll(svar, async () => {
+      await withWeb(
+        { "https://sits.eu/collection/stella/": { body: kollektionssida("Stella", "https://sits.eu/img/stella.jpg") }, "https://sits.eu/img/stella.jpg": { type: IMAGE } },
+        async () => {
+          const [c] = await resolveCandidateImages([fatolj("Stella")], [source("https://sits.eu/collection/stella/", 1)]);
+          assert.equal(c.imageUrl, lokal("https://sits.eu/img/stella.jpg"), `svar ${svar}`);
+        },
+      );
+    });
+  }
+});
+
+test("en sida vars titel säger 'sofa' är ingen sida om en fåtölj: varken bild eller mått lånas därifrån", async () => {
+  await medBildkontroll(true, async (fragade) => {
+    await withWeb(
+      { "https://butiken.se/hugo": { body: `<html><head><title>Hugo sofa | Butiken</title><meta property="og:image" content="https://butiken.se/img/hugo.jpg"></head></html>` }, "https://butiken.se/img/hugo.jpg": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Hugo")], [source("https://butiken.se/hugo", 1)]);
+        assert.equal(c.imageUrl, null);
+        assert.equal(c.imageSource, null);
+        assert.equal(fragade.length, 0);
+      },
+    );
+  });
+});
+
+test("registret nycklas på typen: Brandon som fåtölj och Brandon som soffa är två bilder", async () => {
+  await medBildkontroll(true, async () => {
+    await withWeb(
+      { "https://sits.eu/collection/brandon/": { body: kollektionssida("Brandon", "https://sits.eu/img/brandon.jpg") }, "https://sits.eu/img/brandon.jpg": { type: IMAGE } },
+      async () => {
+        await resolveCandidateImages([fatolj("Brandon")], [source("https://sits.eu/collection/brandon/", 1)]);
+        assert.equal(await registreradKandidatbild("Sits", "Brandon", "fatolj"), lokal("https://sits.eu/img/brandon.jpg"));
+        assert.equal(await registreradKandidatbild("Sits", "Brandon", "soffa"), null, "fåtöljens bild lånas inte ut till soffan");
+        assert.equal(await registreradKandidatbild("Sits", "Brandon"), null);
+      },
+    );
+  });
+});
+
+test("galleriet på kollektionssidan: filen vars namn säger modellen OCH fåtölj väljs framför huvudbildens hörnsoffa", async () => {
+  const galleri = Array.from({ length: 8 }, (_, i) => i === 6 ? "IMPULSE_armchair_aniline_1_latte_2.webp" : i === 7 ? "JENNY_armchair_wide.webp" : `IMPULSE_3seater_kin_${i}.webp`)
+    .map((f) => `<img src="https://sits.eu/static/${f}" width="1200" height="800" alt="">`).join("");
+  const sida = `<html><head><title>Impulse furniture collection | Sits</title><meta property="og:image" content="https://sits.eu/og-image.jpg"></head><body>${galleri}</body></html>`;
+  await medBildkontroll((a) => a === lokal("https://sits.eu/static/IMPULSE_armchair_aniline_1_latte_2.webp"), async (fragade) => {
+    await withWeb(
+      { "https://sits.eu/collection/impulse/": { body: sida }, "https://sits.eu/og-image.jpg": { type: IMAGE }, "https://sits.eu/static/IMPULSE_armchair_aniline_1_latte_2.webp": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Impulse")], [source("https://sits.eu/collection/impulse/", 1)]);
+        assert.equal(c.imageUrl, lokal("https://sits.eu/static/IMPULSE_armchair_aniline_1_latte_2.webp"));
+        assert.equal(fragade[0], lokal("https://sits.eu/static/IMPULSE_armchair_aniline_1_latte_2.webp"), "filen vars namn säger modellen och typen prövas först — soffbilden i og:image kommer aldrig före");
+      },
+    );
+  });
+});
+
+test("en fil som säger en ANNAN typ i namnet väljs aldrig för en fåtölj, och en annan modells fil räcker inte som bevis", async () => {
+  const sida = `<html><head><title>Impulse furniture collection | Sits</title></head><body>
+    <img src="https://sits.eu/static/IMPULSE_3seater_kin.webp" width="1200" height="800" alt="">
+    <img src="https://sits.eu/static/JENNY_armchair_wide.webp" width="1200" height="800" alt=""></body></html>`;
+  await medBildkontroll(false, async (fragade) => {
+    await withWeb(
+      { "https://sits.eu/collection/impulse/": { body: sida }, "https://sits.eu/static/IMPULSE_3seater_kin.webp": { type: IMAGE }, "https://sits.eu/static/JENNY_armchair_wide.webp": { type: IMAGE } },
+      async () => {
+        const [c] = await resolveCandidateImages([fatolj("Impulse")], [source("https://sits.eu/collection/impulse/", 1)]);
+        assert.equal(c.imageUrl, null, "soffan är utesluten på namnet, Jennys fåtölj prövas som vilken bild som helst — och visar inte Impulse-saken ens");
+        assert.equal(fragade.length, 1, "bara Jennys fil frågades: soffans namn dömde den ut utan en titt");
+      },
+    );
+  });
 });
