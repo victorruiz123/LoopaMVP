@@ -719,6 +719,8 @@ export interface ConditionJob {
   /** Den säljaren valde, eller den identifieringen kunde avgöra själv. */
   selected?: ModelCandidate | null;
   identityError?: string | null;
+  /** Bildsökningen för modellkorten (SerpApi-flödet) är på väg: ett kort utan bild är då inte "ingen bild" än, och väljarskärmen väntar vidare. */
+  externalImagesPending?: boolean;
   /** Grundat underlag från identifieringen, återanvänt av specifikationssteget. */
   identityResearch?: { researchText: string; sources: Array<{ title: string; url: string; qualityTier?: 1 | 2 | 3 }> } | null;
   /** När nuvarande fas började — för fasloggningen. */

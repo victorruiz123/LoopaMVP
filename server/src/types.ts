@@ -167,9 +167,19 @@ export interface ModelCandidate {
   model: string;
   variant: string | null;
   productType: string | null;
+  /**
+   * Undertypen kandidaten menar när samma namn är två olika möbler ("barstol": IKEA NORDVIKEN finns som matstol och som barstol), läst ur kandidatens egna ord (externalImages.ts,
+   * undertypForKandidat). Styr sökfrågan till referensbilden, titelurvalet, bildkontrollen och registrets nyckel. Bara appjobb sätter den.
+   */
+  undertyp?: "barstol" | null;
   confidence: "strong" | "likely" | "possible";
   /** Kort text som skiljer kandidaterna åt, t.ex. "hög rygg, teakstomme". */
   distinguishingDetail: string | null;
+  /**
+   * Synliga detaljer i bilderna som talar FÖR just den här modellen, ur produktforskningen
+   * (server/src/research). Saknas på kandidater från den gamla generatorvägen.
+   */
+  evidence?: string[];
   /**
    * Produktbild, hämtad ur den källa den grundade sökningen pekade ut.
    *
@@ -178,6 +188,12 @@ export interface ModelCandidate {
    */
   /** Produktsida modellen påstår sig ha sett. Verifieras genom hämtning, aldrig betrodd rakt av. */
   sourceUrl?: string | null;
+  /**
+   * Sidor modellen såg med en produktbild av just den här modellen (tillverkare, återförsäljare,
+   * katalog — aldrig begagnatannonser). Går genom samma kontroll som alla andra sidor: hämtas, och
+   * titeln eller adressen måste nämna modellen. En påhittad adress ger alltså ingen bild, inte fel bild.
+   */
+  productPages?: string[];
   imageUrl?: string | null;
   /** Sidan bilden kom från, så påståendet går att kontrollera. */
   imageSource?: string | null;
@@ -200,6 +216,27 @@ export interface ModelCandidate {
  * ett misslyckande, så just det fall kandidatflödet finns för visade "Annonsen kunde inte skapas".
  */
 export type IdentityStatus = "identifying" | "needs_selection" | "resolved" | "unavailable";
+
+/**
+ * Hur en identifiering slutade — det skärmen behöver för att säga rätt sak när listan är tom.
+ *
+ *   candidates   minst en modell att välja bland
+ *   no_match     sökningen blev klar och bilderna stödde ingen modell (ett belagt svar, inget fel)
+ *   timeout      tiden på 60 s räckte inte till ett försvarbart svar; inga kandidater gissades fram
+ *   unavailable  tjänsten gick inte att nå (överbelastning, kvot, krediter)
+ */
+/** De uppgifter ett jobb består av. Beroenden: specar och annons kräver en bekräftad modell; priset kräver modell och skick. */
+export type TaskName = "condition" | "identify" | "specs" | "price";
+export type TaskStatus = "pending" | "running" | "completed" | "failed" | "cancelled";
+export interface JobTask {
+  status: TaskStatus;
+  startedAt?: number;
+  finishedAt?: number;
+  /** Kort orsak när uppgiften föll eller avbröts. */
+  note?: string | null;
+}
+
+export type IdentityResult = "candidates" | "no_match" | "timeout" | "unavailable";
 
 /** What the seller typed before filming. The price engine needs a name to search the corpus for. */
 export interface FurnitureIdentity {
@@ -267,6 +304,26 @@ export interface ListingAttribute {
   value: string;
   sourceUrl?: string | null;
   /**
+   * Vad raden är: ett mått, ett material (per komponent) eller en annan belagd uppgift. Satt av
+   * produktforskningen (server/src/research); saknas på rader från generatorn och sidskörden.
+   */
+  kind?: "dimension" | "material" | "fact";
+  /** Kanonisk måttyp (overall_width, seat_height, shade_diameter …) när `kind` är "dimension". */
+  type?: string;
+  /** Komponenten ("Stomme", "Klädsel") när `kind` är "material". */
+  component?: string;
+  /**
+   * Sant BARA när vi själva hämtat källsidan och funnit både modellnamnet och värdet på den. En
+   * adress räcker inte — se server/src/research/verify.ts. `verification` säger vilken nivå det blev.
+   */
+  verified?: boolean;
+  verification?: "page_confirmed" | "cited" | "unverified";
+  /**
+   * Materialets sammansättning i procent, när källan anger den ("33 % bomull, 25 % lin …"). Ett
+   * material utan procent har inget här. Satt av produktforskningen (productFacts.parseComposition).
+   */
+  composition?: Array<{ material: string; percent: number }>;
+  /**
    * Säljaren har skrivit in värdet själv.
    *
    * ERSÄTTER BÅDE KÄLLAN OCH "UPPSKATTAT", och gör det med flit: ett rättat mått är varken belagt av
@@ -324,6 +381,8 @@ export interface GeneratedListing {
     priceRangeMinSek: number | null;
     priceRangeMaxSek: number | null;
     rationale: string | null;
+    /** Sidan nypriset hänförs till (AI-lägets länk i appens testläge). Saknas när priset inte har någon källa. */
+    retailPriceSourceUrl?: string | null;
   };
   listing: { title: string; description: string; conditionText: string };
   sources: ListingSource[];
@@ -338,6 +397,52 @@ export interface GeneratedListing {
    * måste få veta. Se runIdentify i pipeline/identify.ts.
    */
   warnings?: string[];
+  /**
+   * Produktforskningens kvitto (server/src/research): vilken modell som sökte, hur många sökningar
+   * och sidhämtningar det blev, vad det kostade, och hur mycket som gick att bekräfta mot källsidor.
+   * Saknas när annonsen gick den gamla vägen genom generatorn.
+   */
+  /**
+   * Hur uppgifterna hänger ihop (server/src/research/productFacts.ts): vilken variant annonsen gäller,
+   * om flera utföranden med olika mått väntar på ett val, vad som hållits tillbaka och varför, och
+   * vilka motsägelser som hittades. Läses av specifikationsskärmen och kortet — aldrig för att
+   * räkna ut en uppgift på nytt.
+   */
+  factCheck?: {
+    variant: string | null;
+    ambiguous: boolean;
+    options: string[];
+    needsResearch?: boolean;
+    heldBack: Array<{ type: string; label: string; reason: "variant" | "contradiction"; values: string[] }>;
+    issues: Array<{ code: string; severity: "info" | "warning"; message: string; keys?: string[] }>;
+  };
+  research?: {
+    engine: "gemini3";
+    model: string;
+    latencyMs: number;
+    searchQueries: number;
+    fetchedPages: number;
+    estimatedCostUsd: number;
+    /** Svaret kom ur det verifierade faktaminnet — inget nytt Gemini-anrop gjordes. */
+    fromCache?: boolean;
+    /**
+     * PRELIMINÄRT: ett första svar från snabbspåret medan det fulla anropet letar vidare. Annonsen är inte slutlig —
+     * skärmen säger det och låter inte säljaren gå vidare förrän det fulla svaret ersatt den.
+     */
+    provisional?: boolean;
+    /** Gemini-försök i körningen: 1 = inget omförsök; 2 = omförsök efter "too many tool calls" eller reservmodell. */
+    attempts?: number;
+    toolCalls?: number;
+    stoppedBy?: "completed" | "time_budget" | "tool_budget" | "error";
+    dimensions: number;
+    verifiedDimensions: number;
+    materials: number;
+    verifiedMaterials: number;
+    conflicts: string[];
+    missing: string[];
+    rejected: number;
+    matchesPhotos: boolean | null;
+  };
 }
 
 /** Annonsens halva av rapporten. Alltid satt när ett märke fanns, även när den inte gick att nå. */
@@ -893,7 +998,57 @@ export interface ConditionJob {
   productImage?: ProductImage | null;
   /** Urklippet, buret på jobbet av samma skäl: det blir klart medan säljaren väljer modell. */
   coverCutout?: CoverCutout | null;
+  /** Hur den senaste identifieringen slutade. Skärmen läser den när listan är tom: bilderna räckte inte, tiden räckte inte, eller tjänsten var nere. */
+  identityResult?: IdentityResult;
   identityError?: string | null;
+  /**
+   * Kostnadsboken för omgången: varje betalt anrop med tokens, sökfrågor och uppskattad kostnad, mot taket (cost/ledger.ts). Det som visar
+   * att omgången höll sig inom budgeten — eller att den gjorde det inte.
+   */
+  cost?: import("./cost/ledger.js").JobCost;
+  /**
+   * Den enskilda uppgiftens läge. De löper parallellt där deras indata tillåter det, och en som faller tar inte de andras resultat med sig.
+   * Klienten visar det som finns när det finns (skicket före modellen, om det blir klart först). Se pipeline/tasks.ts.
+   */
+  tasks?: Partial<Record<TaskName, JobTask>>;
+  /** Klientens nyckel för uppladdningen (rubriken `Idempotency-Key`): samma nyckel från samma ägare ger tillbaka samma jobb och startar inget nytt betalt arbete. */
+  clientKey?: string;
+  /**
+   * PROTOTYP: identifieringen görs utanför servern (appens webbvy mot Googles AI-läge) och skickas hit via POST /api/jobs/:id/external-identification.
+   * Servern startar då ingen egen modellsökning. Se externalIdentify.ts.
+   */
+  externalIdentify?: boolean;
+  /** Möbeltypen ur säljarens omslagsbild, på svenska ("fåtölj"). Läses en gång (typFranFoto) och används i frågan till AI-läget och på kandidaterna. */
+  furnitureType?: string | null;
+  /**
+   * AI-lägets variant, mått, material och nypris för modellen SÄLJAREN VALDE, översatta till specschemat. Frågan ställs först efter valet (expectExternalSpecs sätter raden
+   * med `specPending` innan annonsen börjar byggas), och specsteget väntar in svaret (waitForExternalSpecs).
+   */
+  externalFacts?: { model: string; spec: Record<string, unknown>; links: string[]; at: number; /** Appens måttfråga är på väg (svaret kommer efter valet). Se waitForExternalSpecs. */ specPending?: boolean };
+  /**
+   * Appens bildsökning (Googles bildsök) är på väg: kandidaterna kan stå med `imageUrl: null` från serverns egen bildjakt TROTS att en bild strax kommer. Väljarskärmen slutar
+   * inte vänta på bilder så länge den är satt (2026-11-02: två kort stod kvar med "Din bild" efter att bilderna landat).
+   */
+  externalImagesPending?: boolean;
+  /**
+   * Satt när omgången inte blev komplett (kostnadstaket nåddes, en uppgift föll): kortet levereras med det som finns och den här markeringen,
+   * och får inte publiceras som om det vore färdigt. Se pipeline/tasks.ts.
+   */
+  incomplete?: { reason: string; at: number };
+  /**
+   * Kvitto på identifieringens körning: modell, omgångar, försök, sökfrågor, tid per steg, kostnad.
+   * Utan det går det inte att säga VARFÖR en identifiering tog 200 s eller blev fel — det var precis
+   * vad den första skarpa körningen saknade. Fullständiga spår ligger i server/data/research-traces/.
+   */
+  identityTrace?: import("./research/types.js").ResearchRunSummary | null;
+  /**
+   * Allt forskningen hittade om den valda produkten, ALLA varianter (se research/productFacts.ts).
+   * Annonsens rader är en vy av det här för en variant. Bevaras så att ett variantval filtrerar i
+   * stället för att söka om — mätt: omsökningen tog 108 s och tappade alla mått.
+   */
+  productFacts?: import("./research/types.js").ProductFacts | null;
+  /** Mätningen av den senaste måttsökningen (tid, sökfrågor, kostnad, om den kom ur minnet). */
+  specTrace?: import("./research/types.js").ResearchRunSummary | null;
   /** Grundat underlag från identifieringen, återanvänt av specifikationssteget. */
   identityResearch?: { researchText: string; sources: Array<{ title: string; url: string; qualityTier?: 1 | 2 | 3 }> } | null;
   /** När nuvarande fas började — för fasloggningen. */

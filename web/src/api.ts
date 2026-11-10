@@ -1,5 +1,6 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
+import { inApp, onlyIdentifySpecs } from "./lib/appBridge";
 import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, RobotHalsaSvar, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, TrafikSvar, Kundresa, KundresaLive, KundresaTidslinje, Kampanj, Kampanjer, Oversikt, ResorSvar, Resa, Mal, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, AdminAffiliateRad, UtbetalningsRad,
   UtskickLista,
   UtskickLage,
@@ -115,7 +116,7 @@ async function setAuthHeader(headers: Headers): Promise<void> {
   }
 }
 
-async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
+export async function authFetch(input: string, init: RequestInit = {}): Promise<Response> {
   const headers = new Headers(init.headers);
   await setAuthHeader(headers);
   const res = await fetch(input, { ...init, headers });
@@ -176,10 +177,44 @@ export async function createJob(
   const res = await authFetch("/api/jobs", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null, dealId }),
+    // Är SerpApi-flödet (eller appskalet) på, identifierar Googles AI-läge modellen och servern söker inte själv (lib/serpApiBridge.ts, lib/appBridge.ts).
+    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null, dealId, ...(inApp() ? { externalIdentify: true, ...(onlyIdentifySpecs() ? { identifyOnly: true } : {}) } : {}) }),
     signal,
   });
   return json(res);
+}
+
+/** Svaret från Googles AI-läge, till servern som översätter det till kandidater. `failed`: frågan kom inte fram till något svar. */
+export async function postExternalIdentification(
+  jobId: string,
+  payload: { answer: string; links: string[]; specsPending?: boolean; imagesPending?: boolean } | { failed: string },
+): Promise<{ items: Array<{ model: string; productType: string | null; undertyp?: string | null }> }> {
+  const res = await authFetch(`/api/jobs/${jobId}/external-identification`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  const body = await json<{ items?: Array<{ model: string; productType: string | null; undertyp?: string | null }> }>(res);
+  return { items: body.items ?? [] };
+}
+
+/** Möbeltypen ur säljarens omslagsbild ("fåtölj"), så att frågan till AI-läget kan säga vad det är. Null när den inte går att avgöra. */
+export async function fetchFurnitureType(jobId: string): Promise<string | null> {
+  const res = await authFetch(`/api/jobs/${jobId}/furniture-type`, { method: "POST" });
+  const body = await json<{ type?: string | null }>(res);
+  return body.type ?? null;
+}
+
+/**
+ * Variant, mått, material och nypris för modellen säljaren valde (uppföljningsfrågan efter valet). `failed`: frågan gav inget svar. `model`: modellen frågan gällde, så att
+ * servern kan ignorera ett sent svar på en tidigare fråga.
+ */
+export async function postExternalSpecs(jobId: string, payload: ({ answer: string; links: string[] } | { failed: string }) & { model: string }): Promise<void> {
+  const res = await authFetch(`/api/jobs/${jobId}/external-specs`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+  await json(res);
+}
+
+/** Referensbilder ur Googles bildsök, rådata per modell. Servern väljer och kontrollerar dem. */
+export async function postExternalImages(jobId: string, groups: Array<{ model: string; rows: unknown[] }>, final = true): Promise<{ set: string[]; none: string[] }> {
+  const res = await authFetch(`/api/jobs/${jobId}/external-images`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ groups, final }) });
+  const body = await json<{ set?: string[]; none?: string[] }>(res);
+  return { set: body.set ?? [], none: body.none ?? [] };
 }
 
 /**
@@ -203,11 +238,13 @@ export async function fetchPrice(identity: FurnitureIdentity): Promise<PriceEsti
 export async function selectModel(
   jobId: string,
   choice: { candidate?: ModelCandidate; manualModel?: string },
+  /** Frågas AI-läget efter varianten, måtten, materialet och nypriset för valet väntar servern in svaret (postExternalSpecs) i stället för att söka själv. */
+  opts: { externalSpecs?: boolean } = {},
 ): Promise<void> {
   const res = await authFetch(`/api/jobs/${jobId}/model`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(choice),
+    body: JSON.stringify({ ...choice, ...(opts.externalSpecs ? { externalSpecs: true } : {}) }),
   });
   await json(res);
 }

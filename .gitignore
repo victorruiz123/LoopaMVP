@@ -49,3 +49,30 @@ utskick-forhandsvisning/
 # adresser. De som redan är incheckade ligger kvar; nya filer ignoreras. Utan raden ser rulla-ut.sh
 # servern som smutsig och avbryter (2026-09-28).
 outbox/
+
+# Lokala verktyg som aldrig ska upp (inte nödvändiga för att driva plattformen):
+#  - appskalet som frågar Googles AI-läge i en Electron-webbvy, dess spikes och provinstanser,
+#  - mät- och probeskript, forskningsfixturer med egna möbelfoton, utvecklingsförhandsvisningar,
+#  - marknadsföringsmaterial och lokala provbilder.
+# Raderna finns för att ett `git add -A` aldrig ska kunna ta med dem av misstag.
+scripts/loopa-app-prototype/
+scripts/webview-spike/
+scripts/aimode-bench/
+scripts/auth-harness/
+scripts/serpapi/
+scripts/lib/
+scripts/research-*.ts
+scripts/latency-probe.ts
+scripts/identify-eval.ts
+scripts/image-check.ts
+scripts/flow-measure.ts
+scripts/make-specs-preview.ts
+scripts/verify-probe.ts
+scripts/wrapup-replay.ts
+tests/fixtures/research/
+web/src/__dev/
+web/modell.html
+web/specs.html
+marketing/
+loopa-landing-page-main/IKEA SÖDERHAMN/
+loopa-landing-page-main/Listing Pictures/

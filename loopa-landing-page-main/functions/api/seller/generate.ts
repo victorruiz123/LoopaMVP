@@ -294,7 +294,19 @@ const HONESTY_RULE = `Svara kort på svenska i löptext. Ange källans URL direk
  * extraction for the top candidate is framed as the main job so the dominant-
  * candidate case gets its specs from this same call, with no extra latency.
  */
-function buildIdentifyResearchPrompt(brand: string, sellerNote: string, excluded: string[] = [], listed: string[] = []): string {
+function buildIdentifyResearchPrompt(
+  brand: string,
+  sellerNote: string,
+  excluded: string[] = [],
+  listed: string[] = [],
+  /**
+   * Kandidatläge "evidence" (satt av Loopa Condition): inga fyllnadskandidater. Standardläget kräver
+   * exakt fyra och fyller överblivna platser med modeller som "LIKNAR" — rätt för loopa.nu, där säljaren
+   * ser sin egen möbel bland fyra, fel när förslagen är sökningens enda svar och säljaren sedan bygger
+   * en hel annons på det de väljer. Se server/src/pipeline/identifieringsval.ts.
+   */
+  evidenceOnly = false,
+): string {
   /**
    * Säljaren har sett förslagen och sagt nej till allihop.
    *
@@ -333,11 +345,16 @@ ${sellerNote ? `- Säljaren berättar: "${sellerNote}"` : '- (inget mer angivet)
 Ingen kategori och ingen modell är angiven. Avgör själv från bilderna vad det är för produkt.
 
 ${rejectedBlock}${listedBlock}DEL 1 — KANDIDATER (snabbt):
-Avgör vilka VERKLIGA produkter/modeller från varumärket bilderna troligen visar. Sök på varumärket + det du ser i bilderna. Fastna ALDRIG i att välja mellan snarlika modeller — är flera rimliga listar du dem och går vidare; säljaren väljer sedan själv.
+${evidenceOnly
+    ? `Avgör vilka VERKLIGA produkter/modeller från varumärket bilderna visar. Sök på varumärket + det du ser i bilderna, och glöm inte äldre och utgångna modeller — många begagnade möbler säljs inte längre. Jämför snarlika modeller mot bilderna och lista bara de som är visuellt försvarbara.
+Skriv varje kandidat EXAKT så här, en per rad (1-4):
+KANDIDAT: märke | modellnamn | variant eller - | produkttyp | STARK eller TROLIG eller MÖJLIG | kort synlig detalj som skiljer den från de andra | produktsidans URL
+Lämna så många kandidater som bilderna och sökresultaten faktiskt stöder, starkast först. Fyll ALDRIG upp listan med modeller som inte stämmer med bilderna.`
+    : `Avgör vilka VERKLIGA produkter/modeller från varumärket bilderna troligen visar. Sök på varumärket + det du ser i bilderna. Fastna ALDRIG i att välja mellan snarlika modeller — är flera rimliga listar du dem och går vidare; säljaren väljer sedan själv.
 Skriv varje kandidat EXAKT så här, en per rad (sikta på 3-4, max 4):
 KANDIDAT: märke | modellnamn | variant eller - | produkttyp | STARK eller TROLIG eller MÖJLIG | kort synlig detalj som skiljer den från de andra | produktsidans URL
 Lämna ALLTID exakt 4 kandidater, ordnade efter hur väl de stämmer med bilderna — starkast först.
-De platser som blir över när färre än fyra verkligen stämmer fyller du med varumärkets modeller i samma produktkategori som LIKNAR den på bilderna mest, märkta MÖJLIG. Säljaren ser sin egen möbel och avfärdar en felaktig kandidat på en sekund, men kan aldrig välja en modell du inte visade.
+De platser som blir över när färre än fyra verkligen stämmer fyller du med varumärkets modeller i samma produktkategori som LIKNAR den på bilderna mest, märkta MÖJLIG. Säljaren ser sin egen möbel och avfärdar en felaktig kandidat på en sekund, men kan aldrig välja en modell du inte visade.`}
 Sista fältet är URL:en till den produktsida där du såg JUST den modellen — en enda adress, ordagrant ur sökresultatet, ingen text runt den. Har du ingen sida för modellen skriver du -. Lägg ALDRIG källan i detaljfältet i stället; detaljfältet är bara den synliga skillnaden.
 Regler: endast verkliga modellnamn du sett i sökresultaten eller säkert vet finns i varumärkets sortiment — hitta ALDRIG på ett modellnamn, och ta aldrig med en modell ur en annan produktkategori bara för att fylla en plats. Hittar du inte fyra verkliga modeller lämnar du färre. Finns ingen trovärdig kandidat alls, skriv exakt: KANDIDAT: INGEN
 
@@ -968,6 +985,26 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     excludeModels?: unknown
     /** Namn som redan står i den lista omgången bygger. Sållas som `excludeModels`, sägs annorlunda. */
     alreadySuggested?: unknown
+    /**
+     * "prior_only": sök INTE själv — strukturera ur `priorResearch`/`priorSources`.
+     *
+     * Satt av Loopa Condition (server/src/pipeline/annons.ts) när produktforskningen redan gjort
+     * sökningen med en starkare modell och verifierat måtten mot källsidorna. Den här handlerns
+     * egen grundade sökning med SELLER_MODEL hade då bara kostat tid och kunnat motsäga ett belagt
+     * värde. Utan underlag ignoreras flaggan och sökningen görs som vanligt.
+     */
+    researchMode?: unknown
+    /**
+     * Underlaget är redan verifierat av anroparen och behöver inga adresser för att räknas som grundat.
+     *
+     * Mätt 2026-10-20 (NORRNÄS): forskningens källor var döda eller begagnatsajter och hade filtrerats bort
+     * ur listan — noll adresser. Villkoret `priorSources.length > 0` gjorde då att prior_only föll
+     * tillbaka på den här handlerns EGNA grundade sökning: tre Gemini-anrop och 15–17 s extra för ett
+     * underlag som redan fanns, och en andra sökning som kunde motsäga det verifierade.
+     */
+    priorVerified?: unknown
+    /** "evidence": fyll inte upp kandidatlistan. Se buildIdentifyResearchPrompt. */
+    candidateMode?: unknown
   }
   try {
     body = await request.json()
@@ -996,6 +1033,10 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
 
   const resolution = validateResolution(body.resolution)
   if (resolution === 'invalid') return json({ ok: false, error: 'invalid resolution' }, 400)
+  /** Bara i fas 2, och bara med underlag att strukturera ur. Se `researchMode` ovan. */
+  const evidenceOnly = body.candidateMode === 'evidence'
+  const priorOnly =
+    body.researchMode === 'prior_only' && !!resolution && priorResearch.length > 0 && (priorSources.length > 0 || body.priorVerified === true)
 
   /**
    * "Hitta nya": säljaren har sett förslagen, avfärdat allihop och ber om fyra andra.
@@ -1101,7 +1142,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
     ? buildSpecResearchPrompt(researchBrand, sellerNote, plainResolved)
     : explicitUnknown
       ? buildUnknownResearchPrompt(brand, sellerNote, productHint)
-      : buildIdentifyResearchPrompt(brand, sellerNote, excludeModels, alreadySuggested)
+      : buildIdentifyResearchPrompt(brand, sellerNote, excludeModels, alreadySuggested, evidenceOnly)
   if (plainResolved) researchForm = 'plain'
 
   /**
@@ -1163,8 +1204,20 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
       return false
     }
 
-    const first = await runResearch(RESEARCH_BUDGET_MS)
-    if (applyResearch(first)) researchFormHit = researchForm
+    if (priorOnly) {
+      // Underlaget är forskningens egna rader om EXAKT den här modellen — alltså `own`, så att dess
+      // MÅTT-rader läses in i attributen precis som den här handlerns egen sökning hade fått.
+      research.text = priorResearch
+      research.sources = priorSources
+      research.ok = true
+      research.own = true
+      reusedPrior = true
+      warnings.push('research_prior_only')
+    }
+    const first = priorOnly ? null : await runResearch(RESEARCH_BUDGET_MS)
+    if (priorOnly) {
+      /* ingen egen sökning */
+    } else if (applyResearch(first)) researchFormHit = researchForm
     else {
       if (!first) warnings.push('research_failed')
       else warnings.push('research_ungrounded')
@@ -1204,7 +1257,7 @@ export const onRequestPost = async (context: { request: Request; env: Env }) => 
      *
      * Ett omförsök, inte en loop, och bara när det ryms i vad som är kvar av deadline.
      */
-    if (!research.ok && resolved && richPrompt && richPrompt !== researchPrompt) {
+    if (!priorOnly && !research.ok && resolved && richPrompt && richPrompt !== researchPrompt) {
       if (remainingMs() > RESEARCH_RETRY_BUDGET_MS + STRUCTURE_RESERVE_MS) {
         researchForm = 'full'
         geminiCalls++

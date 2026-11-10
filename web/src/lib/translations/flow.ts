@@ -569,6 +569,10 @@ export const FLOW: Record<string, Translation> = {
     en: "Here are {antal} other {modeller}. The ones you've already turned down won't come back.",
     fr: "Voici {antal} autres {modeller}. Ceux que vous avez déjà refusés ne reviendront pas.",
   },
+  "Bilderna visar modellen, inte exakt den variant du väljer i nästa steg — färgen kan skilja sig.": {
+    en: "The photos show the model, not the exact variant you pick in the next step — the colour may differ.",
+    fr: "Les photos montrent le modèle, pas exactement la variante choisie à l'étape suivante — la couleur peut différer.",
+  },
   "Vi hittade {antal} {modeller} som stämmer med bilderna. Välj den som är din.": {
     en: "We found {antal} {modeller} matching the photos. Pick the one that's yours.",
     fr: "Nous avons trouvé {antal} {modeller} correspondant aux photos. Choisissez le vôtre.",

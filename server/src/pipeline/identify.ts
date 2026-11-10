@@ -1,16 +1,35 @@
+import path from "node:path";
+import { stat } from "node:fs/promises";
 import { callSellerGenerate, type Resolution, type SellerCall } from "../listing.js";
+import { byggAnnons, byggAnnonsFranFakta } from "./annons.js";
+import { IDENTIFY_DEADLINE_MS } from "../research/config.js";
+import { allowanceFor, costOf, withCostScope } from "../cost/jobCost.js";
+import { budgetStatus, canSpend } from "../cost/ledger.js";
+import { markIncomplete, setTask } from "./tasks.js";
+import { researchEnabled } from "../research/config.js";
+import { Deadline } from "../research/deadline.js";
+import { identifyFurniture, prepareImages, toModelCandidates, toSourceRefs } from "../research/pipeline.js";
+import { beslutaEfterForskning, noteForEmptyResearch } from "./identifieringsval.js";
 import { hamtaVarianter } from "./varianter.js";
 import { resolveCandidateImages, resolveProductPage, type SourceRef } from "../candidateImages.js";
 import { fargForAnnons, fargerI } from "./farg.js";
 import { mergeSpecs } from "../specHarvest.js";
 import { mattminnetsRader } from "../mattminne.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
-import { registreradKandidatbild } from "../kandidatbild.js";
+import { lokalKandidatbild, registreradKandidatbild, registreraKandidatbilder } from "../kandidatbild.js";
+import { losFranSokningar, losProduktsidor, referensKedjaPa, typOrd, valjBland, type RefKandidat } from "../referensbild.js";
+import { bedomReferensbild, typFranFoto, typfamilj } from "../candidateType.js";
+import { pickReferenceRows, undertypForKandidat, valjReferensbild, type ReferenceCheck } from "../externalImages.js";
 import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
 import { kanVaraStol } from "../stolPris.js";
+import { slugKey } from "../research/normalize.js";
+import { cleanExternalLinks, mergeExternalSpec, pickModelPage, specHasFacts, structureExternalAnswer, structureExternalSpecs } from "../externalIdentify.js";
+import { classifyAttribute, withKinds } from "../research/attributeKinds.js";
+import type { IdentifyOk, ProductFacts, ResearchRunSummary } from "../research/types.js";
 import type {
   CapturedImage,
   GeneratedListing,
+  IdentityResult,
   ListingAttribute,
   ListingResult,
   ModelCandidate,
@@ -21,54 +40,14 @@ import type {
 const CONDITION_WAIT_MS = 180_000;
 
 /**
- * FÖRVÄRMNINGEN: fas 2 startas på toppkandidaten redan när valskärmen visas.
+ * Specsökningar som är igång just nu, per jobb: ett variantval väntar in dem i stället för att söka om bredvid.
  *
- * VARFÖR. "Bygger annonsen…" var flödets längsta väntan — mätt på 60 sparade körningar tog
- * generatorns fas 2 median 11,8 s och p90 27,1 s, och den väntan började först när säljaren tryckt.
- * Sökningen bakom den är dessutom ogrundad på första försöket i 38 fall av 60, och just de körningarna
- * kostar ett omförsök till: 9,9 s i median mot 3,6 s för dem som grundade direkt.
- *
- * Ingenting av det behöver ligga efter trycket. Modellen säljaren väljer är den ÖVERSTA i listan i 66
- * fall av 92 — 72 % — så anropet går att göra medan de läser de fyra korten. Träffar det, är annonsen
- * redan byggd när de trycker och skärmen går vidare direkt; missar det, kastas svaret och fas 2 går
- * som förut. Väntan blir aldrig längre av att ha försökt.
- *
- * KOSTNADEN ÄR ETT BRÄNT ANROP i de 28 procenten. Det är avsikten: ett generatoranrop är billigt
- * jämfört med tjugo sekunder som säljaren står och tittar på en snurra mitt i flödet.
- *
- * ETT PER JOBB, aldrig fler. Att förvärma alla fyra kandidaterna hade lagt fyra grundade sökningar på
- * samma nyckel samtidigt, och den sökningen är känslig för just det — se `searchCandidates`, där två
- * överlappande sökningar slog ut kandidaterna helt.
+ * (Här låg förut en FÖRVÄRMNING: fas 2 startades på toppkandidaten redan när valskärmen visades. Den är borttagen. Den var spekulativ
+ * forskning — ett fullt specsanrop på en modell säljaren kanske inte väljer, ≈28 % av gångerna fel — och omgången har ett kostnadstak
+ * (cost/ledger.ts). Specsökningen körs numera i bakgrunden från det att modellen är bekräftad, medan säljaren svarar på frågorna, granskar
+ * skicket och prisförslaget; granskningen av måtten ligger sist i flödet, så ingen väntar på den.)
  */
-const forvarmda = new Map<string, { model: string; call: Promise<SellerCall>; startedAt: number }>();
-/** Städning för jobb som aldrig når fas 2 — säljaren stängde fliken. Löftet är redan löst, det är kartan som ska bort. */
-const FORVARM_TTL_MS = 300_000;
-
-function forvarmFas2(
-  jobId: string,
-  brand: string | null,
-  top: ModelCandidate | undefined,
-  images: CapturedImage[],
-  dir: string,
-  prior: { researchText: string; sources: SourceRef[] } | undefined,
-): void {
-  if (!top?.model?.trim() || images.length === 0) return;
-  // Ett omval kan ha startat en ny kandidatsökning; då gäller den listan, inte den här.
-  if (forvarmda.has(jobId)) return;
-  const call = callSellerGenerate(
-    { brand, model: top.model },
-    images,
-    dir,
-    { kind: "seller_selected", selected: top },
-    prior,
-  );
-  // callSellerGenerate kastar aldrig, men ett obevakat löfte som ändå gjorde det hade fällt processen.
-  call.catch(() => {});
-  forvarmda.set(jobId, { model: top.model, call, startedAt: Date.now() });
-  const timer = setTimeout(() => forvarmda.delete(jobId), FORVARM_TTL_MS);
-  timer.unref?.();
-  console.info(`[identify] ${jobId.slice(0, 8)} förvärmer fas 2 på "${top.model}"`);
-}
+const factsInFlight = new Map<string, { model: string; promise: Promise<ProductFacts | null> }>();
 
 /**
  * Gav försöket något att välja bland?
@@ -97,6 +76,135 @@ function settled(call: SellerCall): call is Extract<SellerCall, { kind: "needs_s
 }
 
 /**
+ * Pågående identifieringar, per jobb — så att en säljare som hinner före (skriver modellnamnet själv) kan stoppa ett betalt anrop som
+ * ingen längre väntar på i stället för att låta det löpa ut och kosta.
+ */
+const pagaendeIdentifiering = new Map<string, AbortController>();
+
+/** Avbryt jobbets pågående identifiering, om det finns en. Anropet stänger sin ström; det som hunnit kosta är redan bokfört. */
+export function avbrytIdentifiering(jobId: string): boolean {
+  const ac = pagaendeIdentifiering.get(jobId);
+  if (!ac) return false;
+  ac.abort();
+  return true;
+}
+
+/** Minsta antal sökfrågor ett (nytt) identifieringsförsök måste kunna få för att vara värt att starta. Under det: inget betalt anrop. */
+export const MIN_IDENTIFY_QUERIES = 3;
+
+/** Ett ärligt tomt svar: inga kandidater, ett besked, och varför. Det enda som visas när forskningen inte gav något. */
+function arligtTomt(result: IdentityResult, note: string | null, runSummary?: ResearchRunSummary | null): Extract<SellerCall, { kind: "needs_selection" }> {
+  return {
+    kind: "needs_selection",
+    candidates: [],
+    sources: [],
+    researchText: "",
+    engine: "gemini3",
+    exactMatch: false,
+    note,
+    runSummary: runSummary ?? undefined,
+    result,
+  };
+}
+
+/** Forskningens svar som appens eget: kandidater, källor, underlag till fas 2. */
+function sellerCallFranForskning(out: IdentifyOk): Extract<SellerCall, { kind: "needs_selection" }> {
+  const candidates = toModelCandidates(out);
+  return {
+    kind: "needs_selection",
+    candidates,
+    sources: toSourceRefs(out.sources),
+    researchText: out.researchText,
+    engine: "gemini3",
+    exactMatch: out.exactMatch,
+    note: candidates.length === 0 ? noteForEmptyResearch(out.uncertaintyNote) : null,
+    runSummary: out.summary,
+    result: candidates.length > 0 ? "candidates" : "no_match",
+  };
+}
+
+/**
+ * Produktforskningens identifiering (server/src/research): alla bildrutor i full kvalitet, en stark modell som får tänka, söka och
+ * öppna produktsidor, och ett strukturerat svar med evidens per kandidat.
+ *
+ * ANROPET FÅR TID ATT BLI KLART, inte en säljarklocka: säljaren väntar inte på det — skicket, frågorna och prisskärmen går att göra
+ * medan det pågår, och kandidaterna visas när de finns. Det som BEGRÄNSAR det är (1) kostnadsbudgeten: söktaket kommer ur jobbets
+ * kostnadsbok (cost/ledger.ts) och är det som håller omgången under sitt tak, och (2) en livslängd som skydd mot ett anrop som hänger sig
+ * (IDENTIFY_DEADLINE_MS, research/deadline.ts) — inte en timer att tävla mot.
+ *
+ * Svarar med vad beslutsregeln (identifieringsval.ts) säger: forskningens eget svar — även när det är tomt — eller ett ärligt
+ * besked utan kandidater. ALDRIG den gamla generatorn som reserv. `null` bara när forskningen är avstängd med LOOPA_RESEARCH_ENGINE=legacy.
+ */
+async function identifieraMedForskning(
+  jobId: string,
+  brand: string,
+  images: CapturedImage[],
+  dir: string,
+  excludeModels: string[] = [],
+  alreadySuggested: string[] = [],
+): Promise<SellerCall | null> {
+  if (!researchEnabled()) return null;
+  const label = jobId.slice(0, 8);
+  const deadline = new Deadline(IDENTIFY_DEADLINE_MS);
+  const abort = new AbortController();
+  pagaendeIdentifiering.set(jobId, abort);
+  try {
+    // Söktaket ur kostnadsboken. Ett försök som budgeten inte rymmer startas inte: inget betalt arbete utan utrymme.
+    const allowance = await allowanceFor(jobId, "identify");
+    if (allowance.searchQueries < MIN_IDENTIFY_QUERIES) {
+      console.warn(`[identify] ${label} budgeten rymmer ${allowance.searchQueries} sökfrågor (minst ${MIN_IDENTIFY_QUERIES} krävs) — inget nytt försök`);
+      return arligtTomt("unavailable", "Kostnadstaket för den här omgången är nått, så modellsökningen görs inte om. Skriv modellnamnet själv, eller starta en ny analys.", null);
+    }
+    const researchImages = await prepareImages(images, dir);
+    const prepareMs = deadline.elapsed();
+    const out = await identifyFurniture(
+      { brand, images: researchImages, excludeModels, alreadySuggested, label, prepareMs, maxSearchQueries: allowance.searchQueries },
+      { deadline, signal: abort.signal },
+    );
+    const beslut = beslutaEfterForskning(out);
+    if (out.kind !== "ok") {
+      console.warn(`[identify] ${label} forskningen gav inget svar (${out.failKind ?? "okänt"}): ${out.reason} → ärligt besked, ingen generator`);
+      if (beslut.use === "none") return arligtTomt(beslut.result, beslut.note, out.summary);
+      return arligtTomt("unavailable", null, out.summary);
+    }
+    const call = sellerCallFranForskning(out);
+    console.info(
+      `[identify] ${label} forskning: kandidater=${call.candidates.length} exakt=${out.exactMatch}` +
+        ` modell=${out.trace.model} sökfrågor=${out.summary.searchQueries}/${allowance.searchQueries} sidor=${out.summary.fetchedPages}` +
+        ` källor=${out.sources.length} cost${out.summary.costIsLowerBound ? "≥" : "≈"}$${out.summary.costUsd} ms=${deadline.elapsed()}/${deadline.totalMs}`,
+    );
+    return call;
+  } catch (err) {
+    // Ett oväntat fel i forskningens egen kod. Inte heller det fylls igen av den gamla generatorn.
+    console.warn(`[identify] ${label} forskningen kastade — ${err instanceof Error ? err.message : String(err)}`);
+    return arligtTomt("unavailable", null);
+  } finally {
+    if (pagaendeIdentifiering.get(jobId) === abort) pagaendeIdentifiering.delete(jobId);
+    deadline.dispose();
+  }
+}
+
+/**
+ * Forskningen först; generatorn bara när beslutsregeln säger det. Samma signatur som generatorns egen
+ * kandidatsökning, så att omvalsrundan och förstaomgången kan använda den utan att veta skillnaden.
+ */
+async function sokKandidater(
+  jobId: string,
+  brand: string,
+  images: CapturedImage[],
+  dir: string,
+  excludeModels: string[] = [],
+  alreadySuggested: string[] = [],
+): Promise<SellerCall> {
+  const nytt = await identifieraMedForskning(jobId, brand, images, dir, excludeModels, alreadySuggested);
+  if (nytt) return nytt;
+  // Kandidatläget "evidens": generatorn fyller inte upp listan med liknande modeller, och det är det
+  // som gäller för varje identifiering härifrån — även när forskningen är avstängd med
+  // LOOPA_RESEARCH_ENGINE=legacy. En lista som är kortare än fyra är ett ärligt svar.
+  return callSellerGenerate(brand, images, dir, undefined, undefined, excludeModels, alreadySuggested, { candidateMode: "evidence" });
+}
+
+/**
  * Den första omgångens sökning — och BARA den, när den gav något att visa.
  *
  * HÄR LÅG FLÖDETS DYRASTE VÄNTAN. Funktionen gjorde tidigare två anrop i serie och lämnade ifrån sig
@@ -117,13 +225,19 @@ function settled(call: SellerCall): call is Extract<SellerCall, { kind: "needs_s
  * papperet men lät två grundade sökningar på samma nyckel gå samtidigt — och den grundade sökningen
  * är känslig nog att det slog ut kandidaterna helt. Latens får inte köpas med den här sökningens
  * träffsäkerhet; den köps här med ORDNINGEN i stället.
+ *
+ * PRODUKTFORSKNINGENS SVAR ÄR AVGÖRANDE. Ett svar från forskningen — även ett med färre än fyra eller
+ * noll kandidater — omprövas aldrig av generatorn: noll kandidater är ett belagt "inget bilderna
+ * stöder", och generatorn fyller i det läget gärna upp med fyra gissningar ur märkets nuvarande sortiment.
+ * Omförsöket nedan gäller bara generatorns egna svar.
  */
 async function searchCandidates(jobId: string, brand: string, images: CapturedImage[], dir: string): Promise<SellerCall> {
-  const call = await callSellerGenerate(brand, images, dir);
+  const call = await sokKandidater(jobId, brand, images, dir, [], []);
+  if (call.kind === "needs_selection" && call.engine === "gemini3") return call;
   // Kandidater, grundade eller ej: det räcker för att fylla skärmen, och resten görs i bakgrunden.
   if (!barren(call)) return call;
   console.info(`[identify] ${jobId.slice(0, 8)} inga kandidater på första försöket — försöker igen`);
-  const second = await callSellerGenerate(brand, images, dir);
+  const second = await callSellerGenerate(brand, images, dir, undefined, undefined, [], [], { candidateMode: "evidence" });
   return barren(second) ? call : second;
 }
 
@@ -200,10 +314,19 @@ async function skrivKandidatbilder(
   if (!fresh) return;
   if (fresh.identityStatus !== "needs_selection" && fresh.identityStatus !== "resolved") return;
   if (!sameList(fresh.candidates ?? [], candidates)) return;
-  fresh.candidates = withImages;
+  // En bild som redan finns på jobbet (till exempel ur Googles bildsök, se applyExternalImages) raderas aldrig av en jakt som blev utan: jaktens slutskrivning bär `null` för
+  // allt den inte hittade, och den skrivs ofta SIST.
+  fresh.candidates = withImages.map((c) => {
+    const prev = (fresh.candidates ?? []).find((p) => p.model === c.model);
+    // Ett appjobb (Googles bildsök): bilden bestäms av applyExternalImages och registret, aldrig av jaktens egna fynd, och jaktens "ingen bild" (null) är inget besked förrän appen sagt sitt.
+    if (fresh.externalIdentify && prev) return { ...c, imageUrl: prev.imageUrl, imageSource: prev.imageUrl ? prev.imageSource ?? c.imageSource : c.imageSource, undertyp: prev.undertyp };
+    // Och en bild som kom ur Googles bildsök (appen) ersätts inte av jaktens: den är redan fotokontrollerad, och jakten kan komma med en miljöbild med soffan i förgrunden.
+    const behall = !!prev?.imageUrl && (!c.imageUrl || /^https:\/\/www\.google\.com\/search\?udm=2/.test(prev.imageSource ?? ""));
+    return behall ? { ...c, imageUrl: prev!.imageUrl, imageSource: prev!.imageSource ?? c.imageSource } : c;
+  });
   // Den valda kandidaten är den enda vars sida annonsen ska byggas på — flytta över den hit så
   // fas 2 slipper leta i listan.
-  const chosen = fresh.selected && withImages.find((c) => c.model === fresh.selected!.model);
+  const chosen = fresh.selected && fresh.candidates.find((c) => c.model === fresh.selected!.model);
   if (chosen) fresh.selected = { ...fresh.selected!, pageSpecs: chosen.pageSpecs, imageSource: chosen.imageSource };
   await persist(fresh);
 }
@@ -222,7 +345,7 @@ async function skrivKandidatbilder(
  */
 async function publiceraRegisterbilder(jobId: string, candidates: ModelCandidate[]): Promise<void> {
   const träffar = await Promise.all(
-    candidates.map((c) => registreradKandidatbild(c.brand, c.model).catch(() => null)),
+    candidates.map((c) => registreradKandidatbild(c.brand, c.model, typfamilj(c.productType)).catch(() => null)),
   );
   if (!träffar.some(Boolean)) return;
   await skrivKandidatbilder(
@@ -238,7 +361,7 @@ async function publiceraRegisterbilder(jobId: string, candidates: ModelCandidate
  * Väljarskärmen ska dyka upp exakt lika snabbt som förut — bilderna är en förbättring av den, inte
  * ett villkor för den. En kandidat vars bild aldrig landar är fortfarande fullt valbar.
  */
-function attachCandidateImages(jobId: string, candidates: ModelCandidate[], sources: SourceRef[]): void {
+function attachCandidateImages(jobId: string, candidates: ModelCandidate[], sources: SourceRef[], external = false): void {
   /**
    * Skrivs in ÄVEN när säljaren redan hunnit välja.
    *
@@ -254,7 +377,8 @@ function attachCandidateImages(jobId: string, candidates: ModelCandidate[], sour
    */
   const publish = (withImages: ModelCandidate[]) => skrivKandidatbilder(jobId, candidates, withImages);
 
-  void resolveCandidateImages(candidates, sources, publish)
+  // `external`: appjobb. Jakten körs för sidornas mått, men dess bilder används aldrig (skrivKandidatbilder) och den rör inte registret (resolveCandidateImages, `register`).
+  void resolveCandidateImages(candidates, sources, publish, undefined, undefined, !external)
     .then(async (withImages) => {
       await publish(withImages);
       const hits = withImages.filter((c) => c.imageUrl).length;
@@ -281,47 +405,62 @@ function attachCandidateImages(jobId: string, candidates: ModelCandidate[], sour
 /**
  * Fas 1: vilken modell är det här?
  *
- * Körs parallellt med skickbedömningen så fort bilderna finns. Besiktningen behöver inte modellen och
- * identifieringen behöver inte betyget — de två spåren delar bara bildrutorna, så att kedja dem hade
- * lagt 6-11 sekunder ovanpå i stället för bredvid.
+ * Körs parallellt med skickbedömningen så fort bilderna finns. Besiktningen behöver inte modellen och identifieringen behöver inte
+ * betyget — de två spåren delar bara bildrutorna, så att kedja dem hade lagt tiderna ovanpå varandra i stället för bredvid. Klienten visar
+ * det som blir klart först (skicket före modellen, eller tvärtom); se pipeline/tasks.ts.
  *
- * Svarar generatorn med kandidater stannar flödet och väntar på säljaren. Kunde den avgöra modellen
- * själv (stark toppkandidat utan verklig konkurrens) hoppas valskärmen över helt — den finns för
- * VERKLIG tvetydighet, inte för varje möbel.
+ * Säljaren väljer modellen. Identifieringen föreslår — med den säkerhet den faktiskt har, "stark", "trolig" eller "möjlig" — och sparar
+ * underlaget (källor, observationer) som fas 2 ärver. Ingenting av fas 2 startar före valet: ingen förvärmning på en gissad modell.
  */
-export async function runIdentify(jobId: string, brand: string, images: CapturedImage[]): Promise<void> {
+export function runIdentify(jobId: string, brand: string, images: CapturedImage[]): Promise<void> {
+  return withCostScope({ jobId, stage: "identify" }, () => runIdentifyInner(jobId, brand, images));
+}
+
+async function runIdentifyInner(jobId: string, brand: string, images: CapturedImage[]): Promise<void> {
   const dir = jobDir(jobId);
   const startedAt = Date.now();
+  await setTask(jobId, "identify", "running", { restart: true });
 
-  /**
-   * ETT anrop, och sedan visas det som finns.
-   *
-   * Omförsöket — det som hämtar hem källorna när sökningen svarade utan att söka (`sources=0`) —
-   * ligger inte längre mellan säljaren och skärmen. Se `searchCandidates` och `grundaIBakgrunden`
-   * för mätningen bakom flytten och för vad omförsöket får respektive inte får ändra på.
-   */
+  /** ETT anrop, och sedan visas det som finns. Se `searchCandidates`. */
   const call = await searchCandidates(jobId, brand, images, dir);
   const job = getJobSync(jobId) ?? (await getJob(jobId));
   if (!job) return;
 
+  /**
+   * Säljaren hann före: de skrev modellnamnet själva (eller avbröt) medan sökningen pågick, och identiteten är avgjord. Ett sent svar får
+   * aldrig skriva över den — varken kandidater eller status — hur väl det än svarade.
+   */
+  if (job.identityStatus !== "identifying") {
+    console.info(`[identify] ${jobId.slice(0, 8)} svaret kom efter att identiteten avgjorts (${job.identityStatus}) — kastas`);
+    await setTask(jobId, "identify", "cancelled", { note: "Säljaren hann före." });
+    return;
+  }
+
   if (call.kind === "needs_selection") {
     job.identityStatus = "needs_selection";
     job.candidates = call.candidates;
-    // Sparas för fas 2. Sökningen där kommer tillbaka tom i två fall av tre på den här vägen, och
-    // då är det här underlaget det enda belagda som finns.
+    // Hur det slutade — skärmen skiljer på "bilderna räckte inte", "tiden/budgeten räckte inte" och "tjänsten var nere" när listan är tom.
+    job.identityResult = call.result ?? (call.candidates.length > 0 ? "candidates" : "no_match");
+    // Raden under väljaren när listan är tom: ett ärligt besked i stället för ett tyst "inga modeller".
+    job.identityError = call.note ?? null;
+    // Kvittot på körningen — tid per steg, sökfrågor, försök, kostnad.
+    job.identityTrace = call.runSummary ?? null;
+    // Sparas för fas 2: de sidor identifieringen läst är specsökningens startpunkt.
     job.identityResearch = { researchText: call.researchText, sources: call.sources };
     console.info(
       `[identify] ${jobId.slice(0, 8)} needs_selection candidates=${call.candidates.length}` +
-        ` sources=${call.sources.length} ms=${Date.now() - startedAt}`,
+        ` motor=${call.engine ?? "generator"} exakt=${call.exactMatch ?? "-"} sources=${call.sources.length} ms=${Date.now() - startedAt}`,
     );
     await persist(job);
+    const failed = job.identityResult === "timeout" || job.identityResult === "unavailable";
+    await setTask(jobId, "identify", failed ? "failed" : "completed", { note: failed ? job.identityError : null });
 
-    // Skärmen har sitt innehåll i och med raden ovan. Allt härunder är förbättringar av den, och
-    // ingenting av det väntas in: bilderna, källorna och fas 2 löper vidare av sig själva.
-    if (settled(call)) attachCandidateImages(jobId, call.candidates, call.sources);
+    // Skärmen har sitt innehåll i och med raden ovan. Bilderna och källorna är förbättringar av den; ingenting av det väntas in.
+    if (call.candidates.length === 0) return;
+    // Forskningens svar grundas inte om i bakgrunden: dess källor är redan riktiga adresser, och en
+    // generatorsökning till hade bara kostat ett anrop för att ersätta dem med sämre.
+    if (call.engine === "gemini3" || settled(call)) attachCandidateImages(jobId, call.candidates, call.sources);
     else grundaIBakgrunden(jobId, brand, images, dir, call);
-    // Fas 2 på toppkandidaten startar HÄR, inte vid trycket. Se forvarmFas2.
-    forvarmFas2(jobId, brand, call.candidates[0], images, dir, job.identityResearch ?? undefined);
     return;
   } else if (call.kind === "ok") {
     /**
@@ -351,29 +490,16 @@ export async function runIdentify(jobId: string, brand: string, images: Captured
       `[identify] ${jobId.slice(0, 8)} no-candidates (research föll) guessed=${guessed ?? "-"}` +
         ` varningar=${warnings.join("|") || "inga"} ms=${Date.now() - startedAt}`,
     );
-    /**
-     * Också gissningen ska få sin bild — och framför allt sitt besked.
-     *
-     * Den här grenen skrev en kandidat men startade aldrig någon bildhämtning, och `imageUrl` blev
-     * därmed stående som `undefined`: "letar fortfarande". Ingen letade. Väljarskärmen visade en
-     * skimrande platshållare och pollade i fem minuter efter en bild som ingen hade beställt — den
-     * enda vägen där laddningen bokstavligen var oändlig.
-     *
-     * Sidorna är annonsens egna källor. De är tunnare här än på kandidatvägen, för det var just
-     * grundningen som föll, men de är vad som finns — och en gissning behöver bilden MEST: säljaren
-     * ska kunna se med en gång att namnet inte stämmer.
-     */
     await persist(job);
-    if (job.candidates.length > 0) {
-      attachCandidateImages(jobId, job.candidates, r?.sources ?? []);
-      // Den enda kandidaten är också den som kommer att väljas, om den väljs alls.
-      forvarmFas2(jobId, brand, job.candidates[0], images, dir, undefined);
-    }
+    await setTask(jobId, "identify", "completed");
+    // Också gissningen ska få sin bild — och framför allt sitt besked: utan en hämtning blev `imageUrl` stående som `undefined`, "letar fortfarande".
+    if (job.candidates.length > 0) attachCandidateImages(jobId, job.candidates, r?.sources ?? []);
     return;
   } else {
     job.identityStatus = "unavailable";
     job.identityError = call.reason;
     console.warn(`[identify] ${jobId.slice(0, 8)} unavailable — ${call.reason}`);
+    await setTask(jobId, "identify", "failed", { note: call.reason });
   }
   await persist(job);
 }
@@ -456,14 +582,25 @@ export async function findMoreCandidates(jobId: string): Promise<{ ok: true } | 
     return true;
   });
 
+  /**
+   * Ett nytt försök är betalt arbete (sökfrågor à 0,15 SEK) och måste rymmas i omgångens budget. Rymmer den det inte svarar vi nej med en
+   * förklaring i stället för att starta något — säljaren kan skriva modellnamnet själv, eller starta en ny analys (en ny omgång, en ny budget).
+   */
+  const allowance = await allowanceFor(jobId, "identify");
+  if (allowance.searchQueries < MIN_IDENTIFY_QUERIES) {
+    return { error: "Kostnadstaket för den här omgången är nått, så fler modellförslag söks inte fram. Skriv modellnamnet själv, eller starta en ny analys." };
+  }
+
   job.rejectedCandidates = rejected;
   job.candidates = [];
   job.candidateRound = (job.candidateRound ?? 0) + 1;
   job.identityStatus = "identifying";
   job.identityError = null;
+  job.identityResult = undefined;
   await persist(job);
+  await setTask(jobId, "identify", "running", { restart: true });
 
-  void runCandidateRound(jobId, brand, images, rejected).catch((err) => {
+  void withCostScope({ jobId, stage: "identify" }, () => runCandidateRound(jobId, brand, images, rejected)).catch((err) => {
     console.warn(`[identify] ${jobId.slice(0, 8)} omval föll — ${err instanceof Error ? err.message : String(err)}`);
   });
   return { ok: true };
@@ -499,7 +636,16 @@ type CandidateRound = {
   /** Skälet från en fallen sökning. Värt att visa bara när omgången blev helt tom. */
   error: string | null;
   searches: number;
+  /** Satt när omgången gjordes av produktforskningen. Då styr den förvärmningen och loopen nedan. */
+  engine?: "gemini3";
+  exactMatch?: boolean;
+  runSummary?: ResearchRunSummary | null;
+  /** Hur forskningens runda slutade (bara när den gjordes av forskningen). */
+  result?: IdentityResult;
 };
+
+/** Vad en lista bär med sig om vem som gjorde den. */
+type ListMeta = { engine?: "gemini3"; exactMatch?: boolean; result?: IdentityResult };
 
 /**
  * Fyll fyra platser med förslag säljaren INTE redan sagt nej till.
@@ -529,7 +675,7 @@ export async function collectNewCandidates(
    * inte växa, och de återstående sökningarna rör bara `research`. Den som visar den behöver alltså
    * inte förbereda sig på att byta ut den under fingret på någon som läser.
    */
-  onFilled?: (candidates: ModelCandidate[], sources: SourceRef[]) => void,
+  onFilled?: (candidates: ModelCandidate[], sources: SourceRef[], meta: ListMeta) => void,
 ): Promise<CandidateRound> {
   const rejectedNames = rejected.map(fullName).filter(Boolean);
   const candidates: ModelCandidate[] = [];
@@ -539,6 +685,10 @@ export async function collectNewCandidates(
   let searches = 0;
   /** Har den fyllda listan redan lämnats ut? Den lämnas en gång, aldrig om. */
   let anmalda = false;
+  let engine: CandidateRound["engine"];
+  let exactMatch: boolean | undefined;
+  let runSummary: ResearchRunSummary | null = null;
+  let result: IdentityResult | undefined;
 
   while ((candidates.length < CANDIDATES_PER_ROUND || !research) && searches < MAX_ROUND_SEARCHES) {
     // Bara mellan sökningarna: säljaren kan ha skrivit namnet själv medan den förra löpte, och då
@@ -571,14 +721,28 @@ export async function collectNewCandidates(
     // Platserna är fyllda: visa dem nu, inte när grundningen nedan är klar.
     if (candidates.length >= CANDIDATES_PER_ROUND && !anmalda) {
       anmalda = true;
-      onFilled?.([...candidates], [...sources]);
+      onFilled?.([...candidates], [...sources], { engine: call.engine, exactMatch: call.exactMatch });
+    }
+    /**
+     * Forskningens svar avgör rundan. En runda är ETT forskningsanrop — med sin egen eskalering inuti —
+     * och inte upp till tre generatorsökningar som ska fylla fyra platser. Färre än fyra, eller noll,
+     * är ett ärligt svar: att söka om tills listan är full var just det som skapade fyra gissningar.
+     */
+    if (call.engine === "gemini3") {
+      engine = "gemini3";
+      exactMatch = call.exactMatch === true;
+      runSummary = call.runSummary ?? null;
+      result = call.result;
+      if (candidates.length === 0 && call.note) error = call.note;
+      if (!research && call.sources.length > 0) research = { researchText: call.researchText, sources: call.sources };
+      break;
     }
     // Fas 2 ärver EN sökning, aldrig tre hopklistrade: den första grundade. Text om fyra andra
     // modeller hade gett annonsen mått som hör till någon annan möbel.
     if (!research && call.sources.length > 0) research = { researchText: call.researchText, sources: call.sources };
   }
 
-  return { candidates, sources, research, error, searches };
+  return { candidates, sources, research, error, searches, engine, exactMatch, runSummary, result };
 }
 
 /**
@@ -609,7 +773,14 @@ async function runCandidateRound(
    * Körs en gång per omgång: antingen från `onFilled` mitt i sökandet, eller på slutresultatet när
    * platserna aldrig blev fyllda. Returnerar jobbet den skrev, eller null när den inte fick skriva.
    */
-  const visa = async (found: ModelCandidate[], sources: SourceRef[], research: CandidateRound["research"], error: string | null) => {
+  const visa = async (
+    found: ModelCandidate[],
+    sources: SourceRef[],
+    research: CandidateRound["research"],
+    error: string | null,
+    meta: ListMeta = {},
+    runSummary: ResearchRunSummary | null = null,
+  ) => {
     const job = getJobSync(jobId) ?? (await getJob(jobId));
     if (!job) return null;
     // Säljaren kan ha skrivit namnet själv medan sökningen pågick. Då är identiteten avgjord, och en
@@ -618,6 +789,7 @@ async function runCandidateRound(
 
     job.candidates = found;
     job.identityStatus = "needs_selection";
+    job.identityResult = found.length > 0 ? "candidates" : (meta.result ?? "no_match");
     // Underlaget byts bara mot ett som faktiskt bär något: en tom omgång får inte kasta de källor den
     // första gav, för det är dem fas 2 ärver när dess egen sökning kommer tillbaka tom.
     if (found.length > 0 && research) job.identityResearch = research;
@@ -625,22 +797,17 @@ async function runCandidateRound(
     // text. Bara en fallen generator är värd en varningsrad, och bara när den lämnade skärmen tom:
     // med fyra förslag uppe är en ursäkt för en sökning som föll däremellan bara brus.
     if (found.length === 0 && error) job.identityError = error;
+    if (runSummary) job.identityTrace = runSummary;
     await persist(job);
     uppe = found;
 
-    if (found.length > 0) {
-      attachCandidateImages(jobId, found, sources);
-      // Den förra omgångens förvärmning gäller ett namn säljaren just avfärdat. Bort med den, och
-      // värm den nya listans toppkandidat i stället.
-      forvarmda.delete(jobId);
-      forvarmFas2(jobId, brand, found[0], images, dir, job.identityResearch ?? undefined);
-    }
+    if (found.length > 0) attachCandidateImages(jobId, found, sources);
     return job;
   };
 
   const round = await collectNewCandidates(
     rejected,
-    (rejectedNames, listedNames) => callSellerGenerate(brand, images, dir, undefined, undefined, rejectedNames, listedNames),
+    (rejectedNames, listedNames) => sokKandidater(jobId, brand, images, dir, rejectedNames, listedNames),
     /**
      * Avbryt mellan sökningarna om säljaren hunnit avgöra identiteten själv. Saknas jobbet i minnet
      * är det inget besked om att valet är gjort — då fortsätter omgången.
@@ -655,8 +822,8 @@ async function runCandidateRound(
       return status === "identifying" || (uppe !== null && status === "needs_selection");
     },
     // Fyllda platser: ut med dem direkt. Se doc-kommentaren på parametern.
-    (found, sources) => {
-      void visa(found, sources, null, null).catch(() => {});
+    (found, sources, meta) => {
+      void visa(found, sources, null, null, meta).catch(() => {});
     },
   );
   const found = round.candidates;
@@ -671,12 +838,13 @@ async function runCandidateRound(
     const job = getJobSync(jobId) ?? (await getJob(jobId));
     // Bara om det fortfarande är DEN HÄR listan som står på skärmen. Ett nytt "hitta nya" under
     // tiden har egna kandidater, och det underlaget hör inte till dem.
-    if (job && round.research && sameList(job.candidates ?? [], uppe)) {
-      job.identityResearch = round.research;
+    if (job && sameList(job.candidates ?? [], uppe) && (round.research || round.runSummary)) {
+      if (round.research) job.identityResearch = round.research;
+      if (round.runSummary) job.identityTrace = round.runSummary;
       await persist(job);
     }
   } else {
-    await visa(found, round.sources, round.research, round.error);
+    await visa(found, round.sources, round.research, round.error, { engine: round.engine, exactMatch: round.exactMatch, result: round.result }, round.runSummary ?? null);
   }
 
   console.info(
@@ -687,14 +855,38 @@ async function runCandidateRound(
 }
 
 /**
+ * Rader utifrån (sidskörd, måttminne) som inte får fylla ett mått forskningen HÅLLIT TILLBAKA.
+ *
+ * Ett mått kan vara tillbakahållet för att utförandena skiljer sig och säljaren inte valt, eller för att
+ * uppgifterna motsade varandra. Sidskörden läser en enda produktsida — ofta ett annat utförande — och hade
+ * fyllt precis det hålet med ett tal som inte gäller säljarens möbel.
+ */
+export function utanTillbakahallna(result: Pick<GeneratedListing, "factCheck"> | { factCheck?: undefined }, rows: ListingAttribute[]): ListingAttribute[] {
+  const held = new Set((result.factCheck?.heldBack ?? []).map((h) => h.type));
+  if (held.size === 0) return rows;
+  return rows.filter((r) => {
+    const k = classifyAttribute(r);
+    return !(k.kind === "dimension" && k.type && held.has(k.type));
+  });
+}
+
+/**
  * Fas 2: säljaren har valt. Bygg annonsen på den modellen, och prissätt.
  *
  * Priset ligger sist med flit. Prismotorn söker på modellnamnet och drar av för skadorna, så den
  * behöver BÅDA de andra spåren klara — det är den enda punkt i flödet där de möts.
  */
-export async function finalizeWithModel(jobId: string, resolution: Resolution): Promise<void> {
+export function finalizeWithModel(jobId: string, resolution: Resolution): Promise<void> {
+  return withCostScope({ jobId, stage: "listing" }, () => finalizeWithModelInner(jobId, resolution));
+}
+
+async function finalizeWithModelInner(jobId: string, resolution: Resolution): Promise<void> {
   const job = getJobSync(jobId) ?? (await getJob(jobId));
   if (!job) return;
+  // Säljarens val gäller. Pågår identifieringen fortfarande (ett handskrivet namn medan den söker) stoppas det betalda anropet: ingen väntar på dess svar.
+  if (avbrytIdentifiering(jobId)) await setTask(jobId, "identify", "cancelled", { note: "Säljaren bekräftade modellen." });
+  else if (job.tasks?.identify?.status === "running") await setTask(jobId, "identify", "cancelled", { note: "Säljaren bekräftade modellen." });
+  await setTask(jobId, "specs", "running", { restart: true });
   const images = job.images ?? job.result?.images ?? [];
   const dir = jobDir(jobId);
   const startedAt = Date.now();
@@ -731,13 +923,25 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    *
    * Hoppas över vid ett omval: då har säljaren redan svarat, och listan ska inte hämtas på nytt.
    */
-  if (job.variantChosen == null) {
+  // Väntar vi på AI-lägets svar (expectExternalSpecs) avgör DET varianten ur bilderna: ingen gissad variantlista att fråga säljaren om (variantOptions står redan som tom).
+  if (job.variantChosen == null && !job.externalFacts?.specPending) {
     // Möbeltypen följer med. Utan den blev frågan ställd om hela serien: "Nordviken stol" gav val
     // mellan matbord, barstol och bänk. Se pipeline/varianter.ts.
-    void hamtaVarianter(brand, model, job.selected?.productType ?? null)
+    const typ = job.selected?.productType ?? null;
+    const variantLista = withCostScope({ jobId, stage: "variants" }, () => hamtaVarianter(brand, model, typ));
+    void variantLista
       .then(async (varianter) => {
         const fresh = getJobSync(jobId) ?? (await getJob(jobId));
         if (!fresh || fresh.variantChosen != null) return;
+        // Forskningens egna utföranden (grundade i källor, med skilda mått) går före minnesbaserade gissningar.
+        if (fresh.productFacts?.variants?.length) {
+          // Variantgrinden väntar på att listan blir satt: ge den forskningens egna alternativ i stället för att låta den vänta ut tidsgränsen.
+          if (fresh.productFacts.variants.length >= 2 && fresh.variantOptions === undefined) {
+            fresh.variantOptions = fresh.productFacts.variants.map((v) => v.label);
+            await persist(fresh);
+          }
+          return;
+        }
         fresh.variantOptions = varianter;
         await persist(fresh);
         console.info(`[varianter] ${jobId.slice(0, 8)} ${varianter.length} varianter för "${model}"`);
@@ -794,42 +998,56 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     specs: ListingAttribute[],
   ): T => {
     if (!listing.result || specs.length === 0) return listing;
-    const attributes = mergeSpecs(listing.result.attributes, specs);
+    const attributes = mergeSpecs(listing.result.attributes, utanTillbakahallna(listing.result as { factCheck?: GeneratedListing["factCheck"] }, specs));
     return attributes === listing.result.attributes ? listing : { ...listing, result: { ...listing.result, attributes } };
   };
 
   /**
-   * Det förvärmda anropet, om det gäller MODELLEN SÄLJAREN VALDE.
-   *
-   * Bort ur kartan direkt, oavsett träff: en miss ska inte ligga kvar och råka konsumeras av ett
-   * senare försök, och en träff får bara användas en gång — omförsöken nedan är till för att fråga
-   * på nytt, inte för att läsa samma svar igen.
+   * Fakta jobbet redan bär om DEN HÄR modellen — vid ett variantval. Då filtrerar vi dem i stället för
+   * att söka om: omsökningen tog 103–108 s och tappade alla mått (se annons.ts, byggAnnonsFranFakta).
+   * Gäller bara samma modell; ett omval av en annan modell börjar om.
    */
-  const forvarmd = forvarmda.get(jobId);
-  forvarmda.delete(jobId);
-  let vantande = forvarmd?.model === model ? forvarmd.call : null;
-  const varmstart = !!vantande;
-  if (forvarmd) {
-    console.info(
-      `[identify] ${jobId.slice(0, 8)} förvärmning ${vantande ? "träff" : "miss"}` +
-        ` (värmd="${forvarmd.model}" vald="${model}") försprång=${Date.now() - forvarmd.startedAt} ms`,
-    );
-  }
+  const storedFacts = job.productFacts && slugKey(job.productFacts.identity.model) === slugKey(model) ? job.productFacts : null;
+  let latestFacts: { facts: ProductFacts; trace: ResearchRunSummary | null } | null = null;
+  // En funktion och inte variabeln: TypeScript ser inte tilldelningen i generateOnce-återanropet.
+  const getFacts = (): { facts: ProductFacts; trace: ResearchRunSummary | null } | null => latestFacts;
 
+  /**
+   * ETT specsanrop per modell och jobb.
+   *
+   * Pågår redan en specsökning för den här modellen och det här jobbet — ett variantval medan den första löper — väntar vi in den i
+   * stället för att starta en andra bredvid: två parallella sökningar kostade dubbelt och den som blev klar sist skrev över den andra.
+   * Dess fakta bär alla utföranden, så variantvalet filtreras ur dem.
+   */
   const generateOnce = () => {
-    // Förvärmningen gäller FÖRSTA försöket. Ett omförsök som läser samma löfte hade fått samma svar.
-    const call = vantande ?? callSellerGenerate({ brand, model }, images, dir, resolution, prior);
-    vantande = null;
-    return call.then((c) =>
-      c.kind === "ok"
+    const identity = { brand, model };
+    const fresh = () => byggAnnons(identity, images, dir, resolution, prior);
+    const viaFacts = (facts: ProductFacts) => byggAnnonsFranFakta(identity, images, dir, resolution, facts, prior).then((c) => c ?? fresh());
+    const running = factsInFlight.get(jobId);
+    const call: Promise<SellerCall> = storedFacts
+      ? viaFacts(storedFacts)
+      : running && running.model === model
+        ? running.promise.then((f) => (f ? viaFacts(f) : fresh()))
+        : fresh();
+    const mine = call.then(
+      (c) => (c.kind === "ok" ? (c.productFacts ?? null) : null),
+      () => null,
+    );
+    factsInFlight.set(jobId, { model, promise: mine });
+    void mine.finally(() => {
+      if (factsInFlight.get(jobId)?.promise === mine) factsInFlight.delete(jobId);
+    });
+    return call.then((c) => {
+      if (c.kind === "ok" && c.productFacts) latestFacts = { facts: c.productFacts, trace: c.specTrace ?? null };
+      return c.kind === "ok"
         ? c.listing
         : {
             status: "unavailable" as const,
             unavailableReason: c.kind === "unavailable" ? c.reason : "Oväntat kandidatsvar i fas 2.",
             result: null,
             latencyMs: Date.now() - startedAt,
-          },
-    );
+          };
+    });
   };
 
   // Uppskattade mått räknas inte som fynd. Annonsen bär dem alltid numera, och läste villkoret dem
@@ -838,61 +1056,54 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   // och ett minne som stoppade omförsöken hade gjort att vi slutade leta efter tillverkarens egna tal.
   const eget = (a: ListingAttribute) => !a.estimated && !a.fromSellers;
   const hasDimensions = (l: Awaited<ReturnType<typeof generateOnce>>) =>
-    !!l.result?.attributes.some((a) => eget(a) && /(mått|bredd|djup|höjd|längd|diameter|sitthöjd|sitsdjup)/i.test(a.label));
+    // Mått som väntar på säljarens val av utförande ÄR funna — att leta om efter dem vore ett betalt anrop för ingenting.
+    !!l.result?.factCheck?.heldBack.some((h) => h.reason === "variant") ||
+    !!l.result?.attributes.some((a) => eget(a) && (a.kind === "dimension" || /(mått|bredd|djup|höjd|längd|diameter|sitthöjd|sitsdjup)/i.test(a.label)));
 
   /**
-   * Upp till tre försök, bundna av en väggklocka.
-   *
-   * Ett omförsök räckte inte. Mätt på samma stol, samma sex bildrutor, sexton minuter isär: en körning
-   * gav sex källor och alla mått, nästa dog på `network error: fetch failed` och omförsöket slog i
-   * 24-sekundersbudgeten. Två olika fel i rad, båda utanför modellen — och då finns inget att lära av
-   * att ge upp efter det andra.
-   *
-   * Budgeten finns för att spåret ändå löper parallellt med skickbedömningen: så länge den håller på
-   * kostar ett försök till ingenting, men den får inte bli det som håller kortet.
+   * Ett andra specsanrop när det första inte gav några mått — men bara om omgångens budget rymmer ett helt anrop till. Förut gjordes upp
+   * till tre försök i en väggklocka på 55 s utan att någon räknade vad de kostade; ett specsanrop kostar sökfrågor à 0,15 SEK, och taket
+   * för hela omgången är 2,00 SEK (cost/ledger.ts). Utan utrymme levereras det som finns, markerat som ofullständigt.
    */
-  const RETRY_BUDGET_MS = 55_000;
-  /** Ett nytt försök är bara meningsfullt om det hinner bli klart. */
-  const MIN_TIME_FOR_ATTEMPT_MS = 20_000;
+  const RETRY_MIN_REMAINING_SEK = 0.7;
 
   /**
-   * Publicera FÖRSTA svaret direkt, försök vidare i bakgrunden.
-   *
-   * Omförsöken låg tidigare före publiceringen, så säljaren väntade ut allihop: när sökningen
-   * timeoutar bränner varje försök hela sin 24-sekundersbudget, och tre försök blev 75 sekunders
-   * "Bygger annonsen…" innan något alls visades. Nu visas annonsen så fort det finns en, och måtten
-   * fylls i om ett senare försök hittar dem — samma mönster som delresultatet i skickbedömningen.
+   * Publicera annonsen på jobbet, märkt med om ett försök till kan komma. Klienten slutar polla först när den ser `improving: false`,
+   * annars fastnar skärmen på det första svaret medan ett bättre skrivs in bakom den.
    */
   const publish = async (listing: Awaited<ReturnType<typeof generateOnce>>, improving: boolean) => {
     const job = getJobSync(jobId) ?? (await getJob(jobId));
     if (!job) return;
+    // Säljaren kan ha bytt modell medan det här byggdes: då hör annonsen till en identitet som inte längre gäller, och får inte skriva över den nya.
+    if (job.identity && slugKey(job.identity.model ?? "") !== slugKey(model)) {
+      console.info(`[identify] ${jobId.slice(0, 8)} annonsen för "${model}" kom efter att modellen bytts till "${job.identity.model}" — kastas`);
+      return;
+    }
     job.identity = { brand, model };
-    // Märkt med om fler försök kan komma. Klienten slutar polla först när den ser `improving: false`,
-    // annars fastnar skärmen på det första svaret medan ett bättre skrivs in bakom den.
     const marked = behallSaljarensRattelser({ ...listing, improving }, job.result?.listing ?? job.pendingListing);
+    // Fakta om ALLA varianter följer med jobbet, så att ett variantval kan filtrera i stället för att söka om.
+    if (latestFacts) {
+      job.productFacts = latestFacts.facts;
+      job.specTrace = latestFacts.trace;
+    }
+    // Hittade forskningen utföranden med olika mått är DET variantfrågan, med forskningens egna ord —
+    // inte minnesbaserade gissningar. Gäller bara om säljaren ännu inte valt.
+    const options = marked.result?.factCheck?.options ?? [];
+    if (job.variantChosen == null && marked.result?.factCheck?.ambiguous && options.length >= 2) {
+      job.variantOptions = options;
+    }
     if (job.result) job.result.listing = marked;
     else job.pendingListing = marked;
     /**
-     * ETT ANNONSHÄRLETT JOBB BLIR KLART HÄR, och ingen annanstans.
-     *
-     * Köparens jobb har ingen besiktning (`skipGrading` i jobCreate.ts), och det är besiktningen som
-     * anropar `completeJob` för ett säljarjobb. Utan den här raden nådde jobbet aldrig ett slutläge:
-     * annonsen låg färdig på skärmen medan jobbet stod kvar i `identifying` — och fyra minuter efter
-     * att köparen klistrat in länken fällde `watchJobDeadline` en analys som varit klar hela tiden,
-     * med "Analysen tog längre än 240 s och avbröts". Varje köparanalys dog så, inte bara de sena.
-     *
-     * Först vid `improving: false`: dessförinnan kan ett omförsök fortfarande fylla i måtten, och
-     * klienten slutar polla när jobbet är klart.
+     * ETT ANNONSHÄRLETT JOBB BLIR KLART HÄR, och ingen annanstans: köparens jobb har ingen besiktning (`skipGrading`), och det är besiktningen
+     * som anropar `completeJob` för ett säljarjobb. Först vid `improving: false` — dessförinnan kan ett omförsök fortfarande fylla i måtten.
      */
-    if (job.adDerived && !improving) {
+    // Samma gäller testläget identifyOnly (prototypen): ingen besiktning, så annonsen/måtten är det som gör jobbet klart.
+    if ((job.adDerived || (job.externalIdentify && job.tasks?.condition?.status === "cancelled")) && !improving) {
       job.progress = { stage: "done", message: "Analysen är klar." };
     }
     await persist(job);
   };
-
-  /** Kommer slingan nedan att göra ett försök till? Samma villkor som dess `break`. */
-  const moreToCome = (l: Awaited<ReturnType<typeof generateOnce>>, until: number) =>
-    !hasDimensions(l) && until - Date.now() >= MIN_TIME_FOR_ATTEMPT_MS;
 
   /**
    * Vad säljare av samma modell mätt upp. Läses EN gång per fas 2 — minnet ligger i processen och
@@ -908,36 +1119,37 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
   }
 
   const listingPromise = (async () => {
-    const until = Date.now() + RETRY_BUDGET_MS;
+    // Sidskörden och måttminnet kommer utan `kind`. Varje rad som lämnar servern ska veta vad den är
+    // (mått, material, uppgift), så att klienten inte gissar av en etikett.
+    const withKindsOn = <T extends { result: { attributes: ListingAttribute[] } | null }>(listing: T): T =>
+      listing.result ? { ...listing, result: { ...listing.result, attributes: withKinds(listing.result.attributes) } } : listing;
     const enrich = async <T extends { result: { attributes: ListingAttribute[] } | null }>(listing: T) =>
-      withPageSpecs(withPageSpecs(listing, await freshPageSpecs()), minnet);
+      withKindsOn(withPageSpecs(withPageSpecs(listing, await freshPageSpecs()), minnet));
+
     let best = await enrich(await generateOnce());
-    await publish(best, moreToCome(best, until));
-    // `ms` är SÄLJARENS väntan: från trycket på modellen till att annonsen ligger på jobbet. Skild
-    // från `listing.latencyMs`, som med en förvärmd träff räknar från långt före trycket och därför
-    // inte längre säger något om hur länge någon stod och väntade.
+    const cost = await costOf(jobId);
+    const retry = !hasDimensions(best) && !!cost && canSpend(cost, RETRY_MIN_REMAINING_SEK);
+    if (!hasDimensions(best) && !retry) {
+      await markIncomplete(jobId, cost && budgetStatus(cost) !== "within" ? "Kostnadstaket för omgången rymde inget nytt försök att hitta måtten." : "Inga mått hittades.");
+    }
+    await publish(best, retry);
+    // `ms` är SÄLJARENS väntan: från trycket på modellen till att annonsen ligger på jobbet.
     console.info(
       `[identify] ${jobId.slice(0, 8)} väg=${resolution.kind} listing=${best.status} mått=${hasDimensions(best)}` +
-        ` förvärmd=${varmstart} medskickade_källor=${prior?.sources.length ?? 0}` +
-        ` källor=${best.result?.sources?.length ?? 0} ms=${Date.now() - startedAt}`,
+        ` medskickade_källor=${prior?.sources.length ?? 0} källor=${best.result?.sources?.length ?? 0} ms=${Date.now() - startedAt}`,
     );
 
-    for (let attempt = 2; attempt <= 3; attempt++) {
-      // Starta inte ett försök som ändå inte hinner klart — 24 sekunders säker väntan i onödan.
-      if (hasDimensions(best) || until - Date.now() < MIN_TIME_FOR_ATTEMPT_MS) break;
-      console.info(`[identify] ${jobId.slice(0, 8)} inga mått — försök ${attempt} av 3 i bakgrunden`);
+    if (retry) {
+      console.info(`[identify] ${jobId.slice(0, 8)} inga mått — ett försök till (budgeten rymmer det)`);
       const next = await enrich(await generateOnce());
       // Bara belagda attribut räknas. De uppskattade måtten följer med varje försök och säger inget om
       // vilket av dem som fick veta mest — de hade bara gjort jämförelsen till en fråga om möbeltyp.
       const count = (l: typeof best) => l.result?.attributes.filter(eget).length ?? 0;
-      if (hasDimensions(next) || count(next) > count(best)) {
-        best = next;
-        await publish(best, moreToCome(best, until));
-      }
+      if (hasDimensions(next) || count(next) > count(best)) best = next;
+      if (!hasDimensions(best)) await markIncomplete(jobId, "Inga mått hittades.");
     }
-    // Sista ordet, alltid skrivet: slingan kan ha slutat utan att publicera (försöket blev inte bättre),
-    // och då står `improving: true` kvar på jobbet med ingen som någonsin tar bort det. Skörden läses
-    // om en sista gång — sidan kan ha landat medan det sista försöket kördes.
+    // Sista ordet, alltid skrivet: `improving: true` ska aldrig stå kvar på jobbet med ingen som tar bort det. Skörden läses om en
+    // sista gång — sidan kan ha landat medan det sista försöket kördes.
     best = await enrich(best);
     await publish(best, false);
     return { ...best, improving: false };
@@ -955,10 +1167,16 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    * Skrivningen hör hemma i spåret som räknar fram talet. Annonsen har sin egen (se `publish`), och den
    * ena ska inte kunna hålla den andra.
    */
-  const pricePromise = (async () => {
+  const pricePromise = withCostScope({ jobId, stage: "price" }, async () => {
+    await setTask(jobId, "price", "running", { restart: true });
     // Priset behöver skadelistan. Skickbedömningen kör i sitt eget spår och kan mycket väl vara klar.
     const ready = await waitForCondition(jobId);
-    if (!ready?.result) return null;
+    if (!ready?.result) {
+      // Ingen besiktning i det här jobbet (testläget identifyOnly): priset hoppas över, det har inte "fallit".
+      const skipped = ((getJobSync(jobId) ?? (await getJob(jobId)))?.tasks?.condition?.status ?? "") === "cancelled";
+      await setTask(jobId, "price", skipped ? "cancelled" : "failed", { note: skipped ? "Pris hoppades över: jobbet har ingen besiktning." : "Skicket blev inte klart." });
+      return null;
+    }
     /**
      * Spekulationen först: prismotorn kan redan ha räknat fram exakt det här talet parallellt med
      * granskningen. Gäller den både modellen säljaren valde och den slutliga skadelistan är svaret
@@ -989,13 +1207,22 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
     // löper. Gäller det priset räknas bunten in nu; annars gör svaret det när det kommer in.
     await synkaStolpris(jobId);
     console.info(`[identify] ${jobId.slice(0, 8)} price=${price?.status ?? "none"} spekulerat=${speculated ? "ja" : "nej"} ms=${Date.now() - startedAt}`);
+    // "Inga tillräckligt lika annonser" är ett svar, inte ett fel: prismotorn gjorde sitt jobb. Bara en motor som inte gick att nå är en fallen uppgift.
+    const priceAnswered = price?.status === "ok" || price?.status === "no_data";
+    await setTask(jobId, "price", priceAnswered ? "completed" : "failed", { note: price?.status === "ok" ? null : price?.status === "no_data" ? "Inga tillräckligt lika annonser." : "Priset kunde inte hämtas." });
     return price;
-  })();
+  });
 
   // Publicera annonsen så fort DEN är klar — säljaren ska inte vänta in priset för att se
   // specifikationerna.
   const listing = await listingPromise;
   console.info(`[identify] ${jobId.slice(0, 8)} listing=${listing.status} ms=${Date.now() - startedAt}`);
+  const listingOk = listing.status === "ok" && !!listing.result;
+  // Forskningen levererade när kortet har mått. Ett kort utan (forskningen föll, eller budgeten rymde inget nytt försök) finns kvar och går att komplettera,
+  // men uppgiften säger sanningen: den föll.
+  const researched = listingOk && hasDimensions(listing);
+  await setTask(jobId, "specs", researched ? "completed" : "failed", { note: researched ? null : listingOk ? "Inga mått hittades." : listing.unavailableReason ?? "Annonsen blev inte klar." });
+  if (!listingOk) await markIncomplete(jobId, listing.unavailableReason ?? "Annonsen blev inte klar.");
 
   /**
    * Omslaget, när kandidatvalet inte redan gav ett.
@@ -1050,15 +1277,25 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
    * omförsök tar. Läses ur sidans egen HTML, aldrig gissat: se harvestSpecs.
    */
   const saknarSpecar =
-    !listing.result?.attributes.some((a) => eget(a) && /(mått|bredd|djup|höjd|längd|diameter)/i.test(a.label)) ||
-    !listing.result?.attributes.some((a) => /(material|klädsel|stomme|träslag)/i.test(a.label));
+    !listing.result?.attributes.some((a) => eget(a) && (a.kind === "dimension" || /(mått|bredd|djup|höjd|längd|diameter)/i.test(a.label))) ||
+    !listing.result?.attributes.some((a) => a.kind === "material" || /(material|klädsel|stomme|träslag)/i.test(a.label));
 
   /** Sant när hämtningen görs BARA för specarnas skull: omslaget är redan satt och bekräftat. */
   const baraSpecar = !!gammal && !provaOm && saknarSpecar;
 
   void (gammal && !provaOm && !saknarSpecar
     ? Promise.resolve({ image: gammal as ProductImage, specs: [] as ListingAttribute[] })
-    : resolveProductPage({ brand, model }, listing.result?.sources ?? [], farg)
+    : resolveProductPage(
+        { brand, model },
+        [
+          ...(listing.result?.sources ?? []),
+          // Sidor specsökningen såg med en produktbild av just den här modellen. De går genom samma
+          // kontroll som alla andra (modellnamnet måste synas), men de är det som finns att gå på för
+          // en utgången modell vars tillverkarsida är borta.
+          ...((getFacts()?.facts.productPages ?? []).map((url) => ({ title: model, url, qualityTier: 2 as const }))),
+        ],
+        farg,
+      )
         // Utebliven ny bild får inte kosta den gamla. Se resonemanget ovan. Och en hämtning som
         // gjordes för MÅTTENS skull får inte byta ut ett omslag som redan är valt och bekräftat —
         // den sidan är vald efter vad den skriver, inte efter vad den visar.
@@ -1081,12 +1318,12 @@ export async function finalizeWithModel(jobId: string, resolution: Resolution): 
        */
       const current = withCover.result?.listing ?? withCover.pendingListing ?? null;
       if (specs.length > 0 && current?.result) {
-        current.result.attributes = mergeSpecs(current.result.attributes, specs);
+        current.result.attributes = mergeSpecs(current.result.attributes, utanTillbakahallna(current.result, specs));
       }
       // Manualvägen bygger sin annons utan att passera slingan ovan, och ett mått ur minnet är
       // fortfarande bättre än den uppskattning som annars står kvar. Efter sidskörden: sidan först.
       if (minnet.length > 0 && current?.result) {
-        current.result.attributes = mergeSpecs(current.result.attributes, minnet);
+        current.result.attributes = mergeSpecs(current.result.attributes, utanTillbakahallna(current.result, minnet));
       }
       await persist(withCover);
       console.info(
@@ -1149,8 +1386,335 @@ async function waitForCondition(jobId: string) {
     const job = getJobSync(jobId) ?? (await getJob(jobId));
     if (!job) return null;
     if (job.progress.stage === "error") return null;
+    // En avbruten besiktning (jobbet kördes utan, skipGrading) levererar aldrig något: vänta inte ut tidsgränsen på det.
+    if (!job.result && job.tasks?.condition?.status === "cancelled") return null;
     if (job.result && !job.result.reviewPending) return job;
     await new Promise((r) => setTimeout(r, 500));
   }
   return null;
+}
+
+/**
+ * PROTOTYP — identifieringen kom utifrån (appens webbvy mot Googles AI-läge). Se externalIdentify.ts.
+ *
+ * Översätter svaret till kandidater på jobbet, så att väljarskärmen och resten av flödet fungerar oförändrat. Svaret ersätter ALDRIG ett val säljaren redan gjort, och
+ * mått och material som följer med används först när säljaren väljer modellen — då genom den vanliga verifieringen (annons.ts).
+ */
+export async function applyExternalIdentification(
+  jobId: string,
+  answer: string,
+  links: string[],
+  opts: { specsPending?: boolean; imagesPending?: boolean } = {},
+): Promise<{ ok: true; candidates: number; costUsd: number; items: Array<{ model: string; productType: string | null; undertyp: "barstol" | null }> } | { error: string }> {
+  const job = await getJob(jobId);
+  if (!job?.externalIdentify) return { error: "Jobbet väntar inte på en extern identifiering." };
+  if (job.identityStatus !== "identifying") return { error: "Identiteten är redan avgjord." };
+  const brand = job.identity?.brand?.trim() || "";
+  let structured;
+  try {
+    structured = await withCostScope({ jobId, stage: "identify" }, () => structureExternalAnswer(answer, links, brand));
+  } catch (err) {
+    const note = err instanceof Error ? err.message : String(err);
+    console.warn(`[identify] ${jobId.slice(0, 8)} AI-lägets svar gick inte att föra över: ${note}`);
+    await failExternalIdentification(jobId, note, "Svaret från AI-läget gick inte att tolka. Skriv modellnamnet själv eller försök igen.");
+    return { error: note };
+  }
+  const cleanLinks = cleanExternalLinks(links);
+  const sources: SourceRef[] = cleanLinks.map((url) => ({ title: new URL(url).hostname.replace(/^www\./, ""), url }));
+  const id = (structured.spec.identity ?? {}) as { variant?: unknown; category?: unknown; discontinued?: unknown };
+  /**
+   * Möbeltypen MÅSTE finnas på kandidaterna: utan den är sidtypsregeln och bildkontrollen avstängda. Svarets egna ord räcker ofta inte, så saknas den läses den ur säljarens
+   * omslagsbild (ett anrop, se typFranFoto) — säljarens foto är den enda källa som alltid finns.
+   */
+  // Fotot går före svarets ord: det är säljarens verkliga möbel. Är typen redan läst (webben frågade efter den innan frågan till AI-läget) kostar det inget; annars läses den nu.
+  let category: string | null = job.furnitureType ?? null;
+  if (!category) category = (await furnitureTypeOf(jobId)).type;
+  if (!category && typeof id.category === "string" && id.category.trim()) category = id.category.trim();
+  const level = (c: "high" | "medium" | "low") => (c === "high" ? "strong" : c === "medium" ? "likely" : "possible");
+  const mk = (model: string, confidence: "strong" | "likely" | "possible", evidence: string, detail: string | null, sourceUrl: string | null): ModelCandidate => ({
+    brand,
+    model,
+    variant: typeof id.variant === "string" && model === structured.model ? id.variant : null,
+    productType: category,
+    confidence,
+    distinguishingDetail: detail,
+    evidence: [evidence],
+    sourceUrl,
+    productPages: [],
+  });
+  // Förslag 1 faller tillbaka på första länken (svarets källista handlar om det); ett alternativ får aldrig en orelaterad länk: dess referensbilder hämtas därifrån.
+  const candidates: ModelCandidate[] = [
+    mk(structured.model, level(structured.confidence), structured.confidenceReason || "Pekades ut av Googles AI-läge utifrån bilderna.", structured.confidenceReason?.slice(0, 160) ?? null, pickModelPage(cleanLinks, structured.model, brand) ?? cleanLinks[0] ?? null),
+    ...structured.alternatives.map((a) => mk(a.model, level(a.confidence), a.why || "Nämndes som alternativ av Googles AI-läge.", a.why?.slice(0, 160) ?? null, a.sourceUrl ?? pickModelPage(cleanLinks, a.model, brand))),
+  ];
+  // Undertypen varje kandidat menar (en NORDVIKEN-BARSTOL är inte NORDVIKEN-matstolen), ur kandidatens egna ord. Går in i bildsökningen och bildkontrollen.
+  for (const c of candidates) c.undertyp = undertypForKandidat(answer, c.model, [c.distinguishingDetail, ...(c.evidence ?? [])], c.sourceUrl);
+  // Registrets bilder FÖRST, och redan innan korten sparas: en modell som någon sett förut (och vars bild klarat alla kontroller) har bilden framme när skärmen ritas, och appen behöver inte söka den.
+  await Promise.all(
+    candidates.map(async (c) => {
+      const hit = await registreradKandidatbild(c.brand, c.model, extRegTyp(c)).catch(() => null);
+      if (hit) {
+        c.imageUrl = hit;
+        c.imageSource = "register";
+      }
+    }),
+  );
+  // KEDJAN, STEG A (src/referensbild.ts): produktlänken AI-läget gav för modellen, om den är en riktig produktsida. Gratis och snabb (~2–6 s), körs för alla som saknar registerbild innan korten sparas, så att
+  // appen bara behöver söka bilder (steg C, SerpApi) för de modeller A inte klarade. Laddningsskärmen väntar ändå på bilderna. Steget har ett tak; en kandidat som inte hann är inte klar och går vidare.
+  if (referensKedjaPa()) {
+    const saknar = candidates.filter((c) => !c.imageUrl);
+    if (saknar.length > 0) {
+      const traffar = await withCostScope({ jobId, stage: "identify" }, () => losProduktsidor(jobId, saknar.map(tillRefKandidat), Number(process.env.LOOPA_REFERENS_A_MS ?? 20_000) || 20_000)).catch(() => new Map<string, { url: string; source: string }>());
+      for (const c of saknar) {
+        const t = traffar.get(c.model);
+        if (t) {
+          c.imageUrl = t.url;
+          c.imageSource = t.source;
+        }
+      }
+      await registreraKandidatbilder(saknar.filter((c) => c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, typ: extRegTyp(c), url: c.imageUrl! }))).catch(() => undefined);
+      console.info(`[bild] ${jobId.slice(0, 8)} steg A (produktlänkar): bild åt ${saknar.filter((c) => c.imageUrl).map((c) => c.model).join(", ") || "ingen"}`);
+    }
+  }
+  const behovBild = candidates.filter((c) => !c.imageUrl);
+  const fresh = (await getJob(jobId)) ?? job;
+  if (fresh.identityStatus !== "identifying") return { error: "Identiteten hann avgöras." };
+  fresh.identityStatus = "needs_selection";
+  fresh.candidates = candidates;
+  fresh.identityResult = "candidates";
+  fresh.identityError = null;
+  fresh.identityResearch = { researchText: `IDENTIFIERING (Googles AI-läge)
+${answer.slice(0, 6000)}`, sources };
+  // `specPending` (äldre vägen): appen frågade efter mått och material för förslag 1 medan säljaren tittade på korten. Nu frågas det först efter valet (expectExternalSpecs).
+  fresh.externalFacts = { model: structured.model, spec: structured.spec, links: cleanLinks, at: Date.now(), ...(opts.specsPending ? { specPending: true } : {}) };
+  // Appens bildsökning är på väg: väljarskärmen får inte sluta vänta på bilder för att serverns egen bildjakt gav upp (applyExternalImages släpper flaggan).
+  // Bara om någon kandidat saknar registerbild: har alla en är det inget att vänta på, och appen behöver inte söka (items nedan är bara de som saknar bild).
+  if (opts.imagesPending && behovBild.length > 0) fresh.externalImagesPending = true;
+  await persist(fresh);
+  await setTask(jobId, "identify", "completed", { note: null });
+  console.info(
+    `[identify] ${jobId.slice(0, 8)} extern identifiering: ${candidates.map((c) => `${c.model}${c.undertyp ? `[${c.undertyp}]` : ""}(${c.confidence})${c.imageUrl ? "*" : ""}`).join(", ")} länkar=${cleanLinks.length} ≈$${structured.costUsd.toFixed(4)} (* = bild ur registret)`,
+  );
+  attachCandidateImages(jobId, candidates, sources, true);
+  return {
+    ok: true,
+    candidates: candidates.length,
+    costUsd: structured.costUsd,
+    items: behovBild.map((c) => ({ model: c.model, productType: c.productType ?? null, undertyp: c.undertyp ?? null })),
+  };
+}
+
+/** Det kedjan i referensbild.ts behöver veta om en kandidat. */
+const tillRefKandidat = (c: ModelCandidate): RefKandidat => ({ brand: c.brand, model: c.model, productType: c.productType ?? null, undertyp: c.undertyp ?? null, sourceUrl: c.sourceUrl ?? null });
+
+/** Registrets nyckel för appens bilder: egen namnrymd ("g:", Googles bildsök, alla kontroller godkända), med undertypen när kandidaten har en (barstol och matstol är olika bilder). */
+const extRegTyp = (c: ModelCandidate): string => `g:${c.undertyp ?? typfamilj(c.productType) ?? ""}`;
+
+/**
+ * Möbeltypen ur säljarens omslagsbild, för frågan till AI-läget ("vilka Sits fåtöljer kan det vara?") och för kandidaterna. Läses en gång per jobb och sparas.
+ * Null när typen inte går att avgöra (annan möbel, ingen nyckel, nätfel): frågan ställs då utan typ.
+ */
+export async function furnitureTypeOf(jobId: string): Promise<{ type: string | null }> {
+  const job = getJobSync(jobId) ?? (await getJob(jobId));
+  if (!job) return { type: null };
+  if (job.furnitureType !== undefined) return { type: job.furnitureType };
+  // Omslagsbilden, annars den skarpaste (flest bytes): samma val som appen gör för frågan till AI-läget. Sökvägen ligger under jobbets originals-mapp.
+  const abs = (p: string) => path.join(jobDir(jobId), p.startsWith("originals/") ? "" : "originals", p);
+  const images = job.images ?? [];
+  const bySize = (await Promise.all(images.map(async (i) => ({ i, size: (await stat(abs(i.path)).catch(() => null))?.size ?? 0 })))).sort((a, b) => b.size - a.size)[0]?.i;
+  const cover = images.find((i) => i.role === "cover") ?? bySize;
+  const type = cover ? await withCostScope({ jobId, stage: "identify" }, () => typFranFoto(abs(cover.path))) : null;
+  const fresh = getJobSync(jobId) ?? (await getJob(jobId));
+  if (fresh) {
+    fresh.furnitureType = type;
+    await persist(fresh);
+  }
+  console.info(`[identify] ${jobId.slice(0, 8)} möbeltyp ur fotot: ${type ?? "okänd"}`);
+  return { type };
+}
+
+/**
+ * Säljaren har valt modell i appen: AI-läget ska nu avgöra vilken EXAKT variant det är (ur bilderna) och ange mått, material och nypris för just den. Frågan ställs av appen
+ * och svaret kommer till applyExternalSpecs, men annonsen börjar byggas redan i samma andetag som valet — därför sätts väntan HÄR, före finalizeWithModel, så att specsteget
+ * (byggAnnons) hittar `specPending` och väntar in svaret i stället för att göra en egen betald sökning. Förut frågades det för förslag 1 direkt, innan säljaren valt något.
+ *
+ * Varianten avgörs av AI-läget, så variantlistan (en gissad lista som säljaren annars får välja ur) hoppas över: variantOptions står som tom, och ingen fråga ställs.
+ * Returnerar false när jobbet inte är ett appjobb (då gör servern som förut).
+ */
+export async function expectExternalSpecs(jobId: string, model: string): Promise<boolean> {
+  const job = getJobSync(jobId) ?? (await getJob(jobId));
+  if (!job?.externalIdentify) return false;
+  job.externalFacts = { model, spec: {}, links: job.externalFacts?.links ?? [], at: Date.now(), specPending: true };
+  if (job.variantChosen == null) job.variantOptions = [];
+  await persist(job);
+  return true;
+}
+
+/**
+ * Svaret från AI-läget (variant, mått, material, nypris för modellen säljaren valde) kom. Översätts och läggs in på jobbet; specsteget, som väntar, går vidare.
+ * `failed`: frågan gav inget svar — specen förblir tom, och specsteget går då Loopas vanliga väg (se annons.ts: en tom spec ersätter aldrig egen sökning).
+ */
+export async function applyExternalSpecs(
+  jobId: string,
+  input: ({ answer: string; links: string[] } | { failed: string }) & { model?: string },
+): Promise<{ ok: boolean; facts?: boolean; costUsd?: number }> {
+  const job = await getJob(jobId);
+  const ext = job?.externalFacts;
+  if (!job || !ext) return { ok: false };
+  // Ett sent svar på en TIDIGARE fråga (säljaren hann byta modell): det hör inte till modellen vi nu väntar på och får varken fylla i specen eller släppa väntan.
+  if (input.model && slugKey(input.model) !== slugKey(ext.model)) {
+    console.warn(`[identify] ${jobId.slice(0, 8)} måttsvar för "${input.model}" ignorerat: väntar på "${ext.model}"`);
+    return { ok: false };
+  }
+  const done = async (spec: Record<string, unknown> | null) => {
+    const fresh = (await getJob(jobId)) ?? job;
+    if (!fresh.externalFacts) return;
+    fresh.externalFacts = { ...fresh.externalFacts, ...(spec ? { spec } : {}), specPending: false };
+    await persist(fresh);
+  };
+  if ("failed" in input) {
+    console.warn(`[identify] ${jobId.slice(0, 8)} måttfrågan gav inget svar: ${input.failed.slice(0, 120)}`);
+    await done(null);
+    return { ok: true, facts: false };
+  }
+  const brand = job.identity?.brand?.trim() || "";
+  try {
+    const r = await withCostScope({ jobId, stage: "specs" }, () => structureExternalSpecs(input.answer, input.links, brand, ext.model));
+    const merged = mergeExternalSpec(ext.spec, r.spec);
+    await done(merged);
+    console.info(`[identify] ${jobId.slice(0, 8)} externa mått för ${ext.model}: ${(Array.isArray(merged.dimensions) ? merged.dimensions.length : 0)} mått, ${(Array.isArray(merged.materials) ? merged.materials.length : 0)} material ≈$${r.costUsd.toFixed(4)}`);
+    return { ok: true, facts: specHasFacts(merged), costUsd: r.costUsd };
+  } catch (err) {
+    console.warn(`[identify] ${jobId.slice(0, 8)} måttsvaret gick inte att föra över: ${err instanceof Error ? err.message : err}`);
+    await done(null);
+    return { ok: true, facts: false };
+  }
+}
+
+/**
+ * Referensbilder ur Googles bildsök (appens webbvy) kom: en lista rader (miniatyradress, sidtitel, storlek) per modell. Se externalImages.ts.
+ *
+ * Per kandidat: de bästa raderna (pickImageRows) hämtas hem parallellt, var och en prövas av fotokontrollen (candidateType.ts) parallellt, och den första i svarets ordning som är
+ * ett foto av rätt typ blir kortets bild. En kandidat som redan har en bild behåller den — det som kom först var också kontrollerat. Ingen bild som klarar kontrollen = ingen ändring.
+ */
+export function applyExternalImages(
+  jobId: string,
+  groups: Array<{ model: string; rows: unknown }>,
+  /** `final`: appen skickar inga fler rader (annars väntar den med ett andra försök för de modeller som blev utan bild, och väljarskärmen får vänta vidare). */
+  opts: { final?: boolean } = {},
+): Promise<{ ok: boolean; set: string[]; none: string[] }> {
+  // Bildvalen (C) och steg B anropar Gemini; i jobbets kostnadsbok hamnar de bara om de körs i jobbets scope. Anropet kommer från en HTTP-väg, utan ett.
+  return withCostScope({ jobId, stage: "identify" }, () => applyExternalImagesInner(jobId, groups, opts));
+}
+
+async function applyExternalImagesInner(
+  jobId: string,
+  groups: Array<{ model: string; rows: unknown }>,
+  opts: { final?: boolean },
+): Promise<{ ok: boolean; set: string[]; none: string[] }> {
+  const job = (getJobSync(jobId) ?? (await getJob(jobId))) ?? null;
+  if (!job?.candidates?.length) return { ok: false, set: [], none: [] };
+  // Bildsökningen är klar (också när den gav noll rader eller föll: appen skickar då tom lista): väljarskärmen får sluta vänta. Se externalImagesPending.
+  const releasePending = async () => {
+    const f = getJobSync(jobId) ?? (await getJob(jobId));
+    if (f?.externalImagesPending) {
+      f.externalImagesPending = false;
+      await persist(f);
+    }
+  };
+  const brand = job.identity?.brand?.trim() || "";
+  const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9åäö]+/g, "");
+  const picked = await Promise.all(
+    job.candidates.map(async (c): Promise<{ model: string; url: string | null } | null> => {
+      const group = groups.find((g) => key(g.model) === key(c.model));
+      if (!group || c.imageUrl) return null;
+      const fam = typfamilj(c.productType);
+      const undertyp = c.undertyp ?? null;
+      const rows = pickReferenceRows(group.rows, c.model, brand, c.productType ?? null, undertyp);
+      // KEDJAN, STEG C: rader med sajt och sida (SerpApi). Reglerna ovan har redan gallrat (märket i titel/adress, ingen prisjämförare); här väljer ETT jämförande anrop den bästa bland högst fem, eller ingen.
+      // Andrahandsannonser ingår inte: deras foton är sällan ett bra referensfoto, och B tar de modeller som blir utan. Rader utan sajtuppgift (skalets) går den gamla vägen nedan.
+      const harSajt = (group.rows as Array<{ source?: unknown; page?: unknown }> | undefined)?.some((r) => typeof r?.page === "string" || typeof r?.source === "string") === true;
+      if (referensKedjaPa() && harSajt) {
+        const rad = new Map((group.rows as Array<{ src: string; alt?: string; source?: string }>).map((r) => [r.src, r]));
+        const tillVal = rows.filter((r) => !r.marketplace).slice(0, 5);
+        console.info(`[bild] ${jobId.slice(0, 8)} ${c.model}: steg C — ${(group.rows as unknown[]).length} träffar, ${rows.length} klarade reglerna, ${tillVal.length} går till valet (andrahandsannonser undantagna)`);
+        const vinnare = await valjBland(
+          { brand, model: c.model, ord: typOrd(c) },
+          tillVal.map((r) => ({ src: r.src, titel: rad.get(r.src)?.alt ?? "", kalla: rad.get(r.src)?.source, referer: null })),
+        ).catch(() => null);
+        return { model: c.model, url: vinnare?.lokal ?? null };
+      }
+      // Varje rad hämtas och bedöms PARALLELLT, med ALLA kontroller i ett anrop (typ, katalogfoto, undertyp): bilden är kortets enda bevis för vilken möbel modellen är.
+      const bedomda = rows.map(async (r): Promise<{ url: string | null; check: ReferenceCheck }> => {
+        const url = await lokalKandidatbild(r.src, null).catch(() => null);
+        if (!url) return { url: null, check: { local: false, marketplace: r.marketplace, typ: null, katalog: null, undertyp: null } };
+        if (!fam) return { url, check: { local: true, marketplace: r.marketplace, typ: true, katalog: null, undertyp: null } };
+        const b = await bedomReferensbild(url, fam, undertyp).catch(() => ({ typ: null, katalog: null, undertyp: null }));
+        return { url, check: { local: true, marketplace: r.marketplace, ...b } };
+      });
+      // Första godkända katalogfotot i rangordningen vinner så snart dess svar finns (valjReferensbild); finns inget, reserven. Ingen bild hellre än fel bild.
+      const i = await valjReferensbild(bedomda.map((p) => p.then((x) => x.check)));
+      return { model: c.model, url: i >= 0 ? (await bedomda[i]).url : null };
+    }),
+  );
+  let fresh = getJobSync(jobId) ?? (await getJob(jobId));
+  if (!fresh?.candidates) return { ok: false, set: [], none: [] };
+  const set: string[] = [];
+  const none: string[] = [];
+  for (const p of picked) {
+    if (!p) continue;
+    const c = fresh.candidates.find((x) => x.model === p.model);
+    if (!c || c.imageUrl) continue;
+    if (p.url) {
+      c.imageUrl = p.url;
+      c.imageSource = "https://www.google.com/search?udm=2&q=" + encodeURIComponent(`${brand} ${c.model} ${c.undertyp ?? c.productType ?? ""}`.trim());
+      set.push(c.model);
+    } else none.push(c.model);
+  }
+  // KEDJAN, STEG B (SIST): appens slutliga lista är inne (`final`) och några modeller saknar fortfarande bild. Bara dem frågar vi Gemini med webbsök om (≈0,3 kr per modell, sökavgiften dominerar, därför sist).
+  // Också när appens bildsökning föll och den skickade en tom lista: då saknar alla bild och B är det som återstår. C:s bilder sparas först, så att ett fel i B aldrig tar dem. Registret får B:s bilder som de andras.
+  if (opts.final && referensKedjaPa()) {
+    const saknas = fresh.candidates.filter((c) => !c.imageUrl);
+    if (saknas.length > 0) {
+      if (set.length) await persist(fresh);
+      const viaB = await losFranSokningar(jobId, saknas.map(tillRefKandidat)).catch(() => new Map<string, { url: string; source: string }>());
+      fresh = getJobSync(jobId) ?? (await getJob(jobId)) ?? fresh;
+      for (const [model, t] of viaB) {
+        const c = fresh.candidates?.find((x) => x.model === model);
+        if (!c || c.imageUrl) continue;
+        c.imageUrl = t.url;
+        c.imageSource = t.source;
+        set.push(model);
+        const i = none.indexOf(model);
+        if (i >= 0) none.splice(i, 1);
+      }
+      console.info(`[bild] ${jobId.slice(0, 8)} steg B (Gemini med webbsök): bild åt ${[...viaB.keys()].join(", ") || "ingen"}; frågade för ${saknas.map((c) => c.model).join(", ")}`);
+    }
+  }
+  if (!fresh.candidates) return { ok: false, set: [], none: [] };
+  // Sista listan: det som fortfarande saknar bild får sitt besked ("ingen bild", null). Förut stod det kvar som "letar", och väljarskärmen väntade på en bild som ingen längre sökte efter.
+  const nullade = opts.final ? fresh.candidates.filter((c) => c.imageUrl === undefined).map((c) => { c.imageUrl = null; return c.model; }) : [];
+  if (set.length || nullade.length) {
+    await persist(fresh);
+    // Registret skrivs bara av bilder som klarat ALLA kontroller, under appens egna nycklar (extRegTyp).
+    await registreraKandidatbilder(
+      fresh.candidates.filter((c) => set.includes(c.model) && c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, typ: extRegTyp(c), url: c.imageUrl! })),
+    );
+  }
+  if (opts.final || none.length === 0) await releasePending();
+  console.info(`[bild] ${jobId.slice(0, 8)} Googles bildsök: bild åt ${set.join(", ") || "ingen"}${none.length ? `; ingen godkänd bild åt ${none.join(", ")}` : ""}`);
+  return { ok: true, set, none };
+}
+
+/** Webbvyn kom inte fram till något svar (captcha som aldrig löstes, sidan ändrad, nätet): ett ärligt tomt val, aldrig en väntan utan slut. */
+export async function failExternalIdentification(jobId: string, reason: string, message = "Googles AI-läge gav inget svar. Skriv modellnamnet själv eller försök igen."): Promise<boolean> {
+  const job = await getJob(jobId);
+  if (!job?.externalIdentify || job.identityStatus !== "identifying") return false;
+  job.identityStatus = "needs_selection";
+  job.candidates = [];
+  job.identityResult = "unavailable";
+  job.identityError = message;
+  await persist(job);
+  await setTask(jobId, "identify", "failed", { note: reason.slice(0, 200) });
+  return true;
 }

@@ -1,8 +1,11 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadImageAsBase64, loadImageAsBase64Scaled } from "./imageUtils.js";
-import type { CapturedImage, FurnitureIdentity, ListingResult, ModelCandidate } from "./types.js";
+import type { CapturedImage, FurnitureIdentity, IdentityResult, ListingResult, ModelCandidate } from "./types.js";
 import type { SourceRef } from "./candidateImages.js";
+import type { ResearchRunSummary } from "./research/types.js";
+import { reportUsage } from "./cost/hooks.js";
+import { SEARCH_USD_PER_QUERY, tokenUsd } from "./cost/ledger.js";
 
 /**
  * Annonsgeneratorn bor i loopa-landing-page-main och ANROPAS, inte kopieras.
@@ -19,6 +22,33 @@ import type { SourceRef } from "./candidateImages.js";
 const GENERATE_MODULE = pathToFileURL(
   path.resolve(import.meta.dirname, "..", "..", "loopa-landing-page-main", "functions", "api", "seller", "generate.ts"),
 ).href;
+
+/**
+ * Kopplar generatorns anropsmätning (functions/api/_shared/gemini.ts) till kostnadsboken. Görs en gång; mottagaren läser jobbet ur den
+ * asynkrona kontexten (cost/jobCost.ts), så anrop utan jobb — ett mätskript — blir inte bokförda.
+ */
+let usageBound = false;
+async function bindGeneratorUsage(): Promise<void> {
+  if (usageBound) return;
+  usageBound = true;
+  const shared = (await import(
+    pathToFileURL(path.resolve(import.meta.dirname, "..", "..", "loopa-landing-page-main", "functions", "api", "_shared", "gemini.ts")).href
+  )) as { setGeminiUsageListener: (fn: ((u: { model: string; serviceTier: string; inputTokens: number; outputTokens: number; thoughtTokens: number; searchQueries: number }) => void) | null) => void };
+  shared.setGeminiUsageListener((u) => {
+    const tokens = tokenUsd(u.model, u, u.serviceTier === "priority" ? "priority" : "standard");
+    reportUsage({
+      stage: "listing",
+      label: "seller_generate",
+      model: u.model,
+      inputTokens: u.inputTokens,
+      outputTokens: u.outputTokens,
+      thoughtTokens: u.thoughtTokens,
+      searchQueries: u.searchQueries,
+      usd: Math.round((tokens + u.searchQueries * SEARCH_USD_PER_QUERY) * 10_000) / 10_000,
+      ok: true,
+    });
+  });
+}
 
 /** Hur länge vi väntar. Generatorn har en egen inre deadline (nedan); det här är bara ett skyddsnät. */
 const LISTING_TIMEOUT_MS = Number(process.env.LISTING_TIMEOUT_MS ?? 40000);
@@ -105,8 +135,30 @@ type Handler = (context: { request: Request; env: Record<string, string | undefi
 
 /** Vad ett anrop mot annonsgeneratorn kan svara. `needs_selection` är ett giltigt svar, inte ett fel. */
 export type SellerCall =
-  | { kind: "needs_selection"; candidates: ModelCandidate[]; sources: SourceRef[]; researchText: string }
-  | { kind: "ok"; listing: ListingResult }
+  | {
+      kind: "needs_selection";
+      candidates: ModelCandidate[];
+      sources: SourceRef[];
+      researchText: string;
+      /** Vilken motor som svarade. "gemini3" = produktforskningen (server/src/research); saknas = generatorn. */
+      engine?: "gemini3";
+      /** Forskningen bedömer den första kandidaten som en exakt träff, inte bara bäst av fyra. */
+      exactMatch?: boolean;
+      /** Raden under väljaren när listan är tom eller osäker. Satt av forskningen och av beslutsregeln. */
+      note?: string | null;
+      /** Sammanfattning av forskningens körning: tid, sökfrågor, kostnad, försök. Sparas på jobbet. */
+      runSummary?: ResearchRunSummary;
+      /** Hur forskningen slutade. Satt av produktforskningen (generatorn har ingen); skärmen skiljer på de tre tomma lägena. */
+      result?: IdentityResult;
+    }
+  | {
+      kind: "ok";
+      listing: ListingResult;
+      /** Allt forskningen belagt om produkten, alla varianter. Sparas på jobbet: ett variantval filtrerar ur det. */
+      productFacts?: import("./research/types.js").ProductFacts;
+      /** Mätningen av måttsökningen (tid, sökfrågor, kostnad, minnesträff). */
+      specTrace?: ResearchRunSummary;
+    }
   | { kind: "unavailable"; reason: string };
 
 /** Andra anropets identitetsbesked: säljarens val, ett handskrivet namn, eller uttalat okänt. */
@@ -134,6 +186,20 @@ export type SellerRequest = {
    * svaret; bara det första bär beskedet "de var fel".
    */
   alreadySuggested?: string[];
+  /**
+   * "evidence": fas 1 fyller INTE upp kandidatlistan. Utan flaggan kräver prompten exakt fyra och fyller
+   * överblivna platser med "liknande" modeller — för loopa.nu, där en säljare ser sin egen möbel bland
+   * fyra och avfärdar fel förslag på en sekund. Hos oss blev det fyra välvårdade produktbilder på fel
+   * stolar när forskningen föll. Se pipeline/identifieringsval.ts.
+   */
+  candidateMode?: "evidence";
+  /**
+   * "prior_only": generatorn söker INTE själv utan strukturerar ur `priorResearch`/`priorSources`.
+   * Sätts av pipeline/annons.ts när produktforskningen redan gjort sökningen med en starkare modell.
+   */
+  researchMode?: "prior_only";
+  /** Underlaget är verifierat av oss och gäller även utan en enda visningsbar adress. Se generate.ts. */
+  priorVerified?: boolean;
 };
 
 /**
@@ -150,6 +216,8 @@ export function buildSellerRequest(
   images: Array<{ mimeType: string; dataBase64: string }> = [],
   excludeModels: string[] = [],
   alreadySuggested: string[] = [],
+  researchMode?: "prior_only",
+  candidateMode?: "evidence",
 ): SellerRequest {
   const brand = identity.brand?.trim() || identity.model.trim();
   const fullName = [identity.brand, identity.model].filter(Boolean).join(" ").trim();
@@ -159,9 +227,14 @@ export function buildSellerRequest(
     sellerNote: fullName || brand,
     images,
     ...(resolution ? { resolution } : {}),
-    ...(prior?.sources.length ? { priorResearch: prior.researchText, priorSources: prior.sources } : {}),
+    // prior_only med verifierat underlag skickas även utan adresser: forskningens källor kan vara döda eller
+    // begagnatsajter och ha filtrerats bort, men underlaget är ändå belagt. Annars sökte generatorn om (15–17 s).
+    ...(prior?.sources.length || (researchMode === "prior_only" && prior?.researchText) ? { priorResearch: prior!.researchText, priorSources: prior!.sources } : {}),
     ...(excludeModels.length ? { excludeModels } : {}),
     ...(alreadySuggested.length ? { alreadySuggested } : {}),
+    // Bara meningsfullt med underlag att strukturera ur. Utan det söker generatorn som vanligt.
+    ...(researchMode === "prior_only" && (prior?.sources.length || prior?.researchText) ? { researchMode, priorVerified: true as const } : {}),
+    ...(candidateMode === "evidence" ? { candidateMode } : {}),
   };
 }
 
@@ -196,6 +269,8 @@ export async function callSellerGenerate(
   excludeModels: string[] = [],
   /** Förslag omgången redan lämnat. Sållas likadant, men säljaren har inte sagt nej till dem. */
   alreadySuggested: string[] = [],
+  /** `researchMode: "prior_only"` — strukturera ur `prior`, sök inte. Se pipeline/annons.ts. */
+  opts: { researchMode?: "prior_only"; candidateMode?: "evidence" } = {},
 ): Promise<SellerCall> {
   const startedAt = Date.now();
   const identity = typeof brandOrIdentity === "string" ? { brand: brandOrIdentity, model: "" } : brandOrIdentity;
@@ -208,6 +283,7 @@ export async function callSellerGenerate(
   let onRequestPost: Handler;
   try {
     ({ onRequestPost } = (await import(GENERATE_MODULE)) as { onRequestPost: Handler });
+    await bindGeneratorUsage();
   } catch (err) {
     return { kind: "unavailable", reason: `Annonsgeneratorn gick inte att ladda: ${err instanceof Error ? err.message.slice(0, 160) : String(err)}` };
   }
@@ -240,7 +316,7 @@ export async function callSellerGenerate(
         request: new Request("http://condition.local/api/seller/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(buildSellerRequest(identity, resolution, prior, payloadImages, excludeModels, alreadySuggested)),
+          body: JSON.stringify(buildSellerRequest(identity, resolution, prior, payloadImages, excludeModels, alreadySuggested, opts.researchMode, opts.candidateMode)),
         }),
         env: {
           GEMINI_API_KEY: process.env.GEMINI_API_KEY,

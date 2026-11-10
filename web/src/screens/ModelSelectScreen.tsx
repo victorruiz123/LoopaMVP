@@ -71,6 +71,12 @@ export default function ModelSelectScreen({
           <span className="accent">{t("är det?")}</span>
         </h1>
         <p className="home-lede">{lede}</p>
+        {/* Referensbilderna visar MODELLEN, inte den variant säljaren väljer i nästa steg: färg, tyg och utförande kan skilja. Bildkontrollen tittar aldrig på färg. */}
+        {candidates.length > 0 && (
+          <p className="home-lede" style={{ fontSize: "0.85em", opacity: 0.75, marginTop: 6 }}>
+            {t("Bilderna visar modellen, inte exakt den variant du väljer i nästa steg — färgen kan skilja sig.")}
+          </p>
+        )}
       </header>
 
       {candidates.length > 0 && (

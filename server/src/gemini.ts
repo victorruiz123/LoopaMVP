@@ -1,7 +1,9 @@
-import { GoogleGenAI, Type, MediaResolution } from "@google/genai";
+import { GoogleGenAI, Type, MediaResolution, ThinkingLevel } from "@google/genai";
 import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import path from "node:path";
+import { reportUsage } from "./cost/hooks.js";
+import { tokenUsd } from "./cost/ledger.js";
 
 export { Type };
 
@@ -32,7 +34,8 @@ export const GEMINI_MODEL = "gemini-3.6-flash";
 // timeout case beyond what a same-model retry would have cost.
 const RETRY_MODEL = "gemini-3.7-flash";
 
-const CACHE_DIR = path.resolve(import.meta.dirname, "..", "data", "cache");
+// LOOPA_GEMINI_CACHE_DIR: en annan (tom) katalog för mätning av vad ett anrop VERKLIGEN kostar — ett cachat svar kostar ingenting och döljer det.
+const CACHE_DIR = process.env.LOOPA_GEMINI_CACHE_DIR || path.resolve(import.meta.dirname, "..", "data", "cache");
 
 let client: GoogleGenAI | null = null;
 
@@ -165,6 +168,11 @@ export async function callGeminiStructured<T>(opts: {
    * besiktningen. Se resonemanget vid `tooOld` nedan.
    */
   cacheMaxAgeMs?: number;
+  /**
+   * Hur mycket modellen får tänka innan den svarar. Utelämnat = modellens eget förval (mätt 2026-11-03: 280–650 tänk-token och 3–6 s för en ja/nej-fråga om en bild). Enkla bildkontroller
+   * ber om "low"/"minimal": svaret är en tittning, inte ett resonemang. Ingår i cachenyckeln, så ett svar med annan nivå aldrig återspelas som om det vore samma anrop.
+   */
+  thinkingLevel?: "minimal" | "low";
 }): Promise<GeminiCallResult<T>> {
   const resolution = opts.resolution ?? "high";
   // Keyed per MODEL. The key has to be computed before the call, when it is not yet known which model
@@ -173,7 +181,7 @@ export async function callGeminiStructured<T>(opts: {
   // under the answering model's key, and a read that finds a mismatched modelUsed is treated as a miss
   // so any entry already poisoned on disk self-heals.
   const cacheKeyFor = (model: string) =>
-    hashCall(`${model}:${resolution}`, opts.systemPrompt, opts.userPrompt, opts.responseSchema ?? {}, opts.images);
+    hashCall(`${model}:${resolution}${opts.thinkingLevel ? `:${opts.thinkingLevel}` : ""}`, opts.systemPrompt, opts.userPrompt, opts.responseSchema ?? {}, opts.images);
   const cached = await readCache(cacheKeyFor(GEMINI_MODEL));
   /**
    * Ett cachat svar kan vara för gammalt för att återanvändas.
@@ -213,6 +221,7 @@ export async function callGeminiStructured<T>(opts: {
         ...(opts.responseSchema ? { responseSchema: opts.responseSchema } : {}),
         temperature: 0,
         mediaResolution: RESOLUTION_MAP[resolution],
+        ...(opts.thinkingLevel ? { thinkingConfig: { thinkingLevel: opts.thinkingLevel === "minimal" ? ThinkingLevel.MINIMAL : ThinkingLevel.LOW } } : {}),
         httpOptions: { timeout: timeoutMs },
       },
     });
@@ -258,5 +267,13 @@ export async function callGeminiStructured<T>(opts: {
   );
 
   await writeCache(cacheKeyFor(modelUsed), { data, tokensUsed, modelUsed, cachedAt: Date.now() });
+  // Kostnadsboken (cost/ledger.ts). Ett cachat svar kostar inget och rapporteras inte; ett som kom ur det här anropet gör det, med den
+  // uppdelning Google lämnar (indata / utdata / tänkande) — stadiet kommer ur jobbets kontext (cost/jobCost.ts).
+  const usage = {
+    inputTokens: u?.promptTokenCount ?? Math.round(tokensUsed * 0.85),
+    outputTokens: u?.candidatesTokenCount ?? Math.round(tokensUsed * 0.15),
+    thoughtTokens: u?.thoughtsTokenCount ?? 0,
+  };
+  reportUsage({ label: opts.purpose, model: modelUsed, ...usage, searchQueries: 0, usd: tokenUsd(modelUsed, usage), ok: true });
   return { data, tokensUsed, cached: false, purpose: opts.purpose, modelUsed, latencyMs };
 }
