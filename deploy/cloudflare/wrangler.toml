@@ -139,6 +139,11 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/om-oss"
 zone_name = "loopa.nu"
 
+# Tjäna — startsidans tredje flik, affiliate-programmet (web/src/screens/AffiliateScreen.tsx).
+[[routes]]
+pattern = "loopa.nu/affiliate"
+zone_name = "loopa.nu"
+
 # ─── Sökmotorernas filer ────────────────────────────────────────────────────
 [[routes]]
 pattern = "loopa.nu/sitemap.xml"

@@ -1,0 +1,628 @@
+/* ==========================================================================
+   TJÄNA (/affiliate) — affiliate-programmets marknadssida.
+
+   Bygger på Om oss byggklossar (om-oss.css, oo-*). Det som bara finns här är
+   prefixat `af-`.
+   ========================================================================== */
+
+.af-anchor { scroll-margin-top: 16px; }
+
+/* ---- så funkar det ---- */
+.af-steg { list-style: none; margin: 32px 0 0; padding: 0; display: grid; gap: 16px; }
+@media (min-width: 768px) {
+  .af-steg { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+}
+.af-steg-kort {
+  position: relative; padding: 24px; border-radius: 16px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+}
+.af-steg-nr { display: block; color: var(--accent); font-size: 40px; font-weight: 800; letter-spacing: -0.04em; line-height: 1; }
+.af-steg-rubrik { margin: 16px 0 0; color: var(--ink); font-size: 19px; font-weight: 700; letter-spacing: -0.02em; }
+.af-steg-text { margin: 8px 0 0; font-size: 15px; line-height: 1.6; }
+
+/* ---- kalkylatorn ---- */
+.af-kalk { margin-top: 32px; display: grid; gap: 20px; }
+@media (min-width: 768px) {
+  .af-kalk { grid-template-columns: 1.4fr 1fr; gap: 24px; }
+}
+.af-kalk-reglage {
+  display: flex; flex-direction: column; gap: 24px; padding: 24px;
+  border-radius: 20px; background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+}
+.af-reglage { display: flex; flex-direction: column; gap: 10px; font-size: 15px; }
+.af-reglage-topp { display: flex; justify-content: space-between; gap: 12px; }
+.af-reglage-topp strong { color: var(--ink); font-weight: 700; }
+.af-reglage input[type="range"] {
+  -webkit-appearance: none; appearance: none; width: 100%; height: 8px; margin: 0;
+  border-radius: 999px; cursor: pointer;
+  background: linear-gradient(to right, var(--accent) 0 var(--af-pct, 50%), var(--field) var(--af-pct, 50%) 100%);
+}
+.af-reglage input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none; width: 24px; height: 24px; border-radius: 999px;
+  background: #fff; border: 3px solid var(--accent); box-shadow: var(--shadow-card);
+}
+.af-reglage input[type="range"]::-moz-range-thumb {
+  width: 18px; height: 18px; border-radius: 999px; background: #fff; border: 3px solid var(--accent);
+}
+.af-reglage input[type="range"]:focus-visible { outline: none; box-shadow: var(--focus); }
+
+.af-kalk-resultat {
+  position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: center;
+  min-height: 200px; padding: 28px; border-radius: 20px; background: var(--ink); color: #fff;
+}
+.af-blob-kalk { top: -70px; right: -70px; width: 180px; height: 180px; opacity: 0.85; }
+.af-kalk-summa {
+  position: relative; margin: 0; color: #fff;
+  font-size: clamp(40px, 6vw, 56px); font-weight: 800; letter-spacing: -0.04em; line-height: 1;
+}
+.af-kalk-till { position: relative; margin: 6px 0 0; color: var(--accent); font-size: 18px; font-weight: 700; }
+.af-kalk-formel { position: relative; margin: 18px 0 0; color: var(--on-dark); font-size: 13px; }
+.af-kalk-not { margin: 0; font-size: 13px; color: var(--muted); }
+@media (min-width: 768px) {
+  .af-kalk-not { grid-column: 1 / -1; }
+}
+
+/* ---- kortrutnäten ---- */
+.af-kort-grid { margin-top: 32px; display: grid; gap: 16px; }
+@media (min-width: 768px) {
+  .af-kort-grid { grid-template-columns: repeat(3, 1fr); gap: 20px; }
+}
+.af-kort {
+  position: relative; overflow: hidden; padding: 24px; border-radius: 16px; background: #fff;
+  box-shadow: var(--shadow-card);
+  transition: transform 300ms var(--ease-ui);
+}
+.af-kort:hover { transform: translateY(-4px); }
+.af-kort:hover .oo-sweep { width: 100%; }
+.af-kort-mork { background: var(--surface); border: 1px solid var(--border); }
+.af-kort-ikon {
+  display: grid; place-items: center; width: 48px; height: 48px;
+  border-radius: 999px; background: var(--accent-light); font-size: 24px;
+}
+.af-kort-rubrik { margin: 16px 0 0; color: var(--ink); font-size: 18px; font-weight: 700; letter-spacing: -0.02em; }
+.af-kort-text { margin: 8px 0 0; font-size: 15px; line-height: 1.6; }
+
+/* ---- länken ---- */
+/* En spalt: registreringen har sin egen tvådelning i datorbredd och behöver hela raden. */
+.af-lank-grid { display: grid; gap: 24px; }
+.af-lank-text { max-width: 30rem; font-size: 17px; }
+.af-auth {
+  padding: 8px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+.af-lank-kort {
+  padding: 24px; border-radius: 20px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+.af-skeleton { min-height: 180px; background: var(--skeleton); background-size: 800px 100%; }
+.af-lank-etikett {
+  margin: 20px 0 8px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.af-lank-rad { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.af-lank-url {
+  flex: 1 1 260px; min-width: 0; padding: 14px 16px; border-radius: 12px; background: var(--field);
+  color: var(--ink); font-size: 16px; font-weight: 600; overflow-wrap: anywhere;
+}
+.af-lank-knappar { display: flex; gap: 8px; flex-wrap: wrap; }
+.af-lank-knappar .oo-btn { border: none; cursor: pointer; font-family: inherit; }
+.af-lank-knappar .oo-btn-ghost { border: 1px solid var(--border); }
+.af-lank-input {
+  margin-top: 12px; width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border);
+  font-size: var(--fs-field); font-family: inherit;
+}
+.af-lank-stats { margin-top: 24px; display: grid; gap: 10px; grid-template-columns: repeat(2, 1fr); }
+@media (min-width: 640px) {
+  .af-lank-stats { grid-template-columns: repeat(5, 1fr); }
+}
+.af-lank-stat { padding: 14px; border-radius: 14px; background: var(--bg); border: 1px solid var(--hairline); }
+.af-lank-stat-varde { margin: 0; color: var(--ink); font-size: 20px; font-weight: 700; letter-spacing: -0.02em; }
+.af-lank-stat-etikett { margin: 2px 0 0; font-size: 13px; }
+
+/* ---- vanliga frågor ---- */
+.af-faq-wrap { display: grid; gap: 24px; }
+@media (min-width: 900px) {
+  .af-faq-wrap { grid-template-columns: 1fr 2fr; gap: 48px; }
+}
+.af-faq { border-top: 1px solid var(--border); }
+.af-faq-rad { border-bottom: 1px solid var(--border); }
+.af-faq-rad summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 18px 0; cursor: pointer; list-style: none;
+  color: var(--ink); font-size: 16px; font-weight: 600;
+}
+.af-faq-rad summary::-webkit-details-marker { display: none; }
+.af-faq-rad summary:focus-visible { outline: none; box-shadow: var(--focus); border-radius: 6px; }
+.af-faq-plus {
+  display: grid; place-items: center; width: 28px; height: 28px; flex-shrink: 0;
+  border-radius: 999px; background: var(--field); color: var(--ink); font-size: 18px; font-weight: 500;
+  transition: transform var(--t) var(--ease-ui), background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.af-faq-rad[open] .af-faq-plus { transform: rotate(45deg); background: var(--accent); color: #fff; }
+.af-faq-rad p { margin: 0 0 18px; max-width: 46rem; font-size: 15px; line-height: 1.65; }
+
+/* ---- avslutningen ---- */
+.af-slut-wrap { padding-bottom: 32px; }
+.af-slut { margin-top: 0; padding: 40px 28px; }
+@media (min-width: 768px) {
+  .af-slut { padding: 56px; }
+}
+.af-slut-rubrik { max-width: none; font-size: clamp(28px, 4vw, 40px); }
+.af-slut-text { margin: 12px 0 0; max-width: 34rem; color: var(--on-dark-strong); font-size: 16px; line-height: 1.6; }
+
+.af-footer-lank { color: inherit; }
+
+/* ==========================================================================
+   RÖRELSE — det som gör att sidan lever. Allt stängs av längst ner för den
+   som bett om minskad rörelse.
+   ========================================================================== */
+
+/* ---- heron: det levande exempelkortet ---- */
+.af-exempel-scen { position: relative; width: 100%; max-width: 400px; margin: 0 auto; padding: 18px 0; }
+.af-exempel {
+  position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px;
+  padding: 22px; border-radius: 24px; background: var(--surface); border: 1px solid var(--border);
+  box-shadow: 0 30px 60px -30px rgba(20, 17, 13, 0.35), var(--shadow-raised);
+  animation: oo-rise 0.55s cubic-bezier(0.22, 1, 0.36, 1) both, af-svava 6s 0.6s ease-in-out infinite;
+}
+.af-exempel-topp { display: flex; align-items: center; justify-content: space-between; }
+.af-exempel-tagg {
+  padding: 3px 10px; border-radius: 999px; background: var(--field);
+  color: var(--muted); font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.af-live {
+  display: inline-flex; align-items: center; gap: 6px; color: var(--green-dark);
+  font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase;
+}
+.af-live-prick {
+  width: 8px; height: 8px; border-radius: 999px; background: var(--green);
+  box-shadow: 0 0 0 0 hsl(142 45% 38% / 0.5); animation: af-ping 1.6s ease-out infinite;
+}
+.af-exempel-lista { display: flex; flex-direction: column; gap: 10px; }
+.af-exempel-rad {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border-radius: 16px; background: var(--bg); border: 1px solid var(--hairline);
+  transition: opacity 400ms var(--ease-ui);
+}
+.af-ny { animation: af-in-uppifran 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; border-color: hsl(142 45% 38% / 0.35); background: var(--green-light); }
+.af-exempel-ikon {
+  display: grid; place-items: center; width: 32px; height: 32px; flex-shrink: 0;
+  border-radius: 999px; background: var(--green-light); color: var(--green-dark); font-size: 14px; font-weight: 800;
+}
+.af-ny .af-exempel-ikon { background: var(--green); color: #fff; animation: af-pop 0.5s 0.15s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+.af-exempel-mobel { display: flex; flex-direction: column; min-width: 0; font-size: 13px; color: var(--muted); }
+.af-exempel-mobel strong { color: var(--ink); font-size: 15px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.af-exempel-plus { margin-left: auto; color: var(--green-dark); font-size: 16px; font-weight: 700; white-space: nowrap; }
+.af-exempel-summa {
+  position: relative; margin-top: 4px; padding: 14px 18px; border-radius: 999px; background: var(--ink); color: #fff;
+  font-size: 15px; font-weight: 500; text-align: center;
+}
+.af-exempel-summa-tal { color: var(--accent); font-size: 20px; font-weight: 800; letter-spacing: -0.02em; }
+.af-puff {
+  position: absolute; left: 50%; top: -6px; translate: -50% 0; pointer-events: none;
+  padding: 4px 10px; border-radius: 999px; background: var(--green); color: #fff;
+  font-size: 13px; font-weight: 700; animation: af-puff 1.4s ease-out both;
+}
+
+/* Emojis som driver runt kortet. */
+.af-flyt { position: absolute; z-index: 0; font-size: 30px; pointer-events: none; filter: drop-shadow(0 6px 10px rgba(20, 17, 13, 0.15)); }
+.af-flyt-1 { top: -14px; left: -26px; animation: af-drift 7s ease-in-out infinite; }
+.af-flyt-2 { top: 34%; right: -30px; font-size: 34px; z-index: 2; animation: af-drift 6s 0.8s ease-in-out infinite reverse; }
+.af-flyt-3 { bottom: -6px; left: -18px; animation: af-drift 8s 1.4s ease-in-out infinite; }
+.af-flyt-4 { top: -20px; right: 18%; font-size: 22px; animation: af-blink 2.6s ease-in-out infinite; }
+.af-flyt-5 { bottom: 8%; right: -16px; font-size: 24px; z-index: 2; animation: af-snurr 5s linear infinite; }
+@media (max-width: 480px) {
+  .af-flyt-1, .af-flyt-3 { left: -6px; }
+  .af-flyt-2, .af-flyt-5 { right: -6px; }
+}
+
+/* ---- det rullande bandet ---- */
+.af-band {
+  overflow: hidden; padding: 16px 0; background: var(--ink); color: #fff;
+  transform: rotate(-1.2deg) scale(1.02); margin: 0 0 24px;
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.af-band-spar { display: flex; width: max-content; animation: af-rulla 32s linear infinite; }
+.af-band:hover .af-band-spar { animation-play-state: paused; }
+.af-band-ord { display: inline-flex; align-items: center; gap: 28px; padding-right: 28px; font-size: 18px; font-weight: 700; letter-spacing: -0.01em; white-space: nowrap; }
+.af-band-prick { color: var(--accent); }
+
+/* ---- scrollanimationer ---- */
+.af-reveal {
+  opacity: 0; transform: translateY(26px);
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1), transform 0.7s cubic-bezier(0.22, 1, 0.36, 1);
+  transition-delay: var(--af-fordrojning, 0ms);
+}
+.af-reveal.af-syns { opacity: 1; transform: none; }
+
+/* ---- stegen: linjen som ritas fram och korten som följer ---- */
+.af-steg { position: relative; }
+.af-steg.af-reveal { opacity: 1; transform: none; }
+@media (min-width: 768px) {
+  .af-steg::before {
+    content: ""; position: absolute; z-index: 0; left: 8%; right: 8%; top: 46px; height: 3px;
+    background: repeating-linear-gradient(90deg, var(--accent) 0 10px, transparent 10px 18px);
+    transform: scaleX(0); transform-origin: left; transition: transform 1.2s 0.15s cubic-bezier(0.65, 0, 0.35, 1);
+  }
+  .af-steg.af-syns::before { transform: scaleX(1); }
+}
+.af-steg-kort {
+  z-index: 1; opacity: 0; transform: translateY(24px) scale(0.97);
+  transition: opacity 0.6s cubic-bezier(0.22, 1, 0.36, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 300ms var(--ease-ui);
+  transition-delay: var(--af-fordrojning, 0ms), var(--af-fordrojning, 0ms), 0ms;
+}
+.af-syns .af-steg-kort { opacity: 1; transform: none; }
+.af-steg-kort:hover { box-shadow: 0 24px 48px -24px rgba(20, 17, 13, 0.3); }
+.af-steg-nr {
+  display: inline-grid; place-items: center; width: 56px; height: 56px; border-radius: 999px;
+  background: var(--accent); color: #fff; font-size: 20px; letter-spacing: -0.02em;
+  box-shadow: 0 0 0 6px var(--accent-light);
+  transition: transform 300ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.af-steg-kort:hover .af-steg-nr { transform: rotate(-10deg) scale(1.1); }
+
+/* ---- korten: lutning mot pekaren och en glans som följer den ---- */
+.af-tilt {
+  --af-rx: 0deg; --af-ry: 0deg;
+  transform-style: preserve-3d; will-change: transform;
+}
+.af-tilt.af-reveal { transform: perspective(900px) translateY(26px); }
+.af-tilt.af-reveal.af-syns {
+  transform: perspective(900px) rotateX(var(--af-rx)) rotateY(var(--af-ry));
+  transition: opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--af-fordrojning, 0ms), transform 200ms ease-out;
+}
+.af-kort:hover { transform: none; }
+.af-tilt.af-syns:hover { box-shadow: 0 28px 50px -24px rgba(20, 17, 13, 0.35); }
+.af-kort-glans {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0; transition: opacity 300ms var(--ease-ui);
+  background: radial-gradient(circle at var(--af-gx, 50%) var(--af-gy, 50%), hsl(14 77% 54% / 0.14), transparent 55%);
+}
+.af-tilt:hover .af-kort-glans { opacity: 1; }
+.af-kort-ikon { transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1); }
+.af-tilt:hover .af-kort-ikon { transform: translateZ(30px) scale(1.15) rotate(-8deg); }
+
+/* Den orange sektionen får lite liv i bakgrunden. */
+.af-far { position: relative; overflow: hidden; }
+.af-far::before, .af-far::after {
+  content: ""; position: absolute; border-radius: 999px; pointer-events: none;
+  border: 26px solid rgba(255, 255, 255, 0.1);
+}
+.af-far::before { width: 320px; height: 320px; top: -120px; right: -80px; animation: oo-float 9s ease-in-out infinite; }
+.af-far::after { width: 200px; height: 200px; bottom: -90px; left: 6%; animation: oo-float 11s 1s ease-in-out infinite reverse; }
+.af-far .oo-wrap { position: relative; z-index: 1; }
+
+/* ---- kalkylatorn ---- */
+.af-kalk-mynt {
+  position: absolute; z-index: 1; right: 28px; top: 28px; font-size: 26px; pointer-events: none;
+  animation: af-mynt 0.7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.af-reglage input[type="range"]::-webkit-slider-thumb { transition: transform 150ms var(--ease-ui); }
+.af-reglage input[type="range"]:active::-webkit-slider-thumb { transform: scale(1.25); }
+
+/* ---- konfettin på kopieraknappen ---- */
+.af-konfetti-ankare { position: relative; display: inline-flex; }
+.af-konfetti { position: absolute; left: 50%; top: 50%; pointer-events: none; }
+.af-konfetti-bit {
+  position: absolute; width: 8px; height: 12px; border-radius: 2px;
+  animation: af-konfetti 1s cubic-bezier(0.15, 0.6, 0.35, 1) both;
+}
+
+/* ---- avslutningen: en glöd som andas ---- */
+.af-slut-glod {
+  position: absolute; inset: -40%; pointer-events: none;
+  background: conic-gradient(from 0deg, transparent 0 60%, hsl(14 77% 54% / 0.35) 75%, transparent 90%);
+  animation: af-snurr 14s linear infinite;
+}
+.af-slut .oo-btn-white { animation: af-andas 2.4s ease-in-out infinite; }
+
+/* ---- FAQ: svaret glider fram ---- */
+.af-faq-rad[open] p { animation: af-in-uppifran 0.4s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.af-faq-rad summary { transition: color var(--t) var(--ease-ui), padding var(--t) var(--ease-ui); }
+.af-faq-rad summary:hover { color: var(--accent); padding-left: 6px; }
+
+/* ---- nyckelbilder ---- */
+@keyframes af-svava { 0%, 100% { translate: 0 0; } 50% { translate: 0 -10px; } }
+@keyframes af-ping { 0% { box-shadow: 0 0 0 0 hsl(142 45% 38% / 0.5); } 100% { box-shadow: 0 0 0 10px hsl(142 45% 38% / 0); } }
+@keyframes af-in-uppifran { from { opacity: 0; transform: translateY(-14px) scale(0.97); } to { opacity: 1; transform: none; } }
+@keyframes af-pop { from { transform: scale(0); } to { transform: scale(1); } }
+@keyframes af-puff {
+  0% { opacity: 0; transform: translateY(6px) scale(0.8); }
+  20% { opacity: 1; transform: translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateY(-46px) scale(1); }
+}
+@keyframes af-drift { 0%, 100% { transform: translate(0, 0) rotate(0deg); } 50% { transform: translate(6px, -16px) rotate(10deg); } }
+@keyframes af-blink { 0%, 100% { opacity: 0.2; transform: scale(0.7); } 50% { opacity: 1; transform: scale(1.15); } }
+@keyframes af-snurr { to { transform: rotate(360deg); } }
+@keyframes af-rulla { to { transform: translateX(-50%); } }
+@keyframes af-mynt {
+  0% { opacity: 0; transform: translateY(14px) rotate(-30deg) scale(0.6); }
+  60% { opacity: 1; transform: translateY(-8px) rotate(10deg) scale(1.1); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes af-konfetti {
+  0% { opacity: 1; transform: translate(0, 0) rotate(0deg); }
+  100% { opacity: 0; transform: translate(var(--af-dx), calc(var(--af-dy) + 80px)) rotate(var(--af-rot)); }
+}
+@keyframes af-andas { 0%, 100% { box-shadow: 0 0 0 0 rgba(255, 255, 255, 0.35); } 50% { box-shadow: 0 0 0 10px rgba(255, 255, 255, 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-exempel, .af-live-prick, .af-ny, .af-ny .af-exempel-ikon, .af-puff, .af-flyt, .af-band-spar,
+  .af-kalk-mynt, .af-konfetti-bit, .af-slut-glod, .af-slut .oo-btn-white, .af-far::before, .af-far::after,
+  .af-faq-rad[open] p { animation: none !important; }
+  .af-reveal, .af-steg-kort, .af-tilt.af-reveal { opacity: 1 !important; transform: none !important; transition: none !important; }
+  .af-steg::before { transform: none !important; }
+}
+
+/* ==========================================================================
+   BILDERNA — collaget bakom exempelkortet och fotot bakom avslutningen.
+   ========================================================================== */
+
+.af-collage {
+  position: absolute; z-index: 0; inset: -130px -150px -110px -80px;
+  display: flex; gap: 14px; justify-content: center; overflow: hidden; pointer-events: none;
+  transform: rotate(-9deg);
+  /* Tonar ut åt alla håll, så att collaget smälter in i heron i stället för att bli en ruta. */
+  mask-image: radial-gradient(ellipse 72% 66% at 50% 50%, #000 58%, transparent 100%);
+  -webkit-mask-image: radial-gradient(ellipse 72% 66% at 50% 50%, #000 58%, transparent 100%);
+}
+.af-collage-kol { display: flex; flex-direction: column; gap: 14px; width: 168px; flex-shrink: 0; }
+.af-collage-kol-2 { margin-top: -60px; animation: af-upp 50s linear infinite; }
+.af-collage-kol-0 { animation: af-upp 38s linear infinite; }
+.af-collage-kol-1 { margin-top: -120px; animation: af-ner 44s linear infinite; }
+.af-collage-bild {
+  display: block; width: 100%; aspect-ratio: 42 / 52; object-fit: cover; border-radius: 18px;
+  border: 4px solid #fff; box-shadow: 0 14px 30px -16px rgba(20, 17, 13, 0.45);
+  filter: saturate(0.9);
+}
+/* Kortet ska läsas först: collaget dras ner en aning i styrka bakom det. */
+.af-exempel-scen .af-exempel { backdrop-filter: blur(6px); background: hsl(0 0% 100% / 0.94); }
+@media (max-width: 767px) {
+  .af-collage { inset: -10px -60px -60px -60px; opacity: 0.8; }
+  .af-collage-kol { width: 130px; }
+}
+
+@keyframes af-upp { from { transform: translateY(0); } to { transform: translateY(calc(-50% - 7px)); } }
+@keyframes af-ner { from { transform: translateY(calc(-50% - 7px)); } to { transform: translateY(0); } }
+
+/* Avslutningen: fotot under en mörk ton, så att texten fortfarande bär. */
+.af-slut-bild {
+  position: absolute; inset: 0; pointer-events: none;
+  background-size: cover; background-position: center 60%;
+  opacity: 0.9; transform: scale(1.06);
+  animation: af-zoom 24s ease-in-out infinite alternate;
+}
+.af-slut-bild::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(100deg, rgba(20, 17, 13, 0.94) 0%, rgba(20, 17, 13, 0.7) 42%, rgba(20, 17, 13, 0.12) 100%);
+}
+@keyframes af-zoom { from { transform: scale(1.06); } to { transform: scale(1.16) translateX(-1.5%); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-collage-kol, .af-slut-bild { animation: none !important; }
+}
+
+/* Knapparna i heron ska alltid ligga över collaget. */
+.af .oo-hero-grid > .oo-rise { position: relative; z-index: 2; }
+
+/* ==========================================================================
+   STRAMARE OCH COOLARE — färre sektioner, en mörk mitt.
+   ========================================================================== */
+
+/* ---- märkena under herons knappar ---- */
+.af-markor { list-style: none; margin: 28px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 18px; }
+.af-markor li { display: inline-flex; align-items: center; gap: 8px; color: var(--ink); font-size: 14px; font-weight: 600; }
+.af-markor li span {
+  display: grid; place-items: center; width: 20px; height: 20px; border-radius: 999px;
+  background: var(--ink); color: #fff; font-size: 11px; font-weight: 800;
+}
+.af .oo-hero-grid { padding-bottom: 88px; }
+.af-band { margin: 0; }
+
+/* ---- stegen: kortet bor i den inre, lutande delen ---- */
+.af-steg-kort { padding: 0; background: none; border: none; box-shadow: none; }
+.af-steg-kort:hover { box-shadow: none; }
+.af-steg-inre {
+  position: relative; overflow: hidden; height: 100%; padding: 28px; border-radius: 20px;
+  background: var(--surface); border: 1px solid var(--border); box-shadow: var(--shadow-card);
+  transform: perspective(900px) rotateX(var(--af-rx)) rotateY(var(--af-ry));
+  transition: transform 200ms ease-out, box-shadow 300ms var(--ease-ui);
+}
+.af-steg-inre:hover { box-shadow: 0 28px 50px -24px rgba(20, 17, 13, 0.35); }
+.af-steg-inre:hover .af-steg-nr { transform: rotate(-10deg) scale(1.1); }
+
+/* ---- kalkylatorn: sidans mörka mitt ---- */
+.af-kalk-sektion { position: relative; overflow: hidden; padding: 88px 0; background: var(--ink); }
+@media (min-width: 768px) {
+  .af-kalk-sektion { padding: 112px 0; }
+}
+.af-kalk-glod {
+  position: absolute; pointer-events: none; width: 760px; height: 760px; left: 50%; top: 55%;
+  translate: -50% -50%; border-radius: 999px;
+  background: radial-gradient(circle, hsl(14 77% 54% / 0.32), transparent 62%);
+  animation: af-glod 8s ease-in-out infinite alternate;
+}
+.af-kalk-sektion::before {
+  /* Ett svagt rutnät, som millimeterpapper bakom räkningen. */
+  content: ""; position: absolute; inset: 0; pointer-events: none;
+  background-image: linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px), linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 44px 44px;
+  mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 30%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse 70% 70% at 50% 50%, #000 30%, transparent 80%);
+}
+.af-kalk-wrap { position: relative; text-align: center; }
+.af-overrubrik { margin: 0 0 12px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.af-kalk-sektion .oo-h2 { font-size: clamp(34px, 5vw, 56px); }
+.af-kalk-ingress { margin: 14px auto 0; max-width: 30rem; color: var(--on-dark-strong); font-size: 17px; }
+.af-kalk-sektion .af-kalk { text-align: left; max-width: 980px; margin: 44px auto 0; }
+.af-kalk-sektion .af-kalk-reglage {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.12); box-shadow: none;
+  backdrop-filter: blur(10px);
+}
+.af-kalk-sektion .af-reglage { color: var(--on-dark-strong); }
+.af-kalk-sektion .af-reglage-topp strong { color: #fff; }
+.af-kalk-sektion .af-reglage input[type="range"] {
+  background: linear-gradient(to right, var(--accent) 0 var(--af-pct, 50%), rgba(255, 255, 255, 0.14) var(--af-pct, 50%) 100%);
+}
+.af-kalk-sektion .af-kalk-resultat {
+  background: linear-gradient(140deg, #e4572e 0%, #f07a4a 55%, #f4a26a 100%);
+  box-shadow: 0 30px 80px -30px hsl(14 77% 54% / 0.8);
+}
+.af-kalk-sektion .af-blob-kalk { background: #fff; opacity: 0.14; }
+.af-kalk-sektion .af-kalk-summa { text-shadow: 0 6px 30px rgba(20, 17, 13, 0.25); font-size: clamp(46px, 7vw, 72px); }
+.af-kalk-sektion .af-kalk-till { color: var(--ink); }
+.af-kalk-sektion .af-kalk-formel { color: rgba(255, 255, 255, 0.85); }
+.af-kalk-sektion .af-kalk-not { color: var(--on-dark); text-align: center; }
+
+/* ---- länken, utloggad: en suddig förhandsvisning av länken ---- */
+.af-lank-utloggad { max-width: 720px; margin-inline: auto; text-align: center; padding: 36px 28px; }
+.af-lank-utloggad .af-lank-text { margin: 18px auto 24px; }
+.af-lank-utloggad .af-lank-knappar { justify-content: center; }
+.af-lank-forhand {
+  position: relative; display: inline-flex; align-items: center; gap: 14px;
+  padding: 14px 20px; border-radius: 14px; background: var(--field); border: 1px dashed var(--border);
+}
+.af-lank-forhand-url { color: var(--ink); font-size: 18px; font-weight: 700; letter-spacing: 0.02em; filter: blur(0.4px); }
+.af-lank-las { font-size: 18px; animation: af-gunga 2.4s ease-in-out infinite; transform-origin: 50% 20%; }
+.af-utfall { margin-top: 8px; text-align: left; animation: af-in-uppifran 0.45s cubic-bezier(0.22, 1, 0.36, 1) both; }
+#lank .oo-h2 { text-align: center; }
+
+@keyframes af-glod { from { scale: 0.85; opacity: 0.7; } to { scale: 1.1; opacity: 1; } }
+@keyframes af-gunga { 0%, 100% { rotate: -8deg; } 50% { rotate: 8deg; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-kalk-glod, .af-lank-las, .af-utfall { animation: none !important; }
+  .af-steg-inre { transform: none !important; }
+}
+
+/* ==========================================================================
+   FINPUTS — djup, ljus och lugnare ytor.
+   ========================================================================== */
+
+/* ---- heron: ett svagt punktraster och en större rubrik ---- */
+.af .oo-hero { overflow: visible; }
+.af-hero-prickar {
+  position: absolute; inset: 0; pointer-events: none;
+  background-image: radial-gradient(hsl(14 40% 40% / 0.18) 1px, transparent 1.4px);
+  background-size: 22px 22px;
+  mask-image: radial-gradient(ellipse 55% 60% at 22% 45%, #000 10%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse 55% 60% at 22% 45%, #000 10%, transparent 75%);
+}
+.af .oo-h1 { font-size: clamp(40px, 6.4vw, 72px); letter-spacing: -0.045em; }
+.af .oo-hero .oo-btn-primary { box-shadow: 0 12px 28px -10px hsl(14 77% 54% / 0.65); }
+.af .oo-hero .oo-btn-primary:hover { box-shadow: 0 16px 34px -10px hsl(14 77% 54% / 0.8); }
+
+/* ---- stegen: ikon i en glödande ruta, siffran som vattenstämpel ---- */
+#sa-funkar { position: relative; background: linear-gradient(180deg, var(--bg) 0%, hsl(32 30% 92%) 100%); }
+.af-steg-inre { padding: 30px 28px 32px; background: linear-gradient(160deg, #fff 0%, hsl(30 40% 98%) 100%); }
+.af-steg-vatten {
+  position: absolute; right: 18px; top: 12px; pointer-events: none;
+  font-size: 96px; font-weight: 800; line-height: 1; letter-spacing: -0.06em;
+  color: transparent; -webkit-text-stroke: 2px hsl(14 77% 54% / 0.22);
+  transition: transform 500ms cubic-bezier(0.22, 1, 0.36, 1), -webkit-text-stroke-color 300ms;
+}
+.af-steg-inre:hover .af-steg-vatten { transform: translate(-6px, 6px); -webkit-text-stroke-color: hsl(14 77% 54% / 0.32); }
+.af-steg-ikon {
+  position: relative; display: grid; place-items: center; width: 56px; height: 56px; border-radius: 16px;
+  font-size: 26px; background: linear-gradient(140deg, #e4572e, #f4a26a);
+  box-shadow: 0 12px 24px -10px hsl(14 77% 54% / 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition: transform 400ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.af-steg-inre:hover .af-steg-ikon { transform: rotate(-8deg) scale(1.08); }
+.af-steg-rubrik { position: relative; margin-top: 22px; font-size: 20px; }
+.af-steg-text { position: relative; }
+
+/* ---- länken: en ram som långsamt roterar i accentfärgen ---- */
+@property --af-vinkel { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.af-lank-scen { position: relative; max-width: 760px; margin-inline: auto; }
+.af-lank-halo {
+  position: absolute; inset: 10% 8%; pointer-events: none; border-radius: 40px; filter: blur(50px);
+  background: radial-gradient(ellipse, hsl(14 77% 54% / 0.5), transparent 70%);
+}
+.af-lank-ram {
+  position: relative; padding: 2px; border-radius: 22px;
+  background: conic-gradient(from var(--af-vinkel), hsl(30 25% 86%) 0%, #e4572e 12%, #f4a26a 22%, hsl(30 25% 86%) 34%, hsl(30 25% 86%) 50%, #e4572e 62%, #f4a26a 72%, hsl(30 25% 86%) 84%);
+  animation: af-vrid 6s linear infinite;
+}
+.af-lank-ram > .af-lank-kort, .af-lank-ram > .af-auth { border: none; max-width: none; box-shadow: 0 30px 60px -30px rgba(20, 17, 13, 0.35); }
+.af-lank-forhand { background: linear-gradient(180deg, var(--field), hsl(30 30% 93%)); border-style: solid; box-shadow: inset 0 2px 6px rgba(20, 17, 13, 0.06); }
+.af-lank-forhand-url { filter: blur(0.6px); }
+@keyframes af-vrid { to { --af-vinkel: 360deg; } }
+
+/* ---- FAQ: mjuka kort i stället för linjer ---- */
+.af-faq-sektion { padding-top: 24px; }
+.af-faq { border-top: none; display: flex; flex-direction: column; gap: 10px; }
+.af-faq-rad {
+  border: 1px solid var(--border); border-radius: 16px; background: var(--surface); padding: 0 20px;
+  transition: border-color var(--t) var(--ease-ui), box-shadow var(--t) var(--ease-ui);
+}
+.af-faq-rad:hover { box-shadow: 0 14px 30px -20px rgba(20, 17, 13, 0.3); }
+.af-faq-rad[open] { border-color: hsl(14 77% 54% / 0.45); box-shadow: 0 18px 36px -22px hsl(14 77% 54% / 0.5); }
+.af-faq-rad summary:hover { padding-left: 0; }
+
+/* ---- avslutningen: större, ljusare, mer foto ---- */
+.af-slut { padding: 48px 28px; border-radius: 28px; }
+@media (min-width: 768px) {
+  .af-slut { padding: 80px 64px; }
+}
+.af-slut-rubrik { font-size: clamp(32px, 5vw, 56px); letter-spacing: -0.04em; }
+.af-slut-bild::after {
+  background: linear-gradient(100deg, rgba(20, 17, 13, 0.92) 0%, rgba(20, 17, 13, 0.6) 45%, rgba(20, 17, 13, 0.05) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .af-lank-ram { animation: none !important; }
+  .af-steg-vatten, .af-steg-ikon { transition: none !important; }
+}
+
+/* Mobil: cirkeln får inte ligga bakom den orange rubriken. */
+@media (max-width: 767px) {
+  .af .oo-blob-hero { top: -250px; right: -170px; width: 380px; height: 380px; }
+}
+
+/* ==========================================================================
+   ÄNNU COOLARE — ljuskägla, skimmer och överrubriker.
+   ========================================================================== */
+
+/* Heron utan märkena: knapparna avslutar textspalten. */
+.af .oo-hero .oo-actions { margin-top: 32px; }
+
+/* En mjuk ljuskägla som följer muspekaren. */
+.af-hero-spot {
+  position: absolute; inset: 0; pointer-events: none; opacity: 0;
+  background: radial-gradient(520px circle at var(--af-mx, 30%) var(--af-my, 40%), hsl(14 90% 62% / 0.16), transparent 60%);
+  transition: opacity 500ms var(--ease-ui);
+}
+.af .oo-hero:hover .af-hero-spot { opacity: 1; }
+
+/* "Tjäna pengar." skimrar långsamt i accentens toner. */
+.af-skimmer {
+  background: linear-gradient(100deg, #e4572e 0%, #e4572e 35%, #f6a571 50%, #e4572e 65%, #e4572e 100%);
+  background-size: 250% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: af-skimra 5s ease-in-out infinite;
+}
+.af-skimmer .oo-underline { color: #e4572e; opacity: 0.45; }
+@keyframes af-skimra { 0% { background-position: 100% 0; } 60%, 100% { background-position: 0% 0; } }
+
+/* Överrubriker på de ljusa sektionerna, med en liten streck-accent. */
+.af .oo-section .af-overrubrik, #sa-funkar .af-overrubrik { display: inline-flex; align-items: center; gap: 10px; }
+.af .oo-section .af-overrubrik::before, #sa-funkar .af-overrubrik::before {
+  content: ""; width: 22px; height: 2px; border-radius: 2px; background: currentColor;
+}
+#lank .af-overrubrik { display: flex; justify-content: center; }
+
+/* FAQ: rubriken följer med medan man läser frågorna. */
+@media (min-width: 900px) {
+  .af-faq-huvud { position: sticky; top: 32px; align-self: start; }
+}
+.af-faq-mer { margin: 16px 0 0; font-size: 15px; color: var(--muted); }
+.af-faq-mer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.af-faq-mer a:hover { text-decoration: underline; }
+
+/* Avslutningen: knappen blir orange och lyser. */
+.af-slut .oo-btn-white { background: var(--accent); color: #fff; animation: af-andas-orange 2.4s ease-in-out infinite; }
+@keyframes af-andas-orange { 0%, 100% { box-shadow: 0 0 0 0 hsl(14 77% 54% / 0.55); } 50% { box-shadow: 0 0 0 12px hsl(14 77% 54% / 0); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .af-skimmer, .af-slut .oo-btn-white { animation: none !important; }
+  .af-hero-spot { display: none; }
+}

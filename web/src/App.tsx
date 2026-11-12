@@ -20,7 +20,8 @@ import PublicCardScreen from "./screens/PublicCardScreen";
 import { loopaIdFromPath } from "./lib/loopaId";
 import ButikApp from "./butik/ButikApp";
 import OmOssScreen from "./screens/OmOssScreen";
-import { isOmOssPath } from "./components/HemFlikar";
+import AffiliateScreen from "./screens/AffiliateScreen";
+import { isAffiliatePath, isOmOssPath } from "./components/HemFlikar";
 import KopApp from "./kop/KopApp";
 import { isButikPath } from "./butik/router";
 import { isKopPath } from "./kop/router";
@@ -188,6 +189,9 @@ export default function App() {
   /** /om-oss — startsidans andra flik. Ett vägval på adressen, som de juridiska sidorna. */
   const omOss = isOmOssPath(pathname);
 
+  /** /affiliate — startsidans tredje flik, Tjäna. Samma slags vägval som Om oss. */
+  const affiliateSida = isAffiliatePath(pathname);
+
   /**
    * Länken i återställningsmejlet. Före allt annat: besökaren kom hit för att byta lösenord, och den
    * session länken gav ska inte släppa in dem någon annanstans förrän det är gjort. Se LosenordScreen.
@@ -201,7 +205,7 @@ export default function App() {
    * skärmnamnet. Här mäts allt annat — butiken, köpsidan, kortet, Trygg affär, de juridiska sidorna.
    * Se lib/besok.ts.
    */
-  const flodetVisas = !losenordslage && !affar && !kop && !butik && !legalDoc && !publicId && !omOss;
+  const flodetVisas = !losenordslage && !affar && !kop && !butik && !legalDoc && !publicId && !omOss && !affiliateSida;
   useEffect(() => {
     if (!flodetVisas) besok.sidaVisad(pathname, null);
   }, [pathname, flodetVisas]);
@@ -227,6 +231,8 @@ export default function App() {
         <PublicCardScreen initialId={publicId} />
       ) : omOss ? (
         <OmOssScreen />
+      ) : affiliateSida ? (
+        <AffiliateScreen />
       ) : (
         <FlowApp />
       )}
