@@ -47,7 +47,7 @@ export const MAX_ROWS_PER_MODEL = 6;
  * Med sajten känd (SerpApi): upp till tio rader klarar reglerna och går vidare till det jämförande valet (referensbild.ts), som tittar på de fem bästa. Ett brett urval behövs: med fyra rader hade Brandon
  * två kvar och inte den grå fåtöljen som finns längre ned i träfflistan. Hämtningen är ett par sekunder, valet ETT anrop per modell.
  */
-export const MAX_ROWS_PER_MODEL_MED_KALLA = 10;
+export const MAX_ROWS_PER_MODEL_MED_KALLA = 16;
 
 /**
  * Titeln kommer från en andrahandsmarknad, ett anslagstavle- eller ett bildklippsidor ("6 köksstolar Norrnäs IKEA | Köp på Tradera"): bilden är någon annans ögonblicksbild, inte modellens
