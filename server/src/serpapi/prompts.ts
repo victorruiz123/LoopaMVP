@@ -111,6 +111,11 @@ const TYP_MATT: Record<string, { variant: string; matt: string; delar: string }>
  * gör: tillverkarens sida först, minst två svenska återförsäljare, kontroll av att sidan gäller RÄTT märke, pris för just varianten (inte "från", rea eller annan storlek), en andra kontroll av
  * misstänkta belopp, och "okänt" i stället för en gissning. Nyprisets belopp är ETT tal (servern tar det högre om svaret anger ett spann, externalIdentify.ts), och raderna Prisunderlag och Säkerhet
  * låter säljaren och oss se vad priset vilar på. Mått och material får fortfarande uppskattas (märkta "uppskattat"), nypriset aldrig.
+ *
+ * ANDRAHANDSMARKNADEN SOM RESERVKÄLLA (2026-11-12, på säljarens begäran). Förut sa frågan "använd aldrig begagnatsajter som källa" utan att skilja nypris från mått, så AI-läget gav upp och uppskattade
+ * mått för en utgången modell (IKEA INGEMAR: "uppskattat" på alla fyra mått, ingen produktsida finns). Nu gäller: produktsida och återförsäljare först; saknas de används Blocket, Tradera och Facebook
+ * som reserv för mått och material, men bara när flera annonser är överens (och antalet anges); uppskattning är sista utvägen. Nypriset hämtas fortfarande aldrig ur en andrahandsannons.
+ * Frågan är därmed INTE längre ord för ord skalets (main.js).
  */
 export const SPEC_PROMPT = (brand: string | null | undefined, model: string, type: string | null | undefined): string => {
   const namn = `${brand ? brand + " " : ""}${model}`;
@@ -119,18 +124,19 @@ export const SPEC_PROMPT = (brand: string | null | undefined, model: string, typ
   return (
     `Anta att ${(ord ? ord.def : "Möbeln").toLowerCase()} på bilderna är ${namn}. Gör en djup och kritisk research innan du svarar, som en noggrann researcher som aldrig nöjer sig med första bästa träff: ett fel pris eller fel mått är värre än att skriva att något är okänt.\n` +
     `1. Variant: titta noga på bilderna och avgör vilken EXAKT variant av ${namn} det är: ${m.variant}. Välj EN variant, den som stämmer bäst med bilderna, och skriv aldrig en lista över möjliga utföranden, tyger eller färger.\n` +
-    `2. Källor: börja med tillverkarens egen produktsida för ${namn} och kontrollera sedan minst två svenska återförsäljare eller prislistor som säljer just den modellen. Kontrollera på varje sida att produkten verkligen är ${namn}${brand ? ` från ${brand}` : ""} och inte en annan möbel med samma eller liknande namn från ett annat märke eller en butiks eget märke. Använd aldrig begagnatsajter som Tradera, Blocket eller Facebook som källa till nypriset.\n` +
+    `2. Källor: börja med tillverkarens egen produktsida för ${namn} och kontrollera sedan minst två svenska återförsäljare eller prislistor som säljer just den modellen. Kontrollera på varje sida att produkten verkligen är ${namn}${brand ? ` från ${brand}` : ""} och inte en annan möbel med samma eller liknande namn från ett annat märke eller en butiks eget märke. Hittar du ingen produktsida eller återförsäljare för mått och material (till exempel för en utgången modell) ska du använda andrahandsmarknaden som reservkälla: annonser på Blocket, Tradera, Facebook Marketplace och liknande. Då räcker inte en enda annons: jämför mått och material i flera olika annonser för just ${namn}, kontrollera att varje annons gäller rätt modell och märke, ange bara det som flera annonser är överens om, och skriv hur många annonser som stödde varje uppgift. Andrahandsannonser är aldrig källa till nypriset.\n` +
     "3. Nypris: leta upp priset för just den variant du valt (rätt storlek, klädsel eller tyggrupp och ben), inte ett \"från\"-pris för modellens billigaste utförande, inte ett rea-, kampanj- eller outletpris, inte priset på en annan storlek eller ett annat tyg och inte priset på en tillbehörsdel. Kostar modellens utföranden olika mycket, ta reda på modellens prisspann och placera din variant rätt i det innan du väljer belopp. Verkar ett pris för lågt eller för högt jämfört med modellens övriga utföranden eller med jämförbara möbler, kontrollera det i en annan källa innan du skriver det.\n" +
     "4. Väg källorna mot varandra: stämmer de inte överens, lita mest på tillverkarens egen sida, därefter återförsäljare som anger exakt utförande, och skriv vilka belopp som skilde sig och varför du valde som du gjorde. Kan du inte styrka ett pris för just den varianten skriver du okänt i stället för att gissa.\n" +
     "Svara sedan med de här raderna:\n" +
     "Variant: variantens namn, tyg eller yta och färg\n" +
     `Mått i cm: ${m.matt} för just den varianten\n` +
     `Material: ${m.delar} för just den varianten\n` +
+    "Måttunderlag: var måtten och materialet kommer ifrån (tillverkarens sida, återförsäljare eller hur många andrahandsannonser som stödde dem)\n" +
     "Nypris: ETT belopp i kronor för just den varianten (aldrig ett spann), med årtal om modellen är utgången, eller okänt\n" +
     "Prisunderlag: de priser du jämförde (källa och belopp) och varför du valde just det\n" +
     "Länk: adressen till sidan som nyprisets belopp kommer från (tillverkarens eller en återförsäljares produktsida)\n" +
     "Säkerhet: hög, medel eller låg för varianten, måtten och priset var för sig, och en mening om vad som är osäkert\n" +
-    'Mått och material som inte står i någon källa får du uppskatta utifrån varianten och bilderna, och skriver då "uppskattat". Nypriset får aldrig uppskattas.'
+    'Mått och material ska komma ur källor, i den här ordningen: tillverkarens sida, återförsäljare, och sist flera överensstämmande andrahandsannonser. Bara det som inte går att belägga i någon av dem får du uppskatta utifrån varianten och bilderna, och skriver då "uppskattat". Nypriset får aldrig uppskattas.'
   );
 };
 
