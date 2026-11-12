@@ -87,6 +87,13 @@ export default function HomeScreen({
   usePageTitle(null);
   const [query, setQuery] = useState("");
   const [hurOppen, setHurOppen] = useState(false);
+  // Intoningen när sidan öppnas, som på Om oss och Tjäna. Klassen tas bort när den spelats klart,
+  // så att brickor som dyker upp medan man söker inte väntar in sin fördröjning.
+  const [intro, setIntro] = useState(true);
+  useEffect(() => {
+    const t = window.setTimeout(() => setIntro(false), 1800);
+    return () => window.clearTimeout(t);
+  }, []);
 
   /**
    * INBJUDAN. Kom besökaren via en väns länk (loopa.nu/?ref=KOD) blir sidan en inbjudan: rubriken
@@ -159,7 +166,7 @@ export default function HomeScreen({
   const exact = shown.some((n) => fold(n) === fold(typed));
 
   return (
-    <div className="screen screen-light home">
+    <div className={`screen screen-light home ${intro ? "home-intro" : ""}`}>
       {/*
         Topplisten: ordmärket till vänster, profilen till höger.
 
