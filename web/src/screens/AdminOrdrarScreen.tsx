@@ -483,22 +483,34 @@ function AffiliateUtbetalningar() {
       {rader === null && !fel ? (
         <div className="profile-loading"><div className="spinner" /></div>
       ) : rader && rader.length === 0 ? (
-        <p className="card-row-meta">{t("Inga affiliate-provisioner än.")}</p>
+        <p className="card-row-meta">{t("Ingen har värvats via en affiliate-länk än.")}</p>
       ) : (
         <ul className="card-list">
           {(rader ?? []).map((rad) => (
             <li key={rad.userId} className="card-row" style={{ cursor: "default", flexDirection: "column", alignItems: "stretch", gap: 6 }}>
               <span className="card-row-title">{rad.email ?? t("affiliate utan e-post")}</span>
               <span className="card-row-meta">
-                {rad.kod ?? "—"} · {t("Väntande {vantande}, utbetalt {utbetalt}", {
+                {rad.kod ?? "—"} · {t("{antal} värvade", { antal: String(rad.varvade.length) })} · {t("Väntande {vantande}, utbetalt {utbetalt}", {
                   vantande: formatOre(rad.vantandeOre),
                   utbetalt: formatOre(rad.utbetaltOre),
                 })}
               </span>
+              {rad.varvade.length > 0 && (
+                <details className="card-row-meta">
+                  <summary style={{ cursor: "pointer" }}>{t("Värvade")}</summary>
+                  <ul style={{ margin: 0, paddingLeft: 18 }}>
+                    {rad.varvade.map((v) => (
+                      <li key={v.userId}>
+                        {v.email ?? v.userId} · {(v.referredAt ?? "").slice(0, 10)}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <ul className="card-row-meta" style={{ margin: 0, paddingLeft: 18 }}>
                 {rad.provisioner.map((p) => (
                   <li key={p.id}>
-                    {p.productId} · {formatOre(p.amountOre)} ({t("5 % av {pris}", { pris: formatOre(p.salePriceOre) })}) ·{" "}
+                    {p.productId} · {rad.varvade.find((v) => v.userId === p.sellerUserId)?.email ?? p.sellerUserId} · {formatOre(p.amountOre)} ({t("5 % av {pris}", { pris: formatOre(p.salePriceOre) })}) ·{" "}
                     {p.status === "pending"
                       ? t("väntar")
                       : p.status === "paid"

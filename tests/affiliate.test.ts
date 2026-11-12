@@ -215,3 +215,48 @@ test("ett raderat konto tappar sin e-post, men provisionerna står kvar", async 
   assert.equal((await affiliateStore().profil(a.id))?.email, null);
   assert.equal((await affiliateStore().provisionForProdukt(id))?.status, "pending");
 });
+
+// ─── självläkningen och panelens "vem kom från vem" ──────────────────────────
+
+test("en provision som föll vid utbetalningen skapas i efterhand, en gång, med det frysta beloppet", async () => {
+  const { a, b } = await paret();
+  const id = await saldMobel(b.id);
+  // Lagret faller just när säljaren betalas ut: utbetalningen står, provisionen blir inte av.
+  const s = affiliateStore();
+  const orginal = s.skapaProvision.bind(s);
+  s.skapaProvision = async () => {
+    throw new Error("lagret svarar inte");
+  };
+  try {
+    await markeraUtbetald(id, { mobelprisSek: 2500 }, "admin");
+  } finally {
+    s.skapaProvision = orginal;
+  }
+  assert.equal(await s.provisionForProdukt(id), null, "provisionen föll");
+
+  assert.equal(await regler.ikappProvisioner(), 1);
+  const p = (await s.provisionForProdukt(id))!;
+  assert.equal(p.affiliateUserId, a.id);
+  assert.equal(p.amountOre, 12500);
+  assert.equal(await regler.ikappProvisioner(), 0, "en andra körning skapar inget");
+});
+
+test("ikappkörningen rör inte returnerade, outbetalda eller ovärvade möbler", async () => {
+  const { b } = await paret();
+  const osald = await saldMobel(b.id);
+  const c = konto(0);
+  const ovarvad = await saldMobel(c.id);
+  await markeraUtbetald(ovarvad, { mobelprisSek: 900 }, "admin");
+  await regler.ikappProvisioner();
+  assert.equal(await affiliateStore().provisionForProdukt(osald), null, "inte utbetald");
+  assert.equal(await affiliateStore().provisionForProdukt(ovarvad), null, "inte värvad");
+});
+
+test("admin ser vem som värvat vem, även innan något sålts", async () => {
+  const { a, b } = await paret();
+  const rad = (await adminOversikt()).find((r) => r.userId === a.id);
+  assert.ok(rad, "affiliaten syns utan provisioner");
+  assert.deepEqual(rad.varvade.map((v) => v.userId), [b.id]);
+  assert.equal(rad.varvade[0].email, b.email);
+  assert.equal(rad.provisioner.length, 0);
+});

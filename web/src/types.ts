@@ -669,6 +669,8 @@ export interface AdminAffiliateRad {
   kod: string | null;
   vantandeOre: number;
   utbetaltOre: number;
+  /** Vem som kom via affiliatens länk, och när. Se server/src/affiliate/regler.ts, adminOversikt. */
+  varvade: { userId: string; email: string | null; referredAt: string | null }[];
   provisioner: AffiliateProvision[];
 }
 

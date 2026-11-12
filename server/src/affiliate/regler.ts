@@ -194,6 +194,42 @@ export async function provisionVidUtbetalning(
   return "provision";
 }
 
+/**
+ * Provisioner som borde finnas men inte gör det — skapas i efterhand.
+ *
+ * VARFÖR. provisionVidUtbetalning får aldrig fälla säljarens utbetalning (butik/utbetalning.ts), så
+ * föll lagret just då blev det bara en rad i loggen och provisionen fanns aldrig. Här rättas det:
+ * varje möbel som är utbetald, inte returnerad och såld av en värvad säljare ska ha en provision.
+ *
+ * SÄKER ATT KÖRA HUR OFTA SOM HELST. Unikheten per annons (lagret, och i Supabase ett unikt index)
+ * gör att en andra körning inte skapar något. Beloppet tas ur det frysta kvittot, inte ur annonsen,
+ * och provisionen dateras till utbetalningen. En värvning kan inte ha kommit efter en utbetalning:
+ * anspråket kräver ett konto utan annonser (gorAnsprak).
+ */
+export async function ikappProvisioner(): Promise<number> {
+  const store = affiliateStore();
+  const varvade = new Set((await store.allaVarvade()).map((p) => p.userId));
+  if (varvade.size === 0) return 0;
+  const harProvision = new Set((await store.provisioner()).map((p) => p.productId));
+  let skapade = 0;
+  for (const r of await butikStore().all()) {
+    if (!r.utbetalning || !r.jobId || harProvision.has(r.id)) continue;
+    if (r.state !== "sold" && r.state !== "delivered") continue;
+    const job = await getJob(r.jobId);
+    const saljare = job ? ownerIdOf(job) : null;
+    if (!saljare || !varvade.has(saljare)) continue;
+    const utfall = await provisionVidUtbetalning(
+      { productId: r.id, sellerUserId: saljare, mobelprisSek: r.utbetalning.mobelprisSek },
+      new Date(r.utbetalning.at),
+    );
+    if (utfall === "provision") {
+      skapade += 1;
+      console.warn(`[affiliate] provisionen för ${r.id} saknades och skapades i efterhand.`);
+    }
+  }
+  return skapade;
+}
+
 // ---------------------------------------------------------------------------
 // 3. Returen
 // ---------------------------------------------------------------------------
@@ -281,26 +317,48 @@ export async function oversikt(userId: string, email: string | null, nu: Date = 
   };
 }
 
+export interface AdminVarvad {
+  userId: string;
+  email: string | null;
+  referredAt: string | null;
+}
+
 export interface AdminAffiliateRad {
   userId: string;
   email: string | null;
   kod: string | null;
   vantandeOre: number;
   utbetaltOre: number;
+  /** Vem som kom via affiliatens länk, och när. Senaste först. */
+  varvade: AdminVarvad[];
   provisioner: AffiliateProvision[];
 }
 
-/** Panelens lista: en rad per affiliate med provisioner, de med väntande belopp först. */
+/**
+ * Panelens lista: en rad per affiliate som värvat någon eller har provisioner, de med väntande
+ * belopp först. Saknade provisioner skapas först (ikappProvisioner), så att listan aldrig visar
+ * mindre än det som är intjänat — men faller det steget visas listan ändå.
+ */
 export async function adminOversikt(): Promise<AdminAffiliateRad[]> {
-  const store = affiliateStore();
-  const perAnvandare = new Map<string, AffiliateProvision[]>();
-  for (const p of await store.provisioner()) {
-    const lista = perAnvandare.get(p.affiliateUserId) ?? [];
-    lista.push(p);
-    perAnvandare.set(p.affiliateUserId, lista);
+  try {
+    await ikappProvisioner();
+  } catch (err) {
+    console.warn("[affiliate] ikappkörningen föll:", err instanceof Error ? err.message : err);
   }
+  const store = affiliateStore();
+  const perAnvandare = new Map<string, { provisioner: AffiliateProvision[]; varvade: AdminVarvad[] }>();
+  const rad = (id: string) => {
+    let r = perAnvandare.get(id);
+    if (!r) perAnvandare.set(id, (r = { provisioner: [], varvade: [] }));
+    return r;
+  };
+  for (const p of await store.allaVarvade()) {
+    rad(p.referredBy!).varvade.push({ userId: p.userId, email: p.email, referredAt: p.referredAt });
+  }
+  for (const p of await store.provisioner()) rad(p.affiliateUserId).provisioner.push(p);
+
   const rader: AdminAffiliateRad[] = [];
-  for (const [userId, provisioner] of perAnvandare) {
+  for (const [userId, { provisioner, varvade }] of perAnvandare) {
     const profil = await store.profil(userId);
     const summa = (status: AffiliateProvision["status"]) =>
       provisioner.filter((p) => p.status === status).reduce((s, p) => s + p.amountOre, 0);
@@ -310,8 +368,11 @@ export async function adminOversikt(): Promise<AdminAffiliateRad[]> {
       kod: profil?.kod ?? null,
       vantandeOre: summa("pending"),
       utbetaltOre: summa("paid"),
+      varvade: varvade.sort((a, b) => (b.referredAt ?? "").localeCompare(a.referredAt ?? "")),
       provisioner: provisioner.sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     });
   }
-  return rader.sort((a, b) => b.vantandeOre - a.vantandeOre || b.utbetaltOre - a.utbetaltOre);
+  return rader.sort(
+    (a, b) => b.vantandeOre - a.vantandeOre || b.utbetaltOre - a.utbetaltOre || b.varvade.length - a.varvade.length,
+  );
 }

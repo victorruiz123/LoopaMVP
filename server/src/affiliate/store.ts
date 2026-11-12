@@ -54,6 +54,8 @@ export interface AffiliateStore {
   profilForKod(kod: string): Promise<AffiliateProfil | null>;
   /** Alla profiler med `referredBy = userId`. */
   varvade(userId: string): Promise<AffiliateProfil[]>;
+  /** Alla profiler som är värvade av någon — panelens "vem kom från vem". */
+  allaVarvade(): Promise<AffiliateProfil[]>;
   /** Null när användaren eller koden redan finns. Den som anropar slumpar en ny kod och försöker igen. */
   skapaProfil(p: AffiliateProfil): Promise<AffiliateProfil | null>;
   sattEmail(userId: string, email: string): Promise<void>;
@@ -136,6 +138,10 @@ class FileStore implements AffiliateStore {
 
   async varvade(userId: string) {
     return [...(await this.lasProfiler()).values()].filter((p) => p.referredBy === userId);
+  }
+
+  async allaVarvade() {
+    return [...(await this.lasProfiler()).values()].filter((p) => p.referredBy !== null);
   }
 
   skapaProfil(p: AffiliateProfil) {
@@ -288,6 +294,11 @@ class SupabaseStore implements AffiliateStore {
 
   async varvade(userId: string) {
     const rows = await call<Record<string, any>[]>("GET", `affiliate_profiles?referred_by=eq.${q(userId)}&order=referred_at.desc`);
+    return (rows ?? []).map(profilFranRad);
+  }
+
+  async allaVarvade() {
+    const rows = await call<Record<string, any>[]>("GET", `affiliate_profiles?referred_by=not.is.null&order=referred_at.desc`);
     return (rows ?? []).map(profilFranRad);
   }
 
