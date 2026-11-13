@@ -209,6 +209,8 @@ async function jobbMedKandidater(kandidater: Array<{ model: string; imageUrl?: s
   job.identityStatus = "needs_selection";
   job.externalImagesPending = true;
   job.candidates = kandidater.map((k) => ({ brand: "Sits", model: k.model, variant: null, productType: "fåtölj", confidence: "likely", distinguishingDetail: null, ...(k.imageUrl ? { imageUrl: k.imageUrl } : {}), ...(k.sourceUrl ? { sourceUrl: k.sourceUrl } : {}) }));
+  // AI-lägets identifieringssvar med en beskrivning per modell: det bildvalet och registret behöver (utan det sparas ingen bild i registret).
+  job.identityResearch = { researchText: ["IDENTIFIERING (Googles AI-läge)", ...kandidater.map((k, i) => `### ${i + 1}. ${k.model} (80 %)\n- Motivering: En stoppad fåtölj.`)].join("\n"), sources: [] };
   await persist(job);
   return job.id;
 }
@@ -289,4 +291,141 @@ test("applyExternalImages med kedjan: föll appens bildsökning (tom lista) frå
   const job = (await getJob(id))!;
   assert.equal(job.candidates![0].imageUrl, lokal("https://t.test/sits-palma.jpg"));
   assert.equal(job.externalImagesPending, false);
+});
+
+// ── PREBEN (2026-11-12): två möbler med samma namn, och vad bildvalet vet om dem ───────────────────────────────────────────────────────────────
+
+const { readFileSync } = await import("node:fs");
+const render = await import("../server/src/serpapi/render.js");
+const ext = await import("../server/src/externalImages.js");
+const fixtur = (n: string) => JSON.parse(readFileSync(path.join(import.meta.dirname, "fixtures/serpapi", n), "utf8"));
+/** AI-lägets riktiga identifieringssvar för säljarens PREBEN (stoppad stol med stålunderrede), som servern lagrar det. */
+const PREBEN_SVAR = render.answerText(fixtur("aimode-preben.json"));
+
+test("beskrivningUr: avsnittet om just PREBEN, utan länkar och källhänvisningar, med artikelnumret som generation; andra modellers avsnitt blandas inte in", () => {
+  const b = R.beskrivningUr(PREBEN_SVAR, "PREBEN");
+  assert.match(b.beskrivning, /helklädda sitsen/);
+  assert.match(b.beskrivning, /grålackerat stål/);
+  assert.match(b.beskrivning, /Utgången modell/);
+  assert.doesNotMatch(b.beskrivning, /https?:|\[\d\]|BERGMUND|HENRIKSDAL/);
+  assert.equal(b.generation, "602.013.31");
+  const k = R.beskrivningUr(PREBEN_SVAR, "KÄTTIL");
+  assert.match(k.beskrivning, /Aktuell modell/);
+  assert.doesNotMatch(k.beskrivning, /PREBEN/);
+  assert.equal(k.generation, "", "ingen generation att ange för en aktuell modell utan artikelnummer i sitt avsnitt");
+  assert.deepEqual(R.beskrivningUr(PREBEN_SVAR, "FINNSINTE"), { beskrivning: "", generation: "" });
+  assert.deepEqual(R.beskrivningUr("", "PREBEN"), { beskrivning: "", generation: "" });
+});
+
+test("beskrivningUr: årtiondet används när artikelnummer saknas, annars blir generationen tom", () => {
+  assert.equal(R.beskrivningUr("### 1. PREBEN (95 %)\n- Status: Utgången modell (såldes under 1970-talet).\n- Motivering: pinnstol i trä.", "PREBEN").generation, "1970");
+  assert.equal(R.beskrivningUr("1. PREBEN (95 %)\nStatus: såldes på 2010-talet.", "PREBEN").generation, "2010");
+  assert.equal(R.beskrivningUr("1. IMPULSE (80 %)\nMotivering: stoppad fåtölj.", "IMPULSE").generation, "");
+});
+
+test("registerTyp: två möbler med samma namn får olika registernycklar, och utan generation blir nyckeln som förut", () => {
+  const c = { model: "PREBEN", productType: "stol", undertyp: null };
+  assert.equal(R.registerTyp(c, PREBEN_SVAR), "g:stol:602.013.31");
+  assert.equal(R.registerTyp(c, "1. PREBEN\nStatus: såldes under 1970-talet.\nMotivering: pinnstol."), "g:stol:1970");
+  assert.notEqual(R.registerTyp(c, PREBEN_SVAR), R.registerTyp(c, "1. PREBEN\nStatus: såldes under 1970-talet."));
+  assert.equal(R.registerTyp({ model: "Impulse", productType: "fåtölj", undertyp: null }, "1. Impulse\nMotivering: stoppad."), "g:fatolj");
+  assert.equal(R.registerTyp({ model: "NORDVIKEN", productType: "stol", undertyp: "barstol" }, ""), "g:barstol");
+});
+
+test("unikaKallor: samma sida med samma titel tas bara en gång (Instagram-bilden tre gånger), två bilder från samma sida med olika titlar behålls", () => {
+  const rader = [
+    { id: 1, sida: "https://www.instagram.com/p/ABC/?utm=1", titel: "Vintage IKEA Preben", kalla: "Instagram" },
+    { id: 2, sida: "https://instagram.com/p/ABC", titel: "Vintage IKEA  PREBEN", kalla: "Instagram" },
+    { id: 3, sida: "https://shop.test/x", titel: "Stol framifrån", kalla: "Shop" },
+    { id: 4, sida: "https://shop.test/x", titel: "Stol från sidan", kalla: "Shop" },
+    { id: 5, sida: null, titel: "Preben", kalla: "Blocket" },
+    { id: 6, sida: null, titel: "preben", kalla: "Blocket" },
+    { id: 7, sida: null, titel: "Preben", kalla: "Auctionet" },
+  ];
+  assert.deepEqual(R.unikaKallor(rader, (r) => r).map((r) => r.id), [1, 3, 4, 5, 7]);
+});
+
+test("PREBEN: av de riktiga 40 träffarna gick bara äldre pinnstolar till valet med fem platser — med dubbletterna borta och åtta platser är IKPARTS (den moderna stolen) med", () => {
+  const rader = render.imageRows({ images_results: fixtur("bildrader-preben.json") }) as Array<{ src: string; alt: string; source?: string; page?: string }>;
+  assert.equal(rader.length, 40);
+  const rad = new Map(rader.map((r) => [r.src, r]));
+  const klara = ext.pickReferenceRows(rader, "PREBEN", "IKEA", "stol", null).filter((r: { marketplace: boolean }) => !r.marketplace);
+  const kallor = (lista: Array<{ src: string }>) => lista.map((r) => rad.get(r.src)?.source);
+  assert.ok(!kallor(klara.slice(0, 5)).includes("IKPARTS Spare Parts"), "förut: fem första, och IKPARTS föll bort");
+  const nu = R.unikaKallor(klara, (r: { src: string }) => ({ sida: rad.get(r.src)?.page, titel: rad.get(r.src)?.alt, kalla: rad.get(r.src)?.source })).slice(0, R.valMax());
+  assert.ok(kallor(nu).includes("IKPARTS Spare Parts"), "nu: IKPARTS med bland valets bilder");
+  assert.ok(nu.length >= 5 && nu.length <= 8);
+  assert.equal(new Set(nu.map((r: { src: string }) => `${rad.get(r.src)?.page}|${rad.get(r.src)?.alt}`)).size, nu.length, "inga dubbletter kvar");
+});
+
+test("byggValjPrompt: beskrivningen och säljarens foto är med, konstruktionen ska stämma (inte 'utförande spelar ingen roll'), och 0 är ett giltigt svar; utan foto hänvisas till beskrivningen", () => {
+  const kand = [{ lokal: "/api/kandidatbild/a.jpg", titel: "Pinnstol Preben", kalla: "Auctionet" }, { lokal: "/api/kandidatbild/b.jpg", titel: "IKEA PREBEN reservdelar", kalla: "IKPARTS" }];
+  const ctx = { brand: "IKEA", model: "PREBEN", ord: "stol", beskrivning: "Slank, helklädd sits och rygg, grålackerat stål, ben i massiv bok." };
+  const med = R.byggValjPrompt(ctx, kand, true);
+  assert.match(med.system, /helklädd sits/);
+  assert.match(med.system, /FÖRSTA bilden är säljarens egen möbel/);
+  assert.match(med.system, /samma KONSTRUKTION som säljarens foto/);
+  assert.match(med.system, /SAMMA NAMN KAN HA ANVÄNTS PÅ TVÅ HELT OLIKA MÖBLER/);
+  assert.match(med.system, /Svara 0 om ingen bild visar samma konstruktion/);
+  assert.doesNotMatch(med.system, /utförande spelar INGEN roll/i);
+  assert.match(med.user, /Bild 1: "Pinnstol Preben" \(sajt: Auctionet\)\nBild 2: "IKEA PREBEN reservdelar" \(sajt: IKPARTS\)/);
+  const utan = R.byggValjPrompt(ctx, kand, false);
+  assert.doesNotMatch(utan.system, /FÖRSTA bilden/);
+  assert.match(utan.system, /samma KONSTRUKTION som beskrivningen/);
+  const ingenting = R.byggValjPrompt({ brand: "IKEA", model: "PREBEN", ord: "stol" }, kand, false);
+  assert.doesNotMatch(ingenting.system, /Så här beskrivs/);
+  assert.match(ingenting.system, /Svara 0/);
+});
+
+test("valMax: åtta som förval, LOOPA_REFERENS_VAL_MAX ändrar", () => {
+  assert.equal(R.valMax(), 8);
+  process.env.LOOPA_REFERENS_VAL_MAX = "5";
+  try {
+    assert.equal(R.valMax(), 5);
+  } finally {
+    delete process.env.LOOPA_REFERENS_VAL_MAX;
+  }
+});
+
+test("registret skrivs bara när bilden valts MED underlag, och under en nyckel som bär generationen: en bild utan beskrivning och utan säljarfoto sparas inte", async () => {
+  // Jobb UTAN identifieringssvar och utan omslagsbild: ingen beskrivning, inget foto.
+  const utan = await jobbMedKandidater([{ model: "Zeta" }]);
+  const ju = (await getJob(utan))!;
+  ju.identityResearch = undefined;
+  await persist(ju);
+  R.settSokare(async () => ({ image_url: "https://t.test/sits-zeta.jpg", page_url: "" }));
+  R.settBildvaljare(async () => 0);
+  try {
+    await medFetch(async () => {
+      const r = await applyExternalImages(utan, [], { final: true });
+      assert.deepEqual(r.set, ["Zeta"], "bilden visas för säljaren");
+    });
+  } finally {
+    R.settSokare(null);
+    R.settBildvaljare(null);
+  }
+  assert.equal(await registreradKandidatbild("Sits", "Zeta", "g:fatolj"), null, "men registret får den inte");
+
+  // Jobb MED ett identifieringssvar som beskriver modellen (och anger artikelnumret): bilden sparas under generationsnyckeln.
+  const med = await jobbMedKandidater([{ model: "Omega" }]);
+  const j = (await getJob(med))!;
+  j.identityResearch = { researchText: "IDENTIFIERING (Googles AI-läge)\n### 1. Omega (90 %)\n- Status: Utgången modell (såldes under 2010-talet).\n- Motivering: Stoppad fåtölj, artikel 702.013.31.", sources: [] };
+  await persist(j);
+  R.settSokare(async () => ({ image_url: "https://t.test/sits-omega.jpg", page_url: "" }));
+  let beskrivningTillValet: unknown = null;
+  R.settBildvaljare(async (ctx: { beskrivning?: string }) => {
+    beskrivningTillValet = ctx.beskrivning;
+    return 0;
+  });
+  try {
+    await medFetch(async () => {
+      await applyExternalImages(med, [], { final: true });
+    });
+  } finally {
+    R.settSokare(null);
+    R.settBildvaljare(null);
+  }
+  assert.match(String(beskrivningTillValet), /Stoppad fåtölj/, "B:s bildval fick AI-lägets beskrivning av modellen");
+  assert.equal(await registreradKandidatbild("Sits", "Omega", "g:fatolj"), null, "inte under nyckeln utan generation");
+  assert.equal(await registreradKandidatbild("Sits", "Omega", "g:fatolj:702.013.31"), lokal("https://t.test/sits-omega.jpg"));
 });
