@@ -5588,6 +5588,12 @@ body:has(.grind) .consent { display: none; }
   background: rgba(20,17,13,.45); -webkit-backdrop-filter: blur(16px) saturate(1.4); backdrop-filter: blur(16px) saturate(1.4);
   border: 1px solid rgba(255,255,255,.2); box-shadow: none; padding: 5px 14px 5px 5px; font-size: 14px;
 }
+/* DATORN: bilden stannar i sin spalt. Kant-till-kant-marginalerna ovan är till för telefonen, där
+   blocket ska nå skärmens kanter. I datorvyns två spalter (se "Annonsen — bilden till vänster") drog
+   samma negativa högermarginal in bilden i faktaspalten, och eftersom blocket är `sticky` målades
+   den OVANPÅ märket, namnet och priset. Hörnen rundas runt om: det finns ingen skärmkant att möta. */
+[data-view="desktop"] .annons-v2 .listing-cover-block { margin: 0; }
+[data-view="desktop"] .annons-v2 .listing-stage { border-radius: 30px; }
 .annons-v2 .listing-thumbs { padding: 0 var(--safe-left); justify-content: center; }
 .annons-v2 .listing-thumb { width: 44px; height: 44px; border-radius: 10px; }
 
