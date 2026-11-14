@@ -37,8 +37,13 @@ function isLang(value: unknown): value is Lang {
 /**
  * Vad appen ska öppnas på.
  *
- * Sparat val först, annars webbläsarens språk — den som har sin telefon på franska ska inte behöva
- * hitta väljaren för att förstå startsidan. Allt annat än de tre blir svenska.
+ * Sparat val först, annars SVENSKA. Ingenting annat avgör.
+ *
+ * Här lästes tidigare webbläsarens språk (`navigator.languages`). Det gjorde att svenska kunder med
+ * telefonen eller datorn inställd på engelska — vanligt, inte undantag — fick hela sajten på engelska,
+ * och väljaren låg då bara i profilen, bakom inloggningen. De kom inte tillbaka till svenskan. Loopa
+ * är en svensk tjänst för svenska säljare; svenska är utgångsläget, och språkknappen i topplisten
+ * (components/SprakKnapp) är vägen till engelska för den som vill dit.
  */
 function initialLang(): Lang {
   try {
@@ -46,11 +51,6 @@ function initialLang(): Lang {
     if (isLang(saved)) return saved;
   } catch {
     // Privat läge eller blockerade kakor: valet går inte att spara, men appen ska fungera ändå.
-  }
-  const preferred = typeof navigator !== "undefined" ? navigator.languages ?? [navigator.language] : [];
-  for (const tag of preferred) {
-    const code = tag?.slice(0, 2).toLowerCase();
-    if (isLang(code)) return code;
   }
   return "sv";
 }

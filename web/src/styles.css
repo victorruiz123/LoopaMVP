@@ -654,6 +654,36 @@ body {
   .hem-flik { padding: 7px 12px; }
 }
 
+/* ---- språkknappen: SV | EN (components/SprakKnapp) ----
+   Samma pillerform som flikarna bredvid, men mindre och dämpad: den ska gå att hitta, inte tävla
+   med "Sälj". På smala skärmar fyller ordmärket, flikarna och profilbrickan redan raden (335 av
+   343px på en 375px telefon), så där får knappen en egen smal rad överst, högerställd. Startsidan
+   väljer placering i JS efter sitt visningsläge; Om oss och Tjäna ritar två exemplar och låter
+   bredden nedan avgöra vilket som syns. */
+.sprak-knapp {
+  display: inline-flex; gap: 2px; padding: 3px; flex-shrink: 0;
+  border-radius: 999px; background: var(--surface); border: 1px solid var(--border);
+}
+.sprak-knapp-val {
+  min-width: 36px; padding: 6px 10px; border: none; border-radius: 999px;
+  background: none; color: var(--muted); font-family: inherit;
+  font-size: 12px; font-weight: 700; letter-spacing: 0.04em; line-height: 1; cursor: pointer;
+  transition: background var(--t) var(--ease-ui), color var(--t) var(--ease-ui);
+}
+.sprak-knapp-val:hover { color: var(--ink); background: var(--field); }
+.sprak-knapp-val:focus-visible { outline: none; box-shadow: var(--focus); }
+.sprak-knapp-aktiv, .sprak-knapp-aktiv:hover { background: var(--ink); color: var(--bg); }
+.sprak-knapp-ovanfor { display: none; }
+@media (max-width: 639px) {
+  .sprak-knapp-rad { display: none; }
+  .sprak-knapp-ovanfor { display: inline-flex; }
+}
+/* Raden som bär knappen på smala skärmar. Tom — och därmed utan höjd — på breda. */
+.sprak-rad { display: flex; justify-content: flex-end; }
+@media (max-width: 639px) {
+  .sprak-rad { margin-bottom: 10px; }
+}
+
 
 /* ---- heron ---- */
 .home-hero { margin-bottom: 34px; }

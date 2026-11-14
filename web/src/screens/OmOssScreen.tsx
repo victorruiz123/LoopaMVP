@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import HemFlikar, { gaTill } from "../components/HemFlikar";
+import SprakKnapp from "../components/SprakKnapp";
 import { useLang } from "../lib/i18n";
 import { usePageTitle } from "../lib/pageTitle";
 import "./om-oss.css";
@@ -247,6 +248,10 @@ export default function OmOssScreen() {
 
   return (
     <div className="om-oss">
+      {/* Språkknappen ovanför raden på telefonen, i raden på bredare skärmar. Se components/SprakKnapp. */}
+      <div className="oo-wrap sprak-rad sprak-rad-oo">
+        <SprakKnapp variant="ovanfor" />
+      </div>
       <div className="oo-wrap oo-bar">
         <a
           href="/"
@@ -259,6 +264,7 @@ export default function OmOssScreen() {
           loopa
         </a>
         <HemFlikar aktiv="om-oss" />
+        <SprakKnapp variant="rad" />
       </div>
 
       {/* Hero */}

@@ -11,6 +11,7 @@ import { brandLook, brandNameStyle, harEgenIdentitet } from "../lib/brandLook";
 import HurFungerarDet from "../components/HurFungerarDet";
 import LetarDuMobel from "../components/LetarDuMobel";
 import HemFlikar from "../components/HemFlikar";
+import SprakKnapp from "../components/SprakKnapp";
 import MobelParad from "../components/MobelParad";
 import { usePageTitle } from "../lib/pageTitle";
 import { useT } from "../lib/i18n";
@@ -179,11 +180,19 @@ export default function HomeScreen({
         ser före sidfoten. Den står till VÄNSTER om brickan av samma skäl som "Sälj" gör det i
         butikens topplist: profilen är radens ände, och något utanför den läser som om DEN vore det.
       */}
+      {/* Språkknappen: i raden på datorn, i en egen rad ovanför på telefonen — där fyller ordmärket,
+          flikarna och profilbrickan redan bredden. Se components/SprakKnapp. */}
+      {!dator && (
+        <div className="sprak-rad">
+          <SprakKnapp />
+        </div>
+      )}
       <div className="home-bar">
         <span className="home-wordmark">loopa</span>
         <HemFlikar aktiv="salj" />
         <div className="home-bar-hoger">
           {dator && !inbjuden && <LetarDuMobel varifran="/" variant="bar" />}
+          {dator && <SprakKnapp />}
           {/* Ingen knapp alls medan sessionen läses: att gissa fel i en tiondels sekund byter ut
               brickan framför ögonen på den som just siktat in sig på den. */}
           {!loading && (

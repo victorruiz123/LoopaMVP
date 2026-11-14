@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import HemFlikar, { gaTill } from "../components/HemFlikar";
+import SprakKnapp from "../components/SprakKnapp";
 import AuthScreen from "./AuthScreen";
 import { formatOre } from "../components/Affiliate";
 import { getMinAffiliate } from "../api";
@@ -761,6 +762,10 @@ export default function AffiliateScreen() {
 
   return (
     <div ref={rot} className="om-oss af">
+      {/* Språkknappen ovanför raden på telefonen, i raden på bredare skärmar. Se components/SprakKnapp. */}
+      <div className="oo-wrap sprak-rad sprak-rad-oo">
+        <SprakKnapp variant="ovanfor" />
+      </div>
       <div className="oo-wrap oo-bar">
         <a
           href="/"
@@ -773,6 +778,7 @@ export default function AffiliateScreen() {
           loopa
         </a>
         <HemFlikar aktiv="affiliate" />
+        <SprakKnapp variant="rad" />
       </div>
 
       {/* Hero */}

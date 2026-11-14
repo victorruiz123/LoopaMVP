@@ -299,3 +299,15 @@
 @media (prefers-reduced-motion: reduce) {
   .oo-rise, .oo-float, .oo-bob, .oo-draw, .oo-pulse { animation: none; }
 }
+
+/* ---- språkknappens rad (components/SprakKnapp) ----
+   Syns bara på smala skärmar, där den står överst och tar över safe-area-marginalen från raden
+   under. Samma lager som topplisten, annars målas bakgrundens former ovanpå knappen. */
+.sprak-rad-oo { position: relative; z-index: 2; }
+@media (max-width: 639px) {
+  .sprak-rad-oo { padding-top: calc(12px + env(safe-area-inset-top)); margin-bottom: 0; }
+  .sprak-rad-oo + .oo-bar { padding-top: 10px; }
+}
+@media (min-width: 640px) {
+  .sprak-rad-oo { display: none; }
+}

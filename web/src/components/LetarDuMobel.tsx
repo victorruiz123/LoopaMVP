@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { track } from "../butik/components/Bits";
 import { ArrowUpIcon, CloseIcon } from "./icons";
+import { useT } from "../lib/i18n";
 import "./letar.css";
 
 /**
@@ -128,6 +129,7 @@ export default function LetarDuMobel({
   istallet?: boolean;
   variant?: "rad" | "bar";
 }) {
+  const t = useT();
   const [oppen, setOppen] = useState(false);
 
   const oppna = () => {
@@ -139,15 +141,15 @@ export default function LetarDuMobel({
     <>
       {variant === "bar" ? (
         <button type="button" className="letar-bar-knapp" onClick={oppna}>
-          Letar du möbel?
+          {t("Letar du möbel?")}
         </button>
       ) : (
         <section className={`letar${istallet ? " letar-istallet" : ""}`}>
           <p className="letar-text">
-            Letar du efter något? Berätta, så hör vi av oss när det kommer in.
+            {t("Letar du efter något? Berätta, så hör vi av oss när det kommer in.")}
           </p>
           <button type="button" className="letar-knapp" onClick={oppna}>
-            Letar du möbel?
+            {t("Letar du möbel?")}
           </button>
         </section>
       )}
@@ -157,12 +159,20 @@ export default function LetarDuMobel({
   );
 }
 
-/** En replik i samtalet. `fel` = det gick inte; `svag` = ett överhoppande, inte ett svar. */
+/**
+ * En replik i samtalet. `fel` = det gick inte; `svag` = ett överhoppande, inte ett svar.
+ *
+ * TEXTEN SPARAS PÅ SVENSKA och översätts när den ritas — loopas repliker, serverns följdfrågor och
+ * de svarsalternativ man tryckt på. Då följer ett pågående samtal med om språket byts mitt i det.
+ * `oversatt` säger vilka "du"-repliker som är våra ord (ett tryckt alternativ, "Hoppa över") och
+ * vilka som är det personen själv skrev; det egna skrivna lämnas alltid orört.
+ */
 interface Meddelande {
   roll: "loopa" | "du";
   text: string;
   fel?: boolean;
   svag?: boolean;
+  oversatt?: boolean;
 }
 
 /**
@@ -178,6 +188,7 @@ interface Meddelande {
  * precis som förut, och en replik som inte gick fram kan därför inte flytta flödet framåt.
  */
 function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void }) {
+  const t = useT();
   const [steg, setSteg] = useState<Steg>("beskriv");
   const [logg, setLogg] = useState<Meddelande[]>([{ roll: "loopa", text: OPPNING }]);
   const [utkast, setUtkast] = useState("");
@@ -304,7 +315,12 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
   };
 
   /** Ett svar, eller ett överhoppande. Båda för flödet framåt på exakt samma sätt. */
-  const besvara = (answer: string | null) => {
+  /**
+   * `franVal` = ett tryckt svarsalternativ. Alternativen kommer från servern på svenska och skickas
+   * tillbaka PÅ SVENSKA — servern känner igen "Soffor" och "5 000 kr", inte deras översättningar
+   * (efterlysning/parse.ts, applyAnswer). Bara det som visas översätts.
+   */
+  const besvara = (answer: string | null, franVal = false) => {
     const fraga = fragor[index];
     if (!fraga) return;
     const rent = answer?.trim() || null;
@@ -312,7 +328,7 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
     setUtkast("");
     const sista = index + 1 >= fragor.length;
     saga(
-      rent ? { roll: "du", text: rent } : { roll: "du", text: "Hoppar över", svag: true },
+      rent ? { roll: "du", text: rent, oversatt: franVal } : { roll: "du", text: "Hoppar över", svag: true, oversatt: true },
       { roll: "loopa", text: sista ? EPOST_FRAGA : fragor[index + 1].question },
     );
     if (sista) setSteg("epost");
@@ -383,16 +399,16 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
         ref={arkRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Letar du möbel?"
+        aria-label={t("Letar du möbel?")}
         /* Klick i arket ska inte stänga det. Bakgrunden stänger; innehållet är inte bakgrunden. */
         onClick={(e) => e.stopPropagation()}
       >
         <header className="letar-topp">
           <h2>
             <span className="letar-prick" aria-hidden="true" />
-            Letar du möbel?
+            {t("Letar du möbel?")}
           </h2>
-          <button type="button" className="letar-stang" onClick={onStang} aria-label="Stäng">
+          <button type="button" className="letar-stang" onClick={onStang} aria-label={t("Stäng")}>
             <CloseIcon size={15} />
           </button>
         </header>
@@ -400,9 +416,9 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
         <div className="letar-flode" ref={flodeRef}>
           {logg.map((m, i) =>
             m.roll === "du" ? (
-              <p key={i} className={`letar-du ${m.svag ? "letar-du-svag" : ""}`}>{m.text}</p>
+              <p key={i} className={`letar-du ${m.svag ? "letar-du-svag" : ""}`}>{m.oversatt ? t(m.text) : m.text}</p>
             ) : (
-              <p key={i} className={`letar-svar ${m.fel ? "letar-svar-fel" : ""}`}>{m.text}</p>
+              <p key={i} className={`letar-svar ${m.fel ? "letar-svar-fel" : ""}`}>{t(m.text)}</p>
             ),
           )}
 
@@ -410,7 +426,7 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
           {arbetar && (
             <p className="letar-vantar" aria-live="polite">
               <span className="letar-puls" aria-hidden="true" />
-              <span>{steg === "epost" ? "Sparar…" : "Läser…"}</span>
+              <span>{steg === "epost" ? t("Sparar…") : t("Läser…")}</span>
             </p>
           )}
         </div>
@@ -424,11 +440,11 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
                 onClick={() => {
                   // Fyller raden, skickar inte: chipset är början på en beskrivning, inte en färdig
                   // fråga. Se EXEMPEL ovan.
-                  setUtkast(e + " ");
+                  setUtkast(t(e) + " ");
                   faltRef.current?.focus();
                 }}
               >
-                {e}
+                {t(e)}
               </button>
             ))}
           </div>
@@ -437,19 +453,19 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
         {fraga && !arbetar && (
           <div className="letar-forslag">
             {fraga.options?.map((o) => (
-              <button key={o} type="button" onClick={() => besvara(o)}>{o}</button>
+              <button key={o} type="button" onClick={() => besvara(o, true)}>{t(o)}</button>
             ))}
             {/* Varje fråga går att hoppa över, och knappen står bland svaren och inte i en kant. En
                 överhoppningsknapp man måste leta efter är ingen överhoppningsknapp. */}
             <button type="button" className="letar-hoppa" onClick={() => besvara(null)}>
-              Hoppa över
+              {t("Hoppa över")}
             </button>
           </div>
         )}
 
         {steg === "klar" ? (
           <div className="letar-forslag letar-forslag-slut">
-            <button type="button" onClick={onStang}>Stäng</button>
+            <button type="button" onClick={onStang}>{t("Stäng")}</button>
           </div>
         ) : (
           <form
@@ -464,8 +480,8 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
                 type="email"
                 value={utkast}
                 onChange={(e) => setUtkast(e.target.value)}
-                placeholder="du@exempel.se"
-                aria-label="Din e-postadress"
+                placeholder={t("du@exempel.se")}
+                aria-label={t("Din e-postadress")}
                 autoComplete="email"
                 inputMode="email"
                 maxLength={160}
@@ -492,12 +508,12 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
                   el.style.height = `${el.scrollHeight}px`;
                 }}
                 rows={1}
-                placeholder={steg === "fragor" ? "Skriv ditt svar…" : PLACEHOLDER}
-                aria-label={fraga ? fraga.question : "Beskriv vad du letar efter"}
+                placeholder={steg === "fragor" ? t("Skriv ditt svar…") : t(PLACEHOLDER)}
+                aria-label={fraga ? t(fraga.question) : t("Beskriv vad du letar efter")}
                 maxLength={500}
               />
             )}
-            <button type="submit" disabled={!utkast.trim() || arbetar} aria-label="Skicka">
+            <button type="submit" disabled={!utkast.trim() || arbetar} aria-label={t("Skicka")}>
               <ArrowUpIcon size={18} />
             </button>
           </form>
@@ -506,8 +522,7 @@ function LetarVy({ varifran, onStang }: { varifran: string; onStang: () => void 
         {/* Vad adressen används till, och inte till. Står kvar hela vägen: den som tvekar inför att
             lämna den gör det innan de skriver den, inte efter. */}
         <p className="letar-fot">
-          Vi använder adressen för att höra av oss om just det här. Inget nyhetsbrev, ingen
-          vidareförsäljning.
+          {t("Vi använder adressen för att höra av oss om just det här. Inget nyhetsbrev, ingen vidareförsäljning.")}
         </p>
       </div>
     </div>,
