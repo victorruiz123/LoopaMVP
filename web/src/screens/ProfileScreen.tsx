@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
-import { getMinAffiliate, getMinInbjudan, imageUrl, listJobs, loggaLankKopierad } from "../api";
+import { getMinAffiliate, getMinInbjudan, getMinaCredits, imageUrl, listJobs, loggaLankKopierad } from "../api";
 import { useAuth } from "../auth/AuthProvider";
 import GradeBadge from "../components/GradeBadge";
 import { ArrowLeftIcon, CardIcon, CheckIcon, ChevronRight, CopyIcon, SendIcon, UsersIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
-import type { JobSummary, MinAffiliate, MinInbjudan } from "../types";
+import type { JobSummary, MinAffiliate, MinInbjudan, MinaCredits } from "../types";
 import { usePageTitle } from "../lib/pageTitle";
 import LegalLink from "../components/LegalLink";
 import LanguagePicker from "../components/LanguagePicker";
@@ -139,6 +139,8 @@ export default function ProfileScreen({
             <Tal etikett={t("Din tur")} varde={String(vantar)} under={vantar > 0 ? t("väntar på dig") : undefined} lyser={vantar > 0} />
           </dl>
 
+          <Credits />
+
           <nav className="pf-konto" aria-label={t("Konto")}>
             {/* Språket är en kontoinställning — här, inte bredvid namnet, där det tog namnets plats. */}
             <div className="pf-konto-rad pf-konto-sprak">
@@ -241,6 +243,65 @@ export default function ProfileScreen({
 // ---------------------------------------------------------------------------
 // Små byggstenar
 // ---------------------------------------------------------------------------
+
+/**
+ * Massproductions-credits (server/src/massproductions.ts): summan och en rad per möbel.
+ *
+ * Syns bara för den som har credits — ett tomt "0 credits" vore en reklamskylt för ett erbjudande
+ * som bara gäller ett märke. Hämtas för sig: faller anropet saknas rutan, inte profilen.
+ */
+export function Credits() {
+  const t = useT();
+  const { lang } = useLang();
+  const [credits, setCredits] = useState<MinaCredits | null>(null);
+
+  useEffect(() => {
+    let aktiv = true;
+    getMinaCredits()
+      .then((c) => aktiv && setCredits(c))
+      .catch(() => undefined);
+    return () => {
+      aktiv = false;
+    };
+  }, []);
+
+  if (!credits || credits.poster.length === 0) return null;
+  const datum = (iso: string) => new Date(iso).toLocaleDateString(lang, { day: "numeric", month: "short" });
+  /*
+    SALDOT ÄR BARA DET SOM ÄR SÅLT. Credits från en möbel som ännu ligger ute står under, som
+    väntande, och räknas inte in — de blir säljarens först när möbeln säljs (massproductions.ts).
+  */
+  return (
+    <section className="pf-credits" aria-labelledby="pf-credits-rubrik">
+      <div className="pf-credits-topp">
+        <h2 id="pf-credits-rubrik" className="pf-credits-rubrik">{t("Massproductions-credits")}</h2>
+        <span className="pf-credits-summa">{credits.saldo.toLocaleString("sv-SE")}</span>
+      </div>
+      <p className="pf-credits-not">
+        {credits.vantar > 0
+          ? t("Gäller bara hos Massproductions. +{antal} väntar — de blir dina när möblerna är sålda, räknat på vad de säljs för.", { antal: credits.vantar.toLocaleString("sv-SE") })
+          : t("Gäller bara hos Massproductions.")}
+      </p>
+      <ul className="pf-credits-lista">
+        {credits.poster.map((p) => (
+          <li key={p.id} className={`pf-credits-${p.status}`}>
+            <span>
+              {p.titel}
+              <small>
+                {p.status === "tillgodo"
+                  ? t("Såld {datum} · på ditt konto", { datum: datum(p.saldAt ?? p.skapad) })
+                  : p.status === "annullerad"
+                    ? t("Returnerad · gäller inte")
+                    : t("Väntar på att möbeln säljs · vid dagens pris")}
+              </small>
+            </span>
+            <b>{p.status === "tillgodo" ? "+" : ""}{p.credits.toLocaleString("sv-SE")}</b>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function Tal({ etikett, varde, under, lyser = false }: { etikett: string; varde: string; under?: string; lyser?: boolean }) {
   return (

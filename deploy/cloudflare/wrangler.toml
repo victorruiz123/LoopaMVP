@@ -63,6 +63,22 @@ zone_name = "loopa.nu"
 pattern = "loopa.nu/k/*"
 zone_name = "loopa.nu"
 
+# Versalt K: en länk som skrivs av för hand, eller där telefonen satt versal efter snedstrecket.
+# Rutterna skiljer på stora och små bokstäver; servern gör det inte (se server.ts, kampanjlänken).
+[[routes]]
+pattern = "loopa.nu/K/*"
+zone_name = "loopa.nu"
+
+# ─── www.loopa.nu ───────────────────────────────────────────────────────────
+#
+# Namnet går genom Cloudflare men pekar inte på någon sajt — allt där gav 404. Workern skickar det
+# vidare till loopa.nu med 301 (loopa-router.js, överst). Verifiera efter deploy:
+#   curl -s -o /dev/null -D - "https://www.loopa.nu/k/massproduction" | grep -iE "^HTTP|^location"
+# ska ge 301 till https://loopa.nu/k/massproduction.
+[[routes]]
+pattern = "www.loopa.nu/*"
+zone_name = "loopa.nu"
+
 # ─── /salj: den gamla adressen, som fortfarande måste svara ────────────────
 #
 # /salj var säljflödets adress den vecka roten ännu gick till företagssidan. Den står i länkar vi
@@ -235,6 +251,12 @@ zone_name = "loopa.nu"
 
 [[routes]]
 pattern = "loopa.nu/api/session*"
+zone_name = "loopa.nu"
+
+# Nyhetsbrevet. Lades till direkt i Cloudflare-panelen och saknades här — utan raden hade nästa
+# `wrangler deploy` tagit bort den, eftersom deployen ersätter alla rutter med listan i den här filen.
+[[routes]]
+pattern = "loopa.nu/api/nyhetsbrev"
 zone_name = "loopa.nu"
 
 # Mätningen av flödet. Klienten skickar den med `navigator.sendBeacon` (web/src/lib/flode.ts), och

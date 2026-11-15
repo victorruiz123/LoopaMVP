@@ -738,8 +738,20 @@ async function traderaState(job: ConditionJob, partnerSlug: unknown = null) {
  * Slugen kommer från klienten tills villkoren är satta, och från villkoren sedan.
  */
 async function saljvillkor(job: ConditionJob, mobelpris: number | null, partnerSlug: unknown = null) {
+  const villkor = await grundvillkor(job, mobelpris, partnerSlug);
+  /**
+   * MASSPRODUCTIONS: pengar eller credits (massproductions.ts). Bara när märket säljaren valde är
+   * Massproductions och priset är känt. Pengar är samma utfall som `standard` — det säljaren annars
+   * hade fått — och credits är 10 % över möbelpriset. `valt` är låst när villkoren väl är satta.
+   */
+  const { erbjudandeFor } = await import("./massproductions.js");
+  return { ...villkor, massproductions: erbjudandeFor(job, mobelpris !== null ? villkor.standard : null) };
+}
+
+async function grundvillkor(job: ConditionJob, mobelpris: number | null, partnerSlug: unknown = null) {
   const { STANDARD_ANDEL, GRATIS_ANDEL, uppdelning } = await import("./provision.js");
   const { partnerFor } = await import("./partner/partners.js");
+  const { arMassproductions } = await import("./massproductions.js");
   const las = job.saleTerms ?? null;
   const partner = partnerFor(las ? las.partner : partnerSlug);
   if (partner) {
@@ -755,7 +767,9 @@ async function saljvillkor(job: ConditionJob, mobelpris: number | null, partnerS
   }
   let krediter: { antal: number; forstaUtgang: string | null } = { antal: 0, forstaUtgang: null };
   const agare = ownerIdOf(job);
-  if (!las && agare) {
+  // En Massproductions-möbel har sitt eget val (pengar eller credits) — gratisförsäljningen erbjuds
+  // inte där, utan sparas till en annan möbel. Två erbjudanden i samma bekräftelse vore ett pussel.
+  if (!las && agare && !arMassproductions(job.identity?.brand)) {
     try {
       const { krediterFor, tillgangliga } = await import("./referral/regler.js");
       const t = tillgangliga(await krediterFor(agare));
@@ -851,16 +865,31 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
    *
    * Kom säljaren via en partners länk gäller 0 % utan att någon kredit tas — se saljvillkor.
    */
-  const body = await readJsonBody<{ anvandGratis?: unknown; partner?: unknown }>(req, 1024).catch(
-    () => ({}) as { anvandGratis?: unknown; partner?: unknown },
+  const body = await readJsonBody<{ anvandGratis?: unknown; partner?: unknown; ersattning?: unknown; namn?: unknown }>(req, 1024).catch(
+    () => ({}) as { anvandGratis?: unknown; partner?: unknown; ersattning?: unknown; namn?: unknown },
   );
+  /**
+   * MASSPRODUCTIONS: säljaren MÅSTE ha valt pengar eller credits. Ett tryck utan val är en äldre
+   * klient eller ett fel, och då läggs möbeln inte ut på ett val ingen gjort — samma regel som för
+   * gratisförsäljningen: ett ja gäller det säljaren faktiskt sa ja till.
+   */
+  const { arMassproductions, ersattningVidTryck } = await import("./massproductions.js");
+  const arMp = arMassproductions(job.identity?.brand);
+  const mpVal = job.saleTerms ? null : ersattningVidTryck(job, body.ersattning, readiness.plan.itemPrice, body.namn);
+  if (mpVal === "saknas") {
+    return sendJson(res, 409, { error: "Välj om du vill ha pengar eller credits för möbeln.", ...(await traderaState(job)) });
+  }
+  if (mpVal === "saknar-namn") {
+    return sendJson(res, 409, { error: "Skriv ditt namn — Massproductions behöver det för dina credits.", ...(await traderaState(job)) });
+  }
   let nyKredit: { id: string } | null = null;
+  const villkorNyss = !job.saleTerms;
   if (!job.saleTerms) {
     const { STANDARD_ANDEL, GRATIS_ANDEL } = await import("./provision.js");
     const { partnerFor } = await import("./partner/partners.js");
     const agare = ownerIdOf(job);
     const partner = partnerFor(body.partner);
-    if (!partner && body.anvandGratis === true) {
+    if (!partner && !arMp && body.anvandGratis === true) {
       const { anvandKredit } = await import("./referral/regler.js");
       nyKredit = agare ? await anvandKredit(agare, readiness.plan.loopaId) : null;
       if (!nyKredit) {
@@ -874,6 +903,7 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
       commissionRate: partner || nyKredit ? GRATIS_ANDEL : STANDARD_ANDEL,
       referralCreditId: nyKredit?.id ?? null,
       partner: partner?.slug ?? null,
+      ersattning: mpVal,
       decidedAt: new Date().toISOString(),
     };
     if (partner) console.info(`[partner] job ${jobId} läggs upp via ${partner.namn} — 0 % provision.`);
@@ -888,7 +918,28 @@ async function handlePublishTradera(jobId: string, req: IncomingMessage, res: Se
       const { lamnaTillbakaKredit } = await import("./referral/regler.js");
       await lamnaTillbakaKredit(nyKredit.id).catch(() => undefined);
     }
+    // Massproductions-valet likaså: möbeln kom aldrig i kö, så säljaren får välja igen.
+    if (villkorNyss && arMp) job.saleTerms = null;
     throw err;
+  }
+
+  /**
+   * Massproductions-krediterna, EFTER att möbeln står i kö — ett tryck som föll ska aldrig ge
+   * credits. Idempotent per möbel (reserveraCredits), så ett nytt tryck efter ett avslag i
+   * granskningen ger inte dubbla. Ett fel här stoppar inte överlämningen: valet står på möbelns
+   * villkor och posten kan skrivas om i efterhand; loggen bär orsaken.
+   */
+  const ersattning = job.saleTerms?.ersattning;
+  const credsAgare = ownerIdOf(job);
+  if (ersattning?.typ === "credits" && credsAgare) {
+    try {
+      const { reserveraCredits } = await import("./massproductions.js");
+      const titel = job.result?.listing?.result?.listing.title ?? job.listing?.result?.listing.title ?? readiness.plan.title;
+      await reserveraCredits({ userId: credsAgare, jobId, titel, mobelprisSek: ersattning.mobelprisSek });
+      // Brevet till Massproductions går INTE här, utan när möbeln är såld (butik/store.ts, claimForSale).
+    } catch (err) {
+      console.error(`[massproductions] credits för ${jobId} kunde inte skrivas:`, err instanceof Error ? err.message : err);
+    }
   }
 
   /**
@@ -2445,6 +2496,12 @@ const server = http.createServer(async (req, res) => {
         return sendJson(res, 404, { error: "Not found" });
       }
 
+      /** Massproductions-credits: summan och en post per möbel. Se massproductions.ts. */
+      if (segments[1] === "salj" && segments[2] === "credits" && segments.length === 3 && req.method === "GET") {
+        const { minaCredits } = await import("./massproductions.js");
+        return sendJson(res, 200, await minaCredits(identity.id));
+      }
+
       /** Affiliate-länken: koden, vad den gett, anspråket efter registreringen. Se affiliate/routes.ts. */
       if (segments[1] === "salj" && segments[2] === "affiliate") {
         const { handleAffiliate } = await import("./affiliate/routes.js");
@@ -2896,6 +2953,8 @@ const server = http.createServer(async (req, res) => {
         }
         if (segments[2] === "kampanjer" && segments.length === 4 && req.method === "DELETE") {
           const { taBortKampanj } = await import("./data/kampanjer.js");
+          const { FASTA_KAMPANJER } = await import("./data/kampanjer.js");
+          if (FASTA_KAMPANJER.some((f) => f.kod === segments[3])) return sendJson(res, 400, { error: "Samarbetslänken är inbyggd och går inte att ta bort." });
           if (!(await taBortKampanj(segments[3]))) return sendJson(res, 404, { error: "Länken finns inte." });
           return sendJson(res, 200, { ok: true });
         }
@@ -2999,6 +3058,7 @@ const server = http.createServer(async (req, res) => {
                   // Äldre annonser publicerades innan godkännandet fanns; att de ligger uppe är godkännandet.
                   godkand: t?.approvedAt ?? (t?.status === "published" ? (t.publishedAt ?? t.startedAt) : null),
                   sald: post?.soldAt ?? null,
+                  ersattning: j.saleTerms?.ersattning?.typ ?? null,
                 };
               }),
             }),
@@ -3353,6 +3413,21 @@ const server = http.createServer(async (req, res) => {
      * routern (/salj och /salj/*) och ingen av dem har någon egen sida att skydda.
      */
     if (url.pathname === "/salj" || url.pathname === "/salj/" || url.pathname.startsWith("/salj/")) {
+      // Undantaget: en kampanjlänk, /salj/massproduction. Se saljKampanjSvar i data/kampanjer.ts.
+      // Den får appskalet (eller en 302 till sin exakta stavning) — aldrig 301, som cachas för gott.
+      const { saljKampanjSvar } = await import("./data/kampanjer.js");
+      const kampanj = req.method === "GET" || req.method === "HEAD" ? await saljKampanjSvar(url.pathname, url.search) : null;
+      if (kampanj?.typ === "omdirigera") {
+        res.writeHead(302, { Location: kampanj.location, "Cache-Control": "no-store" });
+        return res.end();
+      }
+      if (kampanj?.typ === "appen") {
+        if (req.method === "HEAD") {
+          res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
+          return res.end();
+        }
+        if (await serveStatic(url.pathname, res, url.search)) return;
+      }
       res.writeHead(301, { Location: "/" });
       return res.end();
     }
@@ -3370,16 +3445,23 @@ const server = http.createServer(async (req, res) => {
      * 302 och inte 301: en webbläsare som cachat svaret skulle aldrig mer fråga, och länkens mål får
      * gå att ändra.
      */
-    const kampanjVag = /^\/k\/([a-z0-9]{5})\/?$/.exec(url.pathname);
-    if (kampanjVag && req.method === "GET") {
-      const { kampanjFor } = await import("./data/kampanjer.js");
-      const k = await kampanjFor(kampanjVag[1]);
-      if (!k) {
-        res.writeHead(302, { Location: "/" });
+    //
+    // LÄSBARA KODER OCH VERSALER. Partnerlänkar bär ett namn (/k/massproduction, se FASTA_KAMPANJER),
+    // och folk skriver av dem med versaler, bindestreck eller ett snedstreck för mycket. Allt som
+    // leder till en kampanj men inte är dess exakta adress omdirigeras först till den exakta —
+    // klienten läser bara den formen, och då räknas varje besök på en och samma kod.
+    //
+    // HEAD besvaras också: länkkontroller och förhandsvisningar i appar frågar ofta så, och ett
+    // 404 där får länken att se trasig ut i samma ögonblick som den delas.
+    if (/^\/k(\/|$)/i.test(url.pathname) && (req.method === "GET" || req.method === "HEAD")) {
+      const { kampanjSvar } = await import("./data/kampanjer.js");
+      const svar = await kampanjSvar(url.pathname, url.search);
+      if (svar?.typ === "omdirigera") {
+        res.writeHead(302, { Location: svar.location, "Cache-Control": "no-store" });
         return res.end();
       }
-      if (k.mal !== "/") {
-        res.writeHead(302, { Location: `${k.mal}?k=${k.kod}` });
+      if (svar?.typ === "appen" && req.method === "HEAD") {
+        res.writeHead(200, { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store" });
         return res.end();
       }
       // Faller igenom till appskalet nedan.
@@ -3441,6 +3523,10 @@ startBlocketVakt();
 // Robotarnas dagliga hälsokontroll: Blocket, Tradera och Facebook klockan sju, med rapport i panelen
 // och brev till adminadresserna när något inte är grönt. Se robotHalsa.ts.
 startRobotHalsa();
+
+// Kontaktbrevet till Massproductions: försöker igen var 15:e minut med det som inte gått fram.
+// Se massproductionsKontakt.ts.
+void import("./massproductionsKontakt.js").then(({ startMassproductionsKontakt }) => startMassproductionsKontakt());
 
 // Säljarens siffror från marknadsplatserna: Traderas och Blockets säljarsidor, lästa av robotarna var
 // tredje timme. Se kanalStatistik.ts.

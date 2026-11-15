@@ -915,6 +915,17 @@ export interface SaleTerms {
    * kunder säljer utan provision — och annonsen bär partnerns märkning i panelen. Saknas på äldre jobb.
    */
   partner?: string | null;
+  /**
+   * Massproductions-valet (massproductions.ts): pengar eller credits. Satt bara på möbler av märket
+   * Massproductions, och då alltid. `credits` är beloppet som reserverades, när säljaren valde dem.
+   */
+  ersattning?: {
+    typ: "pengar" | "credits";
+    credits: number | null;
+    mobelprisSek: number;
+    /** Namnet säljaren skrev vid credits-valet. Går till Massproductions när möbeln är såld. */
+    namn?: string | null;
+  } | null;
   decidedAt: string;
 }
 

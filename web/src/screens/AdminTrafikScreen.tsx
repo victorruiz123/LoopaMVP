@@ -218,6 +218,7 @@ const KANAL_BETYDER: Record<string, string> = {
   Inbjudan: "Klickade på en väns inbjudningslänk",
   Affiliate: "Kom via en partners länk",
   "E-post": "Klickade i ett mejl",
+  Samarbeten: "Kom via en samarbetspartners länk, t.ex. Mass Production AB",
   Kampanj: "En märkt länk (utm) som inte passar ovan",
   Övrigt: "En annan webbplats som länkat till oss",
 };

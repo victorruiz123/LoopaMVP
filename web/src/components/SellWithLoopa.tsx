@@ -6,6 +6,7 @@ import AuthScreen from "../screens/AuthScreen";
 import { sparadPartner } from "../lib/partner";
 import { CheckIcon, CloseIcon } from "./icons";
 import ProcessFeedback from "./ProcessFeedback";
+import ErsattningsVal from "./ErsattningsVal";
 import AnnonsStatistik from "./AnnonsStatistik";
 import LegalLink from "./LegalLink";
 import { useT } from "../lib/i18n";
@@ -13,7 +14,7 @@ import * as flode from "../lib/flode";
 import { formatSek } from "../lib/price";
 import { LOOPA_FEE_CAP_SEK } from "../lib/fees";
 import { formatDropDate, ladderRungs } from "../lib/priceLadder";
-import type { ChannelPlan, PriceLadder, SaljVillkor, TraderaPlan, TraderaState } from "../types";
+import type { ChannelPlan, ErsattningsTyp, MassproductionsErbjudande, PriceLadder, SaljVillkor, TraderaPlan, TraderaState } from "../types";
 import blocketMark from "../assets/kanaler/blocket.png";
 import traderaMark from "../assets/kanaler/tradera.png";
 import facebookMark from "../assets/kanaler/facebook.png";
@@ -92,7 +93,7 @@ export default function SellWithLoopa({
   onSellAnother?: () => void;
 }) {
   const t = useT();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   /**
    * Kontot, det ALLRA sista steget. Gästen har filmat, prissatt och granskat hela annonsen utan konto;
    * först när "Ja, sälj den" trycks frågar vi efter det. Inloggningen ritas ovanpå annonsen så att
@@ -158,6 +159,37 @@ export default function SellWithLoopa({
    * aktiva valet. Servern avgör om krediten fortfarande gäller när trycket kommer.
    */
   const [anvandGratis, setAnvandGratis] = useState(true);
+  /**
+   * Massproductions-valet (components/ErsattningsVal.tsx): pengar eller credits. `valjer` är sidan
+   * med de två korten; den öppnas av "Sälj med Loopa" i stället för bekräftelsen, och valet följer
+   * sedan med in i bekräftelsen och trycket. Är möbeln redan överlämnad står valet på servern
+   * (villkor.massproductions.valt) och sidan visas inte igen.
+   */
+  const [ersattning, setErsattning] = useState<ErsattningsTyp | null>(() => sparatVal(jobId));
+  /** Namnet säljaren skrev vid credits-valet. Går till Massproductions när möbeln är såld. */
+  const [mpNamn, setMpNamn] = useState<string | null>(() => sparatNamn(jobId));
+  /**
+   * Fönstret, och varifrån det öppnades — det avgör vart man hamnar efter valet:
+   *   "auto"  — av sig självt när annonsen var klar: tillbaka till sidan med "Sälj med Loopa"
+   *   "salj"  — av "Sälj med Loopa" utan ett val: vidare till bekräftelsen
+   *   "andra" — av "Ändra" i bekräftelsen: tillbaka till bekräftelsen
+   */
+  const [valjer, setValjer] = useState<null | "auto" | "salj" | "andra">(null);
+  const harVisatVal = useRef(false);
+  const mpErbjudande = state?.villkor?.massproductions ?? null;
+  const mpRedanLamnad = !!state?.publication || !!mpErbjudande?.valt;
+  const mpKanSaljas = !!state?.plan;
+
+  /**
+   * VALET FÖRE "SÄLJ MED LOOPA". När annonsen är klar och möbeln är en Massproductions som går att
+   * sälja öppnas fönstret av sig självt, en gång. Har säljaren redan valt (sparat i webbläsaren) eller
+   * lämnat över möbeln visas det inte.
+   */
+  useEffect(() => {
+    if (harVisatVal.current || !mpErbjudande || mpRedanLamnad || !mpKanSaljas) return;
+    harVisatVal.current = true;
+    if (!ersattning) setValjer("auto");
+  }, [mpErbjudande, mpRedanLamnad, mpKanSaljas, ersattning]);
 
   /**
    * Ligger rutan fortfarande nedanför det man ser? Då står den fasta listen kvar. Så fort rutan
@@ -195,7 +227,15 @@ export default function SellWithLoopa({
     setFailure(null);
     try {
       const gratisErbjuden = !!state?.villkor?.gratis;
-      setState(await publishToTradera(jobId, { anvandGratis: gratisErbjuden && anvandGratis, partner }));
+      const mp = state?.villkor?.massproductions ?? null;
+      setState(
+        await publishToTradera(jobId, {
+          anvandGratis: gratisErbjuden && anvandGratis,
+          partner,
+          ersattning: mp ? (mp.valt ?? ersattning) : null,
+          namn: mp && !mp.valt && ersattning === "credits" ? mpNamn : null,
+        }),
+      );
       setConfirming(false);
       setNyssSkickad(true);
       flode.mikro("publicerad");
@@ -314,6 +354,19 @@ export default function SellWithLoopa({
               Loopa", vilket är sant och är fel sak att möta ett ja med: säljaren har lämnat över en
               försäljning och fick ett handläggningsbesked tillbaka. */}
           <h1 id="sell-kvitto-rubrik">{t("Vi tar över försäljningen")}</h1>
+          {/* Massproductions: valet säljaren just gjorde, så att kvittot säger vad man får. */}
+          {state.villkor?.massproductions?.valt === "credits" && (
+            <p className="muted">
+              {t("Du får credits hos Massproductions när möbeln är såld — {antal} vid dagens pris, räknat på vad den säljs för. Du kan följa dem i din profil.", {
+                antal: state.villkor.massproductions.credits.toLocaleString("sv-SE"),
+              })}
+            </p>
+          )}
+          {state.villkor?.massproductions?.valt === "pengar" && (
+            <p className="muted">
+              {t("Du får {belopp} när möbeln är såld.", { belopp: formatSek(state.villkor.massproductions.pengar.saljarenSek) })}
+            </p>
+          )}
           <KvittoVagar onMyListings={onMyListings} onSellAnother={onSellAnother} framtradande />
         </div>
         {processfragan}
@@ -351,6 +404,16 @@ export default function SellWithLoopa({
    */
   const villkor = state.villkor;
   const utfall = villkor?.gratis && anvandGratis ? villkor.gratis : (villkor?.standard ?? null);
+  const mp = villkor?.massproductions ?? null;
+  /** Valet som gäller: serverns när möbeln redan är överlämnad, annars det säljaren valt här. */
+  const mpVal: ErsattningsTyp | null = mp ? (mp.valt ?? ersattning) : null;
+  /** "Sälj med Loopa": valsidan först på en Massproductions-möbel som inte har ett val, annars bekräftelsen. */
+  const oppnaSalj = () => {
+    setFailure(null);
+    // Credits utan namn går inte att lämna över (servern kräver det) — då frågar fönstret efter namnet.
+    if (mp && (!mpVal || (mpVal === "credits" && !mp.valt && !mpNamn))) setValjer("salj");
+    else setConfirming(true);
+  };
   /**
    * Kanalerna, lästa ur serverns plan och aldrig skrivna här: en avstängd kanal (Facebook utan
    * FACEBOOK_ENABLED, Blocket i torrkörning) får inte lovas under knappen. Loopa Butik står alltid
@@ -394,7 +457,34 @@ export default function SellWithLoopa({
               innan man bestämmer sig, och en knapp utan belopp bredvid sig ber om ett ja i blindo.
               Taket och frakten förklaras i bekräftelsen; här står bara talet och vad det är del av.
             */}
-            {utfall && (
+            {mp ? (
+              <p className="sell-utfall">
+                <span className="sell-utfall-etikett">{t("Du får")}</span>
+                <strong className="sell-utfall-belopp">
+                  {mpVal === "credits"
+                    ? t("{antal} credits hos Massproductions", { antal: mp.credits.toLocaleString("sv-SE") })
+                    : mpVal === "pengar"
+                      ? formatSek(mp.pengar.saljarenSek)
+                      : t("{pengar} eller {credits} credits hos Massproductions", {
+                          pengar: formatSek(mp.pengar.saljarenSek),
+                          credits: mp.credits.toLocaleString("sv-SE"),
+                        })}
+                </strong>
+                <span className="sell-utfall-not">
+                  {mpVal
+                    ? t("du valde {val} · vid dagens pris", { val: mpVal === "credits" ? t("credits") : t("pengar") })
+                    : t("Massproductions — välj pengar eller credits")}
+                  {mpVal && !mp.valt && (
+                    <>
+                      {" · "}
+                      <button type="button" className="btn-text btn-inline sell-andra-val" onClick={() => setValjer("auto")}>
+                        {t("Ändra")}
+                      </button>
+                    </>
+                  )}
+                </span>
+              </p>
+            ) : utfall && (
               <p className="sell-utfall">
                 <span className="sell-utfall-etikett">{t("Du får")}</span>
                 <strong className="sell-utfall-belopp">{formatSek(utfall.saljarenSek)}</strong>
@@ -416,8 +506,7 @@ export default function SellWithLoopa({
               className="btn btn-primary"
               onClick={() => {
                 flode.klick("publicera");
-                setFailure(null);
-                setConfirming(true);
+                oppnaSalj();
               }}
             >
               {publication?.status === "error" ? (
@@ -450,7 +539,14 @@ export default function SellWithLoopa({
       )}
       {fastList && !blocked && (
         <div className={`sell-fastlist${rutanNedanfor && !confirming ? " synlig" : ""}`} aria-hidden={!rutanNedanfor}>
-          {utfall && (
+          {mp ? (
+            <span className="sell-fastlist-belopp">
+              <small>{t("Du får")}</small>
+              <strong>
+                {mpVal === "credits" ? t("{antal} Massproductions-credits", { antal: mp.credits.toLocaleString("sv-SE") }) : formatSek(mp.pengar.saljarenSek)}
+              </strong>
+            </span>
+          ) : utfall && (
             <span className="sell-fastlist-belopp">
               <small>{t("Du får")}</small>
               <strong>{formatSek(utfall.saljarenSek)}</strong>
@@ -461,8 +557,7 @@ export default function SellWithLoopa({
             tabIndex={rutanNedanfor ? 0 : -1}
             onClick={() => {
               flode.klick("publicera", { detalj: "fast_list" });
-              setFailure(null);
-              setConfirming(true);
+              oppnaSalj();
             }}
           >
             {t("Sälj med")} <span className="ordmark ordmark-vit">loopa</span>
@@ -485,6 +580,29 @@ export default function SellWithLoopa({
           />
         </div>
       )}
+      {valjer && mp && !kontoSteg && (
+        <ErsattningsVal
+          erbjudande={mp}
+          forval={ersattning}
+          namnForslag={mpNamn ?? profile?.full_name ?? ""}
+          onStang={() => {
+            const fran = valjer;
+            setValjer(null);
+            if (fran === "andra") setConfirming(true);
+          }}
+          onVal={(v, namn) => {
+            flode.klick("massproductions_val", { detalj: v });
+            setErsattning(v);
+            sparaVal(jobId, v);
+            setMpNamn(namn);
+            sparaNamn(jobId, namn);
+            const fran = valjer;
+            setValjer(null);
+            // Öppnat av sig självt: tillbaka till sidan, där "Sälj med Loopa" nu visar valet.
+            if (fran !== "auto") setConfirming(true);
+          }}
+        />
+      )}
       {confirming && plan && !kontoSteg && (
         <SellConfirm
           plan={plan}
@@ -503,6 +621,16 @@ export default function SellWithLoopa({
           saljvillkor={state.villkor ?? null}
           anvandGratis={anvandGratis}
           onAnvandGratis={setAnvandGratis}
+          massproductions={mp}
+          ersattning={mpVal}
+          onAndraErsattning={
+            mp && !mp.valt
+              ? () => {
+                  setConfirming(false);
+                  setValjer("andra");
+                }
+              : null
+          }
         />
       )}
       {processfragan}
@@ -521,6 +649,49 @@ export default function SellWithLoopa({
  * ett mycket mindre fel än en ruta som kraschar flödet, och därför är båda anropen tysta.
  */
 const FEEDBACK_NYCKEL = (jobId: string) => `loopa.feedback.${jobId}`;
+
+/**
+ * Massproductions-valet, sparat per möbel i webbläsaren tills möbeln lämnas över — så att fönstret
+ * inte frågar igen efter en omladdning. Bara en bekvämlighet: det som gäller är det servern skriver
+ * på möbelns villkor vid trycket. Kastar lagringen (privat läge) frågar fönstret igen, och det är allt.
+ */
+const VAL_NYCKEL = (jobId: string) => `loopa.mpval.${jobId}`;
+
+function sparatVal(jobId: string): ErsattningsTyp | null {
+  try {
+    const v = localStorage.getItem(VAL_NYCKEL(jobId));
+    return v === "pengar" || v === "credits" ? v : null;
+  } catch {
+    return null;
+  }
+}
+
+const NAMN_NYCKEL = (jobId: string) => `loopa.mpnamn.${jobId}`;
+
+function sparatNamn(jobId: string): string | null {
+  try {
+    return localStorage.getItem(NAMN_NYCKEL(jobId)) || null;
+  } catch {
+    return null;
+  }
+}
+
+function sparaNamn(jobId: string, namn: string | null): void {
+  try {
+    if (namn) localStorage.setItem(NAMN_NYCKEL(jobId), namn);
+    else localStorage.removeItem(NAMN_NYCKEL(jobId));
+  } catch {
+    // Privat läge: namnet frågas igen.
+  }
+}
+
+function sparaVal(jobId: string, v: ErsattningsTyp): void {
+  try {
+    localStorage.setItem(VAL_NYCKEL(jobId), v);
+  } catch {
+    // Se ovan.
+  }
+}
 
 /**
  * "Vi håller på" — där "Sälj med Loopa" stod innan ja:et. Egen komponent och inte en rubrik i
@@ -639,6 +810,9 @@ function SellConfirm({
   saljvillkor,
   anvandGratis,
   onAnvandGratis,
+  massproductions = null,
+  ersattning = null,
+  onAndraErsattning = null,
 }: {
   plan: TraderaPlan;
   coverUrl: string | null;
@@ -651,6 +825,11 @@ function SellConfirm({
   saljvillkor: SaljVillkor | null;
   anvandGratis: boolean;
   onAnvandGratis: (v: boolean) => void;
+  /** Massproductions-erbjudandet och valet från valsidan. Null för alla andra märken. */
+  massproductions?: MassproductionsErbjudande | null;
+  ersattning?: ErsattningsTyp | null;
+  /** Tillbaka till valsidan. Null när valet redan är låst på servern. */
+  onAndraErsattning?: (() => void) | null;
 }) {
   const t = useT();
   const panel = useRef<HTMLDivElement>(null);
@@ -830,7 +1009,33 @@ function SellConfirm({
             </fieldset>
           )}
 
-          {(() => {
+          {massproductions && ersattning && (
+            <div className="sell-ersattning">
+              <span className="sell-ersattning-text">
+                <small>{t("Du valde")}</small>
+                <strong>
+                  {ersattning === "credits"
+                    ? t("{antal} credits hos Massproductions", { antal: massproductions.credits.toLocaleString("sv-SE") })
+                    : formatSek(massproductions.pengar.saljarenSek)}
+                </strong>
+                <span>
+                  {ersattning === "credits"
+                    ? t("{paslag} % över priset möbeln säljs för — räknat på dagens pris {pris}. Gäller bara hos Massproductions och blir dina när möbeln är såld.", {
+                        paslag: Math.round(massproductions.paslag * 100),
+                        pris: formatSek(massproductions.pengar.mobelprisSek),
+                      })
+                    : t("i pengar, i stället för {antal} credits hos Massproductions", { antal: massproductions.credits.toLocaleString("sv-SE") })}
+                </span>
+              </span>
+              {onAndraErsattning && (
+                <button type="button" className="btn btn-outline btn-small" onClick={onAndraErsattning} disabled={sending}>
+                  {t("Ändra")}
+                </button>
+              )}
+            </div>
+          )}
+
+          {massproductions && ersattning === "credits" ? null : (() => {
             /*
               VAD SÄLJAREN FÅR UT, uträknat — på SERVERN. Klienten väljer bara vilket av de två
               utfallen som visas; beloppen är serverns, så det säljaren läser här är samma tal som

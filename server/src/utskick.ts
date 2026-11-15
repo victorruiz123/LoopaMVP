@@ -275,10 +275,34 @@ async function transport() {
  * Ett enda brev, utanför utskicket — samma one.com-konto och samma avsändare. Används av
  * lösenordsåterställningen (losenord.ts). Kastar om SMTP saknas eller brevet nekas.
  */
-export async function skickaEttBrev(brev: { to: string; subject: string; text: string }): Promise<void> {
+export async function skickaEttBrev(brev: {
+  to: string;
+  subject: string;
+  text: string;
+  /** Vart ett svar går. Utelämnat: till avsändaren, som förut. */
+  replyTo?: string;
+  headers?: Record<string, string>;
+}): Promise<{ messageId: string | null; accepted: string[]; rejected: string[] }> {
   if (!smtpKonfigurerat()) throw new Error("SMTP_USER och SMTP_PASS saknas på servern.");
   const post = await transport();
-  await post.sendMail({ from: avsandare(), ...brev });
+  const info = await post.sendMail({ from: avsandare(), ...brev });
+  const adresser = (v: unknown) =>
+    (Array.isArray(v) ? v : []).map((a) => (typeof a === "string" ? a : String((a as { address?: unknown })?.address ?? ""))).filter(Boolean);
+  return { messageId: info.messageId ?? null, accepted: adresser(info.accepted), rejected: adresser(info.rejected) };
+}
+
+/**
+ * Loggar in på SMTP-servern och lämnar direkt, utan att skicka något brev. Svarar på frågan "skulle
+ * ett brev gå iväg just nu?" — kontrollerna i robothälsan använder den. Kastar med serverns orsak.
+ */
+export async function provaSmtpInloggning(): Promise<void> {
+  if (!smtpKonfigurerat()) throw new Error("SMTP_USER och SMTP_PASS saknas på servern.");
+  const post = await transport();
+  try {
+    await post.verify();
+  } finally {
+    post.close();
+  }
 }
 
 const sov = (ms: number) => new Promise((r) => setTimeout(r, ms));

@@ -237,7 +237,7 @@ export type Klick =
   | "uppladdning_forsok_igen" | "uppladdning_tillbaka" | "valj_kandidat" | "skriv_modell" | "hitta_fler"
   | "fragor_skickade" | "variant_vald" | "matt_nasta" | "matt_tillbaka" | "annons_fortsatt_anda"
   | "byt_modell" | "se_skick" | "besiktning_forsok_igen" | "besiktning_avbryt" | "skada_stammer"
-  | "skada_stammer_inte" | "skickrapport_vidare" | "publicera" | "publicera_bekrafta" | "publicera_avbryt";
+  | "skada_stammer_inte" | "skickrapport_vidare" | "publicera" | "publicera_bekrafta" | "publicera_avbryt" | "massproductions_val";
 
 export type Fel =
   | "kamera_nekad" | "kamera_saknas" | "kamera_upptagen" | "kamera_https" | "kamera_start"

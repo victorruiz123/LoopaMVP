@@ -42,6 +42,11 @@ export interface AnnonsIn {
   /** En admin godkände, och möbeln fick gå ut. */
   godkand: string | null;
   sald: string | null;
+  /**
+   * Massproductions-valet som låstes när "Sälj med Loopa" trycktes (saleTerms.ersattning.typ).
+   * Null/saknas = inget val: ett annat märke, eller inte överlämnad än. Se massproductions.ts.
+   */
+  ersattning?: "pengar" | "credits" | null;
 }
 
 export interface ResanIn {
@@ -171,6 +176,15 @@ export interface KampanjResa {
   salda: number;
   /** Senaste besöket genom länken. Null = ingen har använt den än. */
   senast: string | null;
+  /**
+   * Massproductions-valet för annonserna som kom in genom länken: pengar eller credits.
+   *
+   * I ANNONSER OCH I SÄLJARE. En säljare som lämnar över tre möbler gör tre val, men det är en
+   * person. `saljare` är de som gjort minst ett val, `saljareCredits` de som valt credits minst en
+   * gång — andelen av dem är svaret på "hur många som tar credits". Räknas bara på annonser där
+   * valet faktiskt gjordes, alltså Massproductions-möbler som lämnats över.
+   */
+  ersattning: { pengar: number; credits: number; saljare: number; saljareCredits: number };
 }
 
 /**
@@ -457,7 +471,10 @@ export function helaResan(inn: ResanIn): ResanSvar {
   // Kampanjlänkarna, med samma regler som kanalerna. En länk ingen använt står med på noll: att
   // affischen inte gav något är också ett svar.
   const kampanjMap = new Map<string, KampanjResa>(
-    inn.kampanjkoder.map((kod) => [kod, { kod, besok: 0, borjade: 0, fardigaBesok: 0, annonser: 0, salda: 0, senast: null }]),
+    inn.kampanjkoder.map((kod) => [
+      kod,
+      { kod, besok: 0, borjade: 0, fardigaBesok: 0, annonser: 0, salda: 0, senast: null, ersattning: { pengar: 0, credits: 0, saljare: 0, saljareCredits: 0 } },
+    ]),
   );
   const periodensBesok = besokAlla.filter(iFonster(fran, nuIso)).filter((b) => passarEnhet(besokEnhet(b)));
   for (const b of periodensBesok) {
@@ -470,11 +487,25 @@ export function helaResan(inn: ResanIn): ResanSvar {
     if (!r.senast || b.start > r.senast) r.senast = b.start;
   }
   const periodensAnnonser = annonser.filter(({ a, enhet }) => a.skapad >= fran && passarEnhet(enhet));
+  // Säljarna bakom valen, per länk. En annons utan ägare räknas som en egen säljare.
+  const valPerSaljare = new Map<string, Map<string, boolean>>();
   for (const { a, kampanjkod } of periodensAnnonser) {
     const r = kampanjkod ? kampanjMap.get(kampanjkod) : undefined;
     if (!r) continue;
     r.annonser += 1;
     if (annonsNadde(a) >= 3) r.salda += 1;
+    if (a.ersattning === "pengar" || a.ersattning === "credits") {
+      r.ersattning[a.ersattning] += 1;
+      let saljare = valPerSaljare.get(r.kod);
+      if (!saljare) valPerSaljare.set(r.kod, (saljare = new Map()));
+      const vem = a.ownerId ?? `jobb:${a.jobId}`;
+      saljare.set(vem, (saljare.get(vem) ?? false) || a.ersattning === "credits");
+    }
+  }
+  for (const [kod, saljare] of valPerSaljare) {
+    const e = kampanjMap.get(kod)!.ersattning;
+    e.saljare = saljare.size;
+    e.saljareCredits = [...saljare.values()].filter(Boolean).length;
   }
   const matning: Matkvalitet = {
     besok: periodensBesok.length,

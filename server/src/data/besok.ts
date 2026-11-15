@@ -173,6 +173,7 @@ export type Kanal =
   | "Affiliate"
   | "E-post"
   | "Offline"
+  | "Samarbeten"
   | "Kampanj"
   | "Övrigt";
 
@@ -210,6 +211,8 @@ export function kanalFor(props: Record<string, unknown>): { kanal: Kanal; kalla:
     if (medium && /e-?mail|mejl|nyhetsbrev|newsletter/.test(medium)) return { kanal: "E-post", kalla: namn };
     // Affischen och QR-koden har ingen referrer alls — utan märkningen är de omätbara.
     if (medium && /offline|print|qr|affisch|flyer/.test(medium)) return { kanal: "Offline", kalla: namn };
+    // Ett samarbete: en partner som delar vår länk. Källan är partnern, t.ex. massproduction.
+    if (medium && /^(partner|samarbete)$/.test(medium)) return { kanal: "Samarbeten", kalla: namn };
     if ((medium && /marknadsplats/.test(medium)) || MARKNAD.test(`${namn}.`)) return { kanal: "Marknadsplatser", kalla: namn };
     if (SOCIAL_KALLA.test(namn) || (medium && /social|paid_social|cpc_social/.test(medium))) return { kanal: "Sociala medier", kalla: namn };
     if (/google|bing/.test(namn) && medium && /cpc|ppc|paid|sok/.test(medium)) return { kanal: "Sök", kalla: `${namn} (betald)` };

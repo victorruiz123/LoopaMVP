@@ -36,6 +36,8 @@ test("kanalen: inbjudan före UTM före värdnamn, och tomt är Direkt", () => {
   assert.equal(besok.kanalFor({ utm_source: "instagram", host: "google.com" }).kanal, "Sociala medier");
   assert.equal(besok.kanalFor({ utm_source: "nyhetsbrev", utm_medium: "email" }).kanal, "E-post");
   assert.equal(besok.kanalFor({ utm_source: "affisch" }).kanal, "Kampanj");
+  assert.equal(besok.kanalFor({ utm_source: "massproduction", utm_medium: "partner" }).kanal, "Samarbeten");
+  assert.equal(besok.kanalFor({ utm_source: "massproduction", utm_medium: "partner" }).kalla, "massproduction");
   assert.equal(besok.kanalFor({ host: "www.google.se" }).kanal, "Sök");
   assert.equal(besok.kanalFor({ host: "l.facebook.com" }).kanal, "Sociala medier");
   assert.equal(besok.kanalFor({ host: "l.facebook.com" }).kalla, "facebook.com");

@@ -624,6 +624,44 @@ export interface SaljVillkor {
   forstaUtgang: string | null;
   /** Partnern säljaren kom via — då är `standard` redan 0 % och `gratis` null. Saknas från äldre servrar. */
   partner?: { slug: string; namn: string } | null;
+  /**
+   * Massproductions-erbjudandet (server/src/massproductions.ts): pengar eller credits. Satt bara när
+   * märket är Massproductions. Beloppen är serverns — klienten räknar aldrig själv.
+   */
+  massproductions?: MassproductionsErbjudande | null;
+}
+
+export type ErsattningsTyp = "pengar" | "credits";
+
+export interface MassproductionsErbjudande {
+  /** Pengar: samma uppdelning som `standard` — möbelpriset minus Loopas del. */
+  pengar: Uppdelning;
+  /** Credits: 10 % över möbelpriset. */
+  credits: number;
+  /** Påslaget, 0,1. */
+  paslag: number;
+  /** Valet, när möbeln väl är överlämnad. Null innan. */
+  valt: ErsattningsTyp | null;
+}
+
+/** GET /api/salj/credits. Se server/src/massproductions.ts, minaCredits. */
+export interface MinaCredits {
+  /** Credits på kontot — bara från sålda möbler. */
+  saldo: number;
+  /** Blir säljarens när möblerna säljs. Ingår inte i saldot. */
+  vantar: number;
+  poster: Array<{
+    id: string;
+    jobId: string;
+    titel: string;
+    mobelprisSek: number;
+    credits: number;
+    /** vantar: inte såld än · tillgodo: såld, på kontot · annullerad: returnerad. */
+    status: "vantar" | "tillgodo" | "annullerad";
+    skapad: string;
+    saldAt: string | null;
+    annulleradAt: string | null;
+  }>;
 }
 
 /** GET /api/salj/inbjudan. */
@@ -2367,6 +2405,8 @@ export interface KundresaKampanj {
   annonser: number;
   salda: number;
   senast: string | null;
+  /** Massproductions-valet för annonserna genom länken. Se server/src/data/kundresa.ts. */
+  ersattning: { pengar: number; credits: number; saljare: number; saljareCredits: number };
 }
 
 export interface KundresaMatning {
@@ -2385,6 +2425,8 @@ export interface Kampanj {
   mal: string;
   skapad: string;
   av: string | null;
+  /** Inbyggd samarbetslänk (t.ex. loopa.nu/k/massproduction). Går inte att ta bort. */
+  fast?: boolean;
 }
 
 export interface Kampanjer {
@@ -2497,7 +2539,7 @@ export interface RobotRapport {
   kordAt: string;
   sekunder: number;
   utfall: RobotUtfall;
-  robotar: Array<{ robot: "blocket" | "tradera" | "facebook"; utfall: RobotUtfall; kontroller: RobotKontroll[] }>;
+  robotar: Array<{ robot: "blocket" | "tradera" | "facebook" | "epost"; utfall: RobotUtfall; kontroller: RobotKontroll[] }>;
 }
 
 export interface RobotHalsaSvar {

@@ -1,5 +1,6 @@
 /**
- * Den dagliga hälsokontrollen av robotarna: Blocket, Tradera och Facebook.
+ * Den dagliga hälsokontrollen av robotarna: Blocket, Tradera och Facebook — och e-posten, som
+ * Massproductions-breven hänger på (massproductionsKontakt.ts).
  *
  * Robotarna går sönder tyst. En session som gått ut, ett formulär som byggts om, en kö som slutat
  * röra sig — inget av det syns förrän en säljare undrar varför annonsen aldrig kom upp. Blocket-vakten
@@ -28,7 +29,7 @@ import type { GroupPublication, ManualAction, MarketplacePublication } from "./i
 import type { SenasteSvep } from "./kanalStatistik.js";
 
 export type Utfall = "ok" | "varning" | "fel" | "av";
-export type Robot = "blocket" | "tradera" | "facebook";
+export type Robot = "blocket" | "tradera" | "facebook" | "epost";
 
 export interface Kontroll {
   namn: string;
@@ -57,7 +58,7 @@ const FASTNAT_MS = 2 * 60 * 60_000;
 /** Så många rapporter sparas för panelen. En månad. */
 const MAX_HISTORIK = 30;
 
-const NAMN: Record<Robot, string> = { blocket: "Blocket", tradera: "Tradera", facebook: "Facebook" };
+const NAMN: Record<Robot, string> = { blocket: "Blocket", tradera: "Tradera", facebook: "Facebook", epost: "E-post" };
 
 // ---------------------------------------------------------------------------
 // Sammanvägning
@@ -304,6 +305,8 @@ export interface HalsaBeroenden {
   facebookSession: () => Promise<Kontroll>;
   facebookUnderlag: () => Promise<FacebookUnderlag>;
   statistikSvep: () => Promise<{ svep: SenasteSvep | null; timmar: number }>;
+  /** Brevlådan och kontaktbreven till Massproductions. Se massproductionsKontakt.ts, kontrollera. */
+  epost: (nu: Date) => Promise<Kontroll[]>;
   nu: () => Date;
 }
 
@@ -318,6 +321,10 @@ const standard: HalsaBeroenden = {
   statistikSvep: async () => {
     const { lasSenasteSvep, svepTimmar } = await import("./kanalStatistik.js");
     return { svep: lasSenasteSvep(), timmar: svepTimmar() };
+  },
+  epost: async (nu) => {
+    const { kontrollera } = await import("./massproductionsKontakt.js");
+    return kontrollera(undefined, nu);
   },
   nu: () => new Date(),
 };
@@ -346,7 +353,14 @@ export async function korRobotHalsa(beroenden: Partial<HalsaBeroenden> = {}): Pr
   const fbSession = await sakert("Inloggningen", d.facebookSession);
   const facebook = fbSession.utfall === "av" ? [fbSession] : [fbSession, ...bedomFacebook(await d.facebookUnderlag(), start)];
 
-  const robotar = [besked("blocket", blocket), besked("tradera", tradera), besked("facebook", facebook)];
+  let epost: Kontroll[];
+  try {
+    epost = await d.epost(start);
+  } catch (err) {
+    epost = [{ namn: "E-postkontrollen", utfall: "fel", text: `Kontrollen själv föll: ${felText(err)}` }];
+  }
+
+  const robotar = [besked("blocket", blocket), besked("tradera", tradera), besked("facebook", facebook), besked("epost", epost)];
   return {
     kordAt: start.toISOString(),
     sekunder: Math.round((d.nu().getTime() - start.getTime()) / 1000),

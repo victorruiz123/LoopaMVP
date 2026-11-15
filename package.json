@@ -30,7 +30,8 @@
     "annons:visa": "tsx scripts/visa-redigering.ts",
     "facebook": "tsx server/src/integrations/facebook/cli.ts",
     "robotar:halsa": "tsx server/src/robotHalsa-kor.ts",
-    "statistik:svep": "tsx server/src/kanalStatistik-kor.ts"
+    "statistik:svep": "tsx server/src/kanalStatistik-kor.ts",
+    "massproductions:kontakt": "tsx server/src/massproductionsKontakt-kor.ts"
   },
   "devDependencies": {
     "@types/node": "^22.10.2",

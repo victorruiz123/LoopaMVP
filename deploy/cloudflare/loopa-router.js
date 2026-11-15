@@ -20,6 +20,20 @@ const URSPRUNG = "app.loopa.nu";
 export default {
   async fetch(request) {
     const inkommande = new URL(request.url);
+
+    /**
+     * www.loopa.nu → loopa.nu, med sökväg och query orörda.
+     *
+     * www-namnet går genom Cloudflare men är inte kopplat till någon sajt, så allt där svarade 404 —
+     * också en delad länk som någon skrivit av med "www." först. 301 här: det är samma adress, och
+     * den ska aldrig börja svara något annat.
+     */
+    if (inkommande.hostname === "www.loopa.nu") {
+      inkommande.hostname = "loopa.nu";
+      inkommande.protocol = "https:";
+      return Response.redirect(inkommande.toString(), 301);
+    }
+
     const mal = new URL(request.url);
     mal.hostname = URSPRUNG;
     mal.protocol = "https:";

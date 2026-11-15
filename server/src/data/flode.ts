@@ -179,6 +179,7 @@ export const KLICK = new Set([
   "publicera",
   "publicera_bekrafta",
   "publicera_avbryt",
+  "massproductions_val",
 ]);
 
 /**

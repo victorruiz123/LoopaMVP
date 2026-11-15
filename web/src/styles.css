@@ -6742,6 +6742,7 @@ body:has(.grind) .consent { display: none; }
 .resa-kedja-pil b { font-size: var(--fs-xs); color: var(--ink); font-variant-numeric: tabular-nums; }
 .resa-kanal-trappa { grid-area: trappa; min-width: 0; }
 .resa-lank-utfall .resa-kanal-trappa { flex: 1 1 320px; max-width: 460px; }
+.resa-lank-ersattning { flex: 1 1 100%; }
 .resa-ingang-tratt { grid-area: tratt; min-width: 0; }
 
 /* Sammanfattat: sektionens svar i siffror, sist. Mörk botten så att den läses som ett slut och inte
@@ -7078,3 +7079,103 @@ button.resa-kt-rad:hover { background: var(--surface-pressed); }
 @media (prefers-reduced-motion: reduce) {
   .home-intro *, .home-intro .home-bar { animation: none !important; }
 }
+
+/* ── Massproductions-valet: pengar eller credits (components/ErsattningsVal.tsx) ──────────────
+   En egen sida över annonsen, i samma form som kvittot: hela skärmen, en spalt, två kort bredvid
+   varandra på datorn och under varandra på telefonen. */
+.ersv {
+  position: fixed; inset: 0; z-index: 75; display: flex; align-items: center; justify-content: center;
+  animation: sell-modal-fade var(--t-slow) var(--ease-ui) both;
+}
+/* Telefonen: hela skärmen. Datorn: ett fönster över annonsen, med sidan dämpad bakom. */
+.ersv-scrim { position: absolute; inset: 0; background: hsl(var(--scrim) / 0.5); }
+.ersv-inner {
+  position: relative; z-index: 1; width: 100%; height: 100%; max-width: 640px; overflow-y: auto;
+  display: flex; flex-direction: column; gap: 14px; background: var(--bg);
+  padding: calc(18px + env(safe-area-inset-top)) var(--safe-right) calc(24px + env(safe-area-inset-bottom)) var(--safe-left);
+  animation: sell-modal-rise 380ms var(--ease-sheet) both;
+}
+.ersv-inner:focus { outline: none; }
+@media (min-width: 720px) {
+  .ersv-inner { height: auto; max-height: calc(100% - 48px); border-radius: 24px; padding: 28px 32px 28px; box-shadow: 0 24px 60px hsl(var(--scrim) / 0.25); }
+}
+.ersv-stang {
+  position: absolute; top: calc(14px + env(safe-area-inset-top)); right: 14px; width: 36px; height: 36px; border-radius: 50%;
+  display: grid; place-items: center; border: 0; cursor: pointer; background: var(--surface-sunk); color: var(--ink);
+}
+@media (min-width: 720px) { .ersv-stang { top: 18px; right: 18px; } }
+.ersv-kicker {
+  margin: 12px 0 0; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--accent);
+}
+.ersv-rubrik { margin: 0; font-size: clamp(28px, 6vw, 40px); line-height: 1.08; font-weight: 800; letter-spacing: -0.03em; color: var(--ink); }
+.ersv-ingress { margin: 0 0 6px; font-size: var(--fs-md); line-height: 1.5; color: var(--muted); max-width: 52ch; }
+.ersv-val { display: grid; grid-template-columns: 1fr; gap: 12px; }
+@media (min-width: 640px) { .ersv-val { grid-template-columns: 1fr 1fr; } }
+.ersv-kort {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 4px; text-align: left;
+  padding: 18px 18px 20px; border-radius: 18px; cursor: pointer; font: inherit; color: var(--ink);
+  background: var(--surface); border: 1.5px solid var(--hairline);
+  transition: border-color var(--t-fast) var(--ease-ui), box-shadow var(--t-fast) var(--ease-ui), transform var(--t-fast) var(--ease-ui);
+}
+.ersv-kort:hover { border-color: var(--border); }
+.ersv-kort:active { transform: scale(0.985); }
+.ersv-kort:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+.ersv-kort.vald { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.ersv-kort-topp { display: flex; align-items: center; gap: 8px; width: 100%; margin-bottom: 6px; }
+.ersv-kort-etikett { font-size: var(--fs-sm); font-weight: 700; letter-spacing: 0.02em; color: var(--ink-soft); }
+.ersv-kort-marke {
+  font-size: var(--fs-2xs); font-weight: 700; padding: 3px 8px; border-radius: 999px;
+  background: var(--accent-light); color: var(--accent-ink);
+}
+.ersv-kort-bock {
+  margin-left: auto; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  border: 1.5px solid var(--border); color: #fff;
+}
+.ersv-kort.vald .ersv-kort-bock { background: var(--accent); border-color: var(--accent); }
+.ersv-kort-belopp { font-size: clamp(30px, 7vw, 38px); font-weight: 800; letter-spacing: -0.03em; line-height: 1.05; font-variant-numeric: tabular-nums; }
+.ersv-kort-enhet { font-size: var(--fs-sm); color: var(--muted); }
+.ersv-kort-rader { display: flex; flex-direction: column; gap: 3px; margin-top: 10px; font-size: var(--fs-sm); color: var(--ink-soft); line-height: 1.4; }
+.ersv-fortsatt { margin-top: 8px; }
+.ersv-fortsatt:disabled { opacity: 0.5; }
+.ersv-not { margin: 0; text-align: center; font-size: var(--fs-xs); color: var(--muted); }
+
+/* Valet i bekräftelsen: vad säljaren valde, med en väg tillbaka till valsidan. */
+.sell-ersattning {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 12px 14px; border-radius: 14px; background: var(--accent-light);
+}
+.sell-ersattning + .sell-delning { margin-top: 12px; }
+.sell-ersattning-text { display: flex; flex-direction: column; gap: 2px; }
+.sell-ersattning-text small { font-size: var(--fs-xs); color: var(--accent-ink); font-weight: 600; }
+.sell-ersattning-text strong { font-size: var(--fs-lg); color: var(--ink); font-variant-numeric: tabular-nums; }
+.sell-ersattning-text span { font-size: var(--fs-xs); color: var(--ink-soft); }
+
+/* Profilens credits (screens/ProfileScreen.tsx). */
+.pf-credits { margin-top: 16px; padding: 16px; border-radius: 16px; background: var(--surface); border: 1px solid var(--hairline); }
+.pf-credits-topp { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.pf-credits-rubrik { margin: 0; font-size: var(--fs-sm); font-weight: 700; color: var(--ink-soft); }
+.pf-credits-summa { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; color: var(--ink); font-variant-numeric: tabular-nums; }
+.pf-credits-not { margin: 4px 0 10px; font-size: var(--fs-xs); color: var(--muted); }
+.pf-credits-lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.pf-credits-lista li { display: flex; justify-content: space-between; gap: 10px; font-size: var(--fs-sm); padding-top: 8px; border-top: 1px solid var(--hairline); }
+.pf-credits-lista li span { color: var(--ink); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-credits-lista li small { display: block; color: var(--muted); font-size: var(--fs-2xs); }
+.pf-credits-lista li b { font-variant-numeric: tabular-nums; white-space: nowrap; }
+/* Väntande och annullerade poster är inte pengar på kontot — de ska inte se ut som det. */
+.pf-credits-lista li.pf-credits-vantar b { color: var(--muted); font-weight: 600; }
+.pf-credits-lista li.pf-credits-tillgodo b { color: var(--green-dark); }
+.pf-credits-lista li.pf-credits-annullerad b { color: var(--muted); text-decoration: line-through; font-weight: 500; }
+
+/* "Ändra" i säljrutan, intill valet: en länk i textens storlek, inte en knapp. */
+.sell-andra-val { padding: 0; border: 0; background: none; font: inherit; color: var(--accent); font-weight: 600; cursor: pointer; text-decoration: underline; text-underline-offset: 2px; }
+
+/* Namnet vid credits-valet (components/ErsattningsVal.tsx). */
+.ersv-namn { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.ersv-namn span { font-size: var(--fs-sm); font-weight: 700; color: var(--ink); }
+.ersv-namn input {
+  font: inherit; font-size: var(--fs-field); padding: 12px 14px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--surface); color: var(--ink);
+}
+.ersv-namn input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
+.ersv-namn small { font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; }

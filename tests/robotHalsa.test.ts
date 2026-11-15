@@ -156,9 +156,11 @@ test("ett helt varv: prövningarna körs, en som kastar blir ett fel, och avstä
       return { marketplace: [], grupper: [], atgarder: [] };
     },
     statistikSvep: async () => ({ svep: null, timmar: 3 }),
+    epost: async () => [{ namn: "Brevlådan (SMTP)", utfall: "ok", text: "Inloggningen gick igenom." }],
     nu: () => NU,
   });
   assert.equal(r.utfall, "fel");
+  assert.equal(r.robotar.find((b) => b.robot === "epost")!.utfall, "ok");
   const tradera = r.robotar.find((b) => b.robot === "tradera")!;
   assert.equal(tradera.utfall, "fel");
   assert.match(tradera.kontroller[0].text, /Kontrollen själv föll: nätverket/);

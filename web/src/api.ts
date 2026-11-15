@@ -1,7 +1,7 @@
 import { supabase } from "./lib/supabase";
 import { t } from "./lib/i18n";
 import { inApp, onlyIdentifySpecs } from "./lib/appBridge";
-import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, RobotHalsaSvar, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, TrafikSvar, Kundresa, KundresaLive, KundresaTidslinje, Kampanj, Kampanjer, Oversikt, ResorSvar, Resa, Mal, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, AdminAffiliateRad, UtbetalningsRad,
+import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, RaderingsResultat, RaderingsUnderlag, AdminUsers, AnnonsAndring, CardAnswer, ConditionJob, JobSummary, Damage, ConditionResult, DebugTrace, ListingAttribute, FurnitureIdentity, ModelCandidate, PriceEstimate, PriceLadder, PublicCard, TraderaState, TraderaPost, TraderaPosten, RobotHalsaSvar, AdminOrdrar, AdminOrderDetalj, OrderAtgard, DataSvar, DataObjekt, TrafikSvar, Kundresa, KundresaLive, KundresaTidslinje, Kampanj, Kampanjer, Oversikt, ResorSvar, Resa, Mal, Samtal, AdminEfterlysning, EfterlysningKandidat, AdminFeedbackSvar, MinInbjudan, MinAffiliate, MinaCredits, ErsattningsTyp, AdminAffiliateRad, UtbetalningsRad,
   UtskickLista,
   UtskickLage,
 } from "./types";
@@ -178,7 +178,13 @@ export async function createJob(
     method: "POST",
     headers: { "Content-Type": "application/json" },
     // Är SerpApi-flödet (eller appskalet) på, identifierar Googles AI-läge modellen och servern söker inte själv (lib/serpApiBridge.ts, lib/appBridge.ts).
-    body: JSON.stringify({ images, brand: identity?.brand ?? null, model: identity?.model ?? null, dealId, ...(inApp() ? { externalIdentify: true, ...(onlyIdentifySpecs() ? { identifyOnly: true } : {}) } : {}) }),
+    body: JSON.stringify({
+      images,
+      brand: identity?.brand ?? null,
+      model: identity?.model ?? null,
+      dealId,
+      ...(inApp() ? { externalIdentify: true, ...(onlyIdentifySpecs() ? { identifyOnly: true } : {}) } : {}),
+    }),
     signal,
   });
   return json(res);
@@ -322,14 +328,19 @@ export async function getTraderaState(jobId: string, partner: string | null = nu
 /** Lägger ut möbeln till salu: en riktig Tradera-annons på Loopas konto. Svarar innan den är uppe. */
 export async function publishToTradera(
   jobId: string,
-  opts: { anvandGratis?: boolean; partner?: string | null } = {},
+  opts: { anvandGratis?: boolean; partner?: string | null; ersattning?: ErsattningsTyp | null; namn?: string | null } = {},
 ): Promise<TraderaState> {
   const res = await authFetch(`/api/jobs/${jobId}/tradera`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ anvandGratis: opts.anvandGratis === true, partner: opts.partner ?? null }),
+    body: JSON.stringify({ anvandGratis: opts.anvandGratis === true, partner: opts.partner ?? null, ersattning: opts.ersattning ?? null, namn: opts.namn ?? null }),
   });
   return json(res);
+}
+
+/** Massproductions-credits: summan och en post per möbel. Se server/src/massproductions.ts. */
+export async function getMinaCredits(): Promise<MinaCredits> {
+  return json(await authFetch("/api/salj/credits"));
 }
 
 // ---- inbjudningar (/api/salj/inbjudan) ----

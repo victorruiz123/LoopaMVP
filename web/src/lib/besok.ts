@@ -55,8 +55,14 @@ export function fangaKalla(): void {
     // Kampanjlänken: /k/KOD till säljsidan, ?k=KOD dit servern omdirigerat. Koden slås upp på
     // servern (server/src/data/kampanjer.ts); här skickas den bara med, och /k/KOD byts mot roten
     // innan appen hinner rita en sida som inte finns.
-    const kampanjVag = /^\/k\/([a-z0-9]{5})\/?$/.exec(url.pathname);
-    const kampanjkod = kampanjVag?.[1] ?? (p.get("k") && /^[a-z0-9]{5}$/.test(p.get("k")!) ? p.get("k")! : undefined);
+    // Koden är fem slumpade tecken eller ett läsbart namn (/k/massproduction) — samma två former som
+    // servern godtar (arKod i kampanjer.ts). Servern har redan omdirigerat versaler och alias hit.
+    const KOD = /^[a-z0-9](?:[a-z0-9-]{1,38}[a-z0-9])$/;
+    // /salj/KOD är samma länk under en Worker-rutt som redan låg ute (se saljKampanjSvar).
+    const kampanjVag = /^\/(?:k|salj)\/([^/]+)\/?$/.exec(url.pathname);
+    const vagKod = kampanjVag?.[1].toLowerCase();
+    const fragaKod = p.get("k")?.toLowerCase();
+    const kampanjkod = vagKod && KOD.test(vagKod) ? vagKod : fragaKod && KOD.test(fragaKod) ? fragaKod : undefined;
     // Adressen städas så fort koden är fångad: en besökare som kopierar adressfältet och delar det
     // vidare ska inte räkna sina vänner till vår kampanj.
     if (kampanjVag) {

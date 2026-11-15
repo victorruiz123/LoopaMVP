@@ -299,7 +299,21 @@ export async function markJobRemoved(id: string, by: "seller" | "admin"): Promis
   job.removedAt = new Date().toISOString();
   job.removedBy = by;
   await persist(job);
+  await rensaCredits(id, false);
   return job;
+}
+
+/**
+ * Massproductions-credits för en borttagen annons försvinner med den (massproductions.ts). Får aldrig
+ * fälla borttagningen — profilen döljer ändå poster vars annons är borta.
+ */
+async function rensaCredits(jobId: string, ocksaTillgodo: boolean): Promise<void> {
+  try {
+    const { taBortVidBorttagenAnnons } = await import("./massproductions.js");
+    await taBortVidBorttagenAnnons(jobId, { ocksaTillgodo });
+  } catch (err) {
+    console.warn(`[jobb] credits för ${jobId} kunde inte tas bort: ${err instanceof Error ? err.message : String(err)}`);
+  }
 }
 
 /**
@@ -310,6 +324,8 @@ export async function markJobRemoved(id: string, by: "seller" | "admin"): Promis
  * få sina uppgifter borttagna och en kvarlämnad mapp med fotona från deras hem vore fel svar.
  */
 export async function raderaJobb(id: string): Promise<void> {
+  // Kontot raderas: personens credits går med, även de som var tillgodo.
+  await rensaCredits(id, true);
   jobs.delete(id);
   await rm(jobDir(id), { recursive: true, force: true });
 }

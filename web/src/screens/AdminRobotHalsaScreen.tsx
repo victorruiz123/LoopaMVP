@@ -3,7 +3,7 @@ import { hamtaRobotHalsa, korRobotHalsa } from "../api";
 import { useT } from "../lib/i18n";
 import type { RobotHalsaSvar, RobotUtfall } from "../types";
 
-const NAMN = { blocket: "Blocket", tradera: "Tradera", facebook: "Facebook" } as const;
+const NAMN = { blocket: "Blocket", tradera: "Tradera", facebook: "Facebook", epost: "E-post" } as const;
 const ETIKETT: Record<RobotUtfall, string> = { ok: "OK", varning: "Varning", fel: "Fel", av: "Av" };
 const RANG: Record<RobotUtfall, number> = { av: 0, ok: 1, varning: 2, fel: 3 };
 

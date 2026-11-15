@@ -560,7 +560,7 @@ export async function claimForSale(
     // gör compareAndSet — utan mot att någon annans reservation fullföljs av fel köpare.
     if (!current || current.reservationToken !== opts.requireToken) return null;
   }
-  return move(
+  const sold = await move(
     id,
     ["live", "reserved"],
     "sold",
@@ -574,6 +574,50 @@ export async function claimForSale(
     actor,
     channel === "tradera" ? "Såld på Tradera." : "Såld i Butik.",
   );
+  /**
+   * Massproductions-credits blir säljarens HÄR, och ingen annanstans (massproductions.ts). Varje väg
+   * till "såld" — kassan, Tradera-mejlet, panelen — går genom den här funktionen. Får aldrig fälla
+   * försäljningen: möbeln är såld när raden nås, och en post som inte flyttades syns i loggen.
+   */
+  if (sold?.jobId) {
+    try {
+      const { tillgodoVidForsaljning } = await import("../massproductions.js");
+      /**
+       * FÖRSÄLJNINGSPRISET, utan frakt: kassans frysta pris i Butik; annars annonsens pris just nu
+       * (prisstegens senaste sänkning — det Tradera-annonsen och panelen sålde den för). Credits
+       * räknas om på det, inte på priset vid överlämningen.
+       */
+      const { getJob: hamtaJobb } = await import("../jobStore.js");
+      const { priceOf } = await import("./normalize.js");
+      const saldJobb = await hamtaJobb(sold.jobId).catch(() => undefined);
+      const forsaljningspris = channel === "butik" && sold.reservedPriceSek != null ? sold.reservedPriceSek : saldJobb ? priceOf(saldJobb) : null;
+      const post = await tillgodoVidForsaljning(sold.jobId, forsaljningspris);
+      /**
+       * Brevet till Massproductions: NU, när möbeln är såld och credits är säljarens — med namnet
+       * säljaren skrev vid valet. Utan att vänta, så att försäljningen aldrig hänger på SMTP.
+       * Omförsök, larm och kontrollen sköts i massproductionsKontakt.ts.
+       */
+      if (post) {
+        const job = saldJobb;
+        void import("../massproductionsKontakt.js")
+          .then(({ kontaktVidCreditsVal }) =>
+            kontaktVidCreditsVal({
+              userId: post.userId,
+              jobId: post.jobId,
+              loopaId: id,
+              titel: post.titel,
+              mobelprisSek: post.mobelprisSek,
+              credits: post.credits,
+              namn: job?.saleTerms?.ersattning?.namn ?? null,
+            }),
+          )
+          .catch((err) => console.error(`[massproductions-kontakt] ${id}: brevet kunde inte startas:`, err instanceof Error ? err.message : err));
+      }
+    } catch (err) {
+      console.error(`[butik] credits för ${id} kunde inte bli tillgodo: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return sold;
 }
 
 export async function markDelivered(id: string, actor: TransitionActor): Promise<ButikRecord | null> {
@@ -590,6 +634,15 @@ export async function markReturned(id: string, actor: TransitionActor): Promise<
       await annulleraVidRetur(id);
     } catch (err) {
       console.warn(`[butik] affiliate-provisionen för ${id} kunde inte annulleras: ${err instanceof Error ? err.message : String(err)}`);
+    }
+    // Massproductions-credits likaså: ingen försäljning, inga credits.
+    if (moved.jobId) {
+      try {
+        const { annulleraVidRetur: annulleraCredits } = await import("../massproductions.js");
+        await annulleraCredits(moved.jobId);
+      } catch (err) {
+        console.warn(`[butik] credits för ${id} kunde inte annulleras: ${err instanceof Error ? err.message : String(err)}`);
+      }
     }
   }
   return moved;

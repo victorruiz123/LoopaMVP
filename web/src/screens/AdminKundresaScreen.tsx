@@ -983,7 +983,7 @@ function SummeringLankar({ data }: { data: Kundresa }) {
     <Sammanfattat
       rader={[
         { varde: `${anvanda} / ${l.length}`, etikett: t("Länkar som använts"), info: t("Hur många av kampanjlänkarna som gav minst ett besök under perioden, av alla länkar som finns."), forklaring: t("under perioden") },
-        { varde: besok, etikett: t("Besök via länkar"), info: t("Besök som kom in genom en av panelens kampanjlänkar (loopa.nu/k/…) under perioden."), forklaring: alla ? t("{andel} av alla besök", { andel: pct(besok, alla) }) : undefined },
+        { varde: besok, etikett: t("Besök via länkar"), info: t("Besök som kom in genom en av panelens kampanjlänkar (loopa.nu/salj/…) under perioden."), forklaring: alla ? t("{andel} av alla besök", { andel: pct(besok, alla) }) : undefined },
         besok ? { varde: decimal(per100(fardiga, besok)), etikett: t("Annonser per 100 besök"), info: t("Hur många av hundra besök som slutade i en färdig annons. Räknas på besöken, så att stora och små kanaler kan jämföras rättvist."), forklaring: t("via länkar, mot {snitt} totalt", { snitt: decimal(per100(allaFardiga, alla)) }) } : null,
       ]}
     />
@@ -2049,7 +2049,9 @@ function Matkvalitet({ data }: { data: Kundresa }) {
 // Kampanjlänkarna
 // ---------------------------------------------------------------------------
 
-const LANKBAS = "loopa.nu/k/";
+// /salj/KOD och inte /k/KOD: /salj/* är en Worker-rutt som redan ligger ute, /k/* kräver en ny
+// Cloudflare-utrullning. Servern svarar likadant på båda (server/src/data/kampanjer.ts).
+const LANKBAS = "loopa.nu/salj/";
 
 /**
  * Kampanjlänkarna: en länk per ställe ni delar Loopa, och vad varje länk gav.
@@ -2178,6 +2180,9 @@ function Kampanjlankar({ data }: { data: Kundresa }) {
             <b>{t("Nyhetsbrev och mejl")}</b> — {t("en länk per utskick.")}
           </li>
           <li>
+            <b>{t("Samarbeten")}</b> — {t("en länk per partner, t.ex. Mass Production AB. Besöken syns under kanalen Samarbeten i Varifrån.")}
+          </li>
+          <li>
             <b>{t("Mun till mun")}</b> — {t("syns via inbjudningslänkarna säljarna redan har (kanalen Inbjudan).")}
           </li>
         </ul>
@@ -2227,13 +2232,40 @@ function Kampanjlankar({ data }: { data: Kundresa }) {
                       <span className="trafik-dampad">
                         {t("Senast använd {datum}", { datum: datum(r.senast!) })}
                       </span>
+                      {r.ersattning && (r.ersattning.saljare > 0 || k.plats === "massproduction") && (
+                        <span className="resa-lank-ersattning">
+                          {r.ersattning.saljare > 0 ? (
+                            <>
+                              <strong>
+                                {t("{n} av {av} säljare valde credits ({andel})", {
+                                  n: r.ersattning.saljareCredits,
+                                  av: r.ersattning.saljare,
+                                  andel: pct(r.ersattning.saljareCredits, r.ersattning.saljare),
+                                })}
+                              </strong>{" "}
+                              <span className="trafik-dampad">
+                                {t("· {credits} möbler för credits, {pengar} för pengar", {
+                                  credits: r.ersattning.credits,
+                                  pengar: r.ersattning.pengar,
+                                })}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="trafik-dampad">{t("Ingen säljare via länken har valt pengar eller credits än.")}</span>
+                          )}
+                        </span>
+                      )}
                     </>
                   ) : (
                     <span className="trafik-dampad">{t("Inga besök genom länken under perioden än.")}</span>
                   )}
-                  <button type="button" className="btn btn-text btn-inline resa-lank-bort" onClick={() => void taBort(k)}>
-                    {t("Ta bort")}
-                  </button>
+                  {k.fast ? (
+                    <span className="trafik-dampad resa-lank-bort">{t("Inbyggd samarbetslänk")}</span>
+                  ) : (
+                    <button type="button" className="btn btn-text btn-inline resa-lank-bort" onClick={() => void taBort(k)}>
+                      {t("Ta bort")}
+                    </button>
+                  )}
                 </div>
               </li>
             );
