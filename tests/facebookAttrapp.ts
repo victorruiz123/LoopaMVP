@@ -68,6 +68,8 @@ export interface FbRedigerbart {
   marketplace?: Record<string, { title: string; description: string; price?: number }>;
   /** Gruppinlägg att redigera, per sökväg (t.ex. "/groups/444/posts/9001/") → nuvarande text. */
   inlagg?: Record<string, string>;
+  /** Den äldre redigeringssidan: beskrivningen dold bakom en hopfälld "Mer information". */
+  hopfalld?: boolean;
 }
 
 export interface FbAttrapp {
@@ -368,22 +370,31 @@ if (sell) sell.addEventListener("click", () => {
     // ── Redigering av det som redan ligger uppe (ANTAGET, som robotens selektorer) ──
     const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;");
     if (url.pathname === "/marketplace/edit/") {
-      // Samma fält och etiketter som publiceringsformuläret (selectors.ts, VERIFIERAT): Titel, Pris,
-      // och Beskrivning under den hopfällda "Mer information". Knappen heter Uppdatera.
+      // Som Facebooks redigeringssida 2026-11-16 (uppmätt): fälten ligger INUTI sina <label> utan
+      // aria-label, "Mer information" är utfälld från början (aria-expanded="true", klick fäller IHOP),
+      // och en annons som inte finns ger "Skapa ett nytt säljinlägg" med 200 — inte ett felmeddelande.
+      // `hopfalld: true` ger den äldre formen med dold beskrivning bakom knappen.
       const id = url.searchParams.get("listing_id") ?? "";
       const a = opts.redigerbart?.marketplace?.[id];
-      if (!a) return html(sida("Marketplace", `<div role="main"><h1>Annonsen hittades inte</h1></div>`), 404);
+      if (!a) {
+        return html(sida("Facebook", `<div role="main"><h1>Skapa ett nytt säljinlägg</h1><p>Välj typ av säljinlägg</p><div role="button">Vara till salu</div></div>`));
+      }
+      const oppen = opts.redigerbart?.hopfalld !== true;
       return html(
         sida(
           "Redigera annons | Facebook Marketplace",
           `<div role="main"><h1>Redigera annons</h1>
-           <p><input aria-label="Titel" id="rubrik" value="${esc(a.title)}" style="width:420px"></p>
-           <p><input aria-label="Pris" id="pris" value="${a.price ?? ""}"></p>
-           <div role="button" aria-expanded="false" id="mer">Mer information</div>
-           <div id="mer-innehall" style="display:none"><textarea aria-label="Beskrivning" id="beskrivning" style="width:640px;height:220px;font:13px system-ui">${esc(a.description)}</textarea></div>
+           <p><label><span>Titel</span><input id="rubrik" value="${esc(a.title)}" style="width:420px"></label></p>
+           <p><label><span>Pris</span><input id="pris" value="${a.price ?? ""}"></label></p>
+           <div role="button" aria-expanded="${oppen}" id="mer">Mer information</div>
+           <div id="mer-innehall" style="display:${oppen ? "block" : "none"}"><label><span>Beskrivning</span><textarea id="beskrivning" style="width:640px;height:220px;font:13px system-ui">${esc(a.description)}</textarea></label></div>
            <div role="button" aria-label="Uppdatera" id="spara">Uppdatera</div></div>`,
           `<script>
-            document.getElementById("mer").onclick = function () { this.setAttribute("aria-expanded", "true"); document.getElementById("mer-innehall").style.display = "block"; };
+            document.getElementById("mer").onclick = function () {
+              var oppen = this.getAttribute("aria-expanded") === "true";
+              this.setAttribute("aria-expanded", String(!oppen));
+              document.getElementById("mer-innehall").style.display = oppen ? "none" : "block";
+            };
             document.getElementById("spara").onclick = function () {
               fetch("/attrapp/redigering", { method: "POST", body: JSON.stringify({ var: "annons ${id}", text: document.getElementById("beskrivning").value, titel: document.getElementById("rubrik").value, pris: document.getElementById("pris").value }) });
             };

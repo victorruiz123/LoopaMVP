@@ -231,6 +231,55 @@ test("Facebook: en prissänkning når Marketplace-priset och textinläggets för
   }
 });
 
+test("Facebook: ett säljinlägg som tagits bort blir för hand, och de andra ändras ändå", async () => {
+  const job = await nyttJobb();
+  const attrapp = await facebookUppe(job);
+  // Ett andra säljinlägg i en annan grupp, med ett eget id som Facebook inte längre har (uppmätt 2026-11-16:
+  // redigeringsadressen visar då "Skapa ett nytt säljinlägg").
+  const l = await facebookListingFor(job);
+  assert.ok(l.ok);
+  const id = loopaIdFor(job.id);
+  await store.enqueueGroupPublication(id, "666", job.id, false);
+  await store.updateGroupPublication(id, "666", (p) => ({ ...p, status: "PUBLISHED", composer: "listing", facebookListingId: "999", facebookPostUrl: `${attrapp.bas}/commerce/listing/999/`, contentSnapshot: groupListingSnapshot(l.listing) }));
+  job.priceLadder = { startPrice: 6500, floorPrice: 4000, weeklyDropPct: 0.1, currentPrice: 5850, nextDropAt: null, drops: [] } as never;
+  await persist(job);
+  process.env.FACEBOOK_REDIGERA = "1";
+  try {
+    const utfall = await redigeraFacebook(job);
+    assert.equal(utfall.status, "manuell", utfall.detalj);
+    assert.match(utfall.detalj, /Grupp 666: annonsen finns inte längre på Facebook/);
+    assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 111")?.pris, "5850", "den levande annonsen fick priset");
+    assert.match(attrapp.lage.redigeringar.find((r) => r.var === INLAGG)?.text ?? "", /5\s?850/);
+  } finally {
+    delete process.env.FACEBOOK_REDIGERA;
+    await attrapp.stang();
+  }
+});
+
+test("Facebook: beskrivningen hittas både utfälld (i dag) och bakom en hopfälld Mer information (förut)", async () => {
+  for (const hopfalld of [false, true]) {
+    const job = await nyttJobb();
+    const l = await facebookListingFor(job);
+    assert.ok(l.ok);
+    const mpFore = marketplaceSnapshot(l.listing, "Möbler");
+    const attrapp = await startaFbAttrapp({ redigerbart: { hopfalld, marketplace: { "111": { title: mpFore.title, description: mpFore.description, price: mpFore.price } } } });
+    process.env.FACEBOOK_BASE_URL = attrapp.bas;
+    const id = l.listing.loopaId;
+    await store.enqueueMarketplace(id, job.id, false);
+    await store.updateMarketplace(id, (p) => ({ ...p, status: "PUBLISHED", facebookListingId: "111", contentSnapshot: mpFore }));
+    await rattaBeskrivningen(job);
+    process.env.FACEBOOK_REDIGERA = "1";
+    try {
+      const utfall = await redigeraFacebook(job);
+      assert.equal(utfall.status, "klar", `hopfalld=${hopfalld}: ${utfall.detalj}`);
+      assert.ok(attrapp.lage.redigeringar.find((r) => r.var === "annons 111")?.text.includes(NY_MENING), `hopfalld=${hopfalld}`);
+    } finally {
+      delete process.env.FACEBOOK_REDIGERA;
+      await attrapp.stang();
+    }
+  }
+});
+
 test("Facebook: rubrikvakten och id ur adressen", () => {
   assert.equal(rubrikenArVar("Sweef Cloud 3-sits soffa i grå sammet", ["Sweef Cloud 3-sits soffa i grå sammet"]), true);
   assert.equal(rubrikenArVar("Sweef Cloud 3-sits soffa i grå", [null, "Sweef Cloud 3-sits soffa i grå sammet"]), true, "kapad rubrik");

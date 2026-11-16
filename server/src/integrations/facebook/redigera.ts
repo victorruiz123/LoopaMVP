@@ -96,6 +96,20 @@ async function skarmbild(page: Page, namn: string): Promise<string | null> {
   }
 }
 
+/**
+ * Beskrivningen på redigeringssidan. Facebook lägger textrutan INUTI sin <label> utan aria-label, så
+ * fältets namn blir "Beskrivning" följt av hela den nuvarande texten (uppmätt 2026-11-16) — den exakta
+ * etiketten träffar då aldrig. Rubrik och pris klarar sig: ett inputs värde ingår inte i namnet.
+ * Exakt först (publiceringsformuläret, tom ruta), sedan namnet som börjar med ordet.
+ */
+export const BESKRIVNING_ETIKETTER = [/^Beskrivning$/i, /^Description$/i, /^Beskrivning/i, /^Description/i];
+
+/** Vad Facebook visar på redigeringsadressen för en annons som inte längre finns. */
+export const ANNONS_BORTA = /Välj typ av säljinlägg|Skapa ett nytt säljinlägg|Choose listing type|Create new listing|inte tillgängligt just nu|content isn't available/i;
+
+/** En annons som inte finns kvar: en manuell åtgärd, inte ett fel som ska försökas igen. */
+export class AnnonsBorta extends Error {}
+
 interface AnnonsInnehall {
   title: string;
   price: number;
@@ -120,6 +134,10 @@ async function redigeraAnnons(
 
   const rubrikfalt = page.getByLabel(/^(Titel|Title)$/i).or(page.locator(FB.marketplace.title)).first();
   if (!(await rubrikfalt.isVisible({ timeout: 10_000 }).catch(() => false))) {
+    // En annons som tagits bort (av oss, gruppens admin eller Facebook) ger inget fel på redigeringsadressen:
+    // Facebook visar "Skapa ett nytt säljinlägg" i stället (uppmätt 2026-11-16). Det är inget att försöka igen.
+    const text = await page.locator("body").innerText({ timeout: 2000 }).catch(() => "");
+    if (ANNONS_BORTA.test(text)) throw new AnnonsBorta(`${vad}: annonsen finns inte längre på Facebook (${page.url()}) — ta bort den ur jobbet eller lägg upp den igen för hand.`);
     throw new Error(`${vad}: redigeringsformuläret visades inte (inget Titel-fält på ${page.url()}). Ingenting ändrades.`);
   }
   const iFormularet = (await rubrikfalt.inputValue().catch(() => "")) ?? "";
@@ -145,7 +163,7 @@ async function redigeraAnnons(
     await mer.click({ timeout: 5000 }).catch(() => undefined);
     await page.waitForTimeout(800);
   }
-  if (!(await fillField(page, [/^Beskrivning$/i, /^Description$/i], FB.marketplace.description, nytt.description))) {
+  if (!(await fillField(page, BESKRIVNING_ETIKETTER, FB.marketplace.description, nytt.description))) {
     throw new Error(`${vad}: beskrivningsfältet hittades inte. Ingenting sparades.`);
   }
 
@@ -313,6 +331,11 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
             if (skarp) await u.klar();
           } catch (err) {
             if (err instanceof FacebookInterrupt) throw err;
+            if (err instanceof AnnonsBorta) {
+              manuella += 1;
+              rader.push(err.message);
+              continue;
+            }
             fel += 1;
             rader.push(err instanceof Error ? err.message : String(err));
           }
