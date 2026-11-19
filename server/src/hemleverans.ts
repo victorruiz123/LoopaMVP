@@ -55,3 +55,46 @@ export function annonsensFrakt(job: Pick<ConditionJob, "tradera" | "blocket">, c
 export function prisMedHemleverans(itemPrice: number, shippingSek: number): number {
   return Math.round(itemPrice) + shippingSek;
 }
+
+/**
+ * Tradera tar frakten i kassan, inte i priset — för annonser publicerade från 2026-11-19.
+ *
+ * FÖRUT låg hemleveransen inbakad i Tradera-priset (gamingstolen: 500 kr möbel stod som 1 100 kr), och
+ * köparen såg ett pris som inte stämde med hemsidan. Nu går möbelpriset till Tradera och hemleveransen
+ * som Traderas fraktkostnad (`shippingCost`) — köparen betalar samma summa, en gång, men ser vad som är
+ * möbeln och vad som är frakten. Blocket har ingen fraktruta för Loopas egen leverans och behåller
+ * frakten i priset.
+ *
+ * EN ANNONS SOM REDAN LIGGER UTE BEHÅLLER SITT SÄTT. Dess text säger att frakten ingår och dess
+ * fraktkostnad hos Tradera är 0; att sänka den till bara möbelpriset vore att ge bort leveransen.
+ * Därför bär publiceringen `fraktSeparat`, och bara en publicerad annons utan flaggan räknas som den
+ * gamla sorten. Allt som ännu inte ligger ute — även en omläggning på väg upp — blir den nya.
+ */
+export function traderaFraktSeparat(job: Pick<ConditionJob, "tradera">): boolean {
+  return job.tradera?.status === "published" ? job.tradera.fraktSeparat === true : true;
+}
+
+/** Priset som står i Tradera-annonsen: möbeln, plus frakten bara på en annons av den gamla sorten. */
+export function traderaAnnonspris(job: Pick<ConditionJob, "tradera">, itemPrice: number, shippingSek: number): number {
+  return traderaFraktSeparat(job) ? Math.round(itemPrice) : prisMedHemleverans(itemPrice, shippingSek);
+}
+
+/**
+ * Ska den här Tradera-annonsen läggas om för att få frakten i kassan? Engångsombytet 2026-11-19 av
+ * annonserna som låg ute när det nya sättet kom. Styrs av TRADERA_FRAKTBYTE:
+ *
+ *   osatt / "0"         av
+ *   "alla"              varje publicerad Tradera-annons av den gamla sorten
+ *   "993b08eb,35d112ba" bara de jobb vars id börjar så — för att pröva på en annons först
+ *
+ * ALDRIG en annons där reserven redan fått ta över (`fraktReserv`): Tradera nekade då fraktkostnaden,
+ * och ett nytt ombyte hade lagt om samma annons var femtonde minut i evighet.
+ */
+export function traderaFraktbyteVantar(job: Pick<ConditionJob, "id" | "tradera">): boolean {
+  const v = process.env.TRADERA_FRAKTBYTE?.trim();
+  if (!v || v === "0") return false;
+  const tr = job.tradera;
+  if (tr?.status !== "published" || !tr.itemId || tr.fraktSeparat === true || tr.fraktReserv) return false;
+  if (v === "alla") return true;
+  return v.split(",").some((p) => p.trim().length >= 4 && job.id.startsWith(p.trim()));
+}

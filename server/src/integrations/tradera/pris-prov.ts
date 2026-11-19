@@ -23,7 +23,7 @@ try {
 }
 
 const { getJob } = await import("../../jobStore.js");
-const { annonsensFrakt, prisMedHemleverans } = await import("../../hemleverans.js");
+const { annonsensFrakt, prisMedHemleverans, traderaFraktSeparat } = await import("../../hemleverans.js");
 const { kategoriMedRattelse } = await import("../../butik/overrides.js");
 const { kanalPrisLagen } = await import("../../priceLadder.js");
 const { getTraderaItem, missingTraderaEnv, updateTraderaPrice } = await import("./tradera.js");
@@ -88,7 +88,8 @@ if (itemFlagga) {
   }
   itemId = job.tradera.itemId;
   mode = job.priceLadder.listingMode ?? "fixed";
-  const frakt = annonsensFrakt(job, await kategoriMedRattelse(job));
+  // Frakten i priset bara på en Tradera-annons av den gamla sorten (hemleverans.ts traderaFraktSeparat).
+  const frakt = traderaFraktSeparat(job) ? 0 : annonsensFrakt(job, await kategoriMedRattelse(job));
   nyttPris = prisMedHemleverans(job.priceLadder.currentPrice, frakt);
   const lage = kanalPrisLagen(job).find((l) => l.kanal === "tradera");
   console.log(`  Jobb:         ${job.id}`);

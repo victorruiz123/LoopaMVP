@@ -17,7 +17,7 @@ import { publishToTradera, traderaConfigured, type TraderaImage } from "./trader
 import { armPriceLadder, nyttKanalPris } from "../../priceLadder.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
-import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
+import { annonsensFrakt, prisMedHemleverans, traderaFraktSeparat } from "../../hemleverans.js";
 import {
   TRADERA_CONDITION,
   TRADERA_SHIPPING_OTHER_ID,
@@ -60,10 +60,12 @@ export interface PublishPlan {
   categoryId: number;
   categoryName: string;
   /**
-   * Vad KÖPAREN betalar: möbeln plus hemleveransen. Det är det här talet som går till Tradera och
-   * står i annonsen — inget tillkommer i kassan.
+   * Vad KÖPAREN betalar totalt: möbeln plus hemleveransen. Det säljaren ser i förhandsvisningen.
+   * Sedan 2026-11-19 är det INTE talet i Tradera-annonsen — se `listingPrice`.
    */
   price: number;
+  /** Priset som skickas till Tradera: bara möbeln. Hemleveransen går som Traderas fraktkostnad. */
+  listingPrice: number;
   /** Möbelns egen andel. Det är den prisstegen sänker; frakten står stilla. */
   itemPrice: number;
   /** Fraktens andel av `price`, utskriven så gränssnittet slipper känna till beloppet. */
@@ -127,6 +129,7 @@ export async function planTraderaPublish(rajob: ConditionJob): Promise<PublishRe
       categoryId: category.id,
       categoryName: category.name,
       price: prisMedHemleverans(price.value, shipping),
+      listingPrice: Math.round(price.value),
       itemPrice: price.value,
       shippingSek: shipping,
       priceSource: price.source,
@@ -168,27 +171,50 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
     // det riktiga jobbet, medan beskrivningen ska byggas ur den rättade kopian.
     const annons = await medRattelser(job);
     // Blocken sparas på publiceringen: säljarens annonsvy visar texten som den faktiskt gick ut.
-    const adBlocks = traderaAdBlocks(annons, plan.shippingSek);
+    let fraktSeparat = true;
+    let adBlocks = traderaAdBlocks(annons, plan.shippingSek, true);
 
     const images = await loadImages(job);
 
-    const result = await publishToTradera({
-      ownReference: job.id,
-      title: plan.title,
-      description: renderAdHtml(adBlocks),
-      categoryId: plan.categoryId,
-      price: plan.price,
-      images,
-      condition: plan.condition,
-      conditionAttributeId: TRADERA_SKICK_ATTRIBUTE_ID,
-      shippingOptionId: TRADERA_SHIPPING_OTHER_ID,
-      // 0 kr, för att frakten redan ligger i priset. Ett belopp här hade lagts PÅ annonspriset i
-      // Traderas kassa och tagit ut hemleveransen en andra gång.
-      shippingCost: 0,
-      paymentOptionIds: traderaPaymentOptionIds(),
-      durationDays: plan.durationDays ?? undefined,
-      mode: plan.mode,
-    });
+    const skicka = (separat: boolean, blocks: AdBlock[]) =>
+      publishToTradera({
+        ownReference: job.id,
+        title: plan.title,
+        description: renderAdHtml(blocks),
+        categoryId: plan.categoryId,
+        // Sedan 2026-11-19: bara möbeln i priset, hemleveransen som Traderas fraktkostnad
+        // (hemleverans.ts traderaFraktSeparat). Köparen betalar leveransen en gång, i kassan.
+        // Det gamla sättet — frakten i priset, 0 kr i kassan — finns kvar som reserv nedan.
+        price: separat ? plan.listingPrice : plan.price,
+        images,
+        condition: plan.condition,
+        conditionAttributeId: TRADERA_SKICK_ATTRIBUTE_ID,
+        shippingOptionId: TRADERA_SHIPPING_OTHER_ID,
+        shippingCost: separat ? plan.shippingSek : 0,
+        paymentOptionIds: traderaPaymentOptionIds(),
+        durationDays: plan.durationDays ?? undefined,
+        mode: plan.mode,
+      });
+
+    let result: Awaited<ReturnType<typeof publishToTradera>>;
+    try {
+      result = await skicka(true, adBlocks);
+    } catch (err) {
+      /**
+       * RESERVEN. Fraktkostnad på "Annat fraktsätt" var oprövad mot Tradera när den infördes. Nekar
+       * Tradera den, och det händer mitt i en omläggning, är den gamla annonsen redan nere — möbeln
+       * hade försvunnit från Tradera. Då läggs den upp på det gamla sättet i stället, och admin får
+       * veta det. BARA för ett avslag som nämner frakten: ett sådant kommer innan någon annons finns.
+       * Vid alla andra fel kan annonsen redan ha gått ut, och ett nytt försök vore en dubblett.
+       */
+      const fel = err instanceof Error ? err.message : String(err);
+      if (!/shipping|frakt/i.test(fel)) throw err;
+      console.warn(`[tradera] job ${jobId} Tradera nekade fraktkostnaden — lägger upp med frakten i priset i stället. (${fel.slice(0, 200)})`);
+      fraktSeparat = false;
+      adBlocks = traderaAdBlocks(annons, plan.shippingSek, false);
+      result = await skicka(false, adBlocks);
+      void larmaOmFraktReserv(job.id, plan.title, fel).catch(() => undefined);
+    }
 
     await update(jobId, (current) => ({
       ...current,
@@ -201,6 +227,8 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
       adBlocks,
       rubrik: plan.title,
       shippingSek: plan.shippingSek,
+      fraktSeparat,
+      fraktReserv: fraktSeparat ? null : new Date().toISOString(),
       // Kanalens kvitto: Tradera ligger på möbelpriset annonsen gick ut med. Det är mot det stegen
       // mäter om Tradera hänger med nästa vecka (priceLadder.ts synkaKanaler).
       pris: nyttKanalPris(plan.itemPrice, "publicering"),
@@ -218,6 +246,21 @@ export async function runTraderaPublish(jobId: string): Promise<void> {
     console.warn(`[tradera] job ${jobId} kunde inte publiceras — ${message}`);
     await update(jobId, (current) => ({ ...current, status: "error", error: message }));
   }
+}
+
+/** Ett brev till admin när reserven fick ta över: frakten ligger då i priset igen, på den annonsen. */
+async function larmaOmFraktReserv(jobId: string, titel: string, fel: string): Promise<void> {
+  const { sendLetter } = await import("../../efterlysning/notify.js");
+  const { adminEmails } = await import("../../admin.js");
+  const body = [
+    `Tradera nekade hemleveransen som fraktkostnad för "${titel}" (${loopaIdFor(jobId)}).`,
+    "Annonsen lades upp på det gamla sättet i stället: frakten inräknad i priset, 0 kr i kassan.",
+    "",
+    `Traderas svar: ${fel}`,
+    "",
+    "Så länge Tradera nekar läggs varje ny Tradera-annons upp så. Säg till utvecklarna.",
+  ].join("\n");
+  for (const to of adminEmails()) await sendLetter({ to, subject: `Tradera: frakten fick ligga i priset för ${titel}`, body, kind: "pris" });
 }
 
 /**
@@ -361,8 +404,10 @@ export function buildDescription(job: ConditionJob): string {
  * "Beskrivning" (GET /api/jobs/:id/annonstext), så att det säljaren läser är ordagrant det som
  * går upp på Tradera.
  */
-export function traderaAdBlocks(job: ConditionJob, shippingSek?: number): AdBlock[] {
-  return composeAd(job, { delivery: true, loopaSells: true, infoPage: true, shippingSek });
+export function traderaAdBlocks(job: ConditionJob, shippingSek?: number, fraktIKassan = traderaFraktSeparat(job)): AdBlock[] {
+  // En annons som redan ligger ute av den gamla sorten behåller texten "ingår i priset" — annars hade
+  // textuppdateringen (annonsUppdatering.ts) sett en ändrad text och lagt om varje sådan annons.
+  return composeAd(job, { delivery: true, loopaSells: true, infoPage: true, shippingSek, fraktIKassan });
 }
 
 export { traderaConfigured };

@@ -839,6 +839,17 @@ export interface TraderaPublication {
    * sänkning (hemleverans.ts `annonsensFrakt`). Saknas på annonser från före 2026-09-29 — de bär 600.
    */
   shippingSek?: number | null;
+  /**
+   * Sant = hemleveransen tas som Traderas fraktkostnad, och priset i annonsen är bara möbeln. Saknas
+   * (eller falskt) på annonser publicerade före 2026-11-19, där frakten är inbakad i priset. Se
+   * hemleverans.ts `traderaFraktSeparat`.
+   */
+  fraktSeparat?: boolean | null;
+  /**
+   * När Tradera nekade hemleveransen som fraktkostnad och annonsen lades upp med frakten i priset i
+   * stället (tradera/publish.ts, reserven). Satt = ombytet (TRADERA_FRAKTBYTE) rör inte annonsen igen.
+   */
+  fraktReserv?: string | null;
   /** Vilket möbelpris Tradera-annonsen bekräftats ligga på, mot stegen. Saknas på äldre annonser. */
   pris?: KanalPris | null;
 }

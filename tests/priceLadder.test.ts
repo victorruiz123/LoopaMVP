@@ -351,6 +351,32 @@ test("veckans sänkning flyttar möbeln och sedan Tradera, i den ordningen", asy
   }
 });
 
+/**
+ * Från 2026-11-19 tar Tradera hemleveransen i kassan. En annons publicerad så (`fraktSeparat`) ska
+ * sänkas till MÖBELPRISET — inte möbeln plus frakten, för då betalar köparen leveransen två gånger.
+ * En äldre annons, vars text säger att frakten ingår, sänks som förut (testet ovan).
+ */
+test("en Tradera-annons med frakten i kassan sänks till bara möbelpriset; Blocket behåller frakten i priset", async () => {
+  const job = await jobb({ tradera: true, blocket: true });
+  job.tradera!.fraktSeparat = true;
+  const r = rigg();
+  process.env.TRADERA_APP_ID = "x";
+  process.env.TRADERA_APP_KEY = "x";
+  process.env.TRADERA_USER_ID = "x";
+  process.env.TRADERA_USER_TOKEN = "x";
+  try {
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(job.priceLadder!.currentPrice, 2040);
+    assert.deepEqual(r.tradera, [{ itemId: 4711, pris: 2040, mode: "fixed" }], "Tradera: bara möbeln");
+    assert.deepEqual(r.blocket, [{ jobId: job.id, pris: annonspris(2040) }], "Blocket: möbeln + frakten");
+    const lagen = kanalPrisLagen(job);
+    assert.equal(lagen.find((l) => l.kanal === "tradera")!.frakt, 0, "panelen skriver Tradera-annonsen som möbelpriset");
+    assert.equal(lagen.find((l) => l.kanal === "blocket")!.frakt, SHIPPING_INCLUDED_SEK);
+  } finally {
+    delete process.env.TRADERA_APP_ID;
+  }
+});
+
 test("möbeln sjunker även när Tradera säger nej — felet bokförs på kanalen, med nytt försök om sex timmar", async () => {
   process.env.TRADERA_APP_ID = "x";
   process.env.TRADERA_APP_KEY = "x";
@@ -888,4 +914,119 @@ test("brytarna: Blocket läggs inte om förrän borttagningen är uppmätt; PRIS
   });
   delete process.env.TRADERA_APP_ID;
   assert.equal(await kanOmlaggas("tradera"), false, "Tradera utan nycklar kan inte läggas om");
+});
+
+// ---------------------------------------------------------------------------
+// Fraktombytet: Tradera-annonserna från före 2026-11-19 får frakten i kassan (TRADERA_FRAKTBYTE)
+// ---------------------------------------------------------------------------
+
+/** En Tradera-annons av den gamla sorten, i fas, utan sänkning på väg. */
+async function gammalTraderaAnnons(blocket = false): Promise<ConditionJob> {
+  return jobb({ tradera: true, blocket, ladder: { nextDropAt: new Date(NU + WEEK).toISOString() } });
+}
+
+/** Omläggningsriggen, där den nya Tradera-annonsen bär frakten i kassan som den riktiga publiceringen. */
+function fraktRigg(opts: Parameters<typeof omRigg>[0] & { fragor?: boolean } = {}) {
+  const r = omRigg(opts);
+  const publicera = r.beroenden.publicera!;
+  r.beroenden.publicera = async (job, kanal) => {
+    const u = await publicera(job, kanal);
+    if (kanal === "tradera" && u.status === "uppe") job.tradera = { ...job.tradera!, fraktSeparat: true };
+    return u;
+  };
+  const fragade: number[] = [];
+  r.beroenden.traderaFragor = async (itemId) => {
+    fragade.push(itemId);
+    return opts.fragor ? { harFragor: true, skal: "1 konversation om annonsen" } : { harFragor: false, skal: "inga" };
+  };
+  return { ...r, fragade };
+}
+
+async function medFraktbyte<T>(varde: string, fn: () => Promise<T>): Promise<T> {
+  process.env.TRADERA_FRAKTBYTE = varde;
+  try {
+    return await fn();
+  } finally {
+    delete process.env.TRADERA_FRAKTBYTE;
+  }
+}
+
+test("fraktombytet lägger om en gammal Tradera-annons en gång — utan sänkning, utan prisanrop, Blocket orörd", async () => {
+  const job = await gammalTraderaAnnons(true);
+  const r = fraktRigg();
+  await medFraktbyte(job.id.slice(0, 12), async () => {
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(job.priceLadder!.currentPrice, 2400, "priset sänks inte av ombytet");
+    assert.deepEqual(r.nertagna, ["tradera"]);
+    assert.deepEqual(r.publiceringar, ["tradera"]);
+    assert.equal(r.tradera.length, 0, "inget prisanrop");
+    assert.equal(r.blocket.length, 0, "Blocket rörs inte");
+    assert.equal(job.tradera!.fraktSeparat, true);
+    assert.equal(job.tradera!.itemId, 9001);
+    assert.equal(job.tradera!.pris!.bekraftat, 2400);
+    assert.equal(kanalPrisLagen(job).find((l) => l.kanal === "tradera")!.frakt, 0);
+
+    // Nästa varv: redan bytt, ingenting händer.
+    await tickPriceLadders(NU + 60_000, r.beroenden);
+    assert.deepEqual(r.nertagna, ["tradera"]);
+  });
+});
+
+test("fraktombytet rör bara de jobb som pekats ut, och ingenting när det är av", async () => {
+  const utpekad = await gammalTraderaAnnons();
+  const annan = await gammalTraderaAnnons();
+  const r = fraktRigg();
+  await tickPriceLadders(NU, r.beroenden);
+  assert.deepEqual(r.nertagna, [], "av: ingenting läggs om");
+  await medFraktbyte(utpekad.id.slice(0, 12), () => tickPriceLadders(NU, r.beroenden));
+  assert.deepEqual(r.nertagna, ["tradera"]);
+  assert.equal(utpekad.tradera!.fraktSeparat, true);
+  assert.notEqual(annan.tradera!.fraktSeparat, true, "den andra står kvar på det gamla sättet");
+});
+
+test("fraktombytet hoppar över en annons där en köpare skrivit — ingen dubblett, inget prisanrop", async () => {
+  const job = await gammalTraderaAnnons();
+  const r = fraktRigg({ fragor: true });
+  await medFraktbyte(job.id.slice(0, 12), () => tickPriceLadders(NU, r.beroenden));
+  assert.deepEqual(r.fragade, [4711]);
+  assert.deepEqual(r.nertagna, []);
+  assert.equal(r.tradera.length, 0);
+  assert.equal(job.tradera!.itemId, 4711);
+  assert.equal(job.tradera!.status, "published");
+
+  // Inkorgen läses med en webbläsare: nästa varv frågar inte igen, först efter sex timmar.
+  await medFraktbyte(job.id.slice(0, 12), () => tickPriceLadders(NU + 15 * 60_000, r.beroenden));
+  assert.deepEqual(r.fragade, [4711], "ingen ny läsning efter en kvart");
+  await medFraktbyte(job.id.slice(0, 12), () => tickPriceLadders(NU + 6 * 3600_000 + 60_000, r.beroenden));
+  assert.deepEqual(r.fragade, [4711, 4711], "läses igen efter sex timmar");
+});
+
+test("fraktombytet hoppar över en annons med bud", async () => {
+  const job = await gammalTraderaAnnons();
+  const r = fraktRigg({ traderaLage: { totalBids: 1, maxBidSek: 2000, ended: false, gotBidders: true, gotWinner: false, endDate: null } });
+  await medFraktbyte(job.id.slice(0, 12), () => tickPriceLadders(NU, r.beroenden));
+  assert.deepEqual(r.nertagna, []);
+  assert.equal(r.tradera.length, 0);
+});
+
+test("fraktombytet försöker aldrig igen på en annons där Tradera nekade fraktkostnaden (reserven)", async () => {
+  const job = await gammalTraderaAnnons();
+  job.tradera!.fraktReserv = new Date(NU - 60_000).toISOString();
+  const r = fraktRigg();
+  await medFraktbyte("alla", () => tickPriceLadders(NU, r.beroenden));
+  assert.deepEqual(r.nertagna, []);
+});
+
+test("kommer den nya annonsen inte upp efter ombytet försöks den igen, som vid veckans omläggning", async () => {
+  const job = await gammalTraderaAnnons();
+  const r = fraktRigg({ svar: ["fel", "uppe"] });
+  await medFraktbyte(job.id.slice(0, 12), async () => {
+    await tickPriceLadders(NU, r.beroenden);
+    assert.equal(omlaggningPagar(job), true, "nere, på väg upp igen");
+    assert.equal(r.nere.length, 1, "admin får veta att den är nere");
+    await tickPriceLadders(NU + 21 * 60_000, r.beroenden);
+    assert.deepEqual(r.publiceringar, ["tradera", "tradera"]);
+    assert.equal(omlaggningPagar(job), false);
+    assert.equal(job.tradera!.fraktSeparat, true);
+  });
 });

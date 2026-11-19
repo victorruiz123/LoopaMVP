@@ -307,13 +307,48 @@ test("Tradera läggs inte om när texten där är densamma", async () => {
   const plan = await planTraderaPublish(job);
   assert.ok(plan.ok, plan.ok ? "" : plan.reason);
   const block = traderaAdBlocks(await overrides.medRattelser(job), plan.plan.shippingSek);
-  job.tradera = { ...job.tradera!, status: "published", itemId: 42, url: null, adBlocks: block, rubrik: plan.plan.title, shippingSek: plan.plan.shippingSek };
+  job.tradera = {
+    ...job.tradera!,
+    status: "published",
+    itemId: 42,
+    url: null,
+    adBlocks: block,
+    rubrik: plan.plan.title,
+    shippingSek: plan.plan.shippingSek,
+    fraktSeparat: true,
+  };
   job.annonsUppdatering = { begard: new Date().toISOString(), status: "vantar", klar: null, kanaler: {}, vantande: ["tradera"] };
   await persist(job);
   await korAnnonsUppdatering(job.id);
   const u = (await getJob(job.id))?.annonsUppdatering;
   assert.equal(u?.kanaler.tradera?.status, "oforandrad", u?.kanaler.tradera?.detalj);
   assert.equal(u?.status, "klar");
+});
+
+/**
+ * En Tradera-annons från före 2026-11-19 har frakten i priset och texten "ingår i priset". Den nya
+ * texten ("tillkommer i kassan") får inte räknas som en ändring — då hade varje sådan annons lagts om
+ * nästa gång en uppdatering kördes, med ett nytt pris den inte bad om.
+ */
+test("en äldre Tradera-annons, med frakten i priset, läggs inte om för att texten om frakten ändrats", async () => {
+  const job = await nyttJobb();
+  const plan = await planTraderaPublish(job);
+  assert.ok(plan.ok, plan.ok ? "" : plan.reason);
+  const gamla = traderaAdBlocks(await overrides.medRattelser(job), plan.plan.shippingSek, false);
+  job.tradera = { ...job.tradera!, status: "published", itemId: 42, url: null, adBlocks: gamla, rubrik: plan.plan.title, shippingSek: plan.plan.shippingSek };
+  job.annonsUppdatering = { begard: new Date().toISOString(), status: "vantar", klar: null, kanaler: {}, vantande: ["tradera"] };
+  await persist(job);
+  await korAnnonsUppdatering(job.id);
+  const u = (await getJob(job.id))?.annonsUppdatering;
+  assert.equal(u?.kanaler.tradera?.status, "oforandrad", u?.kanaler.tradera?.detalj);
+});
+
+test("Tradera-planen skickar bara möbelpriset; köparens summa står kvar för förhandsvisningen", async () => {
+  const job = await nyttJobb();
+  const plan = await planTraderaPublish(job);
+  assert.ok(plan.ok, plan.ok ? "" : plan.reason);
+  assert.equal(plan.plan.listingPrice, plan.plan.itemPrice);
+  assert.equal(plan.plan.price, plan.plan.itemPrice + plan.plan.shippingSek);
 });
 
 test(`ett fel försöks igen, högst ${MAX_FORSOK} gånger, och står sedan kvar`, async () => {

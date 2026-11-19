@@ -35,7 +35,7 @@
 
 import { getJob, listJobs, persist } from "./jobStore.js";
 import { getTraderaLage, traderaConfigured, updateTraderaPrice, type TraderaLage } from "./integrations/tradera/tradera.js";
-import { annonsensFrakt, prisMedHemleverans } from "./hemleverans.js";
+import { annonsensFrakt, prisMedHemleverans, traderaFraktbyteVantar, traderaFraktSeparat } from "./hemleverans.js";
 import { kategoriMedRattelse } from "./butik/overrides.js";
 import { store } from "./butik/store.js";
 import { loopaIdFor } from "./loopaId.js";
@@ -337,7 +337,8 @@ export function kanalPrisLagen(job: ConditionJob): KanalPrisLage[] {
       url: pub.url ?? null,
       // Synkront med flit: kanalen ÄR publicerad, så beloppet står på publiceringen (eller är
       // grundbeloppet för äldre annonser) och kategorin behöver aldrig slås upp.
-      frakt: annonsensFrakt(job, null),
+      // 0 på en Tradera-annons där frakten tas i kassan: annonspriset är då möbelpriset.
+      frakt: kanal === "tradera" && traderaFraktSeparat(job) ? 0 : annonsensFrakt(job, null),
     });
   }
   return lagen;
@@ -395,6 +396,8 @@ export interface SynkBeroenden {
   publicera: (job: ConditionJob, kanal: PrisKanal) => Promise<PubliceringsUtfall>;
   /** Brevet om en annons som är nere. */
   larmaNere: (job: ConditionJob, kanal: PrisKanal, fel: string, tidigareUrl: string | null) => Promise<void>;
+  /** Har en köpare skrivit till Tradera-annonsen? Fraktombytet rör inte en sådan (se synkaKanaler). */
+  traderaFragor: (itemId: number) => Promise<{ harFragor: boolean; skal: string }>;
   nu: () => number;
 }
 
@@ -414,8 +417,20 @@ const standardBeroenden: SynkBeroenden = {
   taNer: async (job, kanal) => (await omlaggning()).taNerForOmlaggning(job, kanal),
   publicera: async (job, kanal) => (await omlaggning()).publiceraEfterOmlaggning(job, kanal),
   larmaNere: async (job, kanal, fel, url) => (await omlaggning()).mejlaOmNere(job, kanal, fel, url),
+  traderaFragor: async (itemId) => (await import("./integrations/tradera/fragor.js")).lasTraderaFragor(itemId),
   nu: () => Date.now(),
 };
+
+/** När fraktombytet senast hoppade över en annons för att en köpare skrivit. I minnet: en omstart prövar om. */
+const fraktbyteHoppat = new Map<string, number>();
+
+/** En rad per process och nyckel — ett hopp som görs om var femtonde minut ska inte fylla loggen. */
+const loggat = new Set<string>();
+function loggaEnGang(nyckel: string, rad: string): void {
+  if (loggat.has(nyckel)) return;
+  loggat.add(nyckel);
+  console.info(rad);
+}
 
 /** Ligger någon kanal nere, mitt i en omläggning? */
 export function omlaggningPagar(job: ConditionJob): boolean {
@@ -553,6 +568,14 @@ export async function synkaKanaler(
     if (!kanalPublicerad(job, kanal) || ladder.omlaggning?.[kanal]) continue;
     const pub = publikation(job, kanal)!;
     const kp = pub.pris!;
+    /**
+     * Fraktombytet (hemleverans.ts traderaFraktbyteVantar): en Tradera-annons från före 2026-11-19
+     * läggs om en gång för att få frakten i kassan, även när priset redan stämmer. Samma väg som
+     * veckans omläggning — nedtagning, ny publicering, omförsök, brev — men aldrig med bud, och aldrig
+     * när en köpare skrivit: då hade den gamla lämnats kvar och den nya lagts bredvid, en dubblett för
+     * en ändring köparen inte bett om.
+     */
+    const fraktbyte = kanal === "tradera" && traderaFraktbyteVantar(job);
 
     if (kp.bekraftat === mal) {
       // I fas. Ett gammalt fel eller larm gäller inte längre.
@@ -562,12 +585,15 @@ export async function synkaKanaler(
         kp.kraverManuell = false;
         kp.nastaForsokAt = null;
       }
-      continue;
+      if (!fraktbyte) continue;
     }
 
     frakt ??= annonsensFrakt(job, await kategoriMedRattelse(job));
-    const annonspris = prisMedHemleverans(mal, frakt);
-    const liggerPa = prisMedHemleverans(kp.bekraftat, frakt);
+    // Tradera från 2026-11-19 tar frakten i kassan: där är annonspriset bara möbeln. Äldre Tradera-
+    // annonser och Blocket har frakten i priset (hemleverans.ts traderaFraktSeparat).
+    const kanalensFrakt = kanal === "tradera" && traderaFraktSeparat(job) ? 0 : frakt;
+    const annonspris = prisMedHemleverans(mal, kanalensFrakt);
+    const liggerPa = prisMedHemleverans(kp.bekraftat, kanalensFrakt);
 
     if (!opts.tvinga && kp.nastaForsokAt && Date.parse(kp.nastaForsokAt) > now) {
       resultat.vantar.push(kanal);
@@ -584,13 +610,31 @@ export async function synkaKanaler(
        * bokförs som vilket prisfel som helst.
        */
       let forcerat: FlyttUtfall | null = null;
-      if (!opts.tvinga && veckosankningVantar(ladder, kp) && (await d.kanOmlaggas(kanal))) {
+      const sankning = veckosankningVantar(ladder, kp);
+      if (!opts.tvinga && (sankning || fraktbyte) && (await d.kanOmlaggas(kanal))) {
         let laggOm = true;
         if (kanal === "tradera") {
           const lage = await d.traderaLage(job.tradera!.itemId!);
           laggOm = !!lage && lage.totalBids === 0 && !lage.gotWinner;
+          if (laggOm && fraktbyte && !sankning) {
+            // Inkorgen läses med en webbläsare. En annons som hoppats över prövas därför igen först
+            // efter sex timmar, inte vid varje varv.
+            const senast = fraktbyteHoppat.get(job.id);
+            if (senast !== undefined && now - senast < RETRY_MS) {
+              laggOm = false;
+            } else {
+              const fragor = await d.traderaFragor(job.tradera!.itemId!);
+              if (fragor.harFragor) {
+                laggOm = false;
+                fraktbyteHoppat.set(job.id, now);
+                loggaEnGang(`fraktbyte-${job.id}`, `[pris-steg] ${job.id.slice(0, 8)} Tradera: fraktombytet hoppas över — ${fragor.skal}`);
+              }
+            }
+          }
         }
         if (laggOm) {
+          // En ny Tradera-annons tar alltid frakten i kassan (tradera/publish.ts): priset är möbeln.
+          const nyAnnons = kanal === "tradera" ? mal : annonspris;
           const om: KanalOmlaggning = {
             nedtagenAt: iso(now),
             tidigareUrl: pub.url ?? null,
@@ -609,14 +653,18 @@ export async function synkaKanaler(
             await persist(job);
             console.info(
               nedtagning
-                ? `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} gamla annonsen ligger kvar — ${nedtagning.skal} Den nya läggs upp bredvid (${annonspris} kr).`
-                : `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} nertagen för omläggning (${liggerPa} → ${annonspris} kr)`,
+                ? `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} gamla annonsen ligger kvar — ${nedtagning.skal} Den nya läggs upp bredvid (${nyAnnons} kr).`
+                : `[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} nertagen för ${fraktbyte && !sankning ? "fraktombyte" : "omläggning"} (${liggerPa} → ${nyAnnons} kr${kanal === "tradera" ? " + frakt i kassan" : ""})`,
             );
             await publiceraNertagen(job, kanal, om, d, now, resultat, kvar);
             continue;
           }
         }
       }
+
+      // Bara fraktombytet tar sig hit med priset redan i fas — och då blev ingen omläggning av. Det
+      // finns inget pris att ändra.
+      if (kp.bekraftat === mal) continue;
 
       let utfall: FlyttUtfall;
       if (forcerat) {
@@ -654,7 +702,7 @@ export async function synkaKanaler(
       if (utfall.status === "andrad") {
         pub.pris = nyttKanalPris(mal, kanal === "tradera" ? "api" : "robot", now);
         resultat.flyttade.push(kanal);
-        console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} ${liggerPa} → ${annonspris} kr (annonspris med frakt)`);
+        console.info(`[pris-steg] ${job.id.slice(0, 8)} ${KANALNAMN[kanal]} ${liggerPa} → ${annonspris} kr (annonspris${kanalensFrakt ? " med frakt" : ", frakten i kassan"})`);
       } else if (utfall.status === "senare") {
         kp.fel = utfall.skal;
         kp.felAt = iso(now);
@@ -708,7 +756,7 @@ async function mejlaOmManuellt(job: ConditionJob, lage: KanalPrisLage, annonspri
   const id = loopaIdFor(job.id);
   const titel = adTitle(job) || id;
   const body = [
-    `${lage.namn}-annonsen för "${titel}" (${id}) ska ligga på ${annonspris} kr (möbeln ${lage.borVara} kr plus hemleverans),`,
+    `${lage.namn}-annonsen för "${titel}" (${id}) ska ligga på ${annonspris} kr (${lage.frakt ? `möbeln ${lage.borVara} kr plus hemleverans` : "hemleveransen tas som frakt i Traderas kassa"}),`,
     `men servern kan inte ändra den själv: ${lage.fel ?? "okänt skäl"}`,
     "",
     lage.url ? `Annonsen: ${lage.url}` : `Annonsen har ingen sparad adress — leta upp den på ${lage.namn}.`,
@@ -842,7 +890,7 @@ export async function tickPriceLadders(
         const { schemalaggPrisUppdatering } = await import("./integrations/annonsUppdatering.js");
         void schemalaggPrisUppdatering(job);
       }
-      if (prisUrFas(job) || omlaggningPagar(job)) {
+      if (prisUrFas(job) || omlaggningPagar(job) || traderaFraktbyteVantar(job)) {
         const r = await synkaKanaler(job, { nu: () => now, ...beroenden });
         flyttade += r.flyttade.length;
       }

@@ -12,7 +12,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { buildDescription } from "../server/src/integrations/tradera/publish.js";
+import { buildDescription, traderaAdBlocks } from "../server/src/integrations/tradera/publish.js";
+import { renderAdHtml } from "../server/src/adContent.js";
 import { buildBlocketDescription } from "../server/src/integrations/blocket/publish.js";
 import { SHIPPING_INCLUDED_SEK, prisMedHemleverans } from "../server/src/hemleverans.js";
 import { DEFAULT_WEEKLY_DROP, ladderRungs } from "../server/src/priceLadder.js";
@@ -313,8 +314,10 @@ test("varken Blocket- eller Tradera-annonsen skriver ut att Loopa är säljaren"
  */
 const INFO_STYCKE = /<p>Se möbeln med alla bilder[^<]*<\/p>\n?/;
 
-test("skillnaden mot Tradera-texten är renderingen och länken till infosidan", () => {
-  const html = buildDescription(job()).replace(INFO_STYCKE, "");
+test("skillnaden mot Tradera-texten är renderingen, länken till infosidan och var frakten tas", () => {
+  // Tradera tar sedan 2026-11-19 frakten i kassan och säger det i leveransstycket; Blocket har den i
+  // priset. Med Traderas gamla leveransstycke ska texterna annars vara ordagrant lika.
+  const html = renderAdHtml(traderaAdBlocks(job(), undefined, false)).replace(INFO_STYCKE, "");
   const text = buildBlocketDescription(job());
   assert.ok(!text.includes("<"), "Blockets fält är ren text — ingen märkning ska följa med");
   /**
@@ -337,8 +340,18 @@ test("skillnaden mot Tradera-texten är renderingen och länken till infosidan",
   assert.equal(avskalad(text), avskalad(html), "samma ord om samma möbel, oavsett kanal");
 });
 
-test("leveransen säger både att den ingår och vad som händer efter köpet", () => {
+test("en ny Tradera-annons säger att hemleveransen tillkommer i kassan, och vad den kostar", () => {
   const html = buildDescription(job());
+  assert.match(html, new RegExp(`Hemleverans ${SHIPPING_INCLUDED_SEK} kr tillkommer i kassan\\.`));
+  assert.match(html, /Priset gäller möbeln/);
+  assert.doesNotMatch(html, /ingår i priset|inräknad i priset/, "ett pris utan frakt får inte säga att frakten ingår");
+  assert.match(html, /budfirma kör möbeln hem till din dörr efter köpet/);
+  assert.match(html, /Avhämtning erbjuds inte/);
+});
+
+test("Blocket och äldre Tradera-annonser säger att leveransen ingår, och vad som händer efter köpet", () => {
+  assert.match(buildBlocketDescription(job()), /Hemleverans ingår i priset\./);
+  const html = renderAdHtml(traderaAdBlocks(job(), undefined, false));
   assert.match(html, /Hemleverans ingår i priset\./);
   assert.match(html, new RegExp(`Hemleveransen kostar ${SHIPPING_INCLUDED_SEK} kr och är redan inräknad`));
   assert.match(html, /ingenting tillkommer i kassan/);
@@ -536,7 +549,7 @@ test("enkelt radbrott håller ihop stycket — det är en rad, inte ett nytt sty
 
 test("en tom handskriven text bygger annonsen som vanligt", () => {
   const tomt: ConditionJob = { ...job(), adText: "  \n " };
-  assert.match(buildDescription(tomt), /Hemleverans ingår i priset/);
+  assert.match(buildDescription(tomt), /Hemleverans \d+ kr tillkommer i kassan/);
 });
 
 test("adminens egna ord filtreras inte — leveranssållet gäller bara generatorns stycke", () => {

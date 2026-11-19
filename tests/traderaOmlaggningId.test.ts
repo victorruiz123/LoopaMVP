@@ -79,3 +79,31 @@ test("omläggning: väntar på den nya i stället för att ta den gamla medan Tr
     aterstall();
   }
 });
+
+// Från 2026-11-19 tar Tradera hemleveransen i kassan: priset är möbeln, frakten skickas som
+// fraktalternativets kostnad. Det här är det som faktiskt går över tråden till Tradera.
+test("frakten går till Tradera som fraktkostnad, priset som bara möbeln", async () => {
+  const riktig = globalThis.fetch;
+  let kropp: Record<string, unknown> | null = null;
+  globalThis.fetch = (async (url: string | URL, init?: RequestInit) => {
+    const u = String(url);
+    const svar = (data: unknown) => new Response(JSON.stringify(data), { status: 200 });
+    if (u.endsWith("/listings/items") && init?.method === "POST") {
+      kropp = JSON.parse(String(init.body));
+      return svar({ requestId: 99, itemId: 0 });
+    }
+    if (u.endsWith("/commit")) return svar(null);
+    if (u.includes("/request-results")) return svar([{ requestId: 99, message: null }]);
+    if (u.endsWith("/listings/seller-items")) return svar(kropp ? [NY] : []);
+    throw new Error(`oväntat anrop: ${init?.method ?? "GET"} ${u}`);
+  }) as typeof fetch;
+  try {
+    await publishToTradera({ ...annons(), price: 500, shippingOptionId: 6, shippingCost: 600 });
+    assert.ok(kropp, "ingen annons skickades");
+    const k = kropp as Record<string, unknown>;
+    assert.equal(k.buyItNowPrice, 500);
+    assert.deepEqual(k.shippingOptions, [{ shippingOptionId: 6, cost: 600 }]);
+  } finally {
+    globalThis.fetch = riktig;
+  }
+});

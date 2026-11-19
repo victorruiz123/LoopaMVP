@@ -79,6 +79,11 @@ export interface AdOptions {
    * in i priset (med adminens kategorirättelse); utan det räknas det ur jobbet (hemleverans.ts).
    */
   shippingSek?: number;
+  /**
+   * Sant = hemleveransen läggs till i kassan i stället för att ingå i priset. Bara Tradera, och bara
+   * annonser publicerade från 2026-11-19 (hemleverans.ts `traderaFraktSeparat`). Osatt = ingår.
+   */
+  fraktIKassan?: boolean;
 }
 
 // Allvarsgraden står mitt i en mening i annonstexten och är gemen därför; skadetyperna inleder sin
@@ -376,17 +381,33 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
      * nu, och den säger det viktigaste i fyra ord. "Endast" behövs inte för att stänga avhämtningen
      * — sista meningen gör det rakt ut.
      */
-    blocks.push(paragraph([{ text: "Hemleverans ingår i priset.", strong: true }]));
-    blocks.push(
-      paragraph([
-        {
-          text:
-            "En budfirma kör möbeln hem till din dörr efter köpet, och du väljer leveranstid via SMS. " +
-            `Hemleveransen kostar ${options.shippingSek ?? annonsensFrakt(job, categorySlugOf(job))} kr och är redan inräknad i priset — ingenting ` +
-            "tillkommer i kassan. Avhämtning erbjuds inte.",
-        },
-      ]),
-    );
+    const frakt = options.shippingSek ?? annonsensFrakt(job, categorySlugOf(job));
+    if (options.fraktIKassan) {
+      // Tradera från 2026-11-19: priset är möbeln, leveransen är Traderas fraktkostnad i kassan.
+      blocks.push(paragraph([{ text: `Hemleverans ${frakt} kr tillkommer i kassan.`, strong: true }]));
+      blocks.push(
+        paragraph([
+          {
+            text:
+              "En budfirma kör möbeln hem till din dörr efter köpet, och du väljer leveranstid via SMS. " +
+              `Priset gäller möbeln; hemleveransen på ${frakt} kr läggs till som frakt när du betalar. ` +
+              "Avhämtning erbjuds inte.",
+          },
+        ]),
+      );
+    } else {
+      blocks.push(paragraph([{ text: "Hemleverans ingår i priset.", strong: true }]));
+      blocks.push(
+        paragraph([
+          {
+            text:
+              "En budfirma kör möbeln hem till din dörr efter köpet, och du väljer leveranstid via SMS. " +
+              `Hemleveransen kostar ${frakt} kr och är redan inräknad i priset — ingenting ` +
+              "tillkommer i kassan. Avhämtning erbjuds inte.",
+          },
+        ]),
+      );
+    }
   }
 
   /**
