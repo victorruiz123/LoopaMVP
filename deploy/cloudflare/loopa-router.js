@@ -1,7 +1,7 @@
 /**
  * Butiken på marknadsdomänen.
  *
- * VARFÖR DEN FINNS. loopa.nu serveras av Cloudflare Pages (marknadssajten: /, /company, /brands,
+ * VARFÖR DEN FINNS. loopa.nu serveras av Cloudflare Pages (marknadssajten: /brands,
  * /secondhand) medan appen och butiken kör på Oracle bakom en tunnel på app.loopa.nu. För Google är
  * det två skilda sajter: marknadsdomänen har byggt upp auktoritet, app-subdomänen har ingen. Och
  * det är butikssidorna — de som ska ranka på "begagnad stol" — som låg på den utan.
@@ -32,6 +32,15 @@ export default {
       inkommande.hostname = "loopa.nu";
       inkommande.protocol = "https:";
       return Response.redirect(inkommande.toString(), 301);
+    }
+
+    /**
+     * /company är nedlagd. Företagssidan ska inte synas för besökare, så allt under den (rutten
+     * "loopa.nu/company*" i wrangler.toml) skickas permanent till startsidan. 301 så att Google
+     * släpper adressen i stället för att fortsätta visa den.
+     */
+    if (inkommande.pathname.startsWith("/company")) {
+      return Response.redirect("https://loopa.nu/", 301);
     }
 
     const mal = new URL(request.url);

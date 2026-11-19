@@ -15,7 +15,7 @@ compatibility_date = "2026-01-01"
 # ─── Appens sidor ───────────────────────────────────────────────────────────
 #
 # ROTEN ÄR VÅR. loopa.nu/ visar säljflödet — det är appens startsida, på den domän folk faktiskt
-# skriver in. Marknadssajtens företagssida bor kvar på loopa.nu/company och nås därifrån.
+# skriver in. Den gamla företagssidan loopa.nu/company är nedlagd, se rutten längre ned.
 #
 # EN WORKER-RUTT VINNER ÖVER EN OMDIRIGERINGSREGEL, tvärtemot vad man tror. Det upptäcktes när
 # rutten låg här en kort stund innan roten skulle flytta, och roten genast visade säljflödet.
@@ -158,6 +158,18 @@ zone_name = "loopa.nu"
 # Tjäna — startsidans tredje flik, affiliate-programmet (web/src/screens/AffiliateScreen.tsx).
 [[routes]]
 pattern = "loopa.nu/affiliate"
+zone_name = "loopa.nu"
+
+# ─── /company: nedlagd ──────────────────────────────────────────────────────
+#
+# Marknadssajtens företagssida ska inte synas alls. Den ligger kvar i Pages-bygget, men rutten här
+# gör att ingen förfrågan når den: workern svarar 301 till roten (loopa-router.js). Stjärnan tar
+# också /company#…, /company/… och /company?… — gamla länkar landar på säljflödet.
+# Verifiera efter deploy:
+#   curl -s -o /dev/null -D - "https://loopa.nu/company" | grep -iE "^HTTP|^location"
+# ska ge 301 till https://loopa.nu/.
+[[routes]]
+pattern = "loopa.nu/company*"
 zone_name = "loopa.nu"
 
 # ─── Sökmotorernas filer ────────────────────────────────────────────────────

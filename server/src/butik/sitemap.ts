@@ -128,7 +128,6 @@ export async function sitemapXml(): Promise<string> {
   const poster: Post[] = [
     { loc: `${base}/`, changefreq: "weekly", priority: "1.0" },
     { loc: `${base}/butik`, changefreq: "daily", priority: "0.9" },
-    { loc: `${base}/company`, changefreq: "monthly", priority: "0.8" },
     { loc: `${base}/brands`, changefreq: "monthly", priority: "0.6" },
     { loc: `${base}/secondhand`, changefreq: "monthly", priority: "0.6" },
   ];

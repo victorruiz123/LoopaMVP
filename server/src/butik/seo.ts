@@ -636,7 +636,7 @@ export async function seoFor(pathname: string, search: string): Promise<SeoHead 
         `<ul>` +
         `<li><a href="/butik">Köp begagnade möbler i butiken</a></li>` +
         `<li><a href="/efterlyses">Se vad köpare i Stockholm söker just nu</a></li>` +
-        `<li><a href="/company">Om Loopa</a></li>` +
+        `<li><a href="/om-oss">Om Loopa</a></li>` +
         `</ul>` +
         // Guiderna, så att varje inlägg har en länk från sajtens starkaste sida. Se bloggSida.
         `<h2>${esc(BLOGG_RUBRIK)}</h2>` +
