@@ -87,17 +87,37 @@ export function findJobByClientKey(ownerId: string | null, clientKey: string): C
   return undefined;
 }
 
+/**
+ * Inläsningar som pågår, per id. Utan den fick två samtidiga anrop för ett jobb som inte låg i minnet
+ * var sitt objekt — båda läste filen innan någon hunnit lägga in sitt. Skarpt 2026-11-19, första varvet
+ * efter en omstart: varvet höll ett objekt, Tradera-publiceringen skrev "publicerad" på ett annat, och
+ * varvet sparade sedan sitt gamla ovanpå. Annonsen låg uppe hos Tradera medan jobbet sa "publishing".
+ * Samma objekt till alla är det hela lagret vilar på (se `persist`).
+ */
+const laddas = new Map<string, Promise<ConditionJob | undefined>>();
+
 export async function getJob(id: string): Promise<ConditionJob | undefined> {
   const inMemory = jobs.get(id);
   if (inMemory) return inMemory;
-  try {
-    const raw = await readFile(path.join(jobDir(id), "job.json"), "utf-8");
-    const job = JSON.parse(raw) as ConditionJob;
-    jobs.set(id, job);
-    return job;
-  } catch {
-    return undefined;
-  }
+  const pagar = laddas.get(id);
+  if (pagar) return pagar;
+  const laddning = (async () => {
+    try {
+      const raw = await readFile(path.join(jobDir(id), "job.json"), "utf-8");
+      // Ett objekt kan ha lagts in medan filen lästes (createJob): det vinner, det är det andra håller i.
+      const redan = jobs.get(id);
+      if (redan) return redan;
+      const job = JSON.parse(raw) as ConditionJob;
+      jobs.set(id, job);
+      return job;
+    } catch {
+      return jobs.get(id);
+    } finally {
+      laddas.delete(id);
+    }
+  })();
+  laddas.set(id, laddning);
+  return laddning;
 }
 
 /** Stadier ett jobb kan ligga kvar i utan att någon längre arbetar på det. */
