@@ -285,6 +285,8 @@ test("Facebook: rubrikvakten och id ur adressen", () => {
   assert.equal(rubrikenArVar("Sweef Cloud 3-sits soffa i grå", [null, "Sweef Cloud 3-sits soffa i grå sammet"]), true, "kapad rubrik");
   assert.equal(rubrikenArVar("IKEA Ektorp tresits", ["Sweef Cloud 3-sits soffa"]), false);
   assert.equal(rubrikenArVar("", ["Sweef"]), false);
+  assert.equal(rubrikenArVar("Mio .", ["Mio .", "Brun läderfåtölj från Mio"]), true, "kort men exakt samma rubrik");
+  assert.equal(rubrikenArVar("Mio", ["Mio ."]), false, "kort och inte exakt samma");
   assert.equal(annonsIdUrAdress("https://www.facebook.com/commerce/listing/123456/?ref=x"), "123456");
   assert.equal(annonsIdUrAdress("https://www.facebook.com/marketplace/item/987/"), "987");
   assert.equal(annonsIdUrAdress("https://www.facebook.com/groups/1/posts/2/"), null);

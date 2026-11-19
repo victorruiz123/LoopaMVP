@@ -74,6 +74,8 @@ export function rubrikenArVar(iFormularet: string, kandidater: Array<string | nu
   return kandidater.some((k) => {
     const v = norm(k ?? "");
     if (!v) return false;
+    // En kort rubrik (t.ex. "Mio ." från september) godkänns bara om den är exakt densamma.
+    if (f === v) return true;
     const n = Math.min(25, f.length, v.length);
     return n >= 8 && f.slice(0, n) === v.slice(0, n);
   });
