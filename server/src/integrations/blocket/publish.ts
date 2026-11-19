@@ -948,7 +948,31 @@ async function pickCondition(page: Page, condition: string | null, logga: Logga)
  * webbläsare (tests/traderaListing.test.ts).
  */
 export function buildBlocketDescription(job: ConditionJob, shippingSek?: number): string {
-  return renderAdPlain(composeAd(job, { delivery: true, loopaSells: true, infoPage: false, shippingSek }));
+  // Inte Loopa: annonser som nämnde Loopa nekades av Blocket (se `namnaLoopa` i adContent.ts).
+  // `utanLoopa` tar det som ändå slinker med — en handskriven text eller generatorns beskrivning.
+  return utanLoopa(renderAdPlain(composeAd(job, { delivery: true, loopaSells: true, infoPage: false, namnaLoopa: false, shippingSek })));
+}
+
+/**
+ * Stryker varje mening som nämner Loopa, rad för rad. En rad som blir tom faller bort; styckena
+ * (tomraderna) står kvar, men aldrig fler än en i rad.
+ */
+export function utanLoopa(text: string): string {
+  return text
+    .split("\n")
+    .map((rad) => {
+      if (!/loopa/i.test(rad)) return rad;
+      const kvar = rad
+        .split(/(?<=[.!?])\s+/)
+        .filter((mening) => !/loopa/i.test(mening))
+        .join(" ")
+        .trim();
+      return kvar || null;
+    })
+    .filter((rad): rad is string => rad !== null)
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
 }
 
 export function isAdUrl(url: string): boolean {

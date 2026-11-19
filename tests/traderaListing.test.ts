@@ -317,7 +317,12 @@ const INFO_STYCKE = /<p>Se möbeln med alla bilder[^<]*<\/p>\n?/;
 test("skillnaden mot Tradera-texten är renderingen, länken till infosidan och var frakten tas", () => {
   // Tradera tar sedan 2026-11-19 frakten i kassan och säger det i leveransstycket; Blocket har den i
   // priset. Med Traderas gamla leveransstycke ska texterna annars vara ordagrant lika.
-  const html = renderAdHtml(traderaAdBlocks(job(), undefined, false)).replace(INFO_STYCKE, "");
+  // Blocket nämner inte Loopa (adContent.ts `namnaLoopa`): ID-raden och uppslagsstycket står bara på
+  // Tradera, och granskningsraden säger samma sak utan avsändare. Allt annat ska vara lika.
+  const html = renderAdHtml(traderaAdBlocks(job(), undefined, false))
+    .replace(INFO_STYCKE, "")
+    .replace(/<p>(<strong>)?Loopa-ID:[\s\S]*$/, "")
+    .replace(/Loopas AI har granskat möbeln från (.+?) och hittade/, "Granskningen av möbeln från $1 hittade");
   const text = buildBlocketDescription(job());
   assert.ok(!text.includes("<"), "Blockets fält är ren text — ingen märkning ska följa med");
   /**
@@ -389,9 +394,20 @@ test("måtten hänvisar till oss och inte till en säljare som inte finns", () =
  * ID:t står i BÅDA kanalerna. Det är det köparen har kvar om länken inte går fram — och det enda
  * som står där även när servern inte vet sin egen adress.
  */
-test("Loopa-ID:t står i annonsen på båda kanalerna", () => {
+test("Loopa-ID:t står i Tradera-annonsen", () => {
   assert.match(buildDescription(job()), new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
-  assert.match(buildBlocketDescription(job()), new RegExp(`Loopa-ID: ${loopaIdFor(JOB_ID)}`));
+});
+
+// Blocket nekade varje annons som nämnde Loopa (2026-11-19). Inte ett ord, inte ens ur en
+// handskriven text eller generatorns beskrivning.
+test("Blocket-annonsen nämner aldrig Loopa", () => {
+  assert.doesNotMatch(buildBlocketDescription(job()), /loopa/i);
+  const j = job();
+  j.result!.listing!.result!.listing.description =
+    "Fin ekstol med stoppad sits. Skickbedömd med Loopa: 6 vyer. Stolen är stabil och hel.";
+  const text = buildBlocketDescription(j);
+  assert.doesNotMatch(text, /loopa/i);
+  assert.match(text, /Fin ekstol med stoppad sits\. Stolen är stabil och hel\./);
 });
 
 /**
@@ -411,9 +427,8 @@ test("annonsen bär en väg till besiktningen, inte två", () => {
   assert.doesNotMatch(html, /Sök på Loopa-ID:t/, "uppslagsvägen behövs inte bredvid en direktlänk");
 
   const text = buildBlocketDescription(job());
-  assert.equal((text.match(/https:\/\//g) ?? []).length, 1, "Blocket-annonsen ska bära exakt en länk");
-  assert.match(text, /Varje annons hos Loopa är publik/);
-  assert.match(text, /Sök på Loopa-ID:t/);
+  // Ingen väg till besiktningen på Blocket: den går via Loopa, och Blocket nekar annonser som nämner Loopa.
+  assert.doesNotMatch(text, /loopa/i);
   if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
   else process.env.LOOPA_PUBLIC_URL = before;
 });
@@ -458,10 +473,9 @@ test("adressen till kortet skrivs ut bara när servern vet vilken den är", () =
   const before = process.env.LOOPA_PUBLIC_URL;
   delete process.env.LOOPA_PUBLIC_URL;
   assert.doesNotMatch(buildBlocketDescription(job()), /https?:\/\/[^ ]*\/c\//);
-  // Uppslagsvägen står kvar som mening — det är bara adressen som fattas.
-  assert.match(buildBlocketDescription(job()), /Sök på Loopa-ID:t/);
+  // Inte heller när servern vet adressen: Blocket-texten nämner inte Loopa.
   process.env.LOOPA_PUBLIC_URL = "https://app.loopa.nu/";
-  assert.match(buildBlocketDescription(job()), new RegExp(`https://app.loopa.nu/c/${loopaIdFor(JOB_ID)}`));
+  assert.doesNotMatch(buildBlocketDescription(job()), /loopa/i);
   if (before === undefined) delete process.env.LOOPA_PUBLIC_URL;
   else process.env.LOOPA_PUBLIC_URL = before;
 });

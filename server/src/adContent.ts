@@ -84,6 +84,15 @@ export interface AdOptions {
    * annonser publicerade från 2026-11-19 (hemleverans.ts `traderaFraktSeparat`). Osatt = ingår.
    */
   fraktIKassan?: boolean;
+  /**
+   * Om texten får nämna Loopa. Osatt = ja.
+   *
+   * FALSKT PÅ BLOCKET (2026-11-19). Alla 13 Blocket-annonser som bar "Loopa-ID", "Sök på Loopa-ID:t
+   * hos Loopa" och "Loopas AI har granskat" nekades; samma barstol utan ett ord om Loopa godkändes
+   * samma dag. Utan Loopa faller ID-raden, uppslagsmeningen och avsändarraden bort, och
+   * granskningsraden säger "Granskningen av möbeln …" i stället för "Loopas AI har granskat …".
+   */
+  namnaLoopa?: boolean;
 }
 
 // Allvarsgraden står mitt i en mening i annonstexten och är gemen därför; skadetyperna inleder sin
@@ -204,7 +213,8 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
    * mest lästa rad. Att granskningen är gjord av en AI står kvar i skickstycket, där siffran den
    * kom fram till också står.
    */
-  if (!options.loopaSells) {
+  const namnaLoopa = options.namnaLoopa !== false;
+  if (!options.loopaSells && namnaLoopa) {
     blocks.push(
       paragraph([{ text: "Annonsen är skriven av Loopa. Vi har filmat möbeln och granskat den med AI.", strong: true }]),
     );
@@ -296,9 +306,10 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
    * Antalet skador står HÄR och bara här. Det stod förut också i ingressen och i en rad som sa att
    * skadorna kom längre ner — en hänvisning nedåt i en text man ändå läser uppifrån och ner.
    */
-  const granskning =
-    `Loopas AI har granskat möbeln från ${result.images.length === 1 ? "ett" : result.images.length} ` +
-    `${result.images.length === 1 ? "håll" : "håll"}${result.reviewed ? ", två gånger," : ""} och `;
+  const hall = `${result.images.length === 1 ? "ett" : result.images.length} håll${result.reviewed ? ", två gånger," : ""}`;
+  const granskning = namnaLoopa
+    ? `Loopas AI har granskat möbeln från ${hall} och `
+    : `Granskningen av möbeln från ${hall} `;
   if (damages.length > 0) {
     blocks.push(
       paragraph([
@@ -427,6 +438,9 @@ export function composeAd(job: ConditionJob, options: AdOptions): AdBlock[] {
    * ändrar ingenting för dem: /c/ svarar där den står, för all framtid, och undantaget som ser till
    * det ligger kvar i butik/seo.ts.
    */
+  // Utan Loopa i texten finns inget ID att slå upp och ingen sida att peka på (Blocket).
+  if (!namnaLoopa) return blocks;
+
   blocks.push(paragraph([{ text: `Loopa-ID: ${loopaId}`, strong: true }]));
   const info = options.infoPage ? infoPageUrl(loopaId) : null;
   const kort = publicCardUrl(loopaId);

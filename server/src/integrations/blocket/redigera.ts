@@ -24,7 +24,7 @@ import { nyttSteg, type Logga } from "./diag.js";
 import { arUpptagen, markeraUpptagen } from "./vakt.js";
 import { capTitle } from "./mapping.js";
 import { adIdFromUrl, annonsenArAktiv, BlocketAnnonsInteAktiv, felText, lasRubrik, redigeringsformularet, rubrikStammer, viaMinaAnnonser } from "./pris.js";
-import { blocketInnehall, buildBlocketDescription, planBlocketPublish } from "./publish.js";
+import { blocketInnehall, buildBlocketDescription, planBlocketPublish, utanLoopa } from "./publish.js";
 import { adTitle } from "../../adContent.js";
 import { medRattelser } from "../../butik/overrides.js";
 import { persist } from "../../jobStore.js";
@@ -57,7 +57,7 @@ export async function redigeraBlocketAnnons(job: ConditionJob, visning?: Visning
   const annons = await medRattelser(job);
   // Frakten annonsen GICK UT med, inte dagens taxa: den är inbakad i priset som står på Blocket.
   const frakt = pub.shippingSek ?? plan.plan.shippingSek;
-  const beskrivning = buildBlocketDescription(annons, frakt) + (visning?.tillagg ? `\n\n${visning.tillagg}` : "");
+  const beskrivning = utanLoopa(buildBlocketDescription(annons, frakt) + (visning?.tillagg ? `\n\n${visning.tillagg}` : ""));
   const nytt = blocketInnehall(plan.plan, beskrivning);
   const fore = pub.innehall ?? null;
   // Står det redan så på Blocket öppnas ingen webbläsare. Utan ögonblicksbild (äldre annonser) vet vi
