@@ -66,6 +66,8 @@ export interface FbAttrappOptions {
 export interface FbRedigerbart {
   /** Marketplace-annonser att redigera, per Facebook-id: /marketplace/edit/?listing_id=<id>. */
   marketplace?: Record<string, { title: string; description: string; price?: number }>;
+  /** Uppdatera "tar inte": klicket registreras men annonsen visar det gamla nästa gång den öppnas. */
+  sparaInte?: boolean;
   /** Gruppinlägg att redigera, per sökväg (t.ex. "/groups/444/posts/9001/") → nuvarande text. */
   inlagg?: Record<string, string>;
   /** Den äldre redigeringssidan: beskrivningen dold bakom en hopfälld "Mer information". */
@@ -77,6 +79,8 @@ export interface FbAttrapp {
   lage: FbAttrappLage;
   groups: Record<string, AttrappGrupp>;
   stang: () => Promise<void>;
+  /** Slå på/av att Uppdatera på Marketplace-redigeringen inte tar. */
+  sparaInte: (pa: boolean) => void;
 }
 
 export const STANDARD_GRUPPER: Record<string, AttrappGrupp> = {
@@ -177,6 +181,16 @@ export async function startaFbAttrapp(opts: FbAttrappOptions = {}): Promise<FbAt
             ...(body.titel !== undefined ? { titel: String(body.titel) } : {}),
             ...(body.pris !== undefined ? { pris: String(body.pris) } : {}),
           });
+          // Som riktiga Facebook: en sparad Marketplace-annons visar det nya nästa gång den öppnas —
+          // utom när attrappen ska spela att Uppdatera inte tog (`sparaInte`).
+          const mpId = /^annons (\d+)$/.exec(String(body.var ?? ""))?.[1];
+          const mpAnnons = mpId ? opts.redigerbart?.marketplace?.[mpId] : undefined;
+          if (mpAnnons && !opts.redigerbart?.sparaInte) {
+            if (body.titel !== undefined) mpAnnons.title = String(body.titel);
+            if (body.text !== undefined) mpAnnons.description = String(body.text);
+            const siffror = String(body.pris ?? "").replace(/\D/g, "");
+            if (siffror) mpAnnons.price = Number(siffror);
+          }
         } else if (what === "listing") {
           lage.listings.push({ groupId: id, fields: (body.fields as Record<string, string>) ?? {}, files: (body.files as string[]) ?? [] });
         } else if (what === "marketplace") {
@@ -537,5 +551,8 @@ for (const k of document.querySelectorAll(".kort")) {
     lage,
     groups,
     stang: () => new Promise<void>((klar) => server.close(() => klar())),
+    sparaInte: (pa: boolean) => {
+      if (opts.redigerbart) opts.redigerbart.sparaInte = pa;
+    },
   };
 }

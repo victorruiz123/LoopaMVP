@@ -131,7 +131,8 @@ async function redigeraAnnons(
   vad: string,
   visning?: Visning,
 ): Promise<string> {
-  await goto(page, fbUrl(`/marketplace/edit/?listing_id=${encodeURIComponent(fbId)}`), `${vad}: redigeringen`);
+  const editUrl = fbUrl(`/marketplace/edit/?listing_id=${encodeURIComponent(fbId)}`);
+  await goto(page, editUrl, `${vad}: redigeringen`);
   await page.waitForTimeout(2000);
 
   const rubrikfalt = page.getByLabel(/^(Titel|Title)$/i).or(page.locator(FB.marketplace.title)).first();
@@ -153,11 +154,7 @@ async function redigeraAnnons(
       throw new Error(`${vad}: rubriken gick inte att fylla i. Ingenting sparades.`);
     }
   }
-  if (!(await fillField(page, [/^Pris$/i, /^Price$/i], FB.marketplace.price, String(nytt.price)))) {
-    throw new Error(`${vad}: prisfältet hittades inte. Ingenting sparades.`);
-  }
-  const prisVisat = (await priceShown(page, FB.marketplace.price)) ?? "";
-  if (NON_SEK.test(prisVisat)) throw new Error(`${vad}: prisfältet visar fel valuta ("${prisVisat}"). Ingenting sparades.`);
+  await fyllPris(page, nytt.price, vad);
 
   // Beskrivningen ligger under den hopfällda "Mer information" (VERIFIERAT i publiceringsformuläret).
   const mer = page.getByRole("button", { name: FB.marketplace.moreInfo }).first();
@@ -180,7 +177,56 @@ async function redigeraAnnons(
   // Kvar på formuläret med ett fältfel = inte sparat.
   const fel = await page.locator(FB.marketplace.fieldError).first().innerText({ timeout: 1000 }).catch(() => "");
   if (fel && /\/marketplace\/edit/.test(page.url())) throw new Error(`${vad}: Facebook sparade inte: "${fel.slice(0, 160)}".`);
-  return `${vad}: uppdaterad.`;
+
+  /**
+   * KLICKET ÄR INTE BEVISET. Förut räknades varje klick på Uppdatera som sparat, ögonblicksbilden
+   * skrevs, och nästa varv såg "redan aktuell" — en prissänkning som inte tog stod då fast för gott.
+   * Nu öppnas redigeringen på nytt och priset läses ur det Facebook faktiskt har sparat.
+   */
+  await goto(page, editUrl, `${vad}: kontrollen`);
+  const kontroll = page.getByLabel(/^(Pris|Price)$/i).or(page.locator(FB.marketplace.price)).first();
+  await kontroll.waitFor({ state: "visible", timeout: 10_000 }).catch(() => undefined);
+  await page.waitForTimeout(1000);
+  const sparat = (await priceShown(page, FB.marketplace.price)) ?? "";
+  if (prisetIFaltet(sparat) !== nytt.price) {
+    throw new Error(`${vad}: Facebook visar "${sparat || "inget pris"}" efter Uppdatera, inte ${nytt.price} kr — ändringen sparades inte.`);
+  }
+  return `${vad}: uppdaterad (Facebook visar nu ${sparat}).`;
+}
+
+/**
+ * Kronorna i prisfältets visade värde: "1 000 kr" → 1000, "900" → 900, "1 000,00 kr" → 1000.
+ * Ören (",00" eller ".00" sist) räknas bort; tusentalsavgränsare (mellanslag, punkt) tas bort.
+ */
+export function prisetIFaltet(visat: string | null | undefined): number | null {
+  const utanOren = (visat ?? "").replace(/[.,]\d{1,2}(?=\D*$)/, "");
+  const siffror = utanOren.replace(/\D/g, "");
+  return siffror ? Number(siffror) : null;
+}
+
+/**
+ * Pris i fältet, och BEVISAT där. Facebooks formaterade fält ("1 000 kr") släpper ibland fill():
+ * värdet ser ut att skrivas men det gamla står kvar. Därför läses fältet tillbaka; stämmer det inte
+ * markeras allt och priset skrivs som en människa. Stämmer det ändå inte sparas ingenting.
+ */
+async function fyllPris(page: Page, pris: number, vad: string): Promise<void> {
+  if (!(await fillField(page, [/^Pris$/i, /^Price$/i], FB.marketplace.price, String(pris)))) {
+    throw new Error(`${vad}: prisfältet hittades inte. Ingenting sparades.`);
+  }
+  let visat = (await priceShown(page, FB.marketplace.price)) ?? "";
+  if (!NON_SEK.test(visat) && prisetIFaltet(visat) !== pris) {
+    const falt = page.getByLabel(/^(Pris|Price)$/i).or(page.locator(FB.marketplace.price)).first();
+    await falt.click({ timeout: 3000 }).catch(() => undefined);
+    await page.keyboard.press(MARKA_ALLT);
+    await page.keyboard.press("Backspace");
+    await page.keyboard.type(String(pris), { delay: 40 });
+    await page.waitForTimeout(500);
+    visat = (await priceShown(page, FB.marketplace.price)) ?? "";
+  }
+  if (NON_SEK.test(visat)) throw new Error(`${vad}: prisfältet visar fel valuta ("${visat}"). Ingenting sparades.`);
+  if (prisetIFaltet(visat) !== pris) {
+    throw new Error(`${vad}: prisfältet visar "${visat}" efter ifyllningen, inte ${pris} kr. Ingenting sparades.`);
+  }
 }
 
 /** Ett textinlägg i en grupp: menyn → Redigera inlägg, med kontroll att texten är vår. */

@@ -47,7 +47,7 @@ const { loopaIdFor } = await import("../server/src/loopaId.js");
 const overrides = await import("../server/src/butik/overrides.js");
 const { blocketInnehall, buildBlocketDescription, planBlocketPublish } = await import("../server/src/integrations/blocket/publish.js");
 const { redigeraBlocketAnnons } = await import("../server/src/integrations/blocket/redigera.js");
-const { annonsIdUrAdress, redigeraFacebook, rubrikenArVar } = await import("../server/src/integrations/facebook/redigera.js");
+const { annonsIdUrAdress, prisetIFaltet, redigeraFacebook, rubrikenArVar } = await import("../server/src/integrations/facebook/redigera.js");
 const { facebookListingFor, groupListingSnapshot, groupSnapshot, marketplaceSnapshot } = await import("../server/src/integrations/facebook/mapping.js");
 const store = await import("../server/src/integrations/facebook/store.js");
 const { korAnnonsUppdatering, schemalaggAnnonsUppdatering, MAX_FORSOK } = await import("../server/src/integrations/annonsUppdatering.js");
@@ -278,6 +278,40 @@ test("Facebook: beskrivningen hittas både utfälld (i dag) och bakom en hopfäl
       await attrapp.stang();
     }
   }
+});
+
+test("Facebook: ett Uppdatera som inte tog räknas inte som sparat — nästa varv försöker igen", async () => {
+  const job = await nyttJobb();
+  const attrapp = await facebookUppe(job);
+  job.priceLadder = { startPrice: 6500, floorPrice: 4000, weeklyDropPct: 0.1, currentPrice: 5850, nextDropAt: null, drops: [] } as never;
+  await persist(job);
+  process.env.FACEBOOK_REDIGERA = "1";
+  try {
+    attrapp.sparaInte(true);
+    const utfall = await redigeraFacebook(job);
+    assert.equal(utfall.status, "fel", utfall.detalj);
+    assert.match(utfall.detalj, /sparades inte/);
+    const id = loopaIdFor(job.id);
+    assert.equal((await store.getMarketplace(id))?.contentSnapshot?.price, 6500, "ögonblicksbilden står kvar på det gamla priset");
+
+    attrapp.sparaInte(false);
+    const igen = await redigeraFacebook(job);
+    assert.equal(igen.status, "klar", igen.detalj);
+    assert.equal((await store.getMarketplace(id))?.contentSnapshot?.price, 5850);
+  } finally {
+    delete process.env.FACEBOOK_REDIGERA;
+    await attrapp.stang();
+  }
+});
+
+test("Facebook: prisfältets kronor", () => {
+  assert.equal(prisetIFaltet("1 000 kr"), 1000);
+  assert.equal(prisetIFaltet("5\u00a0850 kr"), 5850);
+  assert.equal(prisetIFaltet("360 kr"), 360, "så som riktiga Facebook visar det (uppmätt 2026-11-20)");
+  assert.equal(prisetIFaltet("900"), 900);
+  assert.equal(prisetIFaltet("1 000,00 kr"), 1000);
+  assert.equal(prisetIFaltet("1.000 kr"), 1000);
+  assert.equal(prisetIFaltet(""), null);
 });
 
 test("Facebook: rubrikvakten och id ur adressen", () => {
