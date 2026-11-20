@@ -199,7 +199,7 @@ async function provaBlocketSession(): Promise<Kontroll> {
   skrivHalsa({ kontrolleradAt: new Date().toISOString(), ...utfall });
   return utfall.ok
     ? { namn, utfall: "ok", text: "Sessionen gäller." }
-    : { namn, utfall: "fel", text: `Sessionen gäller inte: ${utfall.fel ?? "okänt fel"}. Logga in igen med npm run blocket:logga-in.` };
+    : { namn, utfall: "fel", text: `Sessionen gäller inte: ${utfall.fel ?? "okänt fel"}. Byt den med npm run blocket:byt-session.` };
 }
 
 async function provaTraderaApi(jobs: ConditionJob[]): Promise<Kontroll> {
