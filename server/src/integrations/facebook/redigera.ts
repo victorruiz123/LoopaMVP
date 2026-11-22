@@ -33,7 +33,7 @@
 
 import { mkdirSync } from "node:fs";
 import path from "node:path";
-import type { Page } from "playwright";
+import type { Locator, Page } from "playwright";
 import { FacebookInterrupt } from "./checkpoint.js";
 import { facebookEnabled, facebookScreenshotDir } from "./config.js";
 import { fillField, NON_SEK, priceShown } from "./forms.js";
@@ -62,6 +62,15 @@ const MARKA_ALLT = process.platform === "darwin" ? "Meta+A" : "Control+A";
 const UPPDATERA =
   '[role="button"][aria-label="Uppdatera"], [role="button"][aria-label="Spara"], [role="button"][aria-label="Update"], [role="button"][aria-label="Save"]';
 const SPARA_TEXT = /^(Spara|Uppdatera|Save|Update)$/i;
+
+/**
+ * Syns det inom `ms`? Playwrights `isVisible({ timeout })` VÄNTAR INTE — tidsgränsen ignoreras och svaret
+ * kommer direkt. En meny eller dialog som öppnas en halv sekund efter klicket såg därför aldrig ut att
+ * finnas (uppmätt 2026-11-22).
+ */
+export function syns(l: Locator, ms: number): Promise<boolean> {
+  return l.waitFor({ state: "visible", timeout: ms }).then(() => true, () => false);
+}
 
 function norm(s: string): string {
   return s.toLowerCase().replace(/\s+/g, " ").trim();
@@ -109,10 +118,10 @@ export const BESKRIVNING_ETIKETTER = [/^Beskrivning$/i, /^Description$/i, /^Besk
 /** Vad Facebook visar på redigeringsadressen för en annons som inte längre finns. */
 export const ANNONS_BORTA = /Välj typ av säljinlägg|Skapa ett nytt säljinlägg|Choose listing type|Create new listing|inte tillgängligt just nu|content isn't available/i;
 
-/** En annons som inte finns kvar: en manuell åtgärd, inte ett fel som ska försökas igen. */
+/** En annons som inte finns kvar: posten markeras borta (avstamning.ts markeraBorta), inget att försöka igen. */
 export class AnnonsBorta extends Error {}
 
-interface AnnonsInnehall {
+export interface AnnonsInnehall {
   title: string;
   price: number;
   description: string;
@@ -122,7 +131,7 @@ interface AnnonsInnehall {
  * En Marketplace-annons (eller ett säljinlägg, som är en sådan) på redigeringssidan.
  * Rubrikvakt, sedan Titel, Pris och Beskrivning. Kastar med ett eget fel per steg.
  */
-async function redigeraAnnons(
+export async function redigeraAnnons(
   page: Page,
   fbId: string,
   nytt: AnnonsInnehall,
@@ -136,11 +145,11 @@ async function redigeraAnnons(
   await page.waitForTimeout(2000);
 
   const rubrikfalt = page.getByLabel(/^(Titel|Title)$/i).or(page.locator(FB.marketplace.title)).first();
-  if (!(await rubrikfalt.isVisible({ timeout: 10_000 }).catch(() => false))) {
+  if (!(await syns(rubrikfalt, 10_000))) {
     // En annons som tagits bort (av oss, gruppens admin eller Facebook) ger inget fel på redigeringsadressen:
     // Facebook visar "Skapa ett nytt säljinlägg" i stället (uppmätt 2026-11-16). Det är inget att försöka igen.
     const text = await page.locator("body").innerText({ timeout: 2000 }).catch(() => "");
-    if (ANNONS_BORTA.test(text)) throw new AnnonsBorta(`${vad}: annonsen finns inte längre på Facebook (${page.url()}) — ta bort den ur jobbet eller lägg upp den igen för hand.`);
+    if (ANNONS_BORTA.test(text)) throw new AnnonsBorta(`${vad}: annonsen finns inte längre på Facebook (${page.url()})`);
     throw new Error(`${vad}: redigeringsformuläret visades inte (inget Titel-fält på ${page.url()}). Ingenting ändrades.`);
   }
   const iFormularet = (await rubrikfalt.inputValue().catch(() => "")) ?? "";
@@ -171,7 +180,7 @@ async function redigeraAnnons(
   if (!skarp) return `${vad}: ifyllt men inte sparat (torrkörning)${bild ? `, skärmbild ${bild}` : ""}.`;
 
   const knapp = page.locator(UPPDATERA).or(page.getByRole("button", { name: SPARA_TEXT })).last();
-  if (!(await knapp.isVisible({ timeout: 6000 }).catch(() => false))) throw new Error(`${vad}: Uppdatera-knappen hittades inte. Ingenting sparades.`);
+  if (!(await syns(knapp, 6000))) throw new Error(`${vad}: Uppdatera-knappen hittades inte. Ingenting sparades.`);
   await knapp.click();
   await page.waitForTimeout(4000);
   // Kvar på formuläret med ett fältfel = inte sparat.
@@ -230,7 +239,7 @@ async function fyllPris(page: Page, pris: number, vad: string): Promise<void> {
 }
 
 /** Ett textinlägg i en grupp: menyn → Redigera inlägg, med kontroll att texten är vår. */
-async function redigeraTextinlagg(
+export async function redigeraTextinlagg(
   page: Page,
   postUrl: string,
   loopaLank: string,
@@ -242,15 +251,40 @@ async function redigeraTextinlagg(
   await goto(page, postUrl, `${vad}: inlägget`);
   await page.waitForTimeout(2000);
 
-  const meny = page.getByRole("button", { name: /^(Åtgärder för det här inlägget|Actions for this post)$/i }).first();
-  if (!(await meny.isVisible({ timeout: 8000 }).catch(() => false))) throw new Error(`${vad}: inläggets meny hittades inte. Ingenting ändrades.`);
-  await meny.click();
-  const redigera = page.getByRole("menuitem", { name: /^(Redigera inlägg|Edit post)$/i }).first();
-  if (!(await redigera.isVisible({ timeout: 5000 }).catch(() => false))) throw new Error(`${vad}: "Redigera inlägg" fanns inte i menyn. Ingenting ändrades.`);
-  await redigera.click();
+  // Menyn heter "Åtgärder för det här inlägget från <namn>" (uppmätt 2026-11-22), och inläggssidan kan
+  // visa andras inlägg ovanför vårt. Bara egna inlägg har "Redigera inlägg" — den första menyn som har
+  // det valet öppnas. Loopa-länken i texten avgör sedan att det är rätt inlägg.
+  const menyer = page.getByRole("button", { name: /^(Åtgärder för det här inlägget|Actions for this post)( (från|from) .+)?$/i });
+  if (!(await syns(menyer.first(), 8000))) throw new Error(`${vad}: inläggets meny hittades inte. Ingenting ändrades.`);
+  let oppnad = false;
+  const antal = Math.min(await menyer.count(), 6);
+  for (let i = 0; i < antal && !oppnad; i++) {
+    const meny = menyer.nth(i);
+    if (!(await meny.isVisible().catch(() => false))) continue;
+    // Knappen syns innan sidan svarar på klick (uppmätt 2026-11-22: efter 2 s öppnades ingenting, efter
+    // 8 s gick det). Öppnas ingen meny alls klickas det igen en stund senare.
+    let menyOppen = false;
+    for (let forsok = 0; forsok < 4 && !menyOppen; forsok++) {
+      await meny.click();
+      menyOppen = await syns(page.getByRole("menuitem").first(), 2500);
+      if (!menyOppen) await page.waitForTimeout(2000);
+    }
+    if (!menyOppen) continue;
+    const redigera = page.getByRole("menuitem", { name: /^(Redigera inlägg|Edit post)$/i }).first();
+    if (await syns(redigera, 1500)) {
+      await redigera.click();
+      oppnad = true;
+    } else {
+      await page.keyboard.press("Escape").catch(() => undefined);
+      await page.waitForTimeout(400);
+    }
+  }
+  if (!oppnad) throw new Error(`${vad}: "Redigera inlägg" fanns inte i någon av inläggets menyer. Ingenting ändrades.`);
 
-  const editor = page.locator(FB.composerEditor).first();
-  if (!(await editor.isVisible({ timeout: 8000 }).catch(() => false))) throw new Error(`${vad}: redigeringsrutan öppnades inte. Ingenting ändrades.`);
+  // Inläggssidan är själv en dialog med ett kommentarsfält, som också är en textruta (uppmätt
+  // 2026-11-22: "Kommentera som Victor" kom först). Redigeringsrutan öppnas sist.
+  const editor = page.locator(`${FB.composerEditor}:not([aria-label^="Kommentera"]):not([aria-label^="Write a comment"]):not([aria-label^="Comment as"])`).last();
+  if (!(await syns(editor, 8000))) throw new Error(`${vad}: redigeringsrutan öppnades inte. Ingenting ändrades.`);
   const nuvarande = (await editor.innerText().catch(() => "")) ?? "";
   if (!nuvarande.includes(loopaLank)) {
     throw new Error(`${vad}: inläggets text innehåller inte annonsens Loopa-länk — det är inte vårt inlägg. Ingenting ändrades.`);
@@ -268,7 +302,7 @@ async function redigeraTextinlagg(
     return `${vad}: ifyllt men inte sparat (torrkörning)${bild ? `, skärmbild ${bild}` : ""}.`;
   }
   const knapp = page.locator(FB.dialog).getByRole("button", { name: SPARA_TEXT }).last();
-  if (!(await knapp.isVisible({ timeout: 6000 }).catch(() => false))) throw new Error(`${vad}: Spara-knappen hittades inte. Ingenting sparades.`);
+  if (!(await syns(knapp, 6000))) throw new Error(`${vad}: Spara-knappen hittades inte. Ingenting sparades.`);
   await knapp.click();
   await page.waitForTimeout(3500);
   return `${vad}: uppdaterat.`;
@@ -299,11 +333,14 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
   const textNytt = groupPostCopy(listing) + tillagg;
 
   // Vad som ska göras, och vad som redan stämmer. Inget öppnas i onödan.
-  type Uppgift = { kor: (page: Page) => Promise<string>; klar: () => Promise<unknown> };
+  type Uppgift = { kor: (page: Page) => Promise<string>; klar: () => Promise<unknown>; borta?: () => Promise<unknown> };
   const uppgifter: Uppgift[] = [];
   const rader: string[] = [];
   let manuella = 0;
+  /** Id eller adress saknas i posten: avstämningen (avstamning.ts) letar upp det på Facebook. */
+  let saknas = 0;
   const redigeradeId = new Set<string>();
+  const { begarAvstamning, markeraBorta } = await import("./avstamning.js");
 
   for (const p of mp) {
     if (!visning && sammaInnehall(mpNytt, p.contentSnapshot)) {
@@ -312,14 +349,15 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
     }
     const id = p.facebookListingId ?? annonsIdUrAdress(p.facebookUrl);
     if (!id) {
-      manuella += 1;
-      rader.push("Marketplace: annonsens Facebook-id saknas, så den går inte att hitta automatiskt — ändra för hand.");
+      saknas += 1;
+      rader.push("Marketplace: annonsens Facebook-id saknas — avstämningen letar upp den på Dina inlägg.");
       continue;
     }
     redigeradeId.add(id);
     uppgifter.push({
       kor: (page) => redigeraAnnons(page, id, mpNytt, p.contentSnapshot?.title ?? null, skarp, "Marketplace", visning),
       klar: () => updateMarketplace(p.listingId, (c) => ({ ...c, contentSnapshot: marketplaceSnapshot(listing, c.contentSnapshot?.category ?? "") })),
+      borta: () => markeraBorta(p.listingId, null, "redigeringssidan säger att annonsen inte finns"),
     });
   }
 
@@ -333,8 +371,8 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
       }
       const id = g.facebookListingId ?? annonsIdUrAdress(g.facebookPostUrl);
       if (!id) {
-        manuella += 1;
-        rader.push(`${vad}: säljinläggets annons-id saknas — ändra för hand.`);
+        saknas += 1;
+        rader.push(`${vad}: säljinläggets annons-id saknas — avstämningen letar upp det på Dina inlägg.`);
         continue;
       }
       const sparaBild = () => updateGroupPublication(g.listingId, g.groupId, (c) => ({ ...c, contentSnapshot: groupListingSnapshot(listing) }));
@@ -344,15 +382,19 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
         continue;
       }
       redigeradeId.add(id);
-      uppgifter.push({ kor: (page) => redigeraAnnons(page, id, glNytt, g.contentSnapshot?.title ?? null, skarp, vad, visning), klar: sparaBild });
+      uppgifter.push({
+        kor: (page) => redigeraAnnons(page, id, glNytt, g.contentSnapshot?.title ?? null, skarp, vad, visning),
+        klar: sparaBild,
+        borta: () => markeraBorta(g.listingId, g.groupId, "redigeringssidan säger att säljinlägget inte finns"),
+      });
     } else {
       if (!visning && g.contentSnapshot && norm(g.contentSnapshot.text) === norm(textNytt)) {
         rader.push(`${vad}: redan aktuellt.`);
         continue;
       }
       if (!g.facebookPostUrl) {
-        manuella += 1;
-        rader.push(`${vad}: inläggets adress saknas — ändra för hand.`);
+        saknas += 1;
+        rader.push(`${vad}: inläggets adress saknas — avstämningen letar upp det bland gruppens inlägg.`);
         continue;
       }
       const url = g.facebookPostUrl;
@@ -363,8 +405,12 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
     }
   }
 
+  // Torrkörning och adminens visning rör inte posterna.
+  if (saknas > 0 && skarp) begarAvstamning();
+
   if (uppgifter.length === 0) {
     const detalj = rader.join(" ");
+    if (saknas > 0) return { status: "fel", detalj };
     return manuella > 0 ? { status: "manuell", detalj } : { status: "oforandrad", detalj: detalj || "Redan aktuell på Facebook." };
   }
 
@@ -380,8 +426,9 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
           } catch (err) {
             if (err instanceof FacebookInterrupt) throw err;
             if (err instanceof AnnonsBorta) {
-              manuella += 1;
-              rader.push(err.message);
+              // Borta är borta: posten slutar räknas som uppe, så nästa sänkning inte frågar igen.
+              if (skarp) await u.borta?.().catch(() => undefined);
+              rader.push(`${err.message} — räknas inte längre som uppe.`);
               continue;
             }
             fel += 1;
@@ -402,7 +449,7 @@ export async function redigeraFacebook(job: ConditionJob, visning?: Visning, opt
   }
 
   const detalj = rader.join(" ");
-  if (fel > 0) return { status: "fel", detalj };
+  if (fel > 0 || saknas > 0) return { status: "fel", detalj };
   if (!skarp) return { status: "torrkord", detalj };
   if (manuella > 0) return { status: "manuell", detalj };
   return { status: "klar", detalj };

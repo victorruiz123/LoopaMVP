@@ -33,6 +33,8 @@ process.env.FACEBOOK_MIN_SECONDS_BETWEEN_WRITES = "0";
 process.env.LOOPA_PUBLIC_URL = "https://loopa.nu";
 process.env.ANNONS_UPPDATERING = "1";
 process.env.ANNONS_UPPDATERING_OMFORSOK_MS = String(24 * 3600_000); // omförsöken körs för hand nedan
+process.env.ANNONS_UPPDATERING_DAGLIGT_MS = String(48 * 3600_000);
+process.env.FACEBOOK_AVSTAMNING = "0"; // begärda avstämningar körs för hand nedan
 const SESSION = path.join(rot, "blocket-session.json");
 writeFileSync(SESSION, JSON.stringify({ cookies: [], origins: [] }));
 process.env.BLOCKET_SESSION = SESSION;
@@ -50,7 +52,8 @@ const { redigeraBlocketAnnons } = await import("../server/src/integrations/block
 const { annonsIdUrAdress, prisetIFaltet, redigeraFacebook, rubrikenArVar } = await import("../server/src/integrations/facebook/redigera.js");
 const { facebookListingFor, groupListingSnapshot, groupSnapshot, marketplaceSnapshot } = await import("../server/src/integrations/facebook/mapping.js");
 const store = await import("../server/src/integrations/facebook/store.js");
-const { korAnnonsUppdatering, schemalaggAnnonsUppdatering, MAX_FORSOK } = await import("../server/src/integrations/annonsUppdatering.js");
+const { korAnnonsUppdatering, schemalaggAnnonsUppdatering, MAX_FORSOK, MAX_DAGLIGA } = await import("../server/src/integrations/annonsUppdatering.js");
+const avstamning = await import("../server/src/integrations/facebook/avstamning.js");
 const { planTraderaPublish, traderaAdBlocks } = await import("../server/src/integrations/tradera/publish.js");
 import type { ConditionJob } from "../server/src/types.js";
 
@@ -231,7 +234,7 @@ test("Facebook: en prissänkning når Marketplace-priset och textinläggets för
   }
 });
 
-test("Facebook: ett säljinlägg som tagits bort blir för hand, och de andra ändras ändå", async () => {
+test("Facebook: ett säljinlägg som tagits bort slutar räknas som uppe, och de andra ändras ändå", async () => {
   const job = await nyttJobb();
   const attrapp = await facebookUppe(job);
   // Ett andra säljinlägg i en annan grupp, med ett eget id som Facebook inte längre har (uppmätt 2026-11-16:
@@ -246,8 +249,11 @@ test("Facebook: ett säljinlägg som tagits bort blir för hand, och de andra ä
   process.env.FACEBOOK_REDIGERA = "1";
   try {
     const utfall = await redigeraFacebook(job);
-    assert.equal(utfall.status, "manuell", utfall.detalj);
-    assert.match(utfall.detalj, /Grupp 666: annonsen finns inte längre på Facebook/);
+    assert.equal(utfall.status, "klar", utfall.detalj);
+    assert.match(utfall.detalj, /Grupp 666: annonsen finns inte längre på Facebook.*räknas inte längre som uppe/);
+    const borta = await store.getGroupPublication(id, "666");
+    assert.equal(borta?.status, "FAILED", "posten räknas inte längre som uppe");
+    assert.match(borta?.failureReason ?? "", /Borttagen på Facebook/);
     assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 111")?.pris, "5850", "den levande annonsen fick priset");
     assert.match(attrapp.lage.redigeringar.find((r) => r.var === INLAGG)?.text ?? "", /5\s?850/);
   } finally {
@@ -387,20 +393,23 @@ test("Tradera-planen skickar bara möbelpriset; köparens summa står kvar för 
   assert.equal(plan.plan.price, plan.plan.itemPrice + plan.plan.shippingSek);
 });
 
-test(`ett fel försöks igen, högst ${MAX_FORSOK} gånger, och står sedan kvar`, async () => {
+test(`ett fel försöks igen ${MAX_FORSOK} gånger snabbt, sedan en gång om dygnet i ${MAX_DAGLIGA} dygn, och står sedan kvar`, async () => {
   const job = await nyttJobb();
   const attrapp = await blocketUppe(job);
   await attrapp.stang(); // Blocket "ligger nere": varje försök faller
   await rattaBeskrivningen(job);
   job.annonsUppdatering = { begard: new Date().toISOString(), status: "vantar", klar: null, kanaler: {}, vantande: ["blocket"] };
   await persist(job);
-  for (let i = 1; i <= MAX_FORSOK; i++) {
+  const sista = MAX_FORSOK + MAX_DAGLIGA;
+  for (let i = 1; i <= sista; i++) {
     await korAnnonsUppdatering(job.id);
     const u = (await getJob(job.id))!.annonsUppdatering!;
     assert.equal(u.kanaler.blocket?.status, "fel");
     assert.equal(u.forsok?.blocket, i);
-    if (i < MAX_FORSOK) assert.deepEqual(u.vantande, ["blocket"], `försök ${i} väntar på ett till`);
-    else {
+    if (i < sista) {
+      assert.deepEqual(u.vantande, ["blocket"], `försök ${i} väntar på ett till`);
+      if (i >= MAX_FORSOK) assert.match(u.kanaler.blocket!.detalj, /försöker igen om ett dygn/);
+    } else {
       assert.deepEqual(u.vantande, []);
       assert.equal(u.status, "klar");
       assert.match(u.kanaler.blocket!.detalj, /gav upp/);
@@ -452,5 +461,134 @@ test("provet: ett ord byts på Blocket och Facebook, Tradera rörs inte, och ån
   } finally {
     await blocket.stang();
     await face.stang();
+  }
+});
+
+// ── Avstämningen mot "Dina inlägg" (facebook/avstamning.ts) ─────────────────
+
+test("avstämningen: korten och textinläggen tolkas som Facebook skrev dem 2026-11-22", () => {
+  const k = avstamning.tolkaSaljkort("IKEA Ektorp, 1 950 kr, Aktiv, Publicerad 27/9, Publicerad i Köp, Sälj, Byt och Bortskänk i Stockholm Stad");
+  assert.deepEqual(
+    { rubrik: k?.rubrik, pris: k?.pris, status: k?.status, grupp: k?.grupp },
+    { rubrik: "IKEA Ektorp", pris: 1950, status: "Aktiv", grupp: "Köp, Sälj, Byt och Bortskänk i Stockholm Stad" },
+  );
+  const s = avstamning.tolkaSaljkort("Mio Remo matbord med marmormönstrad skiva, 1 250 kr, ursprungligt pris 1 470 kr, I lager, Publicerad 16/11, Publicerad i Köp & sälj allt möjligt");
+  assert.equal(s?.pris, 1250, "det sänkta priset, inte det överstrukna");
+  assert.equal(s?.status, "I lager");
+  const m = avstamning.tolkaSaljkort("Mio ., 700 kr, ursprungligt pris 900 kr, Aktiv, Publicerad 29/9, Publicerad på Marketplace, 0 klick på säljinlägg");
+  assert.equal(m?.grupp, null, "Marketplace");
+  assert.equal(m?.rubrik, "Mio .");
+  const kommatecken = avstamning.tolkaSaljkort("IKEA Sultan Slåstad Madrass Resårbotten, medium fast beige, 90x200 cm, 450 kr, Såld, Publicerad 2025-11-22, Publicerad på Marketplace, 0 klick på säljinlägg");
+  assert.equal(kommatecken?.rubrik, "IKEA Sultan Slåstad Madrass Resårbotten, medium fast beige, 90x200 cm");
+  const hart = avstamning.tolkaSaljkort("IKEA Nordviken barstol 75 cm, 360\u00a0kr, Aktiv, Publicerad 19/11, Publicerad i Köp och Sälj Heminredning i Norrort. Inga regler");
+  assert.equal(hart?.pris, 360, "hårt mellanslag före kr, som på riktiga sidan");
+  assert.equal(avstamning.tolkaSaljkort("IKEA Ektorp, 1\u00a0950\u00a0kr, Aktiv, Publicerad 27/9, Publicerad på Marketplace")?.pris, 1950);
+  assert.equal(avstamning.tolkaTextinlagg("Mio . säljes – 900\u00a0kr\nSkön")?.pris, 900);
+  assert.equal(k?.publicerad, avstamning.kortDatum("27/9"));
+  const nov = new Date("2026-11-22T12:00:00Z");
+  assert.equal(avstamning.kortDatum("27/9", nov), "2026-09-27");
+  assert.equal(avstamning.kortDatum("28/12", nov), "2025-12-28", "ett datum i framtiden är förra året");
+  assert.equal(avstamning.kortDatum("2025-12-18", nov), "2025-12-18");
+  assert.equal(avstamning.tolkaSaljkort("För barn/ungdom: Black Crows topptursskida, 4 000 US$, Slut i lager, Publicerad 2025-01-21, Publicerad på Marketplace"), null, "inte kronor");
+  assert.deepEqual(avstamning.tolkaTextinlagg("Piranha ATTACK V2 Cloth Edition säljes – 1 190 kr\n\nSäljer en bekväm…"), { rubrik: "Piranha ATTACK V2 Cloth Edition", pris: 1190 });
+});
+
+test("avstämningen: bara sänkningar, bara entydiga rubriker", () => {
+  const mobel = { jobId: "a", loopaId: "LP-A", pris: 700, taket: 1000 } as never;
+  const agare = new Map([["stol", new Set(["a"])], ["bord", new Set(["a", "b"])], ["lampa", new Set(["c"])]]);
+  const levande = new Map([["a", mobel]]);
+  assert.equal(avstamning.bedom("Stol", 900, agare, levande).slag, "ratta");
+  assert.equal(avstamning.bedom("Stol", 700, agare, levande).slag, "ratt");
+  assert.equal(avstamning.bedom("Stol", 500, agare, levande).slag, "lagre", "ett lägre pris kan vara säljarens eget");
+  assert.equal(avstamning.bedom("Stol", 1500, agare, levande).slag, "over_taket", "över möbelns högsta pris är inte vår stege");
+  assert.equal(avstamning.bedom("Bord", 900, agare, levande).slag, "tvetydig");
+  assert.equal(avstamning.bedom("Lampa", 900, agare, levande).slag, "inte_uppe", "såld eller borttagen möbel rörs inte");
+  assert.equal(avstamning.bedom("Soffa", 900, agare, levande).slag, "okand");
+});
+
+test("avstämningen: hittar säljinlägg och textinlägg som saknar id, sänker priset, skriver in vad den hittade och märker det som är borta", async () => {
+  const job = await nyttJobb();
+  const id = loopaIdFor(job.id);
+  await overrides.satt(id, { title: `Avstämningssoffa ${job.id.slice(-4)}` }, "test");
+  job.blocket = { status: "published", url: "https://www.blocket.se/1", steps: [] } as never; // ligger ute
+  job.priceLadder = { startPrice: 6500, floorPrice: 4000, weeklyDropPct: 0.1, currentPrice: 5850, nextDropAt: null, drops: [{ at: "2026-11-15T00:00:00Z", from: 6500, to: 5850 }] } as never;
+  await persist(job);
+  const redo = await facebookListingFor(job);
+  assert.ok(redo.ok, redo.ok ? "" : redo.reason);
+  const l = redo.listing;
+  assert.equal(l.price, 5850);
+  const fore = { ...l, price: 6500 };
+  const mp = marketplaceSnapshot(fore, "Möbler");
+  const text = groupSnapshot(fore).text;
+  const T = mp.title;
+
+  for (const [gid, namn] of [["5550", "Grupp Femfemfem"], ["7770", "Grupp Sjusjusju"], ["8880", "Grupp Åttaåttaåtta"], ["4440", "Grupp Fyrfyrfyr"]]) {
+    await store.putGroup({ id: gid, facebookGroupId: gid, name: namn, canonicalUrl: `https://www.facebook.com/groups/${gid}/` } as never);
+  }
+  const attrapp = await startaFbAttrapp({
+    redigerbart: {
+      marketplace: {
+        "1110": { title: T, description: mp.description, price: 6500 },
+        "2220": { title: T, description: mp.description, price: 6500 },
+        "3330": { title: "Annan möbel", description: "x", price: 900 },
+      },
+      saljsida: [
+        { etikett: `${T}, 6 500 kr, Aktiv, Publicerad 27/9, Publicerad på Marketplace, 0 klick på säljinlägg`, id: "1110" },
+        { etikett: `${T}, 6 500 kr, Aktiv, Publicerad 27/9, Publicerad i Grupp Femfemfem`, id: "2220" },
+        { etikett: "Annan möbel, 900 kr, Aktiv, Publicerad 27/9, Publicerad i Grupp Femfemfem", id: "3330" },
+        { etikett: `${T}, 6 500 kr, Såld, Publicerad 1/9, Publicerad i Grupp Femfemfem`, id: "9990" },
+      ],
+      gruppinnehall: { "4440": [{ postId: "90020", text }] },
+      inlagg: { "/groups/4440/posts/90020/": text },
+    },
+  });
+  process.env.FACEBOOK_BASE_URL = attrapp.bas;
+  // Posterna: Marketplace utan id, säljinlägg i 5550 och 7770 utan id (7770 har inget kort), textinlägg i 4440 utan adress.
+  await store.enqueueMarketplace(id, job.id, false);
+  await store.updateMarketplace(id, (p) => ({ ...p, status: "PUBLISHED", contentSnapshot: mp }));
+  await store.enqueueGroupPublication(id, "5550", job.id, false);
+  await store.updateGroupPublication(id, "5550", (p) => ({ ...p, status: "PUBLISHED", composer: "listing", contentSnapshot: groupListingSnapshot(fore) }));
+  await store.enqueueGroupPublication(id, "7770", job.id, false);
+  await store.updateGroupPublication(id, "7770", (p) => ({ ...p, status: "PUBLISHED", composer: "listing", publishedAt: "2026-10-01T10:00:00Z", contentSnapshot: groupListingSnapshot(fore) }));
+  // Äldre än det äldsta kortet (1/9): kan ha legat i den del av listan som inte laddades — rörs inte.
+  await store.enqueueGroupPublication(id, "8880", job.id, false);
+  await store.updateGroupPublication(id, "8880", (p) => ({ ...p, status: "PUBLISHED", composer: "listing", publishedAt: "2026-08-15T10:00:00Z", contentSnapshot: groupListingSnapshot(fore) }));
+  await store.enqueueGroupPublication(id, "4440", job.id, false);
+  await store.updateGroupPublication(id, "4440", (p) => ({ ...p, status: "PUBLISHED", composer: "post", contentSnapshot: groupSnapshot(fore) }));
+
+  try {
+    // Den vanliga redigeringen ser hålen: inget id, ingen adress → fel (försöks igen), ingenting ändras.
+    process.env.FACEBOOK_REDIGERA = "1";
+    const forst = await redigeraFacebook(job);
+    assert.equal(forst.status, "fel", forst.detalj);
+    assert.match(forst.detalj, /avstämningen letar upp/);
+
+    const res = await avstamning.stamAvFacebook({ skarp: true });
+    assert.equal(res.fel, 0, res.rader.join("\n"));
+    assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 1110")?.pris, "5850", "Marketplace sänkt");
+    assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 2220")?.pris, "5850", "säljinlägget i gruppen sänkt");
+    assert.match(attrapp.lage.redigeringar.find((r) => r.var === "/groups/4440/posts/90020/")?.text ?? "", /5\s?850/, "textinlägget sänkt");
+    assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 3330"), undefined, "en okänd möbel rörs inte");
+    assert.equal(attrapp.lage.redigeringar.find((r) => r.var === "annons 9990"), undefined, "ett sålt kort rörs inte");
+
+    assert.equal((await store.getMarketplace(id))?.facebookListingId, "1110", "id:t skrevs in");
+    assert.equal((await store.getGroupPublication(id, "5550"))?.facebookListingId, "2220");
+    assert.match((await store.getGroupPublication(id, "4440"))?.facebookPostUrl ?? "", /\/groups\/4440\/posts\/90020\/$/);
+    const borta = await store.getGroupPublication(id, "7770");
+    assert.equal(borta?.status, "FAILED", "säljinlägget utan kort räknas inte längre som uppe");
+    assert.match(borta?.failureReason ?? "", /finns inte bland Dina inlägg/);
+    assert.equal((await store.getGroupPublication(id, "8880"))?.status, "PUBLISHED", "äldre än det äldsta inlästa kortet: rörs inte");
+
+    // Nästa varv av den vanliga redigeringen: det som hittades är redan rätt. Bara 8880 (inget kort,
+    // för gammal för att avgöra) saknar fortfarande id och väntar på nästa avstämning.
+    const sen = await redigeraFacebook(job);
+    assert.match(sen.detalj, /Marketplace: redan aktuell/);
+    assert.match(sen.detalj, /Grupp 5550: redan aktuellt/);
+    assert.match(sen.detalj, /Grupp 4440: redan aktuellt/);
+    assert.match(sen.detalj, /Grupp 8880: säljinläggets annons-id saknas/);
+    assert.doesNotMatch(sen.detalj, /7770/, "den borttagna räknas inte längre");
+  } finally {
+    delete process.env.FACEBOOK_REDIGERA;
+    await attrapp.stang();
   }
 });

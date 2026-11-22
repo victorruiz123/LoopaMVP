@@ -87,6 +87,12 @@ const KANALER_FOR: Record<Orsak, readonly AnnonsKanal[]> = {
 const DROJ_MS = Number(process.env.ANNONS_UPPDATERING_DROJ_MS ?? 60_000);
 const OMFORSOK_MS = Number(process.env.ANNONS_UPPDATERING_OMFORSOK_MS ?? 10 * 60_000);
 export const MAX_FORSOK = 3;
+/**
+ * Efter de snabba försöken: ett om dygnet, en vecka till. Ett fel som rättats i koden, en Facebook som
+ * strulade en kväll eller ett id som avstämningen hittat ska inte vänta på nästa prissänkning.
+ */
+const DAGLIGT_MS = Number(process.env.ANNONS_UPPDATERING_DAGLIGT_MS ?? 24 * 3600_000);
+export const MAX_DAGLIGA = 7;
 
 const timers = new Map<string, NodeJS.Timeout>();
 const pagar = new Set<string>();
@@ -222,8 +228,12 @@ export async function korAnnonsUppdatering(jobId: string): Promise<void> {
       }
       if (utfall.status === "fel") {
         forsok[kanal] = (forsok[kanal] ?? 0) + 1;
-        if (forsok[kanal]! < MAX_FORSOK) igen.push(kanal);
-        else utfall = { ...utfall, detalj: `${utfall.detalj} (gav upp efter ${MAX_FORSOK} försök — åtgärda och ändra annonsen igen, eller gör det för hand)` };
+        const n = forsok[kanal]!;
+        if (n < MAX_FORSOK) igen.push(kanal);
+        else if (n < MAX_FORSOK + MAX_DAGLIGA) {
+          igen.push(kanal);
+          utfall = { ...utfall, detalj: `${utfall.detalj} (försöker igen om ett dygn — ${n} av ${MAX_FORSOK + MAX_DAGLIGA} försök)` };
+        } else utfall = { ...utfall, detalj: `${utfall.detalj} (gav upp efter ${n} försök — åtgärda och ändra annonsen igen, eller gör det för hand)` };
       } else if (utfall.status === "senare") {
         igen.push(kanal);
       } else {
@@ -249,7 +259,8 @@ export async function korAnnonsUppdatering(jobId: string): Promise<void> {
       forsok,
     };
     await persist(farsk);
-    if (igen.length) startaTimer(jobId, OMFORSOK_MS);
+    // Ett dygn bara när alla som väntar är förbi de snabba försöken.
+    if (igen.length) startaTimer(jobId, igen.every((k) => (forsok[k] ?? 0) >= MAX_FORSOK) ? DAGLIGT_MS : OMFORSOK_MS);
   } finally {
     pagar.delete(jobId);
   }

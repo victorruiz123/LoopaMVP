@@ -72,6 +72,17 @@ export interface FbRedigerbart {
   inlagg?: Record<string, string>;
   /** Den äldre redigeringssidan: beskrivningen dold bakom en hopfälld "Mer information". */
   hopfalld?: boolean;
+  /**
+   * "Dina inlägg" som den såg ut 2026-11-22 (uppmätt): ett kort per säljinlägg, vars knapp bär hela
+   * etiketten ("Rubrik, 1 950 kr, Aktiv, Publicerad 27/9, Publicerad i <grupp>"), och en knapp
+   * "Fler alternativ för <rubrik>" vars meny länkar till /marketplace/edit/?listing_id=<id>.
+   */
+  saljsida?: Array<{ etikett: string; id: string }>;
+  /**
+   * Gruppernas "Ditt innehåll" → "Har publicerats" (uppmätt 2026-11-22): varje textinlägg med länken
+   * "Visa i grupp" (?multi_permalinks=<id>). Tom lista = "Det finns inga inlägg att visa".
+   */
+  gruppinnehall?: Record<string, Array<{ postId: string; text: string }>>;
 }
 
 export interface FbAttrapp {
@@ -421,13 +432,22 @@ if (sell) sell.addEventListener("click", () => {
       return html(
         sida(
           "Inlägg | Facebook",
+          // Som inläggssidan 2026-11-22 (uppmätt): menyn heter "… från <namn>", och ett annat inlägg
+          // (någon annans, utan "Redigera inlägg") kan stå ovanför vårt.
           `<div role="main"><h2>Secondhand Stockholm</h2>
-           <div style="border:1px solid #ccc;padding:12px;max-width:680px"><div role="button" aria-label="Åtgärder för det här inlägget" id="meny">⋯</div>
-           <div id="text" style="white-space:pre-wrap">${esc(inlagg)}</div></div></div>`,
+           <div style="border:1px solid #ccc;padding:12px;max-width:680px"><div role="button" aria-label="Åtgärder för det här inlägget från Mikael Sjöbeck" id="annans">⋯</div><div>Säljer en cykel.</div></div>
+           <div role="dialog" aria-labelledby="inl"><span id="inl">Victor Ruiz inlägg</span>
+           <div style="border:1px solid #ccc;padding:12px;max-width:680px"><div role="button" aria-label="Åtgärder för det här inlägget från Victor Ruiz" id="meny">⋯</div>
+           <div id="text" style="white-space:pre-wrap">${esc(inlagg)}</div></div>
+           <div contenteditable="true" role="textbox" aria-label="Kommentera som Victor"></div></div></div>`,
           `<script>
             var TEXT = ${JSON.stringify(inlagg)};
+            document.getElementById("annans").onclick = function () {
+              document.body.insertAdjacentHTML("beforeend", '<div role="menu" id="annansmeny"><div role="menuitem">Anmäl inlägg</div><div role="menuitem">Dölj inlägg</div></div>');
+            };
+            document.addEventListener("keydown", function (e) { if (e.key === "Escape") { var m = document.getElementById("annansmeny"); if (m) m.remove(); } });
             document.getElementById("meny").onclick = function () {
-              document.body.insertAdjacentHTML("beforeend", '<div role="menu" style="position:absolute;top:90px;left:40px;background:#fff;border:1px solid #333"><div role="menuitem" id="red" style="padding:6px">Redigera inlägg</div><div role="menuitem" style="padding:6px">Ta bort inlägg</div></div>');
+              document.body.insertAdjacentHTML("beforeend", '<div role="menu" style="position:absolute;top:90px;left:40px;background:#fff;border:1px solid #333;z-index:10"><div role="menuitem" id="red" style="padding:6px">Redigera inlägg</div><div role="menuitem" style="padding:6px">Ta bort inlägg</div></div>');
               document.getElementById("red").onclick = function () {
                 document.querySelector('[role=menu]').remove();
                 document.body.insertAdjacentHTML("beforeend", '<div role="dialog"><h3>Redigera inlägg</h3><div contenteditable="true" role="textbox" id="ed" style="white-space:pre-wrap"></div><div role="button" aria-label="Spara" id="spara">Spara</div></div>');
@@ -513,6 +533,42 @@ document.getElementById("next").addEventListener("click", () => {
     }
     if (url.pathname.startsWith("/marketplace/item/")) return html(sida("Annons", `<div role="main"><h1>Din annons är publicerad</h1><a href="${url.pathname}">Visa annonsen</a></div>`));
     if (url.pathname.startsWith("/commerce/listing/")) return html(sida("Säljinlägg", `<div role="main"><h1>Säljinlägget granskas</h1><p>Det här inlägget granskas innan andra ser det (standardgranskning).</p></div>`));
+    if (url.pathname === "/marketplace/you/selling" && opts.redigerbart?.saljsida) {
+      const kort = opts.redigerbart.saljsida
+        .map(
+          (k, i) =>
+            `<div class="kort" style="border:1px solid #ccc;margin:6px;padding:6px"><div role="button" aria-label="${esc(k.etikett)}">${esc(k.etikett.split(",")[0])}</div>` +
+            `<div role="button" aria-label="Markera som såld">Markera som såld</div>` +
+            `<div role="button" aria-label="Fler alternativ för ${esc(k.etikett.split(",")[0])}" class="mer" data-i="${i}">⋯</div></div>`,
+        )
+        .join("");
+      const ids = JSON.stringify(opts.redigerbart.saljsida.map((k) => k.id));
+      return html(
+        sida(
+          "Dina inlägg",
+          `<div role="main"><h1>Dina inlägg</h1>${kort}</div>`,
+          `<script>
+            var IDS = ${ids};
+            document.querySelectorAll(".mer").forEach(function (m) {
+              m.onclick = function () {
+                var id = IDS[Number(m.dataset.i)];
+                document.body.insertAdjacentHTML("beforeend", '<div role="menu"><div role="menuitem">Markera som väntande</div><a role="menuitem" href="/marketplace/edit/?listing_id=' + id + '&__tn__=!%3AG">Redigera inlägget</a><div role="menuitem">Ta bort inlägget</div></div>');
+              };
+            });
+            document.addEventListener("keydown", function (e) { if (e.key === "Escape") { var d = document.querySelector("[role=menu]"); if (d) d.remove(); } });
+          </script>`,
+        ),
+      );
+    }
+    const innehall = url.pathname.match(/^\/groups\/([^/]+)\/my_posted_content\/?$/);
+    if (innehall && opts.redigerbart?.gruppinnehall) {
+      const g = innehall[1];
+      const lista = opts.redigerbart.gruppinnehall[g] ?? [];
+      const kort = lista.length
+        ? lista.map((i) => `<div class="inlagg" style="border:1px solid #ccc;margin:6px;padding:6px"><div style="white-space:pre-wrap">${esc(i.text)}</div><a href="/groups/${g}/?multi_permalinks=${i.postId}&__tn__=-R">Visa i grupp</a></div>`).join("")
+        : `<p>Det finns inga inlägg att visa</p>`;
+      return html(sida("Ditt innehåll", `<div role="main"><h1>Ditt innehåll</h1><h2>Har publicerats</h2>${kort}</div>`));
+    }
     if (url.pathname === "/marketplace/you/selling" && opts.marketplaceCardsOnly === true) {
       const titel = lage.marketplace.at(-1)?.fields.title ?? "Soffa";
       const kort = (status: string, id: string) =>

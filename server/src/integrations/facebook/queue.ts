@@ -610,4 +610,13 @@ export function startFacebookWorkers(): void {
   setInterval(() => void watch(), limits.membershipCheckMinutes * 60_000).unref();
   setTimeout(() => void discover(), 8 * 60_000).unref();
   setInterval(() => void discover(), limits.discoveryIntervalMinutes * 60_000).unref();
+
+  // Avstämningen mot "Dina inlägg" (avstamning.ts): en gång om dygnet, första gången efter en timme.
+  // FACEBOOK_AVSTAMNING_TIMMAR=0 stänger av den.
+  const timmar = Number(process.env.FACEBOOK_AVSTAMNING_TIMMAR ?? 24);
+  if (timmar > 0) {
+    const avstam = safe("avstämning", async () => (await import("./avstamning.js")).stamAvFacebook());
+    setTimeout(() => void avstam(), 60 * 60_000).unref();
+    setInterval(() => void avstam(), timmar * 3600_000).unref();
+  }
 }
