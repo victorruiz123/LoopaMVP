@@ -239,11 +239,14 @@ async function hamta(url: string, referer: string | null, abs: string, namn: str
  * (candidateType.ts): Sits Impulse stod med en måttritning.
  */
 /**
+ * `register.v6.json` (2026-11-12): v5 bar bilder som valts UTAN beskrivning och säljarens foto, och nyckeln skilde inte två möbler med samma namn åt (IKEA PREBEN: den äldre pinnstolens bild sparades och
+ * återanvändes för den moderna stolen). v6 börjar tomt; nycklarna bär modellens generation (se registerTyp i referensbild.ts) och bilderna skrivs bara när de valts med underlag.
+ *
  * `register.v5.json` (2026-11-03): v4 bar bilder som valts före kontrollerna i candidateType.ts och externalImages.ts. Appens kort visade därför, dagar senare och utan ny kontroll, en
  * andrahandsannons källarbild för IKEA NORRNÄS och matstolen för IKEA NORDVIKEN-BARSTOLEN. Ett nytt namn gör att alla gamla poster slutar gälla. Appens (Googles bildsök) poster ligger
  * under egna nycklar ("g:…", se pipeline/identify.ts) och skrivs bara av bilder som klarat ALLA kontroller.
  */
-const REGISTER_FIL = () => path.join(kandidatbilderDir(), "register.v5.json");
+const REGISTER_FIL = () => path.join(kandidatbilderDir(), "register.v6.json");
 
 let register: Map<string, string> | null = null;
 

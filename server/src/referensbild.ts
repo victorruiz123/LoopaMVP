@@ -16,10 +16,12 @@
  * för att se VAD som avbildas; det jämförande valet valde rent där en bra bild fanns bland kandidaterna men tog fel märke när urvalet var naivt (därav reglerna först).
  */
 
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 import { allowanceFor, withCostScope } from "./cost/jobCost.js";
 import { callGeminiStructured } from "./gemini.js";
+import { getJob, getJobSync, jobDir } from "./jobStore.js";
 import { kandidatbilderDir, lokalKandidatbild } from "./kandidatbild.js";
 import { motsagerTyp, motsagerUndertyp, typfamilj, type Typfamilj, type Undertyp } from "./candidateType.js";
 import { runInteraction } from "./research/geminiInteractions.js";
@@ -36,6 +38,8 @@ export interface RefKandidat {
   productType: string | null;
   undertyp: Undertyp | null;
   sourceUrl?: string | null;
+  /** Vad AI-läget skrev om just den här modellen (status, motivering). Bildvalet behöver det för att skilja två möbler som heter lika. Se beskrivningUr. */
+  beskrivning?: string | null;
 }
 
 /** Ett val: den lokala miniatyren (`/api/kandidatbild/<sha1>.jpg`) och var den kom ifrån. */
@@ -67,8 +71,19 @@ export interface ValjKandidat {
   titel: string;
   kalla?: string;
 }
+/**
+ * Det bildvalet vet om möbeln. `beskrivning` är AI-lägets egna ord om just den här modellen och `jobId` pekar ut säljarens foto (omslaget): tillsammans är de det som skiljer en modern PREBEN
+ * (stoppad sits, stålunderrede) från den äldre pinnstolen med samma namn (2026-11-12: den gamla pinnstolen valdes och sparades i registret).
+ */
+export interface ValjCtx {
+  brand: string;
+  model: string;
+  ord: string;
+  beskrivning?: string | null;
+  jobId?: string | null;
+}
 /** Ger indexet (0-baserat) på den bästa bilden, eller null när ingen duger. */
-export type Bildvaljare = (ctx: { brand: string; model: string; ord: string }, kandidater: ValjKandidat[]) => Promise<number | null>;
+export type Bildvaljare = (ctx: ValjCtx, kandidater: ValjKandidat[]) => Promise<number | null>;
 
 export interface SokSvar {
   /** Upp till tre alternativ från olika sajter, bästa först (ett skarpt test 2026-11-09: det enda förslaget för Brandon gick inte att hämta, och då hade B inget kvar). */
@@ -84,21 +99,39 @@ export type Sokare = (c: RefKandidat, jobId: string, maxSok: number) => Promise<
 /**
  * ETT anrop med alla kandidater (mätt 2026-11-09: ~1 500 tokens, ≈0,02 kr per modell) i stället för en ja/nej-fråga per bild (24 anrop vid fyra förslag). Ett jämförande val är stabilare än absoluta
  * omdömen: det väljer den rena framifrån-bilden där en sådan finns, och svarar 0 när ingen duger. Det kan INTE avgöra märket ur pixlarna (det litar på prompten) — märket är reglernas jobb, före valet.
+ *
+ * SAMMA NAMN, TVÅ MÖBLER (2026-11-12, IKEA PREBEN): en äldre pinnstol i trä och en nyare stoppad stol med stålunderrede heter lika, och Googles träffar domineras av den äldre. Bildvalet fick bara märke,
+ * modell och typ, och instruktionen sa "utförande spelar ingen roll", så det valde pinnstolen. Nu får det AI-lägets beskrivning av modellen och säljarens eget foto (som facit för KONSTRUKTIONEN, inte
+ * för färgen), och instruktionen kräver samma konstruktion. Kostnad: en bild och några rader till, ≈0,01 kr per modell.
  */
+export function byggValjPrompt(ctx: ValjCtx, kandidater: ValjKandidat[], harFoto: boolean): { system: string; user: string } {
+  const lista = kandidater.map((k, i) => `Bild ${i + 1}: "${k.titel.slice(0, 90)}"${k.kalla ? ` (sajt: ${k.kalla})` : ""}`).join("\n");
+  const beskr = (ctx.beskrivning ?? "").trim();
+  const facit = harFoto ? "säljarens foto" : beskr ? "beskrivningen" : "";
+  const system =
+    `Du väljer referensbilden till ett modellkort i en app där en säljare ska känna igen sin möbel. Möbeln är ${ctx.brand} ${ctx.model}, en ${ctx.ord}. ` +
+    (beskr ? `Så här beskrivs just den modellen (ur en sökning på den): "${beskr}". ` : "") +
+    (harFoto ? `Den FÖRSTA bilden är säljarens egen möbel och är inget val: den visar vilken konstruktion det är. Bilderna efter den är kandidaterna, numrerade Bild 1, Bild 2 … i listans ordning. ` : `Bilderna är numrerade i samma ordning som listan. `) +
+    `SAMMA NAMN KAN HA ANVÄNTS PÅ TVÅ HELT OLIKA MÖBLER, en äldre och en nyare (till exempel en pinnstol i trä och en stoppad stol med metallunderrede). Välj den bild som visar SAMMA MÖBEL${facit ? ` som ${facit}` : ""}: ` +
+    `(1) en ${ctx.ord} av märket ${ctx.brand} och modellen ${ctx.model} — titeln och sajten är ledtrådar, men ett annat märkes namn i titeln betyder fel bild; ` +
+    `(2) samma KONSTRUKTION${facit ? ` som ${facit}` : ""}: klädd eller oklädd sits och rygg, material, ryggens form och benens eller underredets form. Färg och tyg spelar INGEN roll, men konstruktionen måste stämma: en trästol med spjälrygg är inte samma möbel som en stoppad stol, även om de heter lika; ` +
+    `(3) HELA möbeln syns, helst framifrån eller snett framifrån mot ren eller neutral bakgrund, skarp och tydlig; inte en närbild, en miljöbild där möbeln är liten, en ritning eller en bild med flera olika möbler. ` +
+    `Svara 0 om ingen bild visar samma konstruktion. Hellre ingen bild än fel möbel.`;
+  return { system, user: `${lista}\nVilken bild är bäst? Svara med bildens nummer (Bild 1 = 1 …), eller 0.` };
+}
+
 const standardVaeljare: Bildvaljare = async (ctx, kandidater) => {
   if (!process.env.GEMINI_API_KEY || kandidater.length === 0) return null;
   const bilder = await Promise.all(kandidater.map((k) => readFile(path.join(kandidatbilderDir(), path.basename(k.lokal)))));
-  const lista = kandidater.map((k, i) => `Bild ${i + 1}: "${k.titel.slice(0, 90)}"${k.kalla ? ` (sajt: ${k.kalla})` : ""}`).join("\n");
+  const foto = ctx.jobId ? await saljarbild(ctx.jobId).catch(() => null) : null;
+  const { system, user } = byggValjPrompt(ctx, kandidater, !!foto);
   const anrop = () =>
     callGeminiStructured<{ val: number; skal: string }>({
       purpose: "referensbild_valj",
-      systemPrompt:
-        `Du väljer referensbilden till ett modellkort i en app där en säljare ska känna igen sin möbel. Möbeln är ${ctx.brand} ${ctx.model}, en ${ctx.ord}. Bilderna är numrerade i samma ordning som listan. ` +
-        `Välj den bild som BÄST visar just den möbeln: (1) en ${ctx.ord} (inte en soffa, ett bord, ett tillbehör som en kudde eller klädsel, eller en detalj), av märket ${ctx.brand} och modellen ${ctx.model} — titeln och sajten är ledtrådar, ` +
-        `ett annat märkes namn i titeln betyder fel bild; (2) HELA möbeln syns, helst framifrån eller snett framifrån mot ren eller neutral bakgrund, skarp och tydlig; ` +
-        `(3) inte en närbild, en miljöbild där möbeln är liten, en ritning, en begagnatannons eller en bild med flera olika möbler. Färg, tyg och utförande spelar INGEN roll. Svara 0 om ingen bild duger.`,
-      userPrompt: `${lista}\nVilken bild är bäst? Svara med bildens nummer, eller 0.`,
-      images: bilder.map((b) => ({ mimeType: "image/jpeg", base64: b.toString("base64") })),
+      systemPrompt: system,
+      userPrompt: user,
+      // Säljarens foto FÖRST (facit för konstruktionen, aldrig ett val), därefter kandidaterna i listans ordning.
+      images: [...(foto ? [foto] : []), ...bilder.map((b) => ({ mimeType: "image/jpeg", base64: b.toString("base64") }))],
       responseSchema: { type: "OBJECT", properties: { val: { type: "INTEGER" }, skal: { type: "STRING" } }, required: ["val", "skal"] },
       resolution: "low",
       thinkingLevel: "minimal",
@@ -119,9 +152,124 @@ const standardVaeljare: Bildvaljare = async (ctx, kandidater) => {
     }
   }
   const v = svar.data;
-  log(`${ctx.model}: valet av ${kandidater.length} bilder -> ${v.val >= 1 && v.val <= kandidater.length ? `bild ${v.val}` : "ingen"} (${String(v.skal ?? "").slice(0, 110)})`);
+  log(`${ctx.model}: valet av ${kandidater.length} bilder (${foto ? "med säljarens foto" : "utan säljarens foto"}, ${(ctx.beskrivning ?? "").trim() ? "med beskrivning" : "utan beskrivning"}) -> ${v.val >= 1 && v.val <= kandidater.length ? `bild ${v.val}` : "ingen"} (${String(v.skal ?? "").slice(0, 110)})`);
   return v.val >= 1 && v.val <= kandidater.length ? v.val - 1 : null;
 };
+
+// --- Säljarens foto, beskrivningen och registernyckeln ----------------------------------------------------------------------------------------------------------------------------------------------------------
+
+const fotoCache = new Map<string, Promise<{ mimeType: string; base64: string } | null>>();
+
+/** Säljarens omslagsbild (annars den skarpaste), nedskalad till ~640 px: bara facit för konstruktionen, så den behöver inte vara stor. Null när jobbet saknar bild. Cachas per jobb. */
+export function saljarbild(jobId: string): Promise<{ mimeType: string; base64: string } | null> {
+  let p = fotoCache.get(jobId);
+  if (!p) {
+    p = lasSaljarbild(jobId).catch(() => null);
+    fotoCache.set(jobId, p);
+    if (fotoCache.size > 30) fotoCache.delete(fotoCache.keys().next().value as string);
+  }
+  return p;
+}
+
+async function lasSaljarbild(jobId: string): Promise<{ mimeType: string; base64: string } | null> {
+  const job = getJobSync(jobId) ?? (await getJob(jobId));
+  const bilder = job?.images ?? [];
+  if (bilder.length === 0) return null;
+  const abs = (p: string) => path.join(jobDir(jobId), p.startsWith("originals/") ? "" : "originals", p);
+  const cover =
+    bilder.find((i) => i.role === "cover") ??
+    (await Promise.all(bilder.map(async (i) => ({ i, size: (await stat(abs(i.path)).catch(() => null))?.size ?? 0 })))).sort((x, y) => y.size - x.size)[0]?.i;
+  if (!cover) return null;
+  const liten = await sharp(await readFile(abs(cover.path)))
+    .rotate()
+    .resize({ width: 640, height: 640, fit: "inside", withoutEnlargement: true })
+    .jpeg({ quality: 72 })
+    .toBuffer();
+  return { mimeType: "image/jpeg", base64: liten.toString("base64") };
+}
+
+const reEsc = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+/**
+ * AI-lägets text om EN modell ur identifieringssvaret: avsnittet som börjar vid den numrerade rubriken som nämner modellen ("### 1. PREBEN …") och slutar vid nästa rubrik eller källistan.
+ * `beskrivning` är texten utan länkrader, länkar och källhänvisningar (status, motivering), högst ~500 tecken. `generation` är det som skiljer två möbler med samma namn: artikelnumret
+ * (602.013.31) om svaret anger ett, annars årtiondet ("2010" ur "såldes under 2010-talet"), annars tomt. Tomt ger samma registernyckel som förut.
+ */
+export function beskrivningUr(svar: string, model: string): { beskrivning: string; generation: string } {
+  const tom = { beskrivning: "", generation: "" };
+  if (!svar || !model.trim()) return tom;
+  const rader = svar.replace(/\\([()[\]])/g, "$1").split("\n");
+  const namn = new RegExp(`(^|[^\\p{L}\\p{N}])${reEsc(model.trim())}([^\\p{L}\\p{N}]|$)`, "iu");
+  const rubrik = /^\s*(?:#{1,6}\s*)?(?:\*\*)?\s*(?:\d{1,2}\s*[.)]|förslag\s*\d{1,2}\b)/i;
+  const slutPa = /^\s*(?:#{1,6}\s*)?(?:references|referenser|källor)\b|^===\s*FLER/i;
+  let start = rader.findIndex((l) => rubrik.test(l) && namn.test(l));
+  let slut = rader.length;
+  if (start >= 0) {
+    for (let i = start + 1; i < rader.length; i++) {
+      if (rubrik.test(rader[i]) || slutPa.test(rader[i])) {
+        slut = i;
+        break;
+      }
+    }
+  } else {
+    start = rader.findIndex((l) => namn.test(l));
+    if (start < 0) return tom;
+    slut = Math.min(rader.length, start + 6);
+  }
+  const avsnitt = rader.slice(start, slut);
+  const heltext = avsnitt.join("\n");
+  const artikel = /\b\d{3}\.\d{3}\.\d{2}\b/.exec(heltext)?.[0];
+  const artionde = /\b((?:19|20)\d0)\s*-?\s*tal(?:et)?\b/i.exec(heltext)?.[1];
+  const generation = artikel ?? artionde ?? "";
+  const beskrivning = avsnitt
+    .filter((l) => !/^\s*[-*]?\s*(produktsida|länk|link)\b/i.test(l))
+    .join(" ")
+    .replace(/\[(?:\d+(?:\s*,\s*\d+)*)\]/g, "")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/[#*_`]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 500);
+  return { beskrivning, generation };
+}
+
+/**
+ * Registrets nyckeldel för appens bilder: "g:" + undertyp eller typ, och därefter modellens GENERATION när svaret anger en (artikelnummer eller årtionde). Utan den delade två möbler med samma
+ * namn en bild: den äldre PREBEN-pinnstolen sparades och återanvändes för den moderna stolen (2026-11-12). Saknar svaret både artikelnummer och årtionde blir nyckeln som förut.
+ */
+export function registerTyp(c: { undertyp?: Undertyp | null; productType?: string | null; model: string }, svar: string): string {
+  const gen = beskrivningUr(svar, c.model).generation;
+  return `g:${c.undertyp ?? typfamilj(c.productType ?? null) ?? ""}${gen ? `:${gen}` : ""}`;
+}
+
+/** Hur många bilder som går till det jämförande valet (efter att dubbletter tagits bort). Förut fem; rätt PREBEN-bild låg på plats nio. */
+export const valMax = (): number => Number(process.env.LOOPA_REFERENS_VAL_MAX ?? 8) || 8;
+
+/**
+ * Tar bort dubbletter ur kandidatlistan (behåller den första, alltså den bäst rankade): samma sida (adressen utan sökfråga och fragment) MED samma titel, eller samma titel från samma sajt när sida saknas.
+ * Googles träfflista har ofta samma bild flera gånger i olika storlek: samma Instagram-bild tog tre platser av fem (PREBEN, 2026-11-12). Två olika bilder från samma sida (olika titlar) behålls båda.
+ * Ordningen bevaras.
+ */
+export function unikaKallor<T>(rader: T[], info: (r: T) => { sida?: string | null; titel?: string | null; kalla?: string | null }): T[] {
+  const sedda = new Set<string>();
+  return rader.filter((r) => {
+    const { sida, titel, kalla } = info(r);
+    let plats = `s|${norm(kalla ?? "")}`;
+    if (sida) {
+      try {
+        const u = new URL(sida);
+        plats = `u|${u.hostname.replace(/^www\./, "")}${u.pathname.replace(/\/+$/, "")}`;
+      } catch {
+        /* ingen adress: sajten får vara platsen */
+      }
+    }
+    const nyckel = `${plats}|${norm(titel ?? "")}`;
+    if (sedda.has(nyckel)) return false;
+    sedda.add(nyckel);
+    return true;
+  });
+}
 
 let bildvaljare: Bildvaljare = standardVaeljare;
 /** För tester: ett eget val i stället för ett betalt anrop. `null` återställer. */
@@ -131,7 +279,7 @@ export function settBildvaljare(fn: Bildvaljare | null): void {
 
 /** Laddar ner kandidaterna (parallellt), låter valet avgöra och ger den lokala adressen på vinnaren, eller null. */
 export async function valjBland(
-  ctx: { brand: string; model: string; ord: string },
+  ctx: ValjCtx,
   kallor: Array<{ src: string; titel: string; kalla?: string; referer?: string | null }>,
 ): Promise<{ lokal: string; index: number } | null> {
   const lokala = await Promise.all(kallor.map((k) => lokalKandidatbild(k.src, k.referer ?? null).catch(() => null)));
@@ -292,7 +440,7 @@ export async function losFranProduktlank(c: RefKandidat, jobId: string): Promise
   }
   const titel = sida.titlar[0] || sida.slutUrl;
   const vinnare = await valjBland(
-    { brand: c.brand, model: c.model, ord: typOrd(c) },
+    { brand: c.brand, model: c.model, ord: typOrd(c), beskrivning: c.beskrivning, jobId },
     sida.bilder.slice(0, 5).map((src) => ({ src, titel, kalla: new URL(sida.slutUrl).hostname.replace(/^www\./, ""), referer: sida.slutUrl })),
   );
   if (!vinnare) {
@@ -394,7 +542,7 @@ export async function losFranSokning(c: RefKandidat, jobId: string): Promise<Ref
   for (const a of alla) if (!giltiga.includes(a)) log(`${id} ${c.model}: B-alternativ avvisat — märket och modellen står inte i adressen (${a.img.slice(0, 80)})`);
   if (giltiga.length === 0) return null;
   const vinnare = await valjBland(
-    { brand: c.brand, model: c.model, ord: typOrd(c) },
+    { brand: c.brand, model: c.model, ord: typOrd(c), beskrivning: c.beskrivning, jobId },
     giltiga.map((a) => ({ src: a.img, titel: a.sida || a.img, kalla: (() => { try { return new URL(a.img).hostname.replace(/^www\./, ""); } catch { return undefined; } })(), referer: a.sida || null })),
   );
   if (!vinnare) {

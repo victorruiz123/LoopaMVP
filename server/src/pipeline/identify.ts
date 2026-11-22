@@ -17,7 +17,7 @@ import { mergeSpecs } from "../specHarvest.js";
 import { mattminnetsRader } from "../mattminne.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { lokalKandidatbild, registreradKandidatbild, registreraKandidatbilder } from "../kandidatbild.js";
-import { losFranSokningar, losProduktsidor, referensKedjaPa, typOrd, valjBland, type RefKandidat } from "../referensbild.js";
+import { beskrivningUr, losFranSokningar, losProduktsidor, referensKedjaPa, registerTyp, saljarbild, typOrd, unikaKallor, valMax, valjBland, type RefKandidat } from "../referensbild.js";
 import { bedomReferensbild, typFranFoto, typfamilj } from "../candidateType.js";
 import { pickReferenceRows, undertypForKandidat, valjReferensbild, type ReferenceCheck } from "../externalImages.js";
 import { estimatePrice, pricingSignature, synkaStolpris, takeSpeculativePrice } from "../pricing.js";
@@ -1452,7 +1452,7 @@ export async function applyExternalIdentification(
   // Registrets bilder FÖRST, och redan innan korten sparas: en modell som någon sett förut (och vars bild klarat alla kontroller) har bilden framme när skärmen ritas, och appen behöver inte söka den.
   await Promise.all(
     candidates.map(async (c) => {
-      const hit = await registreradKandidatbild(c.brand, c.model, extRegTyp(c)).catch(() => null);
+      const hit = await registreradKandidatbild(c.brand, c.model, registerTyp(c, answer)).catch(() => null);
       if (hit) {
         c.imageUrl = hit;
         c.imageSource = "register";
@@ -1464,7 +1464,7 @@ export async function applyExternalIdentification(
   if (referensKedjaPa()) {
     const saknar = candidates.filter((c) => !c.imageUrl);
     if (saknar.length > 0) {
-      const traffar = await withCostScope({ jobId, stage: "identify" }, () => losProduktsidor(jobId, saknar.map(tillRefKandidat), Number(process.env.LOOPA_REFERENS_A_MS ?? 20_000) || 20_000)).catch(() => new Map<string, { url: string; source: string }>());
+      const traffar = await withCostScope({ jobId, stage: "identify" }, () => losProduktsidor(jobId, saknar.map((c) => tillRefKandidat(c, answer)), Number(process.env.LOOPA_REFERENS_A_MS ?? 20_000) || 20_000)).catch(() => new Map<string, { url: string; source: string }>());
       for (const c of saknar) {
         const t = traffar.get(c.model);
         if (t) {
@@ -1472,7 +1472,7 @@ export async function applyExternalIdentification(
           c.imageSource = t.source;
         }
       }
-      await registreraKandidatbilder(saknar.filter((c) => c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, typ: extRegTyp(c), url: c.imageUrl! }))).catch(() => undefined);
+      await registreraMedUnderlag(jobId, answer, saknar.filter((c) => c.imageUrl)).catch(() => undefined);
       console.info(`[bild] ${jobId.slice(0, 8)} steg A (produktlänkar): bild åt ${saknar.filter((c) => c.imageUrl).map((c) => c.model).join(", ") || "ingen"}`);
     }
   }
@@ -1504,11 +1504,27 @@ ${answer.slice(0, 6000)}`, sources };
   };
 }
 
-/** Det kedjan i referensbild.ts behöver veta om en kandidat. */
-const tillRefKandidat = (c: ModelCandidate): RefKandidat => ({ brand: c.brand, model: c.model, productType: c.productType ?? null, undertyp: c.undertyp ?? null, sourceUrl: c.sourceUrl ?? null });
+/** Det kedjan i referensbild.ts behöver veta om en kandidat, med AI-lägets beskrivning av just den modellen ur identifieringssvaret. */
+const tillRefKandidat = (c: ModelCandidate, svar: string): RefKandidat => ({
+  brand: c.brand,
+  model: c.model,
+  productType: c.productType ?? null,
+  undertyp: c.undertyp ?? null,
+  sourceUrl: c.sourceUrl ?? null,
+  beskrivning: beskrivningUr(svar, c.model).beskrivning || c.evidence?.[0] || c.distinguishingDetail || null,
+});
 
-/** Registrets nyckel för appens bilder: egen namnrymd ("g:", Googles bildsök, alla kontroller godkända), med undertypen när kandidaten har en (barstol och matstol är olika bilder). */
-const extRegTyp = (c: ModelCandidate): string => `g:${c.undertyp ?? typfamilj(c.productType) ?? ""}`;
+/**
+ * Skriver bilderna till registret, men bara de som valts MED underlag: AI-lägets beskrivning av modellen eller säljarens foto. En bild som valts utan någotdera (omslag och beskrivning saknades) är
+ * en gissning på namnet, och registret delas av alla säljare. Se registerTyp för nyckeln.
+ */
+async function registreraMedUnderlag(jobId: string, svar: string, kandidater: ModelCandidate[]): Promise<void> {
+  const harFoto = !!(await saljarbild(jobId).catch(() => null));
+  const med = kandidater.filter((c) => c.imageUrl && (harFoto || !!beskrivningUr(svar, c.model).beskrivning));
+  if (med.length) await registreraKandidatbilder(med.map((c) => ({ brand: c.brand, model: c.model, typ: registerTyp(c, svar), url: c.imageUrl! })));
+}
+
+// Registrets nyckel för appens bilder (egen namnrymd "g:", med undertyp och modellens generation) byggs av registerTyp i referensbild.ts.
 
 /**
  * Möbeltypen ur säljarens omslagsbild, för frågan till AI-läget ("vilka Sits fåtöljer kan det vara?") och för kandidaterna. Läses en gång per jobb och sparas.
@@ -1623,6 +1639,8 @@ async function applyExternalImagesInner(
     }
   };
   const brand = job.identity?.brand?.trim() || "";
+  // AI-lägets identifieringssvar (lagras på jobbet): beskrivningen av varje modell ur det följer med till bildvalet.
+  const svarText = job.identityResearch?.researchText ?? "";
   const key = (s: string) => s.toLowerCase().replace(/[^a-z0-9åäö]+/g, "");
   const picked = await Promise.all(
     job.candidates.map(async (c): Promise<{ model: string; url: string | null } | null> => {
@@ -1635,11 +1653,12 @@ async function applyExternalImagesInner(
       // Andrahandsannonser ingår inte: deras foton är sällan ett bra referensfoto, och B tar de modeller som blir utan. Rader utan sajtuppgift (skalets) går den gamla vägen nedan.
       const harSajt = (group.rows as Array<{ source?: unknown; page?: unknown }> | undefined)?.some((r) => typeof r?.page === "string" || typeof r?.source === "string") === true;
       if (referensKedjaPa() && harSajt) {
-        const rad = new Map((group.rows as Array<{ src: string; alt?: string; source?: string }>).map((r) => [r.src, r]));
-        const tillVal = rows.filter((r) => !r.marketplace).slice(0, 5);
+        const rad = new Map((group.rows as Array<{ src: string; alt?: string; source?: string; page?: string }>).map((r) => [r.src, r]));
+        // Upp till valMax() (förval 8) bilder efter att dubbletter tagits bort: samma Instagram-bild tre gånger hade tagit tre av fem platser, och rätt PREBEN-bild låg på plats nio (2026-11-12).
+        const tillVal = unikaKallor(rows.filter((r) => !r.marketplace), (r) => ({ sida: rad.get(r.src)?.page, titel: rad.get(r.src)?.alt, kalla: rad.get(r.src)?.source })).slice(0, valMax());
         console.info(`[bild] ${jobId.slice(0, 8)} ${c.model}: steg C — ${(group.rows as unknown[]).length} träffar, ${rows.length} klarade reglerna, ${tillVal.length} går till valet (andrahandsannonser undantagna)`);
         const vinnare = await valjBland(
-          { brand, model: c.model, ord: typOrd(c) },
+          { brand, model: c.model, ord: typOrd(c), beskrivning: beskrivningUr(svarText, c.model).beskrivning || c.evidence?.[0] || c.distinguishingDetail || null, jobId },
           tillVal.map((r) => ({ src: r.src, titel: rad.get(r.src)?.alt ?? "", kalla: rad.get(r.src)?.source, referer: null })),
         ).catch(() => null);
         return { model: c.model, url: vinnare?.lokal ?? null };
@@ -1677,7 +1696,7 @@ async function applyExternalImagesInner(
     const saknas = fresh.candidates.filter((c) => !c.imageUrl);
     if (saknas.length > 0) {
       if (set.length) await persist(fresh);
-      const viaB = await losFranSokningar(jobId, saknas.map(tillRefKandidat)).catch(() => new Map<string, { url: string; source: string }>());
+      const viaB = await losFranSokningar(jobId, saknas.map((c) => tillRefKandidat(c, svarText))).catch(() => new Map<string, { url: string; source: string }>());
       fresh = getJobSync(jobId) ?? (await getJob(jobId)) ?? fresh;
       for (const [model, t] of viaB) {
         const c = fresh.candidates?.find((x) => x.model === model);
@@ -1696,10 +1715,8 @@ async function applyExternalImagesInner(
   const nullade = opts.final ? fresh.candidates.filter((c) => c.imageUrl === undefined).map((c) => { c.imageUrl = null; return c.model; }) : [];
   if (set.length || nullade.length) {
     await persist(fresh);
-    // Registret skrivs bara av bilder som klarat ALLA kontroller, under appens egna nycklar (extRegTyp).
-    await registreraKandidatbilder(
-      fresh.candidates.filter((c) => set.includes(c.model) && c.imageUrl).map((c) => ({ brand: c.brand, model: c.model, typ: extRegTyp(c), url: c.imageUrl! })),
-    );
+    // Registret skrivs bara av bilder som klarat ALLA kontroller och valts med underlag (beskrivning eller säljarens foto), under appens egna nycklar (registerTyp).
+    await registreraMedUnderlag(jobId, svarText, fresh.candidates.filter((c) => set.includes(c.model) && c.imageUrl));
   }
   if (opts.final || none.length === 0) await releasePending();
   console.info(`[bild] ${jobId.slice(0, 8)} Googles bildsök: bild åt ${set.join(", ") || "ingen"}${none.length ? `; ingen godkänd bild åt ${none.join(", ")}` : ""}`);
