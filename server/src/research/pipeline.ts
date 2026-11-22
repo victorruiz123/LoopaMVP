@@ -18,6 +18,7 @@ import path from "node:path";
 import { readFile } from "node:fs/promises";
 import sharp from "sharp";
 import type { SourceRef } from "../candidateImages.js";
+import { forIdentification } from "../imageRoles.js";
 import type { CapturedImage, ListingAttribute, ModelCandidate } from "../types.js";
 import {
   IDENTIFY_DEADLINE_MS,
@@ -128,8 +129,10 @@ function spread<T>(list: T[], n: number): T[] {
 }
 
 export function pickResearchFrames(images: CapturedImage[], max = RESEARCH_MAX_IMAGES): CapturedImage[] {
-  const cover = images.find((i) => i.role === "cover");
-  const rest = images.filter((i) => i !== cover);
+  // Närbilder, extra bilder och bilder rakt ovanifrån visar en yta och inte möbelns form — se imageRoles.ts.
+  const candidates = forIdentification(images);
+  const cover = candidates.find((i) => i.role === "cover");
+  const rest = candidates.filter((i) => i !== cover);
   const chosen = spread(rest, max - (cover ? 1 : 0));
   return cover ? [cover, ...chosen] : chosen;
 }

@@ -70,8 +70,13 @@ export interface Fixture {
   runIndex: number | null;
   /** Which model actually answered. Recorded fixtures must be the primary model, see fixtures.test.ts. */
   modelUsed: string | null;
-  /** sha256 of SYSTEM_PROMPT + response schema at record time — tells prompt generations apart. */
+  /** sha256 of SYSTEM_PROMPT + NOT_DAMAGE_BLOCK + response schema + user prompt at record time — tells prompt generations apart. */
   promptHash: string | null;
+  /**
+   * How the images were made: filmed (frames from a video walkaround) or photographed (photo guide).
+   * Absent on fixtures recorded before the photo guide existed — those are all `video`, see captureModeOf.
+   */
+  capture_mode?: "video" | "photo";
   recordedAt: string | null;
   lockPartLocations?: boolean;
   /** Name of a not-yet-applied fix in fixes.ts that will change this fixture's outcome. */
@@ -185,13 +190,20 @@ export function buildObserved(deduped: Damage[], grade: GradeExplanation): Obser
   };
 }
 
+/** Fixturer inspelade före fotoguiden har inget `capture_mode` och är filmade. */
+export function captureModeOf(f: Pick<Fixture, "capture_mode">): "video" | "photo" {
+  return f.capture_mode ?? "video";
+}
+
 /** En rad som beskriver underlaget. Delad, så regressen och verify-impact aldrig kan glida isär. */
 export function describeCorpus(fixtures: Fixture[]): string {
   const rec = fixtures.filter((f) => f.source === "recorded");
   const items = new Set(rec.map((f) => f.distinct_item_id));
   const byCount = new Map<string, number>();
   for (const f of rec) {
-    const key = f.frame_count === null ? "okänt antal" : `${f.frame_count} bildrutor`;
+    // Filmade bildrutor och fotograferade bilder är olika experiment, så de räknas aldrig ihop i en siffra.
+    const unit = captureModeOf(f) === "photo" ? "foton" : "bildrutor";
+    const key = f.frame_count === null ? `okänt antal (${captureModeOf(f)})` : `${f.frame_count} ${unit}`;
     byCount.set(key, (byCount.get(key) ?? 0) + 1);
   }
   const spread = [...byCount.entries()].sort().map(([k, n]) => `${n} med ${k}`).join(" · ");

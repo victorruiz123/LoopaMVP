@@ -210,7 +210,7 @@ export function harPubliktKort(job: ConditionJob): boolean {
 
 /** Annonsen bakom kortet, eller null. Samma prövning som `harPubliktKort`, men med texten kvar. */
 function fardigAnnons(job: ConditionJob): GeneratedListing | null {
-  if (job.dealId || job.adDerived) return null;
+  if (job.dealId || job.adDerived || job.conditionOnly) return null;
   const listing = listingOf(job);
   return listing?.status === "ok" ? (listing.result ?? null) : null;
 }

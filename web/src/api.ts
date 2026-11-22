@@ -5,6 +5,7 @@ import type { AdText, AdminAnnonsDetalj, AdminAnnonser, AdminKontoDetalj, Raderi
   UtskickLista,
   UtskickLage,
 } from "./types";
+import type { UploadShot } from "./lib/photoGuide";
 
 /**
  * Varje anrop bär säljarens Supabase-token.
@@ -188,6 +189,45 @@ export async function createJob(
     signal,
   });
   return json(res);
+}
+
+/**
+ * Servern avvisade uppladdningen för att den hade för få olika bilder. Ett läge klienten kan visa ("du behöver
+ * 1 bild till"), inte ett fel — därför en egen typ, och inte en vanlig Error med en feltext.
+ */
+export class TooFewImagesError extends Error {
+  constructor(
+    public min: number,
+    public got: number,
+  ) {
+    super(t("Vi behöver minst {antal} olika bilder (fick {fick}).", { antal: min, fick: got }));
+    this.name = "TooFewImagesError";
+  }
+}
+
+/**
+ * Ett RENT SKICKTEST: bara besiktningen. Ingen identifiering, inga mått, ingen annonstext, inget pris — servern
+ * ignorerar märke och modell och sätter de tre andra uppgifterna som avbrutna (se `conditionOnly` i
+ * server/src/jobCreate.ts). Används av skicktestsidan (web/skicktest.html) och av ingenting annat.
+ *
+ * Servern kräver fotoguidens minimum, fem bilder, och svarar annars med `too_few_images`.
+ */
+export async function createConditionOnlyJob(
+  images: UploadShot[],
+  signal?: AbortSignal,
+): Promise<{ jobId: string; imageCount: number; dropped?: number }> {
+  const res = await authFetch("/api/jobs", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ images, conditionOnly: true }),
+    signal,
+  });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => ({}))) as { error?: string; code?: string; min?: number; got?: number };
+    if (body.code === "too_few_images" && typeof body.min === "number") throw new TooFewImagesError(body.min, body.got ?? 0);
+    throw new Error(body.error ?? `Request failed: ${res.status}`);
+  }
+  return res.json();
 }
 
 /** Svaret från Googles AI-läge, till servern som översätter det till kandidater. `failed`: frågan kom inte fram till något svar. */

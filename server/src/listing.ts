@@ -1,6 +1,7 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { loadImageAsBase64, loadImageAsBase64Scaled } from "./imageUtils.js";
+import { forIdentification } from "./imageRoles.js";
 import type { CapturedImage, FurnitureIdentity, IdentityResult, ListingResult, ModelCandidate } from "./types.js";
 import type { SourceRef } from "./candidateImages.js";
 import type { ResearchRunSummary } from "./research/types.js";
@@ -111,14 +112,17 @@ const IDENT_MAX_SIDE = 1024;
 const IDENT_JPEG_QUALITY = 80;
 
 /**
- * Tre bildrutor spridda över varvet, omslagsbilden först.
+ * Tre bilder av hela möbeln, omslagsbilden först.
  *
- * Sprids med jämna mellanrum över listan i stället för att tas från början: två bildrutor från samma
- * sekund är inte två vinklar, och det är vinklar identifieringen behöver.
+ * Sprids med jämna mellanrum över listan i stället för att tas från början: två bilder från samma
+ * håll är inte två vinklar, och det är vinklar identifieringen behöver. Närbilder, extra bilder och
+ * bilder rakt ovanifrån sorteras bort först (imageRoles.ts): de visar en yta, inte möbelns form, och
+ * i fotoguidens ordning hade spridningen annars hamnat på just dem.
  */
 export function identifieringsBilder(images: CapturedImage[]): CapturedImage[] {
-  const omslag = images.find((i) => i.role === "cover");
-  const varv = images.filter((i) => i !== omslag);
+  const kandidater = forIdentification(images);
+  const omslag = kandidater.find((i) => i.role === "cover");
+  const varv = kandidater.filter((i) => i !== omslag);
   const valda = sprid(varv, IDENT_IMAGE_COUNT - (omslag ? 1 : 0));
   return omslag ? [omslag, ...valda] : valda;
 }

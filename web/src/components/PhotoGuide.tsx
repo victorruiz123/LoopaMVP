@@ -20,12 +20,21 @@ export default function PhotoGuide({
   activeId,
   taken,
   onJump,
+  stepLabel,
+  hideStrip = false,
+  stripLabel = (s) => s.label,
 }: {
   stations: PhotoStation[];
   activeId: string;
   /** dataUrl per stations-id: vad säljaren redan har tagit. */
   taken: Record<string, string>;
   onJump: (id: string) => void;
+  /** Egen rad över rubriken i stället för "Bild {nr} av {antal}" — för läget där det inte finns något antal, som en extra bild. */
+  stepLabel?: string;
+  /** Utan stegrad: kortet ensamt. Den extra bilden hör inte till någon vinkel i raden. */
+  hideStrip?: boolean;
+  /** Namnet under varje miniatyr. Standard är hela etiketten; guiden med sju steg skickar kortnamn, som ryms. */
+  stripLabel?: (s: PhotoStation) => string;
 }) {
   const t = useT();
   const index = stations.findIndex((s) => s.id === activeId);
@@ -38,22 +47,27 @@ export default function PhotoGuide({
         <GuideScene className="guide3d photo-guide-scene" at={station.at} />
         <div className="photo-guide-text">
           <span className="photo-guide-step">
-            {t("Bild {nr} av {antal}", { nr: index + 1, antal: stations.length })}
-            {station.required ? "" : ` · ${t("frivillig")}`}
+            {stepLabel ?? t("Bild {nr} av {antal}", { nr: index + 1, antal: stations.length })}
+            {!stepLabel && !station.required ? ` · ${t("frivillig")}` : ""}
           </span>
           <h2 className="photo-guide-title">{t(station.title)}</h2>
           <p className="photo-guide-instruction">{t(station.instruction)}</p>
         </div>
       </div>
 
-      <ol className="photo-guide-strip">
+      {/* Kolumnerna följer antalet steg: stegraden var hårdkodad till sex, och sju steg hade brutit rad. */}
+      <ol
+        className="photo-guide-strip"
+        hidden={hideStrip}
+        style={{ gridTemplateColumns: `repeat(${stations.length}, minmax(0, 1fr))` }}
+      >
         {stations.map((s, i) => {
           const thumb = taken[s.id];
           const state = s.id === activeId ? "active" : thumb ? "done" : "todo";
           return (
             <li key={s.id}>
               <button
-                className={`photo-guide-stop photo-guide-stop-${state}`}
+                className={`photo-guide-stop photo-guide-stop-${state}${s.required ? "" : " photo-guide-stop-optional"}`}
                 onClick={() => onJump(s.id)}
                 aria-current={s.id === activeId ? "step" : undefined}
               >
@@ -65,7 +79,7 @@ export default function PhotoGuide({
                     </span>
                   )}
                 </span>
-                <span className="photo-guide-stop-label">{t(s.label)}</span>
+                <span className="photo-guide-stop-label">{t(stripLabel(s))}</span>
               </button>
             </li>
           );

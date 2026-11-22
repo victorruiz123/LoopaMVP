@@ -59,3 +59,67 @@ test("en enda bildruta duger", () => {
 test("inga bildrutor ger inga bilder — anroparen svarar 'inga bildrutor att skicka'", () => {
   assert.deepEqual(identifieringsBilder([]), []);
 });
+
+// ─── Fotoguidens ordning ─────────────────────────────────────────────────────
+//
+// Med fotoguiden är listan inget varv: omslag, framifrån, vänster, baksida, höger, ovanifrån, närbild,
+// extra. En spridning över den hamnade på närbilden av en repa — bra för besiktningen, värdelös för att
+// avgöra VILKEN modell det är. Därför sorteras de bilderna bort först (server/src/imageRoles.ts).
+
+function foto(id: string, viewLabel: string | null, role?: "cover"): CapturedImage {
+  return { id, viewLabel, source: "manual", ...(role ? { role } : {}), width: 1600, height: 1200, path: `${id}.jpg`, capturedAt: "2026-11-21T00:00:00.000Z" };
+}
+
+const GUIDENS_ORDNING = [
+  foto("omslag", "Omslagsbild", "cover"),
+  foto("fram", "Framifrån"),
+  foto("vanster", "Vänster sida"),
+  foto("bak", "Bakifrån"),
+  foto("hoger", "Höger sida"),
+  foto("topp", "Ovanifrån"),
+  foto("nar1", "Närbild"),
+  foto("extra1", "Extra bild"),
+];
+
+test("närbilder, extra bilder och ovanifrån väljs aldrig för identifiering", () => {
+  const valda = namn(identifieringsBilder(GUIDENS_ORDNING));
+  assert.equal(valda.length, 3);
+  assert.equal(valda[0], "omslag");
+  for (const id of valda) assert.ok(!["topp", "nar1", "extra1"].includes(id), `${id} är en detaljbild`);
+  // De två som blir kvar spänner upp möbeln: första och sista av helbilderna.
+  assert.deepEqual(valda.slice(1), ["fram", "hoger"]);
+});
+
+test("en närbild som ligger mitt i listan hoppas också över", () => {
+  const images = [foto("fram", "Framifrån"), foto("nar", "Närbild"), foto("bak", "Bakifrån"), foto("sida", "Vänster sida")];
+  assert.ok(!namn(identifieringsBilder(images)).includes("nar"));
+});
+
+test("etiketten matchas oberoende av versaler och blanksteg", () => {
+  const images = [foto("fram", "Framifrån"), foto("a", "  NÄRBILD "), foto("b", "extra bild 2"), foto("c", "Bakifrån")];
+  assert.deepEqual(namn(identifieringsBilder(images)), ["fram", "c"]);
+});
+
+test("bara detaljbilder: då väljs bland dem hellre än att svara 'inga bilder'", () => {
+  const images = [foto("n1", "Närbild"), foto("n2", "Närbild"), foto("n3", "Extra bild"), foto("n4", "Närbild")];
+  assert.equal(identifieringsBilder(images).length, 3);
+});
+
+test("omslagsbilden räknas alltid med, även om den skulle bära en detaljetikett", () => {
+  const images = [foto("c", "Närbild", "cover"), foto("fram", "Framifrån"), foto("bak", "Bakifrån")];
+  assert.equal(identifieringsBilder(images)[0].id, "c");
+});
+
+test("jobb före fotoguiden, utan etiketter, väljs som förut", () => {
+  // Bildrutor ur en film har `viewLabel: null` — inget av det här får röra dem.
+  const gamla = [0, 1, 2, 3, 4, 5].map((n) => bild(n));
+  assert.deepEqual(namn(identifieringsBilder(gamla)), ["img_0", "img_3", "img_5"]);
+});
+
+test("pickResearchFrames följer samma regel: omslaget först, helbilder spridda, inga detaljbilder", async () => {
+  const { pickResearchFrames } = await import("../server/src/research/pipeline.js");
+  const valda = namn(pickResearchFrames(GUIDENS_ORDNING, 4));
+  assert.equal(valda[0], "omslag");
+  for (const id of valda) assert.ok(!["topp", "nar1", "extra1"].includes(id), `${id} är en detaljbild`);
+  assert.equal(valda.length, 4);
+});

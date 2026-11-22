@@ -246,24 +246,35 @@ KONSTRUKTION OCH MATERIAL — sömmar, stickningar, kedring och paspoal · träe
 naturliga färgvariation · tygets bindning, mönster, lugg och luggriktning · avsiktliga designdetaljer,
 skarvar, spår och beslag · lösa klädslars normala drapering.
 
-BILDEN SJÄLV — oskärpa och rörelseoskärpa i videorutor · komprimeringsbrus och JPEG-artefakter, som
-växer fram just i förstorade utsnitt · lågupplösta partier långt bort i bild · spegelbilder och
-dubbelkonturer.
+BILDEN SJÄLV — oskärpa och rörelseoskärpa (en darrig hand, dåligt ljus) · komprimeringsbrus och
+JPEG-artefakter, som växer fram just i förstorade utsnitt · lågupplösta partier långt bort i bild ·
+spegelbilder och dubbelkonturer · skärpning, HDR-effekter och färgfilter som telefonens kamera eller
+säljaren lagt på.
 
 LÖST PÅ YTAN — damm, ludd, smulor, hårstrån, fingeravtryck och annat som torkas bort. Det sitter på
 möbeln, inte i den.
 
 Golv, vägg och föremål i bakgrunden hör inte till möbeln över huvud taget.
 
-TESTET när du inte vet om något är ljus eller yta: sök upp samma ställe i en annan bildruta. Ett märke
-som FÖLJER MED när kameran flyttar sig sitter på möbeln. Ett som flyttar sig, byter form eller
-försvinner är ljus — och ska inte rapporteras.`;
+TESTET när du inte vet om något är ljus eller yta: sök upp samma ställe i en annan bild där ytan syns.
+Ljuset faller olika i varje bild, så ett märke som sitter på SAMMA ställe på möbeln i flera bilder
+sitter på möbeln. Ett som byter form eller försvinner när vinkeln ändras är ljus — och ska inte
+rapporteras. Syns stället bara i en bild finns inget att jämföra med: bedöm då märket på dess egna
+kännetecken. En fläck, reva, spricka eller buckla är en skada även i en enda bild; en glans, reflex
+eller mjuk skugga är det inte.`;
 
 const SYSTEM_PROMPT = `Du är en mycket noggrann möbelbesiktare för en svensk secondhandmarknad (Vips). Du agerar
 som en SYSTEMATISK BESIKTNINGSPROTOKOLL — inte en generell bildbeskrivare.
 
-Du får flera bilder av SAMMA möbel, tagna från olika håll (video-vyer och/eller manuellt tagna foton,
-i den ordning de listas). Vissa bilder kan visa samma yta från olika vinklar.
+Du får flera foton av SAMMA möbel, tagna av säljaren med en mobilkamera, i den ordning de listas. De är
+tagna från olika håll och har olika upplösning och orientering (stående eller liggande). Vissa bilder
+kan visa samma yta från olika vinklar; andra visar en yta som bara finns med i en enda bild.
+
+Etiketten i listan ("Framifrån", "Vänster sida", "Närbild" …) är vad säljaren blev ombedd att
+fotografera. Den är vägledning, inte fakta: en bild kan visa något annat än etiketten säger, och det du
+SER är det som gäller. Omslagsbilden är arrangerad för annonsen men är ett fullgott underlag. En
+närbild saknar sammanhang — placera den mot de övriga bilderna för att avgöra var på möbeln den hör
+hemma. Den får vara den enda bilden som visar ett fynd.
 
 ${TAXONOMY_BLOCK}
 
@@ -323,15 +334,17 @@ METOD:
    En andra granskning tittar sedan på varje fynd och plockar bort uppenbara falsklarm. Den ser bara
    ditt utsnitt: den kan inte rädda ett fynd du inte kunde peka ut, och den kan inte hitta det du
    aldrig rapporterade. Bevisbördan ligger här.
-3. KORSKONTROLLERA mot de andra bildrutorna innan du skriver ner ett fynd. Leta upp samma ställe i de
-   bildrutor där ytan också syns.
-   Syns avvikelsen där också är fyndet verkligt — ge det då EN evidence-rad per bildruta där du kan se
+3. KORSKONTROLLERA mot de andra bilderna innan du skriver ner ett fynd. Leta upp samma ställe i de
+   bilder där ytan också syns. Bilderna är tagna från olika håll, så de flesta ytor syns bara i en eller
+   två bilder — det är normalt och inget skäl att tvivla på ett fynd.
+   Syns avvikelsen i flera bilder är fyndet verkligt — ge det då EN evidence-rad per bild där du kan se
    det. Det är det starkaste bevis kortet kan bära, och det är samma fynd, aldrig flera.
-   Syns ytan tydligt i en annan bildruta men avvikelsen är BORTA där, var det ljus eller smuts.
-   Rapportera det inte.
-   Ett fynd som bara går att se i EN av flera bildrutor som visar samma yta ska ha låg confidence.
-   Undantaget är närbilder och ytor som bara finns med i en enda bildruta: där finns ingenting att
-   jämföra med, och fyndet bedöms på egen hand.
+   Ett tydligt märke (fläck, reva, spricka, buckla, hål, avflagnad yta) duger från EN bild: bedöm det
+   på sina egna kännetecken. Bara märken som KAN vara ljus — glans, reflexer, ljusa partier, mjuka
+   skuggor — kräver att du hittar dem i en andra bild, annars låg confidence.
+   Syns ytan TYDLIGT och NÄRA i en annan bild men avvikelsen är BORTA där, var det ljus eller smuts.
+   Rapportera det inte. En yta långt bort, i skugga eller bara till hälften i bild räknas inte som att
+   den syns tydligt, och att märket saknas där är inget motbevis.
 4. KRITISKT — två fel som är LIKA allvarliga, blanda dem aldrig:
    a) SAMMA fysiska skada sedd i flera bilder (t.ex. samma repa framifrån och från sidan) ska vara EN
       post med en evidence-rad per bild där den syns. Skapa ALDRIG flera defekter för samma skada.
@@ -399,6 +412,42 @@ export interface InspectionResult {
   callMeta: CallMeta;
 }
 
+/**
+ * Vad varje bild ÄR, i den ordning modellen får dem — `Bild 0: omslagsbild (Omslagsbild), Bild 1: foto (Framifrån)`.
+ *
+ * Indexet är det modellen svarar med (`image_index`), så listan och bildlistan måste vara samma lista i
+ * samma ordning. "video-vy" finns kvar för jobb som skapades när appen filmade ett varv och som körs om
+ * (`source === "video"`); alla nya bilder är foton.
+ */
+export function describeImages(images: CapturedImage[]): string {
+  return images
+    .map((img, i) => {
+      const kind = img.source === "video" ? "video-vy" : img.role === "cover" ? "omslagsbild" : "foto";
+      return `Bild ${i}: ${kind}${img.viewLabel ? ` (${img.viewLabel})` : ""}`;
+    })
+    .join(", ");
+}
+
+/** Hela användarprompten. Utbruten så att `tests/record.ts` kan hasha den: den är en del av vad som gör en körning jämförbar med en annan. */
+export function buildUserPrompt(images: CapturedImage[], productContext: string | null): string {
+  const contextLine = productContext ? `\nKänd produktinfo (kan vara ofullständig): ${productContext}` : "";
+  return `Här är ${images.length} bilder av samma möbel: ${describeImages(images)}.${contextLine}\nInspektera systematiskt enligt instruktionerna och rapportera enligt schemat.`;
+}
+
+/**
+ * Tidsgränser som växer med antalet bilder: ≈4 s och ≈1,1 k tokens per bild (mätt på en äldre modell:
+ * 4 bilder 21 s, 8 bilder 37 s). Golvet är de gamla 60 s/30 s, så en vanlig sexbildersbesiktning rörs inte.
+ * Vid tio bilder blir det ≈100 s/50 s. Värsta fallet (primär + reserv ≈150 s) ryms i JOB_DEADLINE_MS (240 s).
+ * Siffrorna är startvärden — justeras mot p95 ur `[timing]`-loggen när fotoflödet mätts.
+ */
+export function inspectTimeouts(imageCount: number): { primaryMs: number; fallbackMs: number } {
+  const n = Math.max(1, Math.floor(imageCount));
+  return {
+    primaryMs: Math.max(60_000, 20_000 + 8_000 * n),
+    fallbackMs: Math.max(30_000, 10_000 + 4_000 * n),
+  };
+}
+
 export async function inspectFurniture(images: CapturedImage[], jobDir: string, productContext: string | null): Promise<InspectionResult> {
   const originalsDir = path.join(jobDir, "originals");
   // Parallellt: varje bild är en oberoende diskläsning plus en base64-kodning, och seriellt lades
@@ -407,9 +456,8 @@ export async function inspectFurniture(images: CapturedImage[], jobDir: string, 
     images.map((img) => loadImageAsBase64(path.join(originalsDir, img.path))),
   );
 
-  const imageList = images.map((img, i) => `Bild ${i}: ${img.source === "manual" ? "manuellt foto" : "video-vy"}${img.viewLabel ? ` (${img.viewLabel})` : ""}`).join(", ");
-  const contextLine = productContext ? `\nKänd produktinfo (kan vara ofullständig): ${productContext}` : "";
-  const userPrompt = `Här är ${images.length} bilder av samma möbel: ${imageList}.${contextLine}\nInspektera systematiskt enligt instruktionerna och rapportera enligt schemat.`;
+  const userPrompt = buildUserPrompt(images, productContext);
+  const { primaryMs, fallbackMs } = inspectTimeouts(images.length);
 
   const { data, tokensUsed, cached, modelUsed, latencyMs } = await callGeminiStructured<RawInspectionResponse>({
     purpose: "main_inspection",
@@ -421,9 +469,9 @@ export async function inspectFurniture(images: CapturedImage[], jobDir: string, 
     // Successful inspections land at 12-17s, so a 60s ceiling never bites a healthy call — it only
     // stops us from cutting off a slow one. 30s was still too tight on an 8-image run while Google was
     // returning 503/504 across models. The 30s product SLA is not reachable under that load; a slow
-    // answer beats no answer while we are evaluating.
-    primaryTimeoutMs: 60_000,
-    fallbackTimeoutMs: 30_000,
+    // answer beats no answer while we are evaluating. Tiden skalar nu med antalet bilder — se inspectTimeouts.
+    primaryTimeoutMs: primaryMs,
+    fallbackTimeoutMs: fallbackMs,
   });
 
   // Golvet appliceras FÖRE allt annat: ett fynd modellen själv kallar en gissning ska varken granskas,

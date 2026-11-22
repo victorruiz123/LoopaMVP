@@ -16,6 +16,7 @@ import EvidenceViewer from "../components/EvidenceViewer";
 import { AlertIcon, ArrowLeftIcon, CameraIcon, ChevronRight } from "../components/icons";
 import FlowSteps from "../components/FlowSteps";
 import { DAMAGE_TYPE_OPTIONS, SEVERITY_OPTIONS, typeLabel, severityLabel } from "../lib/labels";
+import { fileToDataUrl } from "../lib/imageResize";
 import { usePageTitle } from "../lib/pageTitle";
 import { t as translate, useT } from "../lib/i18n";
 import * as flode from "../lib/flode";
@@ -26,13 +27,24 @@ export default function ResultScreen({
   jobId,
   onHome,
   onContinue,
+  skickTest = false,
 }: {
   jobId: string;
   onHome: () => void;
   onContinue: (result: ConditionResult) => void;
+  /**
+   * Skicktestsidan (web/skicktest.html) visar samma skärm, men utan det som hör till resten av flödet: ingen
+   * stegindikator (Modell/Mått/Pris/Skick), ingen väg "Till annonsen" — knappen blir "Testa igen" — och inga
+   * händelser till flödesmätningen. Skärmen i övrigt, godkänn/avvisa-flödet inklusive, är oförändrad.
+   */
+  skickTest?: boolean;
 }) {
   const t = useT();
   usePageTitle("Skickbedömning");
+  // Klick i ett test är inga säljare som gör något: de ska inte in i funneln (server/src/data/flode.ts).
+  const klicka: typeof flode.klick = (...args) => {
+    if (!skickTest) flode.klick(...args);
+  };
   const [result, setResult] = useState<ConditionResult | null>(null);
   const [lage, setLage] = useState<Lage | null>(null);
   const [sparar, setSparar] = useState(false);
@@ -81,7 +93,7 @@ export default function ResultScreen({
 
   /** Sparar svaret och går vidare till nästa skada — eller till helheten efter den sista. */
   async function svara(d: Damage, action: "confirm" | "reject" | "edit", patch?: Parameters<typeof actOnDamage>[3]) {
-    if (action !== "edit") flode.klick(action === "confirm" ? "skada_stammer" : "skada_stammer_inte");
+    if (action !== "edit") klicka(action === "confirm" ? "skada_stammer" : "skada_stammer_inte");
     if (lage?.steg !== "granska") return;
     setSparar(true);
     try {
@@ -125,9 +137,9 @@ export default function ResultScreen({
     return (
       <div className="screen screen-light v2">
         <button className="btn btn-text btn-back" onClick={onHome}>
-          <ArrowLeftIcon /> {t("Startsidan")}
+          <ArrowLeftIcon /> {skickTest ? t("Avsluta testet") : t("Startsidan")}
         </button>
-        <FlowSteps current={4} />
+        {!skickTest && <FlowSteps current={4} />}
 
         {/*
           KORTET. Bilden i sina egna proportioner, så stor som skärmen tillåter, och frågan och svaren
@@ -228,9 +240,9 @@ export default function ResultScreen({
   return (
     <div className="screen screen-light v2 v2-helhet-skarm v2-h">
       <button className="btn btn-text btn-back" onClick={onHome}>
-        <ArrowLeftIcon /> {t("Startsidan")}
+        <ArrowLeftIcon /> {skickTest ? t("Avsluta testet") : t("Startsidan")}
       </button>
-      <FlowSteps current={4} />
+      {!skickTest && <FlowSteps current={4} />}
 
       {/*
         HELHETEN, så stilla som möjligt: betyget i en tunn ring som fylls efter skicket, skickets namn,
@@ -288,12 +300,12 @@ export default function ResultScreen({
         <button
           className="btn btn-primary next-step"
           onClick={() => {
-            flode.klick("skickrapport_vidare");
+            klicka("skickrapport_vidare");
             onContinue(result);
           }}
         >
-          <span>{t("Till annonsen")}</span>
-          <ChevronRight size={18} />
+          <span>{skickTest ? t("Testa igen") : t("Till annonsen")}</span>
+          {!skickTest && <ChevronRight size={18} />}
         </button>
         <div className="v2-h-par">
           <button className="v2-h-knapp" disabled={laggerTill} onClick={() => fotoRef.current?.click()}>
@@ -496,11 +508,17 @@ function Redigera({
   );
 }
 
-function tillDataUrl(fil: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const r = new FileReader();
-    r.onload = () => resolve(String(r.result));
-    r.onerror = () => reject(new Error(translate("Kunde inte läsa bilden.")));
-    r.readAsDataURL(fil);
-  });
+/**
+ * Närbilden säljaren tar på en missad skada, som en JPEG i hanterbar storlek.
+ *
+ * Förut lästes filen rakt av som den var: en telefonbild på 3–8 MB med sin vridning kvar i EXIF. Nu går den
+ * genom samma nedskalning som fotoguidens bilder (längsta sidan 2048 px, upprätt). Går den inte att läsa
+ * kastas ett fel med en text säljaren kan förstå.
+ */
+async function tillDataUrl(fil: File): Promise<string> {
+  try {
+    return await fileToDataUrl(fil);
+  } catch {
+    throw new Error(translate("Kunde inte läsa bilden."));
+  }
 }

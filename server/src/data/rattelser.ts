@@ -18,7 +18,7 @@
 
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import path from "node:path";
-import { DATA_DIR } from "../jobStore.js";
+import { DATA_DIR, getJobSync } from "../jobStore.js";
 
 const DATA_KATALOG = () => process.env.DATA_FLODE_DIR?.trim() || path.join(DATA_DIR, "data");
 const FIL = () => path.join(DATA_KATALOG(), "rattelser.jsonl");
@@ -93,6 +93,9 @@ export function somText(v: unknown): string | null {
  */
 export async function notera(r: Omit<Rattelse, "at"> & { at?: string }): Promise<void> {
   try {
+    // Skicktestet (web/skicktest.html) är ett gränssnitt att prova, inte säljare som säger något om en möbel.
+    // Klick där ska aldrig bli etiketter i träningsdatan — se filens topp: "DET HÄR ÄR TRÄNINGSDATAN".
+    if (getJobSync(r.jobId)?.conditionOnly) return;
     const rad: Rattelse = {
       at: r.at ?? new Date().toISOString(),
       jobId: r.jobId,

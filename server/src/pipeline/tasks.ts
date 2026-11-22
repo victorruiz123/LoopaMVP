@@ -54,7 +54,21 @@ export async function setTask(jobId: string, name: TaskName, status: TaskStatus,
 }
 
 /** Startläget när ett jobb skapas: det som går att köra direkt körs, resten väntar på det det beror på. */
-export function initialTasks(opts: { skipGrading: boolean; identify: "run" | "resolved" | "none" }, now = Date.now()): Partial<Record<TaskName, JobTask>> {
+export function initialTasks(
+  opts: { skipGrading: boolean; identify: "run" | "resolved" | "none"; conditionOnly?: boolean },
+  now = Date.now(),
+): Partial<Record<TaskName, JobTask>> {
+  if (opts.conditionOnly) {
+    // Ett rent skicktest: bara besiktningen körs. De tre andra står som AVBRUTNA och inte som väntande — en
+    // väntande uppgift lovar att något ska hända, och en klient som läser lägena ska inte vänta på det.
+    const skipped = (): JobTask => ({ status: "cancelled", note: "Hoppades över: skicktest, bara besiktningen körs.", finishedAt: now });
+    return {
+      condition: opts.skipGrading ? skipped() : { status: "running", startedAt: now },
+      identify: skipped(),
+      specs: skipped(),
+      price: skipped(),
+    };
+  }
   return {
     condition: opts.skipGrading ? { status: "cancelled", note: "Besiktning hoppades över för det här jobbet.", finishedAt: now } : { status: "running", startedAt: now },
     identify: opts.identify === "run" ? { status: "running", startedAt: now } : opts.identify === "resolved" ? { status: "completed", startedAt: now, finishedAt: now, note: "Modellen angavs av säljaren." } : { status: "pending" },

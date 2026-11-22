@@ -7179,3 +7179,188 @@ button.resa-kt-rad:hover { background: var(--surface-pressed); }
 }
 .ersv-namn input:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-light); }
 .ersv-namn small { font-size: var(--fs-xs); color: var(--muted); line-height: 1.45; }
+
+/* ==========================================================================
+   Bildguiden (components/PhotoCaptureFlow) och skicktestet (screens/SkickTestScreen)
+   Egna prefix: pg- för guiden, st- för testsidan. Återanvänder fotoguidens kort och stegrad
+   (.photo-guide*), kamerans kontroller (.guided-controls, .shutter-btn) och granskningens
+   rutnät (.review-*) — här ligger bara det som är nytt.
+   ========================================================================== */
+
+/* Stegraden följer antalet steg (PhotoGuide sätter kolumnerna inline). `hidden` räcker inte mot
+   `display: grid` ovan, så den måste sägas. */
+.photo-guide-strip[hidden] { display: none; }
+/* Valfria steg: streckad ram tills de har en bild. */
+.photo-guide-stop-optional .photo-guide-stop-frame { border-style: dashed; }
+.photo-guide-stop-optional.photo-guide-stop-done .photo-guide-stop-frame { border-style: solid; }
+
+/* Sökaren utan zoom. `.camera-feed` skalar 1,18x och sparar ändå HELA bildrutan, så säljaren fick mer
+   på bilden än hen såg i sökaren. Här är det man ser det som sparas. */
+.pg-feed { transform: none; }
+/* `visibility` och inte `display: none`: på datorn får kamerapanelen sin höjd av <video>-elementet
+   (`[data-view="desktop"] .camera-feed`), och utan det kollapsar panelen till noll när kameran är av —
+   hela steget blir osynligt, just i det läge där man laddar upp bilder i stället för att fota. */
+.pg-feed-off { visibility: hidden; }
+
+/* Slutarblixten: ett kvitto på att bilden togs, för det som inte syns i sökaren. Av vid reducerad rörelse. */
+.pg-flash {
+  position: absolute; inset: 0; z-index: 3; background: #fff; opacity: 0; pointer-events: none;
+  transition: opacity 140ms ease-out;
+}
+.pg-flash-on { opacity: 0.55; transition: none; }
+@media (prefers-reduced-motion: reduce) {
+  .pg-flash, .pg-flash-on { transition: none; opacity: 0; }
+}
+
+.pg-topbar {
+  position: absolute; top: var(--safe-top); left: var(--safe-left); right: var(--safe-right); z-index: 2;
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+}
+.pg-topbar-right { display: flex; gap: 6px; }
+.pg-chip { min-height: var(--tap); padding: 8px 12px; display: inline-flex; align-items: center; gap: 6px; font-size: var(--fs-md); }
+.pg-count {
+  display: inline-flex; align-items: center; gap: 5px; padding: 6px 12px; border-radius: 999px;
+  background: rgba(0,0,0,0.55); color: #fff; font-size: var(--fs-sm); font-weight: 700; white-space: nowrap;
+}
+.pg-count-ok { background: var(--green); }
+
+/* Kameran av eller fallen: en yta med en tydlig väg framåt, aldrig en svart ruta utan förklaring. */
+.pg-nocam {
+  position: absolute; left: var(--safe-left); right: var(--safe-right); z-index: 2;
+  bottom: calc(112px + env(safe-area-inset-bottom));
+  padding: 14px; border-radius: var(--r); background: rgba(12, 10, 8, 0.78); color: #fff;
+  font-size: var(--fs-md); line-height: 1.4; text-align: center;
+}
+.pg-nocam p { margin: 0 0 10px; }
+.pg-nocam-actions { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pg-nocam-actions .btn { display: inline-flex; align-items: center; gap: 6px; width: auto; }
+.pg-nocam .btn-outline { background: transparent; color: #fff; border-color: rgba(255,255,255,0.5); }
+.pg-have {
+  position: absolute; left: 50%; transform: translateX(-50%); z-index: 2; margin: 0; max-width: 92%;
+  bottom: calc(112px + env(safe-area-inset-bottom));
+  padding: 6px 12px; border-radius: 999px; background: rgba(0,0,0,0.6); color: #fff;
+  font-size: var(--fs-sm); text-align: center; pointer-events: none;
+}
+/* Mål på minst 44 px: de två knapparna vid slutaren trycks utan att man tittar. */
+.guided-side { min-height: var(--tap); }
+
+/* ---- introt ---- */
+.pg-intro, .pg-review { gap: 14px; }
+.pg-tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.pg-tip { display: flex; gap: 12px; align-items: flex-start; }
+.pg-tip-nr {
+  flex: 0 0 28px; width: 28px; height: 28px; margin-top: 1px; border-radius: 999px;
+  display: grid; place-items: center; background: var(--accent); color: #fff;
+  font-size: var(--fs-sm); font-weight: 700;
+}
+.pg-tip strong { display: block; }
+.pg-tip-text { display: block; color: var(--muted); font-size: var(--fs-md); line-height: 1.4; }
+.pg-steps-overview {
+  display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r);
+}
+.pg-steps-overview p { margin: 0; }
+.pg-dots { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.pg-dot { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.pg-dot-mark { width: 14px; height: 14px; border-radius: 999px; border: 2px dashed var(--muted-soft); }
+.pg-dot-core .pg-dot-mark { background: var(--accent); border: 2px solid var(--accent); }
+.pg-dot-label { font-size: 10px; line-height: 1.15; color: var(--muted); overflow-wrap: anywhere; }
+.pg-actions { display: flex; flex-direction: column; gap: 10px; }
+.pg-actions .btn-outline { width: 100%; }
+
+/* ---- granskningen ---- */
+.pg-tile { position: relative; }
+.pg-tile-hit { position: absolute; inset: 0; padding: 0; border: 0; background: none; cursor: pointer; display: block; }
+.pg-tile-hit:focus-visible { outline: none; box-shadow: var(--focus); border-radius: var(--r); }
+.pg-tile-empty {
+  aspect-ratio: 3 / 4; padding: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  border: 1.5px dashed var(--muted-soft); border-radius: var(--r); background: transparent; color: var(--muted);
+  font-family: inherit; text-align: center; cursor: pointer;
+}
+.pg-tile-empty:focus-visible { outline: none; box-shadow: var(--focus); }
+/* Kärnsteg som hoppats över: bärnsten, som varningen — ett upplyst val, inte ett fel. */
+.pg-tile-core { border-color: var(--amber-ink); background: var(--amber-light); color: var(--amber-ink); }
+.pg-tile-name { font-size: var(--fs-sm); font-weight: 600; line-height: 1.2; }
+.pg-tile-sub { font-size: var(--fs-2xs); letter-spacing: 0.06em; text-transform: uppercase; opacity: 0.8; }
+.pg-hint-row { margin: -6px 0 0; }
+.pg-more {
+  display: flex; flex-direction: column; gap: 8px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r);
+}
+.pg-more p { margin: 0; }
+.pg-more-title { margin: 0; font-size: var(--fs-lg); }
+.pg-more-hint { margin: -4px 0 0; text-align: center; }
+
+.pg-modal-scrim {
+  position: fixed; inset: 0; z-index: 200; display: grid; place-items: center; padding: 16px;
+  background: rgba(0,0,0,0.5);
+}
+.pg-modal {
+  width: min(100%, 380px); display: flex; flex-direction: column; gap: 12px; padding: 20px;
+  background: var(--surface); color: var(--ink); border-radius: var(--r-lg);
+}
+.pg-modal h3 { margin: 0; font-size: var(--fs-lg); }
+.pg-modal p { margin: 0; }
+
+/* ---- skicktestsidan ---- */
+.st-kicker {
+  align-self: flex-start; padding: 4px 10px; border-radius: 999px;
+  background: var(--amber-light); color: var(--amber-ink);
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase;
+}
+.st-cols { display: flex; flex-direction: column; gap: 12px; }
+.st-box { padding: 14px 16px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--r); }
+.st-box h2 { margin: 0 0 6px; font-size: var(--fs-lg); }
+.st-box ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-md); line-height: 1.4; }
+.st-box-yes { border-left: 4px solid var(--green); }
+.st-box-no { border-left: 4px solid var(--muted-soft); color: var(--muted); }
+.st-thumbs {
+  list-style: none; margin: 8px 0 0; padding: 0; width: 100%;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(64px, 1fr)); gap: 8px;
+}
+.st-thumbs li { display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; line-height: 1.15; color: var(--muted); text-align: center; }
+.st-thumbs img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; border-radius: var(--r-sm); }
+/* Fast och liten, uppe till höger: resultatskärmen under är produktionens och ska inte behöva flyttas för att ge plats. */
+.st-badge { position: fixed; top: calc(6px + env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); z-index: 150; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.st-badge-btn {
+  padding: 5px 11px; border: 1px solid var(--amber-ink); border-radius: 999px; cursor: pointer;
+  background: var(--amber-light); color: var(--amber-ink); font-family: inherit;
+  font-size: var(--fs-2xs); font-weight: 800; letter-spacing: 0.06em; white-space: nowrap;
+}
+.st-badge-btn:focus-visible { outline: none; box-shadow: var(--focus); }
+.st-panel {
+  width: min(92vw, 360px); max-height: 70dvh; overflow: auto; padding: 14px; display: flex; flex-direction: column; gap: 8px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--hairline); border-radius: var(--r);
+  box-shadow: 0 8px 28px rgba(0,0,0,0.18); font-size: var(--fs-sm);
+}
+.st-panel-line { margin: 0; line-height: 1.4; }
+/* Bildsessionen föll: utan den laddas inga bilder, och det ska synas direkt på brickan. */
+.st-warn { margin: 0; line-height: 1.4; background: hsl(5 80% 96%); border-color: var(--danger); color: var(--danger-dark); }
+.st-panel-title { margin: 6px 0 0; font-size: var(--fs-sm); text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.st-facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 0; }
+.st-facts dt { color: var(--muted); }
+.st-facts dd { margin: 0; overflow-wrap: anywhere; }
+.st-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; }
+.st-log { margin: 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.st-log-t { display: inline-block; min-width: 3.2em; color: var(--muted-soft); font-variant-numeric: tabular-nums; }
+.st-log-d { color: var(--muted); }
+@media (min-width: 640px) {
+  .st-cols { flex-direction: row; }
+  .st-box { flex: 1; }
+}
+
+/* ---- bildguiden: kompakt intro + fast knapprad, och säljguiden ur vägen ---- */
+.pg-intro { gap: 12px; }
+.pg-intro .screen-title { margin: 0; font-size: var(--fs-xl, 1.6rem); line-height: 1.15; }
+.pg-lede { margin: 0; font-size: var(--fs-md); line-height: 1.4; }
+.pg-tips { gap: 10px; }
+.pg-tip-nr { flex-basis: 26px; width: 26px; height: 26px; }
+.pg-tip-text { font-size: var(--fs-sm); line-height: 1.35; }
+/* Knapparna sitter kvar i nederkanten: "Börja fota" ska synas utan att scrolla, hur kort skärmen än är. */
+.pg-intro .pg-actions {
+  position: sticky; bottom: 0; margin-top: auto; padding: 12px 0 calc(12px + env(safe-area-inset-bottom));
+  background: linear-gradient(to bottom, transparent, var(--bg) 14px);
+}
+/* Den flytande "Fråga"-knappen ligger annars över Hoppa över / Ladda upp / slutaren. Bildguidens skärmar
+   har egna knappar nere till höger, och guiden hinner inte hjälpa på ett kamerasteg ändå. */
+body:has(.pg-intro, .pg-camera, .pg-review) .guide-knapp { display: none; }

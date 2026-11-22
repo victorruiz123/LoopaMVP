@@ -1,21 +1,41 @@
 // Tunable MVP constants. Kept isolated for easy benchmarking later.
 
 /**
- * TAKET för hur många bilder ett jobb får ta emot.
+ * TAKET för hur många bilder ett jobb får ta emot — och därmed hur många besiktningen tittar på.
  *
- * Fristående från videovägens `NUM_BUCKETS` (web/src/lib/videoFrames.ts), som styr hur många vyer
- * bildruteuttaget VÄLJER. De svarar på olika frågor och ska kunna röra sig var för sig.
+ * TIO: fotoguidens sju steg (omslag, framifrån, vänster, baksida, höger, ovanifrån, närbild) plus tre
+ * extra närbilder säljaren kan lägga till i slutet. Förut sju, när ett filmat varv gav sex vyer och
+ * omslagsbilden var en sjunde som hölls utanför besiktningen.
  *
- * Skillnaden som gör det viktigt: bakom videovägen står en säljare och väntar på sitt svar, och varje
- * extra bild i INSPEKTIONSANROPET är sekunder de ser. Bakom manuellt uppladdade produktbilder —
- * B2B-vägen — väntar ingen på samma sätt.
+ * ALLA BILDER BESIKTIGAS, omslaget också. Med foton är varje bild en vinkel vi inte har någon annanstans,
+ * till skillnad från ett varv som redan täckte möbeln. Taket är därför ett tak för vad besiktningen
+ * får titta på, och varje bild kostar tid i INSPEKTIONSANROPET (≈4 s och ≈1,1 k tokens per bild, mätt på
+ * en äldre modell — se `inspectTimeouts` i pipeline/inspect.ts, som skalar tidsgränsen med antalet).
  *
- * SJU OCH INTE SEX sedan omslagsbilden kom till: videovarvet ger sina sex vyer, och omslagsbilden är
- * en sjunde bild ovanpå dem. Den KOSTAR INGEN LATENS, för den går inte in i inspektionen — se
- * `tillBedomning` i pipeline/run.ts, som lämnar den utanför anropet. Taket är alltså ett tak för vad
- * ett jobb får BÄRA, inte för vad besiktningen får titta på; de två talen är olika sedan dess.
+ * Servern kapar inte längre tyst: `prepareUploads` (imageIngest.ts) behåller omslaget och tar de första,
+ * och räknar det som föll bort.
  */
-export const MAX_IMAGES_PER_JOB = 7;
+export const MAX_IMAGES_PER_JOB = 10;
+
+/**
+ * Minsta antal olika bilder för att en SÄLJARE ska få starta en skickbedömning.
+ *
+ * 1 TILLS VIDARE, med flit: den nya fotoguiden (klienten) ber om fem, men den gamla videoklienten kan
+ * skicka fyra bildrutor och inget omslag. Höjs minimikravet före klienten byts får den fel i stället för
+ * ett kort. Sätt `MIN_PHOTOS_FOR_GRADING=5` när fotoguiden är live — och sätt tillbaka 1 för att släcka
+ * kravet utan att deploya om.
+ *
+ * Gäller bara säljarens väg (`handleCreateJob`) och bara när skickbedömning ska köras. B2B-vägen
+ * (`/v1/condition`) och köparens annonsanalys (`skipGrading`) har inga krav på antal.
+ */
+/**
+ * Minsta antal bilder fotoguiden ber om — kärnan: omslag, framifrån, vänster, baksida, höger. Skicktestet
+ * (`conditionOnly`) kräver alltid minst så många, oavsett `MIN_PHOTOS_FOR_GRADING`: det är det som testas.
+ * Klientens egen siffra står i web/src/lib/photoGuide.ts (MIN_PHOTOS) — de två ska vara lika.
+ */
+export const GUIDE_MIN_PHOTOS = 5;
+
+export const MIN_PHOTOS_FOR_GRADING = Math.max(1, Math.min(MAX_IMAGES_PER_JOB, Math.floor(Number(process.env.MIN_PHOTOS_FOR_GRADING ?? 1)) || 1));
 
 /**
  * Andrabesiktningen — `verify_findings` — är PÅ, och `VERIFY_FINDINGS=0` stänger av den.

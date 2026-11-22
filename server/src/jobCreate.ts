@@ -19,7 +19,7 @@ import { runConditionGrading } from "./pipeline/run.js";
 import { finalizeWithModel, runIdentify } from "./pipeline/identify.js";
 import { initialTasks, setTask } from "./pipeline/tasks.js";
 import { newJobCost } from "./cost/ledger.js";
-import { getImageDimensions } from "./imageUtils.js";
+import { prepareUploads, type UploadInput } from "./imageIngest.js";
 import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
 import type { CapturedImage, FurnitureIdentity } from "./types.js";
 
@@ -28,8 +28,11 @@ export interface CreateJobBody {
   /** Brand + model as the seller typed them. Optional: grading works without them, pricing does not. */
   brand?: string | null;
   model?: string | null;
-  /** Already curated by the client: selected video frames + any manual photos. No server-side selection. */
-  images: Array<{ dataUrl: string; viewLabel?: string | null; source?: "video" | "manual"; role?: "cover" }>;
+  /**
+   * Säljarens foton, i guidens ordning. Servern väljer inte bland dem — men den normaliserar dem,
+   * släpper dubbletter och lägger omslaget (`role: "cover"`) först. Se `prepareUploads`.
+   */
+  images: UploadInput[];
   /**
    * Affären skanningen tillhör (Trygg affär). Utelämnas för vanliga säljarjobb.
    *
@@ -50,6 +53,14 @@ export interface CreateJobBody {
    * och inget pris — två betalda spår mindre per körning. Se handleCreateJob och appens flagga onlyIdentifySpecs.
    */
   identifyOnly?: boolean;
+  /**
+   * Skicktestet (web/skicktest.html): kör BARA besiktningen. Ingen identifiering, inga mått, ingen annonstext,
+   * inget pris och inget omslagsurklipp — märke och modell i kroppen ignoreras. Se `ConditionJob.conditionOnly`.
+   *
+   * Motsatsen till `identifyOnly`, och går inte att kombinera med den: ett jobb utan besiktning och utan
+   * identifiering gör ingenting.
+   */
+  conditionOnly?: boolean;
 }
 
 /**
@@ -95,10 +106,23 @@ export async function createConditionJob(
    * hade tyst gjort en `true` till en adress.
    */
   ownerEmail: string | null = null,
-): Promise<{ jobId: string; imageCount: number } | { error: string }> {
+  /**
+   * SIST av samma skäl som `ownerEmail`: argumenten skickas positionellt.
+   *
+   * `minImages` är minsta antal olika, läsbara bilder. Sätts bara av säljarens väg när skickbedömning
+   * ska köras — se MIN_PHOTOS_FOR_GRADING. Räknas EFTER normalisering, så ogiltiga bilder och
+   * dubbletter räknas inte.
+   */
+  opts: { minImages?: number; conditionOnly?: boolean } = {},
+): Promise<
+  | { jobId: string; imageCount: number; dropped?: number }
+  | { error: string; code?: "too_few_images"; min?: number; got?: number }
+> {
   if (!Array.isArray(body.images) || body.images.length === 0) {
     return { error: "At least one image is required" };
   }
+  // Ett skicktest utan besiktning har ingenting att köra.
+  if (opts.conditionOnly && skipGrading) return { error: "conditionOnly kan inte kombineras med skipGrading" };
   const clientKey = body.clientKey?.trim().slice(0, 80) || null;
   if (clientKey) {
     const existing = findJobByClientKey(ownerId, clientKey);
@@ -107,47 +131,57 @@ export async function createConditionJob(
       return { jobId: existing.id, imageCount: existing.images?.length ?? 0 };
     }
   }
-  const identity = readIdentity(body);
+
+  // Bilderna avgörs INNAN jobbet skapas: ett avvisat anrop ska inte lämna en jobbkatalog efter sig.
+  const prepared = await prepareUploads(body.images, { max: MAX_IMAGES_PER_JOB, min: opts.minImages ?? 0 });
+  if (prepared.images.length === 0) return { error: "No valid images were decoded" };
+  if (prepared.error) {
+    const { min, got } = prepared.error;
+    return { error: `Minst ${min} bilder krävs för en skickbedömning (fick ${got}).`, code: prepared.error.code, min, got };
+  }
+  const droppedCount = prepared.dropped.invalid + prepared.dropped.duplicate + prepared.dropped.overCap;
+  if (droppedCount > 0) {
+    const d = prepared.dropped;
+    console.info(`[jobb] ${droppedCount} av ${body.images.length} bilder följde inte med: ${d.invalid} oläsliga, ${d.duplicate} dubbletter, ${d.overCap} över taket (${MAX_IMAGES_PER_JOB})`);
+  }
+
+  // Ett skicktest har ingen identitet, hur kroppen än ser ut: ingen identifiering, inget pris och ingen annons
+  // hänger utan den — och det är just det som garanterar att bara besiktningen körs.
+  const identity = opts.conditionOnly ? null : readIdentity(body);
   const job = await createJob(body.productContext ?? null, identity, ownerId, ownerEmail);
   if (clientKey) job.clientKey = clientKey;
   // Märkningen sätts före allt annat skrivande, så att inget mellanläge finns där jobbet är
   // besiktigat men ännu inte känt som privat.
-  if (dealId || adDerived) {
+  if (dealId || adDerived || opts.conditionOnly) {
     if (dealId) job.dealId = dealId;
     if (adDerived) job.adDerived = true;
+    if (opts.conditionOnly) job.conditionOnly = true;
     await persist(job);
   }
   const dir = jobDir(job.id);
   const originalsDir = path.join(dir, "originals");
   await mkdir(originalsDir, { recursive: true });
 
-  const limited = body.images.slice(0, MAX_IMAGES_PER_JOB);
+  // Alltid `.jpg`: `prepareUploads` har kodat om allt som JPEG, och Gemini-anropet läser filen som
+  // `image/jpeg` (imageUtils.ts) — en `.png` med PNG-bytes hade skickats under fel mimetyp.
   const images: CapturedImage[] = [];
-  for (let i = 0; i < limited.length; i++) {
-    const { dataUrl, viewLabel, source, role } = limited[i];
-    const match = /^data:(image\/\w+);base64,(.+)$/.exec(dataUrl);
-    if (!match) continue;
-    const [, mimeType, base64] = match;
-    const ext = mimeType === "image/png" ? "png" : "jpg";
-    const filename = `img_${i}.${ext}`;
-    const abs = path.join(originalsDir, filename);
-    await writeFile(abs, Buffer.from(base64, "base64"));
-    const { width, height } = await getImageDimensions(abs);
+  for (let i = 0; i < prepared.images.length; i++) {
+    const p = prepared.images[i];
+    const filename = `img_${i}.jpg`;
+    await writeFile(path.join(originalsDir, filename), p.buffer);
     images.push({
       id: randomUUID(),
-      viewLabel: viewLabel ?? null,
-      source: source ?? "manual",
-      // Bara "cover" släpps in. Fältet styr vad som blir annonsens ansikte och vad besiktningen får
-      // se, så en klient ska inte kunna hitta på en tredje roll som ingen kod nedströms känner igen.
-      ...(role === "cover" ? { role: "cover" as const } : {}),
-      width,
-      height,
+      viewLabel: p.viewLabel,
+      source: p.source,
+      // Bara "cover" släpps in, och bara på EN bild (prepareUploads). Fältet styr vad som blir
+      // annonsens ansikte, så en klient ska inte kunna hitta på en roll som ingen kod nedströms känner igen.
+      ...(p.role ? { role: p.role } : {}),
+      width: p.width,
+      height: p.height,
       path: filename,
       capturedAt: new Date().toISOString(),
     });
   }
-
-  if (images.length === 0) return { error: "No valid images were decoded" };
 
   job.images = images;
   // Kostnadsboken och uppgifternas startlägen skrivs INNAN något startar: det som körs direkt (skick, modellförslag) märks som körande, det som väntar på
@@ -156,6 +190,7 @@ export async function createConditionJob(
   job.tasks = initialTasks({
     skipGrading,
     identify: identity?.brand && !identity.model ? "run" : identity?.model ? "resolved" : "none",
+    conditionOnly: opts.conditionOnly,
   });
   await persist(job);
 
@@ -174,7 +209,9 @@ export async function createConditionJob(
   // Två spår, parallellt. Besiktningen behöver inte modellen och identifieringen behöver inte
   // betyget — de delar bara bildrutorna. Kedjade hade de lagt sina tider ovanpå varandra.
   if (!skipGrading) {
-    void runConditionGrading(job.id, images, body.productContext ?? null, identity);
+    // Ett skicktest bygger heller inget omslagsurklipp: flera körningar med den stora bildmodellen, och det
+    // är just det slags kostnad ett rent besiktningstest ska slippa.
+    void runConditionGrading(job.id, images, body.productContext ?? null, identity, { skipCover: opts.conditionOnly });
   } else {
     // Utan besiktning blir jobbet aldrig "done" av sig självt — inget spår sätter det. Identiteten
     // driver resten, och klienten läser den direkt (se analysisStatus).
@@ -198,7 +235,7 @@ export async function createConditionJob(
     await persist(job);
     void finalizeWithModel(job.id, { kind: "manual", manualModel: identity.model });
   }
-  return { jobId: job.id, imageCount: images.length };
+  return { jobId: job.id, imageCount: images.length, ...(droppedCount > 0 ? { dropped: droppedCount } : {}) };
 }
 
 /**

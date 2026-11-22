@@ -48,7 +48,11 @@ export type VerificationState = "CONFIRMED" | "REJECTED" | "UNCERTAIN" | "NOT_RU
 export type CoverageState = "INSPECTED_CLEAR" | "INSPECTED_DAMAGE" | "NOT_SUFFICIENTLY_VISIBLE";
 export type ConditionGrade = "A" | "B" | "C" | "D" | "E" | "F";
 
-/** One image sent into the inspection: either a client-selected video frame or a manually captured/uploaded photo. */
+/**
+ * One image sent into the inspection: a manually captured/uploaded photo.
+ * `source: "video"` finns kvar för jobb skapade när appen filmade ett varv (lagrade jobb, fixturer);
+ * nya klienter skickar alltid `"manual"`.
+ */
 export interface CapturedImage {
   id: string;
   /** client-assigned, for display only (e.g. "Framifrån", "Höger sida", "Närbild") — never used for grading logic */
@@ -57,19 +61,19 @@ export interface CapturedImage {
   /**
    * Vad bilden är TILL FÖR, till skillnad från `viewLabel` som säger vad den visar.
    *
-   * `"cover"` sätts av appen på den enda bild säljaren blir ombedd att komponera: omslagsbilden, tagen
-   * i möbelns egen höjd och snett framifrån efter att varvet är filmat. Se omslagsbild.ts i webben.
+   * `"cover"` sätts av appen på den bild säljaren blir ombedd att komponera först i fotoguiden:
+   * omslagsbilden, tagen i möbelns egen höjd och snett framifrån. Se `OMSLAGSSTATION` i webben.
    *
-   * FÄLTET STYR TVÅ SAKER, och ingen av dem är bedömningen:
+   * FÄLTET STYR NUMERA BARA ETT: vilken bild som blir annonsens ansikte (pipeline/cover.ts och
+   * pipeline/bild/omslag.ts) — och bara om urklippet av den håller måttet. En komponerad bild som
+   * modellen ändå klipper sönder ska inte bli annonsens ansikte bara för att den var efterfrågad.
    *
-   *   1. Bilden går INTE in i inspektionsanropet (`tillBedomning` i pipeline/run.ts). Den är ett
-   *      sjunde foto, och ett sjunde foto i anropet är sekunder säljaren står och väntar. Skicket
-   *      avgörs av varvet, precis som förut.
-   *   2. Den vinner omslagsvalet (pipeline/bild/omslag.ts) — men bara om urklippet av den håller
-   *      måttet. En komponerad bild som modellen ändå klipper sönder ska inte bli annonsens ansikte
-   *      bara för att den var efterfrågad.
+   * Omslagsbilden BESIKTIGAS som alla andra bilder. Den hölls tidigare utanför inspektionen
+   * (`tillBedomning`), eftersom ett filmat varv redan täckte möbeln; med foton är den en av få
+   * vinklar vi har. `prepareUploads` lägger den på index 0 — listan har en enda ordning, så
+   * `image_index`, `coverImageIndex` och verify-etiketterna pekar alltid på samma bild.
    *
-   * Odefinierat på allt annat, och på varje bild tagen före omslagssteget fanns.
+   * Odefinierat på allt annat, och på varje jobb skapat före fotoguiden.
    */
   role?: "cover";
   width: number;
@@ -1152,6 +1156,19 @@ export interface ConditionJob {
    * bilder säljaren valt, ofta just för att slitaget inte syns. Se PreliminaryFrame i klienten.
    */
   adDerived?: boolean;
+  /**
+   * Jobbet är ett RENT SKICKTEST (web/skicktest.html): bara besiktningen körs — ingen identifiering, inga
+   * mått, ingen annonstext, inget pris och inget omslagsurklipp.
+   *
+   * SATT = JOBBET ÄR PRIVAT, genom samma två portar som `dealId` och `adDerived` (butik/normalize.ts och
+   * publicCard.ts). Ett testjobb har varken modell eller annons och kan inte publiceras, men ska inte
+   * heller kunna hamna i butiken eller bakom ett gissbart Loopa-ID.
+   *
+   * SÄTTS VID SKAPANDET och aldrig senare, av samma skäl som de andra två. Det styr också vad som får
+   * köras efteråt: `regradeAndReprice` räknar om BETYGET när säljaren rättar en skada, men rör aldrig
+   * priset för ett sådant jobb — det finns ingen modell att pris på.
+   */
+  conditionOnly?: boolean;
   /**
    * Säljarens svar på de två frågor bilderna inte kan besvara: pälsdjur i hemmet, och lukt.
    *
