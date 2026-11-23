@@ -30,8 +30,8 @@ import type { Resolution } from "./listing.js";
 import { assessAddedPhoto } from "./pipeline/addFromPhoto.js";
 import { mapRawDefect } from "./pipeline/inspect.js";
 import { loadImageAsBase64 } from "./imageUtils.js";
-import { getImageDimensions } from "./imageUtils.js";
-import { JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB } from "./config.js";
+import { normaliseImage } from "./imageIngest.js";
+import { GUIDE_MIN_PHOTOS, JOB_DEADLINE_MS, MAX_IMAGES_PER_JOB, MIN_PHOTOS_FOR_GRADING } from "./config.js";
 import { distExists, serveStatic } from "./static.js";
 import { markTraderaPending, planTraderaPublish } from "./integrations/tradera/publish.js";
 import { getTraderaLage, traderaConfigured } from "./integrations/tradera/tradera.js";
@@ -135,6 +135,11 @@ async function regradeAndReprice(job: ConditionJob, kalla: "saljare" | "granskni
   const forePris = job.result.price?.default ?? null;
 
   job.result.grade = gradeCondition(job.result.damages, job.result.overallCondition);
+  // Ett rent skicktest har ingen modell att pris på, och ska aldrig anropa prismotorn — betyget räknas om, inget mer.
+  if (job.conditionOnly) {
+    await persist(job);
+    return;
+  }
   await repriceResult(job.result, await coverImageBase64(job), job.selected?.productType ?? null);
   await persist(job);
   // Det nya priset kommer ojusterat ur motorn, alltså för EN möbel. Är det stolar säljaren räknat
@@ -268,7 +273,16 @@ async function handleCreateJob(req: IncomingMessage, res: ServerResponse, identi
   // Testläget (appens flagga onlyIdentifySpecs) hoppar över skickbedömningen; det gäller bara jobb som redan är externa (appskalet i testläge), aldrig en vanlig uppladdning.
   // SerpApi-flödet i drift sätter inte flaggan: där körs skickbedömning, pris och annons som vanligt.
   const skipGrading = body.externalIdentify === true && body.identifyOnly === true;
-  const out = await createConditionJob(body, identity.id, dealId, false, skipGrading, identity.email);
+  // Skicktestet (web/skicktest.html): bara besiktningen. Kräver alltid fotoguidens minimum — det är det som testas —
+  // och kan aldrig kombineras med identifyOnly (`skipGrading`): ett jobb utan besiktning och utan identifiering gör ingenting.
+  const conditionOnly = body.conditionOnly === true && !skipGrading;
+  // Minimikravet gäller säljarens skickbedömning och inget annat: testläget (skipGrading) bedömer inget skick,
+  // och B2B-vägen (handleApiCreate) och köparens annonsanalys (affar/analysis.ts) går inte genom den här funktionen.
+  const out = await createConditionJob(body, identity.id, dealId, false, skipGrading, identity.email, {
+    minImages: skipGrading ? 0 : conditionOnly ? Math.max(MIN_PHOTOS_FOR_GRADING, GUIDE_MIN_PHOTOS) : MIN_PHOTOS_FOR_GRADING,
+    conditionOnly,
+  });
+  // `code`, `min` och `got` följer med i svaret, så klienten kan visa "du behöver N bilder till" i stället för en feltext.
   if ("error" in out) return sendJson(res, 400, out);
 
   // Affären får veta vilket jobb som är dess. Skanningen är igång; tillståndsbytet till `scanned`
@@ -1391,7 +1405,9 @@ async function handleApiGet(jobId: string, req: IncomingMessage, res: ServerResp
  */
 async function handleListJobs(res: ServerResponse, identity: Identity) {
   const all = await listJobs();
-  return sendJobSummaries(res, all.filter((j) => owns(j, identity)));
+  // Ett skicktest (conditionOnly) är ett gränssnitt som provats, inte en möbel säljaren vill sälja: det ska inte
+  // ligga i "Mina annonser" som en annons utan rubrik. Adminlistan visar det ändå — det kostar riktiga anrop.
+  return sendJobSummaries(res, all.filter((j) => owns(j, identity) && !j.conditionOnly));
 }
 
 /**
@@ -1958,9 +1974,14 @@ async function handleAddFromPhoto(jobId: string, req: IncomingMessage, res: Serv
   const body = await readJsonBody<AddFromPhotoBody>(req);
   const match = /^data:(image\/\w+);base64,(.+)$/.exec(body.dataUrl ?? "");
   if (!match) return sendJson(res, 400, { error: "Behöver en närbild som data-URL" });
-  const [, mimeType, base64] = match;
+  const [, , base64] = match;
 
-  const outcome = await assessAddedPhoto({ mimeType, base64 }, body.partHint ?? null);
+  // Samma dörr som uppladdningen: rätad, skalad och omkodad som JPEG, utan metadata. En närbild tagen med
+  // telefonens egen kameraapp bär annars sin vridning i EXIF, och bredd/höjd kunde bli omkastade.
+  const normalised = await normaliseImage(Buffer.from(base64, "base64"));
+  if (!normalised) return sendJson(res, 400, { error: "Bilden gick inte att läsa" });
+
+  const outcome = await assessAddedPhoto({ mimeType: "image/jpeg", base64: normalised.buffer.toString("base64") }, body.partHint ?? null);
   if (!outcome.isDamage || !outcome.defect) {
     return sendJson(res, 200, { added: false, reason: outcome.reason, result: job.result });
   }
@@ -1968,8 +1989,8 @@ async function handleAddFromPhoto(jobId: string, req: IncomingMessage, res: Serv
   const dir = jobDir(jobId);
   const filename = `added_${Date.now()}.jpg`;
   const abs = path.join(dir, "originals", filename);
-  await writeFile(abs, Buffer.from(base64, "base64"));
-  const { width, height } = await getImageDimensions(abs);
+  await writeFile(abs, normalised.buffer);
+  const { width, height } = normalised;
   const image: CapturedImage = {
     id: randomUUID(),
     viewLabel: "Närbild",

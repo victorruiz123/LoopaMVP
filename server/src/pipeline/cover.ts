@@ -10,9 +10,9 @@
  *
  * 1. DUGLIGHET, mätt här med sharp. Svart, utbränd eller helt platt bildruta diskvalificeras. Det är
  *    aritmetik på pixlar och kan inte ha fel om det den mäter.
- * 2. AVSIKT: bilden med rollen `cover` är den säljaren blev ombedd att komponera efter varvet — i
- *    möbelns egen höjd, snett framifrån. Den slår vy-valet, för den är inte gissad ur en film utan
- *    beställd och tagen.
+ * 2. AVSIKT: bilden med rollen `cover` är den säljaren blev ombedd att komponera — först i fotoguiden,
+ *    i möbelns egen höjd, snett framifrån. Den slår vy-valet, för den är inte gissad utan beställd och
+ *    tagen. (Den besiktigas som alla andra bilder och ligger på index 0 — se run.ts.)
  * 3. VY, från inspektionsanropet, som ändå ser alla bildrutor och får peka ut den som visar möbeln
  *    framifrån. Gratis — inget extra anrop, ingen extra latens. Gäller när ingen omslagsbild togs.
  *

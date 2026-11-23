@@ -100,8 +100,20 @@ function promptHash(): string {
   h.update(region("const TAXONOMY_BLOCK = `", "`;"));
   // Present only in the prompt generations that had a separate cues block; skipped when absent.
   if (src.includes("const SOFT_WEAR_CUES = `")) h.update(region("const SOFT_WEAR_CUES = `", "`;"));
+  // NOT_DAMAGE_BLOCK is interpolated into SYSTEM_PROMPT as `${NOT_DAMAGE_BLOCK}`, so the region below only
+  // saw the reference, never the text — editing it (e.g. the video → photo wording) left the hash unchanged
+  // and two prompt generations fell into the same fixture group. Hash the text itself.
+  if (src.includes("const NOT_DAMAGE_BLOCK = `")) h.update(region("const NOT_DAMAGE_BLOCK = `", "`;"));
   h.update(region("const SYSTEM_PROMPT = `", "`;"));
   h.update(region("const RESPONSE_SCHEMA = {", "\n};"));
+  // The user prompt is part of what makes two runs comparable: it carries the image labels ("foto
+  // (Framifrån)" vs "video-vy"). Older generations built it inline; newer ones in these two functions.
+  if (src.includes("export function describeImages(")) {
+    h.update(region("export function describeImages(", "\n}"));
+    h.update(region("export function buildUserPrompt(", "\n}"));
+  } else if (src.includes("const imageList = ")) {
+    h.update(region("const imageList = ", "schemat.`;"));
+  }
   return h.digest("hex").slice(0, 16);
 }
 
@@ -137,6 +149,10 @@ const fixture = {
   runIndex,
   modelUsed: modelUsed(),
   promptHash: promptHash(),
+  // How the images were made. A run on photos and a run on video frames of the same furniture are not
+  // the same experiment, so the corpus summaries group on this (snapshot.ts describeCorpus). Jobs from
+  // before the photo guide carry source "video" on every frame; anything else is a photo run.
+  capture_mode: (job.result.images ?? []).some((i: { source?: string }) => i.source === "video") ? "video" : "photo",
   recordedAt: job.result.createdAt ?? new Date().toISOString(),
   lockPartLocations: false,
   expectedToChangeIn: null,

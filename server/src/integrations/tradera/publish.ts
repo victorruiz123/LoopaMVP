@@ -26,7 +26,7 @@ import {
   traderaPaymentOptionIds,
 } from "./mapping.js";
 
-/** Tradera tar högst 10 bilder per annons. Jobben har som mest 6 (MAX_IMAGES_PER_JOB). */
+/** Tradera tar högst 10 bilder per annons. Jobben har som mest MAX_IMAGES_PER_JOB (10), så allt ryms. */
 const MAX_TRADERA_IMAGES = 10;
 
 /**

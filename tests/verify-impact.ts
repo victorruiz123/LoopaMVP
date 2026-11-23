@@ -14,7 +14,7 @@
 // till CONFIRMED — exakt vad run.ts publicerar som delresultat innan granskningen.
 // Att mätningen inte rör nätet gör den oberoende av hur Gemini mår i dag.
 
-import { describeCorpus, loadFixtures, runFixture } from "./snapshot.js";
+import { captureModeOf, describeCorpus, loadFixtures, runFixture } from "./snapshot.js";
 import type { Damage } from "../server/src/types.js";
 
 const ADDED_BY_VERIFY = "Hittad av andra besiktaren.";
@@ -89,6 +89,11 @@ console.log(`  samma betyg, annan fyndlista:      ${recListChanged}`);
 console.log(`  helt oförändrat av verify:         ${recordedRows.length - recGradeChanged - recListChanged}`);
 console.log(`  körningar med ogranskade fynd:     ${uncroppableRuns}`);
 console.log(`  betygsspann i underlaget:          ${[...new Set(recordedRows.map((r) => r["betyg m"]))].sort().join(", ")}`);
+const captureModes = new Set(fixtures.filter((f) => f.source === "recorded").map((f) => captureModeOf(f)));
+if (captureModes.size > 1) {
+  console.log(`\n  ⚠ Underlaget blandar filmade och fotograferade körningar (${[...captureModes].join(", ")}).` +
+    `\n    De är olika experiment — dela upp dem innan siffrorna används för att jämföra de två.`);
+}
 const frameCounts = new Set(fixtures.filter((f) => f.source === "recorded").map((f) => f.frame_count));
 if (frameCounts.size > 1) {
   console.log(`\n  ⚠ Underlaget blandar ${frameCounts.size} olika antal bildrutor` +

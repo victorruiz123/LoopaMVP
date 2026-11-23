@@ -45,38 +45,32 @@ class StageTimer {
   }
 }
 
-/**
- * Bilderna BESIKTNINGEN ska titta på: allt utom omslagsbilden.
+/*
+ * ALLA bilder går in i besiktningen, omslagsbilden också.
  *
- * Omslagsbilden är komponerad för annonsen, inte för bedömningen — säljaren blir ombedd att ta den
- * efter varvet, i möbelns egen höjd och snett framifrån. Skicket avgörs av varvet, som redan sett
- * möbeln från alla håll.
+ * Det fanns en `tillBedomning` här som höll omslagsbilden utanför inspektionsanropet. Skälet var latens:
+ * ett filmat varv gav sex vyer som redan täckte möbeln, och en sjunde bild var sekunder säljaren stod
+ * och väntade på något som varvet redan sett. Med fotoguiden är varje bild en vinkel vi inte har
+ * någon annanstans, och omslagsbilden — i möbelns egen höjd, snett framifrån — är en av de bästa.
  *
- * SKÄLET ATT HÅLLA DEN UTANFÖR ÄR LATENS, och den är mätt: bildrutorna går i ETT inspektionsanrop där
- * fyra bilder kostar 21 s och åtta kostar 37 s (se videoFrames.ts). En sjunde bild är alltså ett par
- * sekunder som säljaren står och tittar på en snurra — betalt för en vy varvet redan täcker.
+ * Det tog också bort en regel som var lätt att bryta: bedömningslistan var tvungen att vara ett PREFIX
+ * av hela listan (omslaget sist), annars gled varje `image_index` ett steg och bevisbilder hamnade på
+ * fel foto. Nu finns EN lista i EN ordning (omslaget först, se `prepareUploads`), och `image_index`,
+ * `coverImageIndex` och verify-etiketterna pekar alltid på samma bild.
  *
- * INDEXEN FÖLJER MED. Modellen pekar ut bevis som `image_index` in i den lista den fick, och
- * `mapRawDefect` slår upp i samma lista — så länge båda är den här. Att i stället filtrera efteråt
- * hade flyttat varje index ett steg och satt bevisbilder på fel foto, vilket är ett fel man ser
- * först på kortet, långt från koden som orsakade det.
+ * Latensen är hanterad på ett annat ställe: `inspectTimeouts` skalar tidsgränsen med antalet bilder.
  */
-export function tillBedomning(images: CapturedImage[]): CapturedImage[] {
-  const bedomda = images.filter((i) => i.role !== "cover");
-  // Ett jobb som BARA bär en omslagsbild ska bedömas på den och inte på ingenting. Det kan inte hända
-  // via appen, som alltid filmar först, men en klient som skickar en enda bild med rollen satt ska
-  // få en besiktning och inte ett tomt anrop.
-  return bedomda.length > 0 ? bedomda : images;
-}
 
 export function runConditionGrading(
   jobId: string,
   images: CapturedImage[],
   productContext: string | null,
   identity: FurnitureIdentity | null = null,
+  /** `skipCover`: bygg inget omslagsurklipp. Sätts av skicktestet (ConditionJob.conditionOnly), som bara ska besiktiga. */
+  opts: { skipCover?: boolean } = {},
 ): Promise<void> {
   // Allt betalt som körs härunder bokförs på jobbet som skicksteg (cost/jobCost.ts).
-  return withCostScope({ jobId, stage: "condition" }, () => runConditionGradingInner(jobId, images, productContext, identity));
+  return withCostScope({ jobId, stage: "condition" }, () => runConditionGradingInner(jobId, images, productContext, identity, opts));
 }
 
 async function runConditionGradingInner(
@@ -84,6 +78,7 @@ async function runConditionGradingInner(
   images: CapturedImage[],
   productContext: string | null,
   identity: FurnitureIdentity | null,
+  opts: { skipCover?: boolean },
 ): Promise<void> {
   await setTask(jobId, "condition", "running", { restart: true });
   const dir = jobDir(jobId);
@@ -101,20 +96,13 @@ async function runConditionGradingInner(
     await updateProgress(jobId, { stage: "preparing", message: "Bilder förberedda." });
 
     await updateProgress(jobId, { stage: "inspecting", message: "Inspekterar möbeln…" });
-    const inspection = await inspectFurniture(tillBedomning(images), dir, productContext);
+    const inspection = await inspectFurniture(images, dir, productContext);
     track(inspection.callMeta);
     timer.lap("inspect");
 
     // Omslaget avgörs här, medan inspektionens vy-val fortfarande finns i handen. Duglighetsspärren
     // kör över det om bildrutan är svart eller utbränd — se cover.ts.
-    /**
-     * ALLA bilder, inte `tillBedomning`: omslagsbilden är själva poängen här.
-     *
-     * `coverImageIndex` pekar in i den lista inspektionen fick — alltså den utan omslagsbilden — och
-     * det stämmer fortfarande, för den listan är ett prefix av den här: omslagsbilden ligger sist,
-     * efter varvets bildrutor. Skulle den ordningen någon gång vändas pekar vy-valet på fel bild, och
-     * det är därför appen lägger omslagsbilden sist och inte först.
-     */
+    // `coverImageIndex` pekar in i samma lista som inspektionen fick: samma `images`, samma ordning.
     const coverImageId = await pickCoverImageId(
       images,
       path.join(dir, "originals"),
@@ -123,7 +111,8 @@ async function runConditionGradingInner(
 
     // Omslaget klipps ut här och inte senare: bildrutan är vald, och urklippet ska vara framme när
     // säljaren når annonsen — flera skärmar och en modellsökning bort. Det väntas aldrig in.
-    startCover(jobId, dir, images, coverImageId);
+    // Ett skicktest har ingen annons att göra bilder åt, så det hoppas över (`coverImageId` väljs ändå, det är gratis).
+    if (!opts.skipCover) startCover(jobId, dir, images, coverImageId);
 
     /**
      * Andrabesiktningen är urkopplad (VERIFY_ENABLED, default av). Med flaggan AV går fynden rakt

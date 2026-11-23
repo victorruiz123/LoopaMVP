@@ -1,7 +1,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 import SaljGuide, { type GuideSteg } from "./components/SaljGuide";
 import HomeScreen from "./screens/HomeScreen";
-import CaptureScreen from "./screens/CaptureScreen";
+import PhotoCaptureScreen from "./screens/PhotoCaptureScreen";
 import AnalysisScreen from "./screens/AnalysisScreen";
 import ModelSelectScreen from "./screens/ModelSelectScreen";
 import SpecsScreen from "./screens/SpecsScreen";
@@ -459,7 +459,7 @@ function FlowApp() {
         );
       case "capture":
         return (
-          <CaptureScreen
+          <PhotoCaptureScreen
             identity={screen.identity}
             initialShots={screen.shots}
             onBack={goHome}

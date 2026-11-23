@@ -378,11 +378,12 @@ export function jobToProduct(job: ConditionJob, state: ProductState): Product | 
    * från ett jobb till något butiken kan visa, och en regel som ska gälla överallt hör hemma i den
    * enda porten — inte upprepad hos var och en som råkar gå igenom den.
    *
-   * TVÅ MARKÖRER, båda stängande: `dealId` (tillhör en affär) och `adDerived` (byggt på någon annans
-   * annonsbilder). Den andra finns redan innan den första gör det — köparens analys skapas innan de
-   * har ett konto — och utan den hade en möbel vi aldrig sett legat till försäljning hos oss.
+   * TRE MARKÖRER, alla stängande: `dealId` (tillhör en affär), `adDerived` (byggt på någon annans
+   * annonsbilder) och `conditionOnly` (ett rent skicktest, inget en köpare ska kunna se). Den andra finns
+   * redan innan den första gör det — köparens analys skapas innan de har ett konto — och utan den hade
+   * en möbel vi aldrig sett legat till försäljning hos oss.
    */
-  if (job.dealId || job.adDerived) return null;
+  if (job.dealId || job.adDerived || job.conditionOnly) return null;
 
   const result = job.result;
   if (!result) return null;
