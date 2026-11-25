@@ -24,6 +24,7 @@ const ctype = await import("../server/src/candidateType.js");
 const { http, serpApiSearch, SerpApiError } = await import("../server/src/serpapi/client.js");
 const session = await import("../server/src/serpapi/session.js");
 const aimode = await import("../server/src/serpapi/aimode.js");
+const { BILDBEGARAN } = await import("../server/src/serpapi/bildrader.js");
 
 const ROOT = path.resolve(import.meta.dirname, "..");
 // Frågorna genereras ur appskalets main.js (scripts/loopa-app-prototype/, ett lokalt verktyg som inte ligger i repot). Finns filen, jämförs frågorna med den ord för ord; annars hoppas jämförelsen över
@@ -304,7 +305,7 @@ const dataUrl = `data:image/jpeg;base64,${Buffer.from("fake-jpeg-bytes").toStrin
 const images = () => calls.filter((c) => c.params.engine === "google_images");
 const ai = () => calls.filter((c) => c.params.engine === "google_ai_mode");
 
-test("identify + askSpecs: exakt skalets frågor, bilden bara i första frågan, uppföljningen fortsätter med token, bildsökningarna är skalets", async () => {
+test("identify + askSpecs: frågan har bildbegäran, bilden bara i första frågan, måttfrågan fortsätter med token, bildsökning bara när webben ber om den", async () => {
   onAi = (_p, n) =>
     n === 1
       ? aiBody(`${LONG}\n\n1. **Sits Impulse** – säkerhet 80 %, aktuell\n2. Sits Brandon – säkerhet 60 %\n3. Sits Stella – säkerhet 40 %, utgången\n4. Sits Quattro – säkerhet 30 %`, "tok1", [
@@ -319,9 +320,10 @@ test("identify + askSpecs: exakt skalets frågor, bilden bara i första frågan,
   assert.equal(session.getImage(s.imageName!)!.buf.toString(), "fake-jpeg-bytes");
 
   const idn = await aimode.identify(s, "Sits", "fåtölj");
-  assert.equal(ai().length, 1, "fyra förslag: ingen fler-förslag-fråga");
+  assert.equal(ai().length, 1, "en enda fråga");
+  assert.equal(images().length, 0, "inga bildsökningar i förväg");
   const p1 = ai()[0].params;
-  assert.equal(p1.q, prompts.PROMPT("Sits", "fåtölj"));
+  assert.equal(p1.q, `${prompts.PROMPT("Sits", "fåtölj")} ${BILDBEGARAN}`);
   assert.equal(p1.image_url, s.imageUrl);
   assert.equal(p1.subsequent_request_token, undefined);
   assert.equal(p1.continuable, "true");
@@ -332,15 +334,15 @@ test("identify + askSpecs: exakt skalets frågor, bilden bara i första frågan,
   assert.ok(idn.answer.includes("Källor som AI-läget anger:\n- Impulse Fåtölj | Folkhemmet"));
   assert.ok(idn.links.includes("https://folkhemmet.com/impulse-fatolj/"));
 
-  // Bildsökningarna startade redan under identify (som skalets prefetch): en per namngiven modell, med skalets sökord.
+  // Webben ber bara om bilder för kort som inte fick någon ur Googles bildrader: en sökning per sådan modell.
   const groups = await aimode.findImages(s, "Sits", [
     { model: "Impulse", productType: "fåtölj" },
     { model: "Brandon", productType: "fåtölj" },
   ]);
   assert.deepEqual(
     images().map((c) => c.params.q).sort(),
-    ["Sits Brandon fåtölj produktbild framifrån", "Sits Impulse fåtölj produktbild framifrån", "Sits Quattro fåtölj produktbild framifrån", "Sits Stella fåtölj produktbild framifrån"],
-    "fyra sökningar, inga dubbletter när webben frågar efter samma modeller; kedjans fråga har \"produktbild framifrån\" (2026-11-09)",
+    ["Sits Brandon fåtölj produktbild framifrån", "Sits Impulse fåtölj produktbild framifrån"],
+    "bara de efterfrågade modellerna; kedjans fråga har \"produktbild framifrån\" (2026-11-09)",
   );
   assert.equal(groups[0].model, "Impulse");
   assert.equal(groups[0].rows.length, 1);
@@ -360,32 +362,19 @@ test("identify + askSpecs: exakt skalets frågor, bilden bara i första frågan,
   // Allt som skickades är sparat för granskning, och loggen innehåller aldrig nyckeln.
   const dir = path.join(process.env.LOOPA_SERPAPI_LOG_DIR!, s.id);
   const filer = fs.readdirSync(dir);
-  assert.ok(filer.length >= 7);
+  assert.ok(filer.length >= 4);
   for (const f of filer) assert.ok(!fs.readFileSync(path.join(dir, f), "utf8").includes(KEY), `${f} innehåller nyckeln`);
 });
 
-test("färre än fyra förslag: MORE_PROMPT med de redan nämnda namnen, samma samtal, svaret får skalets skiljelinje", async () => {
-  onAi = (_p, n) =>
-    n === 1
-      ? aiBody(`${LONG}\n1. Sits Impulse – 80 %\n2. Sits Brandon – 60 %`, "tok1")
-      : aiBody(`${LONG}\n1. Sits Stella – 40 %\n2. Sits Quattro – 30 %`, "tok2");
+test("färre än fyra förslag ger ingen ny fråga, och måttfrågan går ändå att ställa i samma samtal", async () => {
+  onAi = (_p, n) => (n === 1 ? aiBody(`${LONG}\n1. Sits Impulse – 80 %\n2. Sits Brandon – 60 %`, "tok1") : aiBody(`${LONG}\nVariant: vit\nNypris: 10 490 kr`, "tok2"));
   const { sid } = await aimode.prepare("anv-1", [dataUrl]);
   const s = session.getSession(sid, "anv-1")!;
   const idn = await aimode.identify(s, "Sits", "fåtölj");
-  assert.equal(ai().length, 2);
-  assert.equal(ai()[1].params.q, prompts.MORE_PROMPT("Sits", "fåtölj", ["Impulse", "Brandon"]));
+  assert.equal(ai().length, 1);
+  assert.deepEqual(prompts.proposalNames(idn.answer, "Sits"), ["Impulse", "Brandon"]);
+  await aimode.askSpecs(s, "Sits", "Impulse", "fåtölj");
   assert.equal(ai()[1].params.subsequent_request_token, "tok1");
-  assert.ok(idn.answer.includes(aimode.MORE_SEPARATOR));
-  assert.deepEqual(prompts.proposalNames(idn.answer, "Sits"), ["Impulse", "Brandon", "Stella", "Quattro"]);
-});
-
-test("ett svar utan nya modeller läggs inte till och ger ingen tredje fråga", async () => {
-  onAi = (_p, n) => (n === 1 ? aiBody(`${LONG}\n1. Sits Impulse – 80 %\n2. Sits Brandon – 60 %`, "tok1") : aiBody(`${LONG}\n1. Sits Impulse – 80 %`, "tok2"));
-  const { sid } = await aimode.prepare("anv-1", [dataUrl]);
-  const s = session.getSession(sid, "anv-1")!;
-  const idn = await aimode.identify(s, "Sits", "fåtölj");
-  assert.equal(ai().length, 2);
-  assert.ok(!idn.answer.includes("FLER FÖRSLAG"));
 });
 
 test("måttfrågan: två försök när AI-läget inte svarar, samma token båda gångerna", async () => {
@@ -483,7 +472,8 @@ test("dagstaket stoppar sökningarna innan de går iväg", async () => {
   onAi = () => aiBody(`${LONG}\n1. A1 – 80 %\n2. B2 – 60 %\n3. C3 – 40 %\n4. D4 – 30 %`, "tok1");
   const { sid } = await aimode.prepare("anv-1", [dataUrl]);
   const s = session.getSession(sid, "anv-1")!;
-  await aimode.identify(s, "Sits", "fåtölj"); // 1 fråga + 4 bildsökningar i förväg: bara EN till får plats, resten ger tomma rader
+  await aimode.identify(s, "Sits", "fåtölj"); // 1 fråga; av två bildsökningar får bara EN plats, den andra ger tomma rader
+  await aimode.findImages(s, "Sits", [{ model: "A1", productType: "fåtölj" }, { model: "B2", productType: "fåtölj" }]);
   assert.equal(calls.length, 2, "taket 2: frågan och en bildsökning");
   await assert.rejects(() => aimode.askSpecs(s, "Sits", "Impulse", "fåtölj"), /måttfrågan gav inget svar/);
   assert.equal(calls.length, 2, "ingen sökning gick iväg över taket");

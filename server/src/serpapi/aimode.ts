@@ -2,22 +2,20 @@
  * Flödet mot Googles AI-läge via SerpApi — en port av appskalets main.js (scripts/loopa-app-prototype/, där frågorna bor) (prepare, identify, askSpecs, findImages), steg för steg:
  *
  *   prepare   omslagsbilden läggs ut på en kortlivad adress (appskalet lade in den i AI-lägets ruta)
- *   identify  fråga 1 = PROMPT (+ bilden), därefter högst två "fler förslag"-frågor i SAMMA samtal så länge färre än fyra förslag namngetts (MORE_PROMPT); bildsökningarna startar så fort
- *             modellerna är namngivna, parallellt med uppföljningarna (som appskalet gör)
+ *   identify  EN fråga: PROMPT + bildbegäran (+ bilden). Googles bildrader läses ur den råa sidan i samma sökning (bildrader.ts) och blir modellkortens bilder. Inga uppföljningsfrågor.
  *   askSpecs  fråga efter valet = SPEC_PROMPT i samma samtal, två försök om AI-läget inte svarar
- *   findImages  bildsökning per modell, alla parallellt (SerpApis google_images i stället för skalets dolda fönster)
+ *   findImages  reserv för kort som inte fick någon bild ur svaret: en bildsökning per sådan modell (SerpApis google_images), alla parallellt
  *
- * FRÅGORNA är de från main.js, ord för ord (prompts.ts är genererad ur den filen). Servern efter detta (strukturering, kort, specsteg, kontroller) är SAMMA kod som för appskalet:
+ * FRÅGORNA bygger på de från main.js (prompts.ts är genererad ur den filen); identifieringsfrågan har bildbegäran efter sig. Servern efter detta (strukturering, kort, specsteg, kontroller) är SAMMA kod som för appskalet:
  * webben anropar den som förut, bara bryggen under (web/src/lib/serpApiBridge.ts) pratar med de här funktionerna i stället för med Electron.
  */
 
 import fs from "node:fs";
 import path from "node:path";
 import { SerpApiError, http, serpApiSearch, withoutKey, type SerpApiJson, type SerpApiParams } from "./client.js";
-import { MORE_PROMPT, PROMPT, SPEC_PROMPT, countProposals, proposalNames, undertypUr } from "./prompts.js";
+import { PROMPT, SPEC_PROMPT, countProposals, proposalNames } from "./prompts.js";
 import { referensKedjaPa } from "../referensbild.js";
-import { BILDTEST_TILLAGG, bilderISvaret, bildtestPa } from "./bildtest.js";
-import { forberedGoogleBilder } from "./bildrader.js";
+import { BILDBEGARAN, forberedGoogleBilder } from "./bildrader.js";
 import { NO_ANSWER, answerText, collectLinks, imageRows, referenceSection } from "./render.js";
 import {
   MAX_AI_CALLS_PER_SESSION,
@@ -34,9 +32,6 @@ import {
 } from "./session.js";
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString().slice(11, 19), "[serpapi]", ...a);
-
-/** Skiljelinjen mellan första svaret och svar på uppföljningsfrågor: SAMMA text som main.js lägger in, så att servern (externalIdentify.ts SYSTEM) och countProposals läser den som förut. */
-export const MORE_SEPARATOR = "\n\n=== FLER FÖRSLAG (svar på en uppföljningsfråga) ===\n";
 
 /**
  * AI-LÄGET får INGEN `location` som förval (mätt 2026-11-07, Sits-fåtölj, samma foto och samma fråga, direkt mot SerpApi): med `location=Stockholm, Sweden` (som SerpApi kodar till en uule) kom
@@ -129,7 +124,7 @@ async function ask(s: Session, text: string, o: { label: string; continues: bool
     ms,
     continued: o.continues,
     withImage: !o.continues,
-    ...(bildtestPa() ? { bilder: bilderISvaret(resp), falt: Object.keys(resp), raHtml: typeof meta.raw_html_file === "string" ? meta.raw_html_file : null } : {}),
+    raHtml: typeof meta.raw_html_file === "string" ? meta.raw_html_file : null,
   });
   saveCall(s, o.label, params, resp);
   // Token för nästa fråga sparas bara när SerpApi gav en: ett svar utan token (ett misslyckat svar) ska inte bryta samtalet för det som redan finns.
@@ -237,18 +232,7 @@ function searchCached(s: Session, brand: string, q: ImageQuery): Promise<ImageRo
   return p;
 }
 
-/** Bildsökningarna börjar nu, medan uppföljningsfrågan och serverns tolkning pågår (som skalets prefetchImages). */
-function prefetchImages(s: Session, brand: string, furnitureType: string | null, answer: string): void {
-  for (const name of proposalNames(answer, brand)) {
-    const q: ImageQuery = { model: name, productType: furnitureType || null, undertyp: undertypUr(answer, name) };
-    if (!s.imgCache.has(imgKey(brand, q))) log(`bildsök i förväg: "${[brand, name, q.undertyp || q.productType || ""].join(" ").trim()}"`);
-    void searchCached(s, brand, q);
-  }
-}
-
 export async function findImages(s: Session, brand: string, queries: ImageQuery[]): Promise<ImageRowsGroup[]> {
-  // Bildtestet: inga bildsökningar, så att uppladdningen kostar en enda sökning.
-  if (bildtestPa()) return queries.map((q) => ({ model: q.model, rows: [] }));
   return Promise.all(queries.map((q) => searchCached(s, brand, q)));
 }
 
@@ -258,39 +242,14 @@ export async function identify(s: Session, brand: string, furnitureType: string 
   return enqueue(s, async () => {
     log(`identify: märke ${brand}, typ ${furnitureType || "okänd"}`);
     if (!s.imageUrl) throw new Error("bilderna är inte iläggda (prepare saknas)");
-    const fraga = bildtestPa() ? `${PROMPT(brand, furnitureType)} ${BILDTEST_TILLAGG}` : PROMPT(brand, furnitureType);
-    const first = await ask(s, fraga, { label: "identifiering", continues: false });
-    if (bildtestPa()) {
-      const turn = s.turns.at(-1);
-      const answer = withSources(first);
-      // Googles bildrader ur den råa sidan sparas för jobbet (nyckel = svarstexten). Se bildrader.ts.
-      const antal = await forberedGoogleBilder(answer, turn?.raHtml ?? null);
-      if (turn) turn.googleBilder = antal;
-      log(`BILDTEST: ${antal} bilder i Googles bildrader, ${turn?.bilder?.length ?? 0} i den tolkade datan. Inga uppföljningar eller bildsökningar.`);
-      return { answer, links: s.links.slice(0, 60) };
-    }
-    // `pure` är svaren utan källistor (det countProposals och proposalNames läser, som skalets svarstext); `full` är det som går till servern.
-    let pure = first.text;
-    let full = withSources(first);
-    log(`identifiering klar: ${first.text.length} tecken, ${countProposals(pure, brand)} förslag: ${proposalNames(pure, brand).join(", ")}`);
-    prefetchImages(s, brand, furnitureType, first.text);
-    // Gav AI-läget färre än fyra förslag ber vi om resten i samma samtal (högst två gånger), som skalet. Ett svar utan nya modeller läggs inte till.
-    for (let varv = 0; varv < 2 && countProposals(pure, brand) < 4; varv++) {
-      try {
-        const kanda = proposalNames(pure, brand);
-        const more = await ask(s, MORE_PROMPT(brand, furnitureType, kanda), { label: "fler förslag", continues: true });
-        const nya = proposalNames(more.text, brand).filter((n) => !kanda.some((k) => k.toLowerCase() === n.toLowerCase()));
-        log(`fler förslag: ${nya.length} nya${nya.length ? ": " + nya.join(", ") : ""}`);
-        if (!nya.length) break;
-        pure = `${pure}${MORE_SEPARATOR}${more.text}`;
-        full = `${full}${MORE_SEPARATOR}${withSources(more)}`;
-        prefetchImages(s, brand, furnitureType, more.text);
-      } catch (err) {
-        log("uppföljningen om fler förslag gav inget svar:", String(err instanceof Error ? err.message : err).slice(0, 100));
-        break;
-      }
-    }
-    return { answer: full, links: s.links.slice(0, 60) };
+    const first = await ask(s, `${PROMPT(brand, furnitureType)} ${BILDBEGARAN}`, { label: "identifiering", continues: false });
+    const answer = withSources(first);
+    log(`identifiering klar: ${first.text.length} tecken, ${countProposals(first.text, brand)} förslag: ${proposalNames(first.text, brand).join(", ")}`);
+    // Googles bildrader ur den råa sidan (samma sökning) sparas tills korten byggs; nyckeln är svarstexten. Kastar aldrig: utan bildrader söks bilderna i efterhand.
+    const turn = s.turns.at(-1);
+    const antal = await forberedGoogleBilder(answer, turn?.raHtml ?? null, http.fetch);
+    if (turn) turn.googleBilder = antal;
+    return { answer, links: s.links.slice(0, 60) };
   });
 }
 
@@ -299,7 +258,6 @@ export async function identify(s: Session, brand: string, furnitureType: string 
 /** Frågan efter valet, i samma samtal. Två försök om AI-läget inte svarar (skalet mätte att det händer ibland). */
 export async function askSpecs(s: Session, brand: string, model: string, furnitureType: string | null): Promise<{ answer: string; links: string[] }> {
   return enqueue(s, async () => {
-    if (bildtestPa()) throw new Error("måttfrågan är avstängd i bildtestet");
     if (!s.token) throw new Error("inget samtal att fortsätta på");
     let got: Asked | null = null;
     for (let försök = 1; försök <= 2 && !got; försök++) {
@@ -322,7 +280,7 @@ export function transcript(s: Session) {
     imageUrl: s.imageUrl,
     aiCalls: s.aiCalls,
     imageCalls: s.imageCalls,
-    turns: s.turns.map((t) => ({ label: t.label, question: t.question, answer: t.answer, searchId: t.searchId, googleUrl: t.googleUrl, ms: t.ms, continued: t.continued, withImage: t.withImage, error: t.error ?? null, bilder: t.bilder, falt: t.falt, googleBilder: t.googleBilder })),
+    turns: s.turns.map((t) => ({ label: t.label, question: t.question, answer: t.answer, searchId: t.searchId, googleUrl: t.googleUrl, ms: t.ms, continued: t.continued, withImage: t.withImage, error: t.error ?? null, googleBilder: t.googleBilder })),
   };
 }
 

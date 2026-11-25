@@ -1,5 +1,5 @@
 /**
- * GOOGLES BILDRADER (bildtestet, se bildtest.ts).
+ * GOOGLES BILDRADER: modellkortens bilder ur samma sökning som identifierar modellen.
  *
  * När frågan till AI-läget har ett foto OCH ber om exempelbilder ritar Google en rad bilder per modell. SerpApis tolkade JSON saknar dem, men de ligger i den råa sidan
  * (search_metadata.raw_html_file; ingår i samma sökning):
@@ -13,6 +13,13 @@ import { motsagerTyp, typfamilj } from "../candidateType.js";
 import { lokalOriginalbild, sparaInbaddadKandidatbild } from "../kandidatbild.js";
 
 const log = (...a: unknown[]) => console.log("[google-bilder]", ...a);
+
+/** Läggs efter identifieringsfrågan (PROMPT). Utan den, och utan foto, ritar AI-läget inga bildrader. */
+export const BILDBEGARAN =
+  "Visa dessutom en exempelbild från internet för varje förslag, direkt under modellens namn. Bilden ska visa hela möbeln av just den modellen, " +
+  "helst en produktbild mot vit bakgrund från tillverkarens eller en återförsäljares produktsida, i den variant som mest liknar möbeln på bilden " +
+  "jag skickade (klädsel, färg och underrede). Visa inte bilden jag skickade, och använd en bild ur en begagnatannons bara om ingen annan finns. " +
+  "Skriv adressen till sidan som exempelbilden kommer från. Hittar du ingen bild som säkert visar rätt modell, skriv det hellre än att visa en annan möbel.";
 
 export interface GoogleBild {
   titel: string;

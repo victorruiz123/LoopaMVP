@@ -9,13 +9,13 @@ Den äldre identifieringen (servern frågar Gemini med webbsök själv, `runIden
 
 1. **Uppladdningen.** Webben frågar servern `GET /api/serpapi/status`. Är svaret `enabled: true` lägger den in bryggen `web/src/lib/serpApiBridge.ts` (som annars bara Electron-skalet ger via `window.loopaApp`) och märker jobbet som externt. Skickbedömningen (video, skador) och identifieringen körs parallellt, som förut.
 2. **Bilden.** Omslagsbilden läggs ut på `/api/serpapi/img/<24 slumpbyte>.jpg` i en halvtimme; SerpApi hämtar den därifrån (`image_url`). Innan en betald fråga går iväg hämtar servern adressen själv (upp till fem försök) och avbryter om den inte går att nå.
-3. **Frågorna** står i `server/src/serpapi/prompts.ts`, en genererad fil: den är ett mekaniskt utdrag ur skalets `main.js` (lokalt verktyg), så att frågorna är ord för ord samma som där. `tests/serpapi.test.ts` jämför dem med `main.js` när den filen finns och hoppar annars över jämförelsen. Fråga 1 med bilden, högst två "fler förslag" i samma samtal så länge färre än fyra namngetts, måttfrågan **efter att säljaren valt modell** (samma samtal, två försök).
+3. **Frågorna** bygger på `server/src/serpapi/prompts.ts`, en genererad fil: ett mekaniskt utdrag ur skalets `main.js` (lokalt verktyg). `tests/serpapi.test.ts` jämför dem med `main.js` när den filen finns. Identifieringen är **en enda fråga** med bilden: `PROMPT` följd av `BILDBEGARAN` (`bildrader.ts`). Inga "fler förslag"-frågor och inga bildsökningar i förväg; ger svaret färre än fyra förslag visas de som finns. Måttfrågan ställs **efter att säljaren valt modell** (samma samtal, två försök).
 4. **Korten** byggs av servern ur svaret (samma kod som för skalet: `applyExternalIdentification`). Väljarskärmen väntar i laddningsskärmen tills bilderna är klara (tak 90 s).
-5. **Referensbilderna** (`server/src/referensbild.ts`), kedjan **A → C → B**:
+5. **Kortbilderna kommer i första hand ur samma sökning** (`server/src/serpapi/bildrader.ts`). Googles bildrader per modell läses ur SerpApis råa sida (`search_metadata.raw_html_file`; den tolkade JSON:en saknar dem). Kortet får den första bilden vars titel nämner modellen (annars det andra namn svaret anger); andrahand, auktioner och fel möbeltyp sållas bort, utan AI-anrop. Originalbilden hämtas först (högst två försök; breda original fylls ut med vitt till 4:3), annars används Googles beskurna ruta. Sidans uppbyggnad är **odokumenterad** och kan ändras; i en provkörning saknades bildraderna helt. Då, och för varje modell utan bild, tar den tidigare kedjan över (`server/src/referensbild.ts`), **A → C → B**:
    - **A** (gratis): produktlänken AI-läget gav för modellen, bara om den är en riktig produktsida (modellens namn i sökvägen; inte startsida, kategori, kollektion, annons, prisjämförare, tillbehör eller annan typ). Sidans bilder (JSON-LD, og:image, twitter:image) hämtas och ett jämförande Gemini-val tar den bästa.
    - **C**: Googles bildsök via SerpApi ("märke modell typ produktbild framifrån"). Regler först (märket på raden, ingen prisjämförare, ingen annons, rätt typ), därefter ett jämförande Gemini-val bland högst fem.
    - **B** sist: Gemini med webbsök (≈0,3 kr per modell), bara för modeller som fortfarande saknar bild när appens slutgiltiga lista kommit; upp till tre alternativ i ett anrop; tas bara emot om märket OCH modellen står i bildens eller sidans adress. Annars **"Ingen bild"** — hellre ingen bild än fel bild.
-   - Registret (`register.v5.json`, nyckel `märke|modell|g:<undertyp|typ>`) slås upp först och fylls på med bilder som klarat kontrollerna. UI:t säger att bilderna visar modellen, inte exakt den variant som väljs i nästa steg.
+   - Registret slås upp först och fylls på med bilder från kedjan som klarat kontrollerna; en bild ur bildraderna går före registret och skrivs inte dit. UI:t säger att bilderna visar modellen, inte exakt den variant som väljs i nästa steg.
 
 ## När flödet är på
 
@@ -45,7 +45,7 @@ Starta om tjänsten (`rulla-ut.sh`). Kontrollera i loggen att en uppladdning ger
 
 ## Kostnad
 
-- **SerpApi:** 1 kredit per sökning, AI-läget också. En identifiering med fyra namngivna förslag = 1 fråga + 4–5 bildsökningar + 1 måttfråga ≈ **7 krediter** (upp till ~10 om "fler förslag" behövs eller måttfrågan görs om). Gratisplanen har 250 per månad ≈ 35 identifieringar; en betald plan behövs för drift. Kontrollera aktuell prislista hos SerpApi och räkna om `SERPAPI_DAILY_CAP` efter den.
+- **SerpApi:** 1 kredit per sökning, AI-läget också. En identifiering = 1 fråga + 1 måttfråga ≈ **2 krediter**, plus en bildsökning (kedjans steg C) för varje modell som varken fick bild ur bildraderna eller ur steg A, och en extra om måttfrågan görs om. Kontrollera aktuell prislista hos SerpApi och räkna om `SERPAPI_DAILY_CAP` efter den.
 - **Gemini:** bildvalet är ett anrop per modell (≈0,02 kr), steg B ≈ 0,3 kr per modell som saknar bild (medianen två sökfrågor), översättningen av AI-lägets svar ett anrop. Posterna går in i jobbets kostnadsbok som förut. **SerpApis sökningar ligger INTE i kostnadsboken** (den styr Geminis sökbudget och ska inte påverkas): de räknas per samtal i serverloggen (`[serpapi] samtal … slut`).
 - **Taken:** per samtal 12 frågor / 30 bildsökningar (`SERPAPI_MAX_AI_PER_SESSION`, `SERPAPI_MAX_IMAGES_PER_SESSION`), per konto och dygn 30 samtal (`SERPAPI_MAX_SESSIONS_PER_USER`), per server och dygn `SERPAPI_DAILY_CAP`. Räknarna ligger i minnet och nollas vid omstart.
 
@@ -79,7 +79,7 @@ Starta om tjänsten (`rulla-ut.sh`). Kontrollera i loggen att en uppladdning ger
 
 ## Vad som inte är mätt
 
-1. **Hela flödet från start till annons:** identifieringen med bildkedjan är provkörd skarpt, men bara i testläget (`onlyIdentifySpecs`: ingen skickbedömning, inget pris). Skickbedömning, pris och annons efter identifieringen är den befintliga koden och rörs inte, och jobb märkta som externa gick den vägen redan i skalet — men helheten med den här bryggen är **inte provkörd**. Gör en uppladdning från start till annons före utrullning till användare.
+1. **Hela flödet från start till annons med bildraderna:** bildraderna är provade lokalt på några få möbler. Måttfrågan efter den längre identifieringsfrågan är bara provad mot en låtsas-SerpApi, och priset har inte kunnat provas lokalt (prismotorns data saknas). Gör en uppladdning från start till annons före utrullning till användare.
 2. **Andra möbeltyper** än fåtöljer, soffor och barstolar (bord, skåp) är inte provade; steg A–C har bara körts mot Sits och IKEA.
 3. **Steg A från Oracles IP** kan få fler 403 från butikssidor än från en hemadress.
 4. **SerpApis tolkning** av Googles svar är inte sidans text; samma bild ger olika förslag 2–4 från körning till körning (det gör skalet också).

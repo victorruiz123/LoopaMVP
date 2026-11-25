@@ -18,7 +18,6 @@ import { mattminnetsRader } from "../mattminne.js";
 import { getJob, getJobSync, jobDir, persist } from "../jobStore.js";
 import { lokalKandidatbild, registreradKandidatbild, registreraKandidatbilder } from "../kandidatbild.js";
 import { beskrivningUr, losFranSokningar, losProduktsidor, referensKedjaPa, registerTyp, saljarbild, typOrd, unikaKallor, valMax, valjBland, type RefKandidat } from "../referensbild.js";
-import { bildtestPa } from "../serpapi/bildtest.js";
 import { valjGoogleBilder } from "../serpapi/bildrader.js";
 import { bedomReferensbild, typFranFoto, typfamilj } from "../candidateType.js";
 import { pickReferenceRows, undertypForKandidat, valjReferensbild, type ReferenceCheck } from "../externalImages.js";
@@ -1461,15 +1460,13 @@ export async function applyExternalIdentification(
       }
     }),
   );
-  // BILDTESTET (serpapi/bildrader.ts): bilderna ur Googles egna bildrader går före registret, så att korten visar det SerpApi-sökningen faktiskt gav.
-  if (bildtestPa()) {
-    const valda = await valjGoogleBilder(jobId, answer, candidates);
-    for (const c of candidates) {
-      const t = valda.get(c.model);
-      if (t) {
-        c.imageUrl = t.url;
-        c.imageSource = t.source;
-      }
+  // GOOGLES BILDRADER (serpapi/bildrader.ts): bilderna ur samma sökning som identifierade modellen går före registret. Modeller utan bild där går vidare till kedjan nedan, som förut.
+  const valda = await valjGoogleBilder(jobId, answer, candidates);
+  for (const c of candidates) {
+    const t = valda.get(c.model);
+    if (t) {
+      c.imageUrl = t.url;
+      c.imageSource = t.source;
     }
   }
   // KEDJAN, STEG A (src/referensbild.ts): produktlänken AI-läget gav för modellen, om den är en riktig produktsida. Gratis och snabb (~2–6 s), körs för alla som saknar registerbild innan korten sparas, så att

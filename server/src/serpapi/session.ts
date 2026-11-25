@@ -29,10 +29,9 @@ export interface Turn {
   continued: boolean;
   withImage: boolean;
   error?: string;
-  /** Bara i bildtestet (bildtest.ts): bilderna och toppfälten i SerpApis svar. */
-  bilder?: import("./bildtest.js").SvarsBild[];
-  falt?: string[];
+  /** Adressen till SerpApis råa sida för sökningen; där ligger Googles bildrader (bildrader.ts). */
   raHtml?: string | null;
+  /** Antal bilder som lästes ur bildraderna. */
   googleBilder?: number;
 }
 
