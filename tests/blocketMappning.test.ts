@@ -110,6 +110,14 @@ test("rubriken kapas vid ett ordslut, inte mitt i ett ord", () => {
   assert.equal(capTitle("IKEA Strandmon"), "IKEA Strandmon");
 });
 
+test("en kapad rubrik slutar inte på ett hängande småord", () => {
+  assert.equal(capTitle("3-sitssoffa Bergholm från SoffaDirekt i ljusklädsel"), "3-sitssoffa Bergholm från SoffaDirekt");
+  // Flera småord i rad, och skiljetecken före dem, tas också bort.
+  assert.equal(capTitle("Skrivbord i ek med lådor och hylla, fint för och med alltid"), "Skrivbord i ek med lådor och hylla, fint");
+  // En rubrik som redan ryms rörs inte, även om den slutar på ett småord.
+  assert.equal(capTitle("Bord i ek med"), "Bord i ek med");
+});
+
 test("kvittoadressen översätts till den publika annonsadressen", () => {
   assert.equal(
     publicUrlFromReceipt("https://www.blocket.se/order-and-payment/ad-receipt?adId=24720589"),

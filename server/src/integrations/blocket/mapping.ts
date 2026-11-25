@@ -188,8 +188,26 @@ export function capTitle(title: string, max = TITLE_MAX): string {
   if (clean.length <= max) return clean;
   const cut = clean.slice(0, max);
   const lastSpace = cut.lastIndexOf(" ");
-  if (lastSpace >= max - 15) return cut.slice(0, lastSpace).replace(/[\s,;:-]+$/, "");
+  if (lastSpace >= max - 15) return utanHangandeOrd(cut.slice(0, lastSpace));
   return cut.trim();
+}
+
+/**
+ * Småord som inte kan stå sist i en kapad rubrik. "3-sitssoffa Bergholm från SoffaDirekt i
+ * ljusklädsel" är 51 tecken, och kapad vid ordslutet blev den "… från SoffaDirekt i", som ser ut som
+ * ett skrivfel. Ordet som hängde kvar tas bort, och det görs om tills rubriken slutar på ett riktigt
+ * ord: "3-sitssoffa Bergholm från SoffaDirekt".
+ */
+const HANGANDE_ORD = new Set(["i", "på", "av", "med", "och", "från", "till", "för", "en", "ett", "som", "om", "utan", "under", "vid", "mot", "samt", "eller", "&", "+"]);
+
+function utanHangandeOrd(rubrik: string): string {
+  const ord = rubrik.replace(/[\s,;:–-]+$/, "").split(" ");
+  // Minst två ord ska stå kvar: en rubrik som bara är "Soffa" är sämre än en med ett småord sist.
+  while (ord.length > 2 && HANGANDE_ORD.has(ord.at(-1)!.toLowerCase())) {
+    ord.pop();
+    ord[ord.length - 1] = ord.at(-1)!.replace(/[,;:–-]+$/, "");
+  }
+  return ord.join(" ").replace(/[\s,;:–-]+$/, "");
 }
 
 /** Måtten som Blockets formulär vill ha dem: hela centimeter, ett fält per riktning. */
