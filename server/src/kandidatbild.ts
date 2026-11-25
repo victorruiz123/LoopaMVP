@@ -145,7 +145,38 @@ export async function lokalKandidatbild(url: string, referer: string | null = nu
   return await arbete;
 }
 
-async function hamta(url: string, referer: string | null, abs: string, namn: string): Promise<string | null> {
+/** Kortbildens största sida när originalet bakom en bild i Googles bildrader används. Kortet i bred vy ritas på knappt 500 skärmpunkter, så 400 blir suddigt där. */
+const ORIGINAL_PX = 640;
+/** Bredaste original som godtas. En soffas produktbild är ofta omkring 2:1. */
+const ORIGINAL_MAX_BREDD_MOT_HOJD = 2.6;
+
+/**
+ * Originalet bakom en bild i Googles bildrader (serpapi/bildrader.ts): hela möbeln i full upplösning, medan rutan i raden ofta är beskuren och ibland bara 200 px bred.
+ * Ett brett original skulle falla på bannerspärren. Här kommer bilden ur Googles träffar för modellen, så den fylls i stället ut med vitt till 4:3, som är kortets form.
+ */
+export async function lokalOriginalbild(url: string): Promise<string | null> {
+  if (!/^https:\/\//i.test(url)) return null;
+  const namn = filnamn(`original:${url}`);
+  const abs = path.join(kandidatbilderDir(), namn);
+  if (existsSync(abs) && (await miniatyrDuger(abs))) return `${URL_PREFIX}/${namn}`;
+  return await hamta(url, null, abs, namn, sparaOriginal);
+}
+
+async function sparaOriginal(ra: Buffer, abs: string, namn: string): Promise<string | null> {
+  if (ra.length === 0 || ra.length > MAX_BYTES) return null;
+  const matt = await sharp(ra).metadata();
+  const bredd = matt.width ?? 0;
+  const hojd = matt.height ?? 0;
+  if (Math.max(bredd, hojd) < MIN_SIDA_PX || bredd / Math.max(1, hojd) > ORIGINAL_MAX_BREDD_MOT_HOJD) return null;
+
+  const vit = { r: 255, g: 255, b: 255 };
+  const { data, info } = await sharp(ra).flatten({ background: vit }).resize(ORIGINAL_PX, ORIGINAL_PX, { fit: "inside", withoutEnlargement: true }).png().toBuffer({ resolveWithObject: true });
+  const fyll = Math.max(0, Math.ceil((info.width * 3) / 4) - info.height);
+  const miniatyr = await sharp(data).extend({ top: Math.floor(fyll / 2), bottom: Math.ceil(fyll / 2), background: vit }).jpeg({ quality: 85 }).toBuffer();
+  return await skrivMiniatyr(miniatyr, abs, namn);
+}
+
+async function hamta(url: string, referer: string | null, abs: string, namn: string, spara: typeof sparaMiniatyr = sparaMiniatyr): Promise<string | null> {
   try {
     const res = await fetch(url, {
       signal: AbortSignal.timeout(HAMTA_TIMEOUT_MS),
@@ -174,44 +205,69 @@ async function hamta(url: string, referer: string | null, abs: string, namn: str
     const langd = Number(res.headers.get("content-length"));
     if (Number.isFinite(langd) && langd > MAX_BYTES) return null;
 
-    const ra = Buffer.from(await res.arrayBuffer());
-    if (ra.length === 0 || ra.length > MAX_BYTES) return null;
-
-    /**
-     * SHARP ÄR KONTROLLEN. En felsida med statuskod 200 — den vanligaste döda bilden av alla — är
-     * HTML, och HTML går inte att avkoda som en bild. Att fråga efter innehållstypen hade varit att
-     * lita på ett påstående; det här är ett försök.
-     *
-     * `withoutEnlargement` för att en liten källbild inte ska skalas upp till suddighet, och
-     * `flatten` mot vitt för att en png med genomskinlighet annars blir svart som jpeg.
-     */
-    const bild = sharp(ra);
-    const matt = await bild.metadata();
-    // Mätt storlek, inte påstådd. Se MIN_SIDA_PX och MAX_BREDD_MOT_HOJD.
-    if (!dugerSomProduktbild(matt.width ?? 0, matt.height ?? 0)) return null;
-
-    const miniatyr = await bild
-      .resize(MINIATYR_PX, MINIATYR_PX, { fit: "inside", withoutEnlargement: true })
-      .flatten({ background: { r: 255, g: 255, b: 255 } })
-      .jpeg({ quality: 80 })
-      .toBuffer();
-
-    await mkdir(kandidatbilderDir(), { recursive: true });
-    /**
-     * Skrivs under ett tillfälligt namn och byter namn sist.
-     *
-     * `existsSync` ovan är hela cachens uppslagning. Skrevs filen på plats direkt skulle en samtidig
-     * läsare kunna se ett halvskrivet namn som "färdigt" och servera en trasig bild. Namnbytet är
-     * atomärt: filen finns antingen inte, eller finns hel.
-     */
-    const tmp = `${abs}.${process.pid}.tmp`;
-    await writeFile(tmp, miniatyr);
-    await rename(tmp, abs);
-    return `${URL_PREFIX}/${namn}`;
+    return await spara(Buffer.from(await res.arrayBuffer()), abs, namn);
   } catch {
     // Timeout, avbruten anslutning, något som inte var en bild. Alla betyder samma sak för anroparen.
     return null;
   }
+}
+
+/**
+ * En bild som ligger inbäddad i en sida (data:image/…;base64) i stället för bakom en adress: Googles bildrader (serpapi/bildrader.ts). Samma kontroller och samma miniatyr som
+ * för en hämtad bild. Egen funktion, så att lokalKandidatbild fortsätter att bara ta emot http(s)-adresser.
+ */
+export async function sparaInbaddadKandidatbild(dataUri: string): Promise<string | null> {
+  const m = /^data:image\/(?:jpe?g|png|webp);base64,/i.exec(dataUri);
+  if (!m) return null;
+  const namn = filnamn(dataUri);
+  const abs = path.join(kandidatbilderDir(), namn);
+  if (existsSync(abs) && (await miniatyrDuger(abs))) return `${URL_PREFIX}/${namn}`;
+  try {
+    return await sparaMiniatyr(Buffer.from(dataUri.slice(m[0].length), "base64"), abs, namn);
+  } catch {
+    return null;
+  }
+}
+
+/** Prövar och skalar ner bildens bytes och lägger miniatyren på disk. Null när det inte duger; kastar när det inte går att avkoda eller skriva. */
+async function sparaMiniatyr(ra: Buffer, abs: string, namn: string): Promise<string | null> {
+  if (ra.length === 0 || ra.length > MAX_BYTES) return null;
+
+  /**
+   * SHARP ÄR KONTROLLEN. En felsida med statuskod 200 — den vanligaste döda bilden av alla — är
+   * HTML, och HTML går inte att avkoda som en bild. Att fråga efter innehållstypen hade varit att
+   * lita på ett påstående; det här är ett försök.
+   *
+   * `withoutEnlargement` för att en liten källbild inte ska skalas upp till suddighet, och
+   * `flatten` mot vitt för att en png med genomskinlighet annars blir svart som jpeg.
+   */
+  const bild = sharp(ra);
+  const matt = await bild.metadata();
+  // Mätt storlek, inte påstådd. Se MIN_SIDA_PX och MAX_BREDD_MOT_HOJD.
+  if (!dugerSomProduktbild(matt.width ?? 0, matt.height ?? 0)) return null;
+
+  const miniatyr = await bild
+    .resize(MINIATYR_PX, MINIATYR_PX, { fit: "inside", withoutEnlargement: true })
+    .flatten({ background: { r: 255, g: 255, b: 255 } })
+    .jpeg({ quality: 80 })
+    .toBuffer();
+
+  return await skrivMiniatyr(miniatyr, abs, namn);
+}
+
+async function skrivMiniatyr(miniatyr: Buffer, abs: string, namn: string): Promise<string> {
+  await mkdir(kandidatbilderDir(), { recursive: true });
+  /**
+   * Skrivs under ett tillfälligt namn och byter namn sist.
+   *
+   * `existsSync` ovan är hela cachens uppslagning. Skrevs filen på plats direkt skulle en samtidig
+   * läsare kunna se ett halvskrivet namn som "färdigt" och servera en trasig bild. Namnbytet är
+   * atomärt: filen finns antingen inte, eller finns hel.
+   */
+  const tmp = `${abs}.${process.pid}.tmp`;
+  await writeFile(tmp, miniatyr);
+  await rename(tmp, abs);
+  return `${URL_PREFIX}/${namn}`;
 }
 
 /**

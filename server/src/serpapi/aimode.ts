@@ -16,6 +16,8 @@ import path from "node:path";
 import { SerpApiError, http, serpApiSearch, withoutKey, type SerpApiJson, type SerpApiParams } from "./client.js";
 import { MORE_PROMPT, PROMPT, SPEC_PROMPT, countProposals, proposalNames, undertypUr } from "./prompts.js";
 import { referensKedjaPa } from "../referensbild.js";
+import { BILDTEST_TILLAGG, bilderISvaret, bildtestPa } from "./bildtest.js";
+import { forberedGoogleBilder } from "./bildrader.js";
 import { NO_ANSWER, answerText, collectLinks, imageRows, referenceSection } from "./render.js";
 import {
   MAX_AI_CALLS_PER_SESSION,
@@ -127,6 +129,7 @@ async function ask(s: Session, text: string, o: { label: string; continues: bool
     ms,
     continued: o.continues,
     withImage: !o.continues,
+    ...(bildtestPa() ? { bilder: bilderISvaret(resp), falt: Object.keys(resp), raHtml: typeof meta.raw_html_file === "string" ? meta.raw_html_file : null } : {}),
   });
   saveCall(s, o.label, params, resp);
   // Token för nästa fråga sparas bara när SerpApi gav en: ett svar utan token (ett misslyckat svar) ska inte bryta samtalet för det som redan finns.
@@ -244,6 +247,8 @@ function prefetchImages(s: Session, brand: string, furnitureType: string | null,
 }
 
 export async function findImages(s: Session, brand: string, queries: ImageQuery[]): Promise<ImageRowsGroup[]> {
+  // Bildtestet: inga bildsökningar, så att uppladdningen kostar en enda sökning.
+  if (bildtestPa()) return queries.map((q) => ({ model: q.model, rows: [] }));
   return Promise.all(queries.map((q) => searchCached(s, brand, q)));
 }
 
@@ -253,7 +258,17 @@ export async function identify(s: Session, brand: string, furnitureType: string 
   return enqueue(s, async () => {
     log(`identify: märke ${brand}, typ ${furnitureType || "okänd"}`);
     if (!s.imageUrl) throw new Error("bilderna är inte iläggda (prepare saknas)");
-    const first = await ask(s, PROMPT(brand, furnitureType), { label: "identifiering", continues: false });
+    const fraga = bildtestPa() ? `${PROMPT(brand, furnitureType)} ${BILDTEST_TILLAGG}` : PROMPT(brand, furnitureType);
+    const first = await ask(s, fraga, { label: "identifiering", continues: false });
+    if (bildtestPa()) {
+      const turn = s.turns.at(-1);
+      const answer = withSources(first);
+      // Googles bildrader ur den råa sidan sparas för jobbet (nyckel = svarstexten). Se bildrader.ts.
+      const antal = await forberedGoogleBilder(answer, turn?.raHtml ?? null);
+      if (turn) turn.googleBilder = antal;
+      log(`BILDTEST: ${antal} bilder i Googles bildrader, ${turn?.bilder?.length ?? 0} i den tolkade datan. Inga uppföljningar eller bildsökningar.`);
+      return { answer, links: s.links.slice(0, 60) };
+    }
     // `pure` är svaren utan källistor (det countProposals och proposalNames läser, som skalets svarstext); `full` är det som går till servern.
     let pure = first.text;
     let full = withSources(first);
@@ -284,6 +299,7 @@ export async function identify(s: Session, brand: string, furnitureType: string 
 /** Frågan efter valet, i samma samtal. Två försök om AI-läget inte svarar (skalet mätte att det händer ibland). */
 export async function askSpecs(s: Session, brand: string, model: string, furnitureType: string | null): Promise<{ answer: string; links: string[] }> {
   return enqueue(s, async () => {
+    if (bildtestPa()) throw new Error("måttfrågan är avstängd i bildtestet");
     if (!s.token) throw new Error("inget samtal att fortsätta på");
     let got: Asked | null = null;
     for (let försök = 1; försök <= 2 && !got; försök++) {
@@ -306,7 +322,7 @@ export function transcript(s: Session) {
     imageUrl: s.imageUrl,
     aiCalls: s.aiCalls,
     imageCalls: s.imageCalls,
-    turns: s.turns.map((t) => ({ label: t.label, question: t.question, answer: t.answer, searchId: t.searchId, googleUrl: t.googleUrl, ms: t.ms, continued: t.continued, withImage: t.withImage, error: t.error ?? null })),
+    turns: s.turns.map((t) => ({ label: t.label, question: t.question, answer: t.answer, searchId: t.searchId, googleUrl: t.googleUrl, ms: t.ms, continued: t.continued, withImage: t.withImage, error: t.error ?? null, bilder: t.bilder, falt: t.falt, googleBilder: t.googleBilder })),
   };
 }
 

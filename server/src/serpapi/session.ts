@@ -29,6 +29,11 @@ export interface Turn {
   continued: boolean;
   withImage: boolean;
   error?: string;
+  /** Bara i bildtestet (bildtest.ts): bilderna och toppfälten i SerpApis svar. */
+  bilder?: import("./bildtest.js").SvarsBild[];
+  falt?: string[];
+  raHtml?: string | null;
+  googleBilder?: number;
 }
 
 export interface ImageRowsGroup {

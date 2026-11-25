@@ -25,6 +25,10 @@ interface Turn {
   continued: boolean;
   withImage: boolean;
   error: string | null;
+  /** Bara i bildtestet (server/src/serpapi/bildtest.ts). */
+  bilder?: Array<{ url: string; falt: string; modell: string | null; titel: string | null; kalla: string | null }>;
+  falt?: string[];
+  googleBilder?: number;
 }
 interface Transcript {
   sid: string;
@@ -68,6 +72,30 @@ export function panelWanted(): boolean {
   }
 }
 
+/** BILDTESTET (tillfälligt): bilderna som följde med SerpApis svar, med fältet de låg i och sidan de kommer från. Tom sträng utanför testet. */
+function bildtestGalleri(t: Turn): string {
+  if (!t.bilder) return "";
+  const webb = (u: string | null): string => (u && /^https?:\/\//i.test(u) ? u : "");
+  const vard = (u: string | null): string => {
+    try {
+      return new URL(webb(u)).hostname.replace(/^www\./, "");
+    } catch {
+      return "ingen källsida angiven";
+    }
+  };
+  const rutor = t.bilder
+    .filter((b) => webb(b.url) || /^data:image\//i.test(b.url))
+    .map((b) => {
+      const img = `<img src="${esc(b.url)}" alt="" referrerpolicy="no-referrer" style="width:150px;height:150px;object-fit:contain;background:#fff;border:1px solid #e5e7eb;border-radius:8px" onload="this.nextElementSibling.textContent=this.naturalWidth+' × '+this.naturalHeight+' px'" onerror="this.nextElementSibling.textContent='bilden gick inte att visa'"><div style="font-size:11px;color:#6b7280"></div>`;
+      return `<figure style="margin:0;width:150px">${webb(b.kalla) ? `<a href="${esc(b.kalla!)}" target="_blank" rel="noreferrer">${img}</a>` : img}
+<figcaption style="font-size:11px;line-height:1.3;word-break:break-word"><b>${esc(b.modell ?? "ingen modell angiven")}</b><br>${esc(b.falt)}<br>${esc((b.titel ?? "").slice(0, 70))}<br><span style="color:#6b7280">${esc(vard(b.kalla))}</span></figcaption></figure>`;
+    })
+    .join("");
+  return `<div style="margin:8px 0;padding:8px;border:2px solid #e4572e;border-radius:8px"><b>Bildtest: ${t.googleBilder ?? 0} bilder i Googles bildrader</b>
+<div style="font-size:11px;color:#6b7280;margin:2px 0 6px">De kommer ur den råa sidan i samma sökning, och de valda visas på modellkorten. I SerpApis tolkade data: ${t.bilder.length} bilder (fält: ${esc((t.falt ?? []).join(", "))}).</div>
+<div style="display:flex;flex-wrap:wrap;gap:10px">${rutor}</div></div>`;
+}
+
 function draw() {
   if (typeof document === "undefined") return;
   if (!panelWanted()) {
@@ -99,7 +127,7 @@ function draw() {
         (t) => `<details style="margin:6px 0;border-top:1px solid #e5e7eb;padding-top:6px"><summary style="cursor:pointer"><b>${esc(t.label)}</b> · ${Math.round(t.ms / 1000)} s${t.withImage ? " · med bild" : t.continued ? " · fortsätter samtalet" : ""}${t.error ? ` · <span style="color:#b3261e">${esc(t.error)}</span>` : ""}</summary>
 <div style="margin-top:4px;color:#6b7280">Fråga</div><pre style="white-space:pre-wrap;margin:2px 0 6px;font:12px/1.4 ui-monospace,monospace">${esc(t.question)}</pre>
 <div style="color:#6b7280">Svar</div><pre style="white-space:pre-wrap;margin:2px 0;font:12px/1.4 ui-monospace,monospace">${esc(t.answer || "(inget svar)")}</pre>
-${t.searchId ? `<div style="color:#6b7280;font-size:11px">SerpApi-sökning ${esc(t.searchId)}${t.googleUrl ? ` · <a href="${esc(t.googleUrl)}" target="_blank" rel="noreferrer">Googles adress</a>` : ""}</div>` : ""}</details>`,
+${t.searchId ? `<div style="color:#6b7280;font-size:11px">SerpApi-sökning ${esc(t.searchId)}${t.googleUrl ? ` · <a href="${esc(t.googleUrl)}" target="_blank" rel="noreferrer">Googles adress</a>` : ""}</div>` : ""}</details>${bildtestGalleri(t)}`,
       )
       .join("");
     panel = `<div style="background:#fff;color:#111;border:1px solid #d1d5db;border-radius:12px;box-shadow:0 8px 28px rgba(0,0,0,.25);padding:12px;margin-bottom:8px;max-height:70vh;overflow:auto">
