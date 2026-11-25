@@ -2485,13 +2485,16 @@ const server = http.createServer(async (req, res) => {
       }
 
       /**
-       * Gästen når bara säljflödet fram till annonsen: sitt eget jobb och prisförslaget. Allt som
-       * lägger ut något — Tradera, butiken, affärer, inbjudningar — kräver att kontot finns först.
+       * Gästen når bara säljflödet fram till annonsen: sitt eget jobb, prisförslaget och SerpApi-flödet
+       * (identifieringen, måtten och kortens bilder ska vara desamma för alla säljare; sökningarna
+       * begränsas av taken i serpapi/session.ts, främst dygnstaket). Allt som lägger ut något —
+       * Tradera, butiken, affärer, inbjudningar — kräver att kontot finns först.
        */
       if (identity.kind === "guest") {
         const iFlodet =
           (segments[1] === "jobs" && (segments[3] !== "tradera" || req.method === "GET")) ||
-          (segments[1] === "price" && segments.length === 2);
+          (segments[1] === "price" && segments.length === 2) ||
+          segments[1] === "serpapi";
         if (!iFlodet) return sendJson(res, 401, { error: "Inloggning krävs." });
       }
 

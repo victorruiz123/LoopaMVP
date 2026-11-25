@@ -411,6 +411,12 @@ test("ingen token i första svaret: uppföljningen kastar ett begripligt fel i s
   assert.equal(ai().length, 1);
 });
 
+test("prepare tar bara emot jpeg, png och webp: adressen är öppen och får aldrig bära en sida", async () => {
+  for (const typ of ["text/html", "image/svg+xml", "application/javascript"]) {
+    await assert.rejects(() => aimode.prepare("guest:x", [`data:${typ};base64,${Buffer.from("<script></script>").toString("base64")}`]), /fel format/, typ);
+  }
+});
+
 test("prepare utan publik adress säger vad som ska sättas", async () => {
   const old = process.env.SERPAPI_PUBLIC_URL;
   delete process.env.SERPAPI_PUBLIC_URL;

@@ -169,7 +169,8 @@ async function reachable(url: string): Promise<boolean> {
  * betald fråga som annars hade gett ett svar utan bild — det vore en gissning som ser ut som en identifiering.
  */
 export async function prepare(owner: string, images: string[]): Promise<{ sid: string; imageUrl: string }> {
-  const m = /^data:([^;,]+);base64,(.*)$/s.exec(images[0] ?? "");
+  // Bara riktiga bildtyper: filen läggs ut på en öppen adress och skickas med den typ som står här. En påhittad typ (text/html) hade blivit en sida på vår domän.
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,(.*)$/s.exec(images[0] ?? "");
   if (!m) throw new Error("bilderna saknas eller har fel format");
   const base = publicBase();
   if (!base) throw new SerpApiError("SerpApi måste kunna hämta bilden från en publik adress. Sätt SERPAPI_PUBLIC_URL i server/.env till serverns adress utifrån (till exempel en tunnel) och starta om servern.");

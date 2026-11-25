@@ -9,7 +9,7 @@
  *   POST /api/serpapi/end       { sid }                                                → bilden och samtalet glöms
  *   GET  /api/serpapi/status                                                           → { enabled, … }: ska webben använda flödet nu? (nyckel, publik adress och dygnstak, se serpApiEnabled)
  *
- * Alla dessa ligger INNANFÖR inloggningsgrinden (varje anrop kostar en sökning hos SerpApi). Enda undantaget är bildadressen, /api/serpapi/img/<nyckel>, som SerpApi själv hämtar
+ * Alla dessa ligger INNANFÖR grinden: ett konto eller en gästtoken krävs, och gästen har samma flöde som den inloggade. Varje sökning kostar hos SerpApi; taken står i session.ts. Enda undantaget är bildadressen, /api/serpapi/img/<nyckel>, som SerpApi själv hämtar
  * bilden från och som därför måste vara öppen — den går inte att gissa och gäller en halvtimme (session.ts).
  */
 
@@ -31,7 +31,7 @@ export function handleSerpApiImage(name: string, req: IncomingMessage, res: Serv
     res.end(JSON.stringify({ error: "Vi hittade ingen sådan bild." }));
     return;
   }
-  res.writeHead(200, { "Content-Type": im.mime, "Content-Length": im.buf.length, "Cache-Control": "no-store" });
+  res.writeHead(200, { "Content-Type": im.mime, "Content-Length": im.buf.length, "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" });
   res.end(req.method === "HEAD" ? undefined : im.buf);
 }
 

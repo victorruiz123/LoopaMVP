@@ -26,6 +26,8 @@ Den äldre identifieringen (servern frågar Gemini med webbsök själv, `runIden
 - `LOOPA_SERPAPI` inte är `0` (avstängning utan att ta bort nyckeln),
 - dygnstaket (`SERPAPI_DAILY_CAP`) inte är nått.
 
+**Alla säljare får flödet, även utan konto:** gästtoken räcker för `/api/serpapi/*` (webben skapar den själv). En gäst kan hämta en ny token när som helst, så taket per konto begränsar inte anonyma besökare; det är `SERPAPI_DAILY_CAP` som sätter gränsen för vad ett dygn kan kosta. Är det nått får alla den vanliga vägen.
+
 Annars tar uppladdningen den vanliga vägen och säljaren märker ingenting: en saknad nyckel, ett nått tak eller `LOOPA_SERPAPI=0` ger aldrig ett felmeddelande. Orsaken står som en rad `[serpapi] flödet är av: …` i serverloggen.
 
 Faller SerpApi-flödet **mitt i** en körning (SerpApi nere, tunnel/adress onåbar, taket nått under flödet) får säljaren väljarskärmens ärliga tomma läge med "Hitta fler" (som kör den äldre identifieringen), "Försök igen" och möjligheten att skriva modellnamnet själv.
