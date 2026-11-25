@@ -58,7 +58,7 @@ import {
 import {
   BLOCKET_CONDITION,
   blocketCategoryFor,
-  capTitle,
+  blocketRubrik,
   conditionOptions,
   MAX_BLOCKET_IMAGES,
   measurementsFrom,
@@ -162,7 +162,7 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
   return {
     ok: true,
     plan: {
-      title: capTitle(title),
+      title: blocketRubrik(title),
       loopaId: loopaIdFor(job.id),
       category: blocketCategoryFor(product.categorySlug, title),
       // Möbeln PLUS hemleveransen, samma tal som Tradera-annonsen bär. Prisstegen räknar i
@@ -237,7 +237,7 @@ export async function blocketPaket(rajob: ConditionJob): Promise<BlocketPaket | 
   if (!postnummer) saknas.push("säljarens postnummer");
 
   return {
-    rubrik: capTitle(rubrikHel),
+    rubrik: blocketRubrik(rubrikHel),
     rubrikHel,
     pris: pris ? prisMedHemleverans(pris.value, frakt) : null,
     prisMobel: pris?.value ?? null,

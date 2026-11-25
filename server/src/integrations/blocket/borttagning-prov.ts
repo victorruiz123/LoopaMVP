@@ -19,7 +19,7 @@ try {
 
 const { getJob } = await import("../../jobStore.js");
 const { adTitle } = await import("../../adContent.js");
-const { capTitle } = await import("./mapping.js");
+const { blocketRubrik } = await import("./mapping.js");
 const { blocketBaseUrl, blocketHeadful, missingBlocketEnv, sessionFileExists } = await import("./blocket.js");
 const { ensureSession, goAndSettle, handleBankID, startBrowser } = await import("./browser.js");
 const { adIdFromUrl } = await import("./pris.js");
@@ -68,7 +68,7 @@ if (annonsUrl) {
     process.exit(1);
   }
   adUrl = job.blocket.url;
-  rubrik = capTitle(adTitle(job));
+  rubrik = blocketRubrik(adTitle(job));
   console.log(`  Jobb:         ${job.id}`);
 }
 

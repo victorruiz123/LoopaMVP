@@ -115,7 +115,7 @@ test("Blocket: rättad beskrivning och rubrik sparas i rätt fält, och ögonbli
     assert.equal(attrapp.lage.redigeringar.length, 1);
     const sparat = attrapp.lage.redigeringar[0];
     assert.ok(sparat.beskrivning?.includes(NY_MENING), "den nya meningen står i beskrivningen");
-    assert.equal(sparat.rubrik, "Sweef Cloud soffa, grå sammet");
+    assert.equal(sparat.rubrik, "Sweef Cloud soffa, grå sammet, inkl. hemleverans");
     assert.equal(sparat.hojd, "82");
     assert.equal(sparat.bredd, "230");
     assert.equal(sparat.djup, "98");

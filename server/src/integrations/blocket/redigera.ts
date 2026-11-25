@@ -22,7 +22,7 @@ import { ensureSession, goAndSettle, handleBankID, isLoggedOut, saveSessionIfRea
 import { clickFirstVisible, dismissCookieBanner, dismissModal, fillByLabel, fillDescription } from "./form.js";
 import { nyttSteg, type Logga } from "./diag.js";
 import { arUpptagen, markeraUpptagen } from "./vakt.js";
-import { capTitle } from "./mapping.js";
+import { blocketRubrik, capTitle } from "./mapping.js";
 import { adIdFromUrl, annonsenArAktiv, BlocketAnnonsInteAktiv, felText, lasRubrik, redigeringsformularet, rubrikStammer, viaMinaAnnonser } from "./pris.js";
 import { blocketInnehall, buildBlocketDescription, planBlocketPublish, utanLoopa } from "./publish.js";
 import { adTitle } from "../../adContent.js";
@@ -105,7 +105,8 @@ export async function redigeraBlocketAnnons(job: ConditionJob, visning?: Visning
     // Rubriken annonsen BÄR på Blocket: den som gick upp, inte nödvändigtvis den som gäller nu — det
     // är ju rubriken som kan vara det som ändrats.
     const rubrikPaBlocket = fore?.rubrik ?? capTitle(adTitle(job));
-    const kandidater = [...new Set([rubrikPaBlocket, plan.plan.title, capTitle(adTitle(job))])];
+    // Den gamla rubriken utan tillägg också: annonser som gick upp före RUBRIK_TILLAGG bär den.
+    const kandidater = [...new Set([rubrikPaBlocket, plan.plan.title, blocketRubrik(adTitle(job)), capTitle(adTitle(job))])];
     if (!vag) vag = await viaMinaAnnonser(page, id, rubrikPaBlocket, pub.url, logga);
     if (!vag) throw new Error(`Hittade ingen redigering för annonsen${id ? ` ${id}` : ""}.`);
 

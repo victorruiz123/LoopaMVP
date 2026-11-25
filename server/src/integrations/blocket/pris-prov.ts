@@ -27,7 +27,7 @@ const { annonsensFrakt, prisMedHemleverans } = await import("../../hemleverans.j
 const { kategoriMedRattelse } = await import("../../butik/overrides.js");
 const { kanalPrisLagen } = await import("../../priceLadder.js");
 const { adTitle } = await import("../../adContent.js");
-const { capTitle } = await import("./mapping.js");
+const { blocketRubrik } = await import("./mapping.js");
 const { blocketBaseUrl, blocketHeadful, missingBlocketEnv, sessionFileExists } = await import("./blocket.js");
 const { ensureSession, goAndSettle, handleBankID, startBrowser } = await import("./browser.js");
 const { adIdFromUrl, blocketPrisRobotPa, driveBlocketPriceChange } = await import("./pris.js");
@@ -98,7 +98,7 @@ if (annonsUrl) {
   const frakt = annonsensFrakt(job, await kategoriMedRattelse(job));
   annonspris = prisMedHemleverans(job.priceLadder.currentPrice, frakt);
   adUrl = job.blocket.url;
-  rubrik = capTitle(adTitle(job));
+  rubrik = blocketRubrik(adTitle(job));
   const lage = kanalPrisLagen(job).find((l) => l.kanal === "blocket");
   console.log(`  Jobb:         ${job.id}`);
   console.log(`  Ligger på:    ${lage ? prisMedHemleverans(lage.bekraftat, frakt) : "?"} kr enligt kvittot (${lage?.via ?? "inget kvitto"})`);

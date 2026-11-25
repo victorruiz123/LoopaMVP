@@ -57,7 +57,7 @@ import { ensureSession, goAndSettle, handleBankID, isLoggedOut, saveSessionIfRea
 import { clickFirstVisible, dismissCookieBanner, dismissModal, fillByLabel, fillBySelector, pageHasText } from "./form.js";
 import { nyttSteg, type Logga } from "./diag.js";
 import { arUpptagen, markeraUpptagen } from "./vakt.js";
-import { capTitle } from "./mapping.js";
+import { blocketRubrik } from "./mapping.js";
 import { adTitle } from "../../adContent.js";
 import { persist } from "../../jobStore.js";
 import type { FlyttUtfall } from "../../priceLadder.js";
@@ -445,7 +445,7 @@ export async function flyttaBlocketPris(job: ConditionJob, annonspris: number): 
     await driveBlocketPriceChange(
       session.page,
       session.context,
-      { adUrl: pub.url, title: capTitle(adTitle(job)), price: annonspris, dryRun: false },
+      { adUrl: pub.url, title: blocketRubrik(adTitle(job)), price: annonspris, dryRun: false },
       logga,
     );
     if (await saveSessionIfReal(session.context).catch(() => false)) logga("Sessionen sparades om", "ok", {});

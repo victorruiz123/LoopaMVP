@@ -49,7 +49,7 @@ import { ensureSession, goAndSettle, handleBankID, isLoggedOut, saveSessionIfRea
 import { dismissCookieBanner, dismissModal } from "./form.js";
 import { nyttSteg, type Logga } from "./diag.js";
 import { arUpptagen, markeraUpptagen } from "./vakt.js";
-import { capTitle } from "./mapping.js";
+import { blocketRubrik } from "./mapping.js";
 import { adIdFromUrl, annonsenArAktiv, felText, rubrikStammer } from "./pris.js";
 import { lasBlocketMeddelanden, type BlocketMeddelanden } from "./meddelanden.js";
 import { adTitle } from "../../adContent.js";
@@ -451,7 +451,7 @@ export async function taNerBlocketAnnons(job: ConditionJob): Promise<TaNerUtfall
       throw err;
     }
     await handleBankID(session.page, session.context, logga);
-    const r = await driveBlocketBorttagning(session.page, { adUrl: pub.url, title: capTitle(adTitle(job)), dryRun: false }, logga);
+    const r = await driveBlocketBorttagning(session.page, { adUrl: pub.url, title: blocketRubrik(adTitle(job)), dryRun: false }, logga);
     if (await saveSessionIfReal(session.context).catch(() => false)) logga("Sessionen sparades om", "ok", {});
     if (r.status === "har-meddelanden") return { status: "har-meddelanden", skal: r.meddelanden?.skal ?? "Annonsen har meddelanden." };
     return { status: "nere" };

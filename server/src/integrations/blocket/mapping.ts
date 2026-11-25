@@ -187,6 +187,8 @@ export function capTitle(title: string, max = TITLE_MAX): string {
   const clean = title.replace(/\s+/g, " ").trim();
   if (clean.length <= max) return clean;
   const cut = clean.slice(0, max);
+  // Kapningen råkar falla precis på ett ordslut: hela sista ordet ryms.
+  if (clean[max] === " ") return utanHangandeOrd(cut);
   const lastSpace = cut.lastIndexOf(" ");
   if (lastSpace >= max - 15) return utanHangandeOrd(cut.slice(0, lastSpace));
   return cut.trim();
@@ -208,6 +210,26 @@ function utanHangandeOrd(rubrik: string): string {
     ord[ord.length - 1] = ord.at(-1)!.replace(/[,;:–-]+$/, "");
   }
   return ord.join(" ").replace(/[\s,;:–-]+$/, "");
+}
+
+/**
+ * Rubrikens slut på Blocket. Hemleveransen är inräknad i Blocket-priset (`prisMedHemleverans`), och
+ * köparen ska se det redan i träfflistan — annars ser priset högt ut jämfört med en möbel som hämtas.
+ * "inkl." och inte "gratis" eller "fri": texten säger vad leveransen kostar, och samma möbel är billigare
+ * på en kanal där frakten läggs på i kassan.
+ */
+export const RUBRIK_TILLAGG = ", inkl. hemleverans";
+
+/**
+ * Rubriken som den står på Blocket: möbelns rubrik, kapad så att tillägget får plats, plus tillägget.
+ * DEN ENDA VÄGEN till Blocket-rubriken — publiceringen, prisroboten, borttagningen och redigeringen
+ * måste alla räkna fram samma rubrik, för det är på den de känner igen annonsen.
+ */
+export function blocketRubrik(title: string): string {
+  const clean = title.replace(/\s+/g, " ").trim();
+  if (/hemleverans|fri frakt|gratis frakt/i.test(clean)) return capTitle(clean);
+  const bas = capTitle(clean, TITLE_MAX - RUBRIK_TILLAGG.length).replace(/[\s,;:.–-]+$/, "");
+  return bas + RUBRIK_TILLAGG;
 }
 
 /** Måtten som Blockets formulär vill ha dem: hela centimeter, ett fält per riktning. */

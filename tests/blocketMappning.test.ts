@@ -29,6 +29,9 @@ import {
   CATEGORY_BY_SLUG,
   blocketCategoryFor,
   capTitle,
+  blocketRubrik,
+  RUBRIK_TILLAGG,
+  TITLE_MAX,
   conditionOptions,
   measurementsFrom,
 } from "../server/src/integrations/blocket/mapping.js";
@@ -116,6 +119,23 @@ test("en kapad rubrik slutar inte på ett hängande småord", () => {
   assert.equal(capTitle("Skrivbord i ek med lådor och hylla, fint för och med alltid"), "Skrivbord i ek med lådor och hylla, fint");
   // En rubrik som redan ryms rörs inte, även om den slutar på ett småord.
   assert.equal(capTitle("Bord i ek med"), "Bord i ek med");
+});
+
+test("Blocket-rubriken slutar på att hemleveransen ingår, och ryms i 50 tecken", () => {
+  assert.equal(blocketRubrik("IKEA Ektorp fåtölj i fint skick"), "IKEA Ektorp fåtölj i fint skick, inkl. hemleverans");
+  assert.equal(blocketRubrik("Piranha Attack V2 Cloth Edition Gamingstol – Grå"), "Piranha Attack V2 Cloth Edition, inkl. hemleverans");
+  assert.equal(blocketRubrik("3-sitssoffa Bergholm från SoffaDirekt i ljusklädsel"), "3-sitssoffa Bergholm, inkl. hemleverans");
+  assert.equal(blocketRubrik("IKEA Strandmon"), "IKEA Strandmon, inkl. hemleverans");
+  for (const t of ["Mio Remo matbord med marmormönstrad skiva", "Svenska hem Eton 3-sitssoffa i konjaksläder", "x".repeat(80)]) {
+    assert.ok(blocketRubrik(t).length <= TITLE_MAX, t);
+    assert.ok(blocketRubrik(t).endsWith(RUBRIK_TILLAGG), t);
+  }
+  // Står leveransen redan i rubriken läggs ingenting till.
+  assert.equal(blocketRubrik("Soffa med fri frakt"), "Soffa med fri frakt");
+});
+
+test("rubriken som kapas precis vid ett ordslut behåller sista ordet", () => {
+  assert.equal(capTitle("Piranha Attack V2 Cloth Edition Gamingstol", 31), "Piranha Attack V2 Cloth Edition");
 });
 
 test("kvittoadressen översätts till den publika annonsadressen", () => {
