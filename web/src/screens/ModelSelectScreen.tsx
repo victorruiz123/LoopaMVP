@@ -85,7 +85,8 @@ export default function ModelSelectScreen({
             <button key={`${c.model}-${i}`} className="candidate" onClick={() => onSelect(c)}>
               {/* Bild och namn, inget annat. Bilden ÄR jämförelsen — en säljare känner igen sin
                   möbel på en sekund och behöver inte läsa sig till skillnaden. */}
-              <CandidatePhoto url={c.imageUrl} searching={searchingImages} />
+              {/* key: en ny adress är en ny bildruta med nytt läge. Se CandidatePhoto. */}
+              <CandidatePhoto key={c.imageUrl ?? "ingen"} url={c.imageUrl} searching={searchingImages} />
               <span className="candidate-name">{c.model}</span>
               <span className="candidate-chevron">
                 <ChevronRight size={18} />
@@ -159,8 +160,9 @@ const PHOTO_TIMEOUT_MS = 12_000;
 function CandidatePhoto({ url, searching }: { url?: string | null; searching: boolean }) {
   const [state, setState] = useState<"laddar" | "klar" | "död">("laddar");
 
+  // Läget nollställs INTE här (komponenten får i stället en ny `key` per adress). En förladdad bild hinner anropa onLoad före effekten; en nollställning satte då tillbaka "laddar", ingen ny
+  // onLoad kom, och tidsgränsen tog bort bilden efter 12 s.
   useEffect(() => {
-    setState("laddar");
     if (!url) return;
     const id = setTimeout(() => setState((s) => (s === "laddar" ? "död" : s)), PHOTO_TIMEOUT_MS);
     return () => clearTimeout(id);
