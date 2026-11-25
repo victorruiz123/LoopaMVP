@@ -103,6 +103,19 @@ async function blocketUppe(job: ConditionJob, rubrikPaBlocket?: string) {
   return attrapp;
 }
 
+test("Blocket: en möbel som är såld i butiken läggs inte upp", async () => {
+  const job = await nyttJobb();
+  const butik = await import("../server/src/butik/store.js");
+  const id = loopaIdFor(job.id);
+  await butik.ensureRecord(id, job.id, "loopa", new Date().toISOString());
+  await butik.publish(id, { kind: "system" } as never);
+  assert.ok((await planBlocketPublish(job)).ok, "osåld möbel går att lägga upp");
+  assert.ok(await butik.claimForSale(id, "tradera", { kind: "system" } as never));
+  const plan = await planBlocketPublish(job);
+  assert.equal(plan.ok, false);
+  assert.match(plan.ok ? "" : plan.reason, /redan såld \(tradera/);
+});
+
 test("Blocket: rättad beskrivning och rubrik sparas i rätt fält, och ögonblicksbilden följer med", async () => {
   const job = await nyttJobb();
   const attrapp = await blocketUppe(job);

@@ -29,6 +29,7 @@ import { annonsensFrakt, prisMedHemleverans } from "../../hemleverans.js";
 import { armPriceLadder, nyttKanalPris } from "../../priceLadder.js";
 import { kategoriMedRattelse, medRattelser } from "../../butik/overrides.js";
 import { jobToProduct } from "../../butik/normalize.js";
+import { store } from "../../butik/store.js";
 import { getJob, jobDir, persist } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { resolveCoverImageId } from "../../pipeline/cover.js";
@@ -115,6 +116,14 @@ export async function planBlocketPublish(rajob: ConditionJob): Promise<BlocketRe
   const card = result?.listing?.result ?? null;
   if (!result) return { ok: false, reason: "Analysen är inte klar än." };
   if (!card) return { ok: false, reason: "Annonsen kunde inte skapas, så det finns inget att publicera." };
+
+  // EN SÅLD MÖBEL LÄGGS INTE UPP. Butiken är det enda stället som vet att möbeln gått på en annan
+  // kanal — jobbet självt säger det inte. 2026-11-25 lades en soffa som sålts på Tradera i september
+  // upp på Blocket, och fick tas bort igen samma kväll.
+  const post = await store().get(loopaIdFor(job.id)).catch(() => null);
+  if (post?.state === "sold") {
+    return { ok: false, reason: `Möbeln är redan såld${post.soldChannel ? ` (${post.soldChannel}` : " ("}${post.soldAt ? `, ${post.soldAt.slice(0, 10)}` : ""}) och läggs inte upp.` };
+  }
 
   const title = adTitle(job);
   if (!title) return { ok: false, reason: "Annonsen saknar rubrik." };

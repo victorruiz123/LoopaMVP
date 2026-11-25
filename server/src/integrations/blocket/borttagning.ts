@@ -79,7 +79,8 @@ export function blocketOmlaggningKlar(): boolean {
 /** Valet i menyn eller på ägarsidan. Exakt text — "Markera som såld" får aldrig träffas. */
 const TA_BORT_VAL = /^\s*(ta bort annonsen|ta bort|radera annonsen|radera|avsluta annonsen|avsluta)\s*$/i;
 /** Bekräftelseknappen i dialogen. */
-const BEKRAFTA = /^\s*(ta bort|ja, ta bort|ta bort annonsen|radera|ja, radera|avsluta|avsluta annonsen|bekräfta|ja)\s*$/i;
+// "Ta bort permanent": Blockets dialog sedan november 2026.
+const BEKRAFTA = /^\s*(ta bort|ta bort permanent|ja, ta bort|ta bort annonsen|radera|ja, radera|avsluta|avsluta annonsen|bekräfta|ja)\s*$/i;
 /** Skälen roboten får välja, om dialogen frågar. Aldrig ett skäl som säger att möbeln sålts. */
 const SKAL_OK = /(vill inte sälja|ångrat|lägger upp (den )?(igen|på nytt)|annat|övrigt|annan anledning)/i;
 const SKAL_SALD = /såld/i;
