@@ -1373,6 +1373,9 @@ export interface TraderaPostStatus {
   lastPollAt: string | null;
   lastError: string | null;
   ohanterade: number;
+  /** Hur fraktlänken når Tradera-köparen. Saknas mot äldre servrar. */
+  sms?: { provider: "46elks" | "file" | "none"; dryrun: boolean };
+  email?: string;
 }
 
 export interface TraderaPosten {
@@ -1643,7 +1646,7 @@ export interface EfterlysningKandidat {
 
 /** Vad panelen kan göra med en order. Se server/src/adminOrdrar.ts. */
 export interface OrderAtgard {
-  gor: "boka" | "levererad" | "anteckna";
+  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank";
   datum?: string;
   tid?: string;
   text?: string;

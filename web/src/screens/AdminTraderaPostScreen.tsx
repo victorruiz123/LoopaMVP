@@ -72,6 +72,20 @@ export default function AdminTraderaPostScreen({ onOpenAd }: { onOpenAd?: (loopa
             : "TRADERA_MAIL_WATCH=0 stänger av bevakningen."}
         </p>
       )}
+      {status?.sms && (
+        <p className="admin-note">
+          {status.sms.provider === "46elks"
+            ? status.sms.dryrun
+              ? t("SMS: 46elks i provläge (SMS_DRYRUN=1) — inga SMS skickas på riktigt.")
+              : t("SMS: 46elks — fraktlänken skickas som SMS till Tradera-köpare.")
+            : status.sms.provider === "none"
+              ? t("SMS: avstängt (SMS_PROVIDER=none). Köparen får bara mejlet.")
+              : t("SMS: ingen leverantör — SMS:en sparas i /outbox. Lägg ELKS_API_USERNAME och ELKS_API_PASSWORD i server/.env.")}
+          {status.email && status.email !== "gmail"
+            ? ` ${t("Mejl: EMAIL_PROVIDER={p} — mejlen till köparen skickas INTE på riktigt.", { p: status.email })}`
+            : ""}
+        </p>
+      )}
       {status?.lastError && <p className="admin-note">{t("Senaste hämtningen misslyckades")}: {status.lastError}</p>}
       {data?.resultat && !data.resultat.error && (
         <p className="admin-note">

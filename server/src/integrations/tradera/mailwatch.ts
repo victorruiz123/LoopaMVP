@@ -36,6 +36,7 @@ import { loopaIdFor } from "../../loopaId.js";
 import { claimForSale, store as butikStore } from "../../butik/store.js";
 import { invalidate } from "../../butik/inventory.js";
 import { sender } from "../../notify/outbox.js";
+import { smsProvider } from "../../notify/sms.js";
 import { isFromTradera, parseTraderaMail, type TraderaMail, type TraderaMailKind } from "./mail.js";
 import { parseBetaltMejl, parseOrderspecifikation, pdfTextItems } from "./orderspec.js";
 import type { ConditionJob } from "../../types.js";
@@ -174,6 +175,12 @@ export interface TraderaMailStatus {
   lastError: string | null;
   /** Poster ingen kryssat av. Det tal fliken visar i sin knapp. */
   ohanterade: number;
+  /**
+   * Hur fraktlänken når Tradera-köparen. `46elks` = SMS skickas på riktigt; `file` = SMS:en hamnar i
+   * /outbox (nycklar saknas); `none` = avstängt. `email` är utskickets leverantör för samma länk.
+   */
+  sms: { provider: "46elks" | "file" | "none"; dryrun: boolean };
+  email: string;
 }
 
 export async function traderaMailStatus(): Promise<TraderaMailStatus> {
@@ -187,6 +194,8 @@ export async function traderaMailStatus(): Promise<TraderaMailStatus> {
     lastPollAt: cursor.lastPollAt,
     lastError: cursor.lastError,
     ohanterade: all.filter((p) => !p.handledAt && p.kind !== "ovrigt").length,
+    sms: { provider: smsProvider(), dryrun: process.env.SMS_DRYRUN === "1" },
+    email: (process.env.EMAIL_PROVIDER ?? "file").trim().toLowerCase() || "file",
   };
 }
 

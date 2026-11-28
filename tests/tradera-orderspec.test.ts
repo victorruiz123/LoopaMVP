@@ -227,3 +227,58 @@ test("hela kedjan: order med köpare och säljare, SMS till KÖPAREN, mejl, en g
   assert.equal(fel.status, 404);
   assert.equal(await orderByFraktToken("kort"), null);
 });
+
+test("46elks: rätt adress, Basic-inloggning, avsändare Loopa — och provläget skickar dryrun", async () => {
+  const { sendSms } = await import("../server/src/notify/sms.js");
+  const fore = { u: process.env.ELKS_API_USERNAME, p: process.env.ELKS_API_PASSWORD, prov: process.env.SMS_PROVIDER, dry: process.env.SMS_DRYRUN };
+  const origFetch = globalThis.fetch;
+  const anrop: Array<{ url: string; init: RequestInit }> = [];
+  globalThis.fetch = (async (url: string, init: RequestInit) => {
+    anrop.push({ url, init });
+    return new Response(JSON.stringify({ id: "s123", status: "created" }), { status: 200 });
+  }) as typeof fetch;
+  try {
+    process.env.ELKS_API_USERNAME = "uabc";
+    process.env.ELKS_API_PASSWORD = "hemligt";
+    delete process.env.SMS_PROVIDER;
+    process.env.SMS_DRYRUN = "1";
+    const r = await sendSms({ to: "+46700000009", text: "Hej!", kind: "prov" });
+    assert.deepEqual(r, { sent: true, provider: "46elks", id: "s123", error: null });
+    assert.equal(anrop[0].url, "https://api.46elks.com/a1/sms");
+    assert.equal((anrop[0].init.headers as Record<string, string>).Authorization, `Basic ${Buffer.from("uabc:hemligt").toString("base64")}`);
+    const body = new URLSearchParams(String(anrop[0].init.body));
+    assert.equal(body.get("from"), "Loopa");
+    assert.equal(body.get("to"), "+46700000009");
+    assert.equal(body.get("message"), "Hej!");
+    assert.equal(body.get("dryrun"), "yes");
+
+    // Ett fel från 46elks blir ett tydligt "inte skickat", inte ett kast.
+    globalThis.fetch = (async () => new Response("Not enough credits", { status: 402 })) as typeof fetch;
+    const fel = await sendSms({ to: "+46700000009", text: "Hej!", kind: "prov" });
+    assert.equal(fel.sent, false);
+    assert.match(fel.error ?? "", /402.*credits/);
+    // Ogiltigt nummer når aldrig leverantören.
+    assert.equal((await sendSms({ to: "0700", text: "x", kind: "prov" })).sent, false);
+  } finally {
+    globalThis.fetch = origFetch;
+    for (const [k, v] of [["ELKS_API_USERNAME", fore.u], ["ELKS_API_PASSWORD", fore.p], ["SMS_PROVIDER", fore.prov], ["SMS_DRYRUN", fore.dry]] as const) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
+});
+
+test("panelens 'Skicka fraktlänken igen' skickar SMS + mejl en gång till och skriver det i historiken", async () => {
+  const { andraOrder } = await import("../server/src/adminOrdrar.js");
+  const { allOrders } = await import("../server/src/butik/orders.js");
+  const order = (await allOrders()).find((o) => o.kanal === "tradera");
+  assert.ok(order);
+  const fore = readdirSync(process.env.OUTBOX_DIR!).length;
+  const detalj = await andraOrder(order!.id, { gor: "skicka-fraktlank" }, "admin-1");
+  assert.ok(detalj);
+  const efter = readdirSync(process.env.OUTBOX_DIR!);
+  assert.equal(efter.length, fore + 2, "ett SMS och ett mejl till");
+  assert.ok(detalj!.handelser.some((h) => /igen, från panelen/.test(h.note)));
+  // En order som inte finns ger null, inte ett utskick.
+  assert.equal(await andraOrder("finns-inte", { gor: "skicka-fraktlank" }, null), null);
+});

@@ -339,6 +339,21 @@ function OrderDetalj({
               <strong>{t("Fraktlänk")}:</strong> <a href={order.fraktLank} target="_blank" rel="noreferrer">{order.fraktLank}</a>
             </div>
           )}
+          {order.fraktLank && (order.status === "paid" || order.status === "booking") && (
+            <div style={{ marginTop: 8 }}>
+              <button
+                type="button"
+                className="btn btn-small btn-outline"
+                disabled={busy}
+                onClick={() => void gor({ gor: "skicka-fraktlank" })}
+              >
+                {t("Skicka fraktlänken igen")}
+              </button>
+              <span className="card-row-meta" style={{ marginLeft: 8 }}>
+                {t("SMS och mejl till köparen. Utfallet står i historiken nedan.")}
+              </span>
+            </div>
+          )}
         </section>
       )}
 

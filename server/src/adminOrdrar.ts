@@ -188,7 +188,11 @@ export async function orderDetalj(id: string): Promise<AdminOrderDetalj | null> 
 
 /** Vad panelen kan göra med en order. Varje åtgärd skriver en rad i historiken. */
 export interface OrderAtgard {
-  gor: "boka" | "levererad" | "anteckna";
+  /**
+   * `skicka-fraktlank`: SMS och mejl med fraktlänken till Tradera-köparen igen. Bara för Tradera-
+   * ordrar som väntar på köparens tider (`paid`) eller där tiderna kan ändras (`booking`).
+   */
+  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank";
   /** För `boka`: tiden som faktiskt bokades. Behöver inte vara en av köparens tre. */
   datum?: string;
   tid?: string;
@@ -232,6 +236,13 @@ export async function andraOrder(id: string, atgard: OrderAtgard, adminId: strin
     const text = atgard.text?.trim();
     if (!text) throw new OrderFel("Anteckningen är tom.");
     await recordOrderEvent(order.id, { status: null, note: text, actor: "admin", publik: atgard.publik === true });
+  } else if (atgard.gor === "skicka-fraktlank") {
+    if (order.kanal !== "tradera" || !order.fraktToken) throw new OrderFel("Fraktlänken finns bara på Tradera-ordrar.");
+    if (order.status !== "paid" && order.status !== "booking") throw new OrderFel("Ordern väntar inte på köparens tider längre.");
+    if (!order.kopare?.telefon && !order.kopare?.email) throw new OrderFel("Köparen har varken telefon eller e-post i ordern.");
+    const { skickaFraktlank } = await import("./integrations/tradera/betald.js");
+    const { titel } = await titelFor(order.productId);
+    await skickaFraktlank(order, titel, "admin");
   } else {
     throw new OrderFel("Okänd åtgärd.");
   }

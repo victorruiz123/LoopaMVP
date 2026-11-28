@@ -195,26 +195,45 @@ export async function hanteraBetaltKop(input: {
     });
   }
 
+  const { sms, mejl } = await skickaFraktlank(order, input.titel, "system");
+  return { order, created, sms, mejl };
+}
+
+/**
+ * Fraktlänken till köparen: SMS till telefonen och mejl till adressen. Varje utfall skrivs på ordern
+ * som en intern rad, så att panelen ser vad som gick fram.
+ *
+ * Används två gånger: automatiskt när ordern skapas, och från panelens "Skicka fraktlänken igen" —
+ * för köp som kom in innan SMS-leverantören fanns, eller när köparen säger att inget kom.
+ */
+export async function skickaFraktlank(
+  order: Order,
+  titel: string | null,
+  actor: "system" | "admin",
+): Promise<{ sms: SmsResult | null; mejl: BetaltUtfall["mejl"] }> {
+  const kopare = order.kopare;
+  if (!kopare || !order.fraktToken) return { sms: null, mejl: null };
   const lank = fraktLank(order);
+  const igen = actor === "admin" ? " (igen, från panelen)" : "";
 
   // SMS:et.
   let sms: SmsResult | null = null;
   if (kopare.telefon) {
-    const text = smsText({ namn: kopare.namn, titel: input.titel, lank });
+    const text = smsText({ namn: kopare.namn, titel, lank });
     sms = await sendSms({ to: kopare.telefon, text, kind: "tradera-frakt" });
     await recordOrderEvent(order.id, {
       status: null,
       note: sms.sent
-        ? `SMS med fraktlänken skickat till ${kopare.telefon} (${smsDelar(text)} del${smsDelar(text) === 1 ? "" : "ar"}).`
-        : `SMS till ${kopare.telefon} gick INTE iväg: ${sms.error ?? "okänt fel"}.`,
-      actor: "system",
+        ? `SMS med fraktlänken skickat till ${kopare.telefon}${igen} (${smsDelar(text)} del${smsDelar(text) === 1 ? "" : "ar"}).`
+        : `SMS till ${kopare.telefon}${igen} gick INTE iväg: ${sms.error ?? "okänt fel"}.`,
+      actor,
       publik: false,
     });
   } else {
     await recordOrderEvent(order.id, {
       status: null,
       note: "Inget telefonnummer i Traderas orderspecifikation — inget SMS skickat.",
-      actor: "system",
+      actor,
       publik: false,
     });
   }
@@ -222,22 +241,24 @@ export async function hanteraBetaltKop(input: {
   // Mejlet, alltid när adressen finns: det är kvittot på länken, och reserven om SMS:et inte kom fram.
   let mejl: BetaltUtfall["mejl"] = null;
   if (kopare.email) {
-    const m = mejlText({ namn: kopare.namn, titel: input.titel, lank, ordernummer, adress: adressRad(kopare) });
+    const m = mejlText({ namn: kopare.namn, titel, lank, ordernummer: order.tradera?.ordernummer ?? order.reference, adress: adressRad(kopare) });
     try {
       await sender().send({ to: kopare.email, subject: m.subject, body: m.body, kind: "tradera-frakt" });
       mejl = "skickat";
+      if (actor === "admin") {
+        await recordOrderEvent(order.id, { status: null, note: `Mejl med fraktlänken skickat till ${kopare.email}${igen}.`, actor, publik: false });
+      }
     } catch (err) {
       mejl = "misslyckat";
       await recordOrderEvent(order.id, {
         status: null,
-        note: `Mejlet med fraktlänken till ${kopare.email} gick inte iväg: ${err instanceof Error ? err.message : String(err)}.`,
-        actor: "system",
+        note: `Mejlet med fraktlänken till ${kopare.email}${igen} gick inte iväg: ${err instanceof Error ? err.message : String(err)}.`,
+        actor,
         publik: false,
       });
     }
   } else {
     mejl = "ingen-adress";
   }
-
-  return { order, created, sms, mejl };
+  return { sms, mejl };
 }
