@@ -59,6 +59,8 @@ export interface AdminOrderRad {
   tradera: TraderaOrderInfo | null;
   /** Länken köparen fick i SMS:et. Panelen kan skicka den igen för hand. */
   fraktLank: string | null;
+  /** Köparens fritextadress från fraktsidan, när den väntar på eller fått ett beslut. */
+  adressGranskning: Order["adressGranskning"] | null;
 }
 
 export interface AdminOrderDetalj extends AdminOrderRad {
@@ -80,6 +82,7 @@ export interface OrderSummering {
 
 /** Vad som väntar på oss i det här läget. Null betyder att bollen ligger hos köparen eller ingen. */
 function attGoraFor(order: Order): string | null {
+  if (order.status === "paid" && order.adressGranskning?.status === "vantar") return "Granska köparens adress — godkänn eller avvisa.";
   switch (order.status) {
     case "paid":
       return order.requestedSlots.length
@@ -141,6 +144,7 @@ async function radAv(order: Order): Promise<AdminOrderRad> {
     kanal: order.kanal ?? "butik",
     kopare: order.kopare ?? null,
     tradera: order.tradera ?? null,
+    adressGranskning: order.adressGranskning ?? null,
     fraktLank: order.fraktToken
       ? `${(process.env.LOOPA_PUBLIC_URL?.trim() || "https://app.loopa.nu").replace(/\/+$/, "")}/butik/frakt/${order.fraktToken}`
       : null,
@@ -192,7 +196,11 @@ export interface OrderAtgard {
    * `skicka-fraktlank`: SMS och mejl med fraktlänken till Tradera-köparen igen. Bara för Tradera-
    * ordrar som väntar på köparens tider (`paid`) eller där tiderna kan ändras (`booking`).
    */
-  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank";
+  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank" | "godkann-adress" | "avvisa-adress";
+  /** För `godkann-adress`: adressen som den ska stå på ordern. */
+  adress?: string;
+  postnummer?: string;
+  ort?: string;
   /** För `boka`: tiden som faktiskt bokades. Behöver inte vara en av köparens tre. */
   datum?: string;
   tid?: string;
@@ -243,6 +251,15 @@ export async function andraOrder(id: string, atgard: OrderAtgard, adminId: strin
     const { skickaFraktlank } = await import("./integrations/tradera/betald.js");
     const { titel } = await titelFor(order.productId);
     await skickaFraktlank(order, titel, "admin");
+  } else if (atgard.gor === "godkann-adress" || atgard.gor === "avvisa-adress") {
+    const { godkannAdress, avvisaAdress, FraktAdressFel } = await import("./butik/fraktAdress.js");
+    try {
+      if (atgard.gor === "godkann-adress") await godkannAdress(order, { adress: atgard.adress, postnummer: atgard.postnummer, ort: atgard.ort });
+      else await avvisaAdress(order, atgard.text);
+    } catch (err) {
+      if (err instanceof FraktAdressFel) throw new OrderFel(err.message);
+      throw err;
+    }
   } else {
     throw new OrderFel("Okänd åtgärd.");
   }

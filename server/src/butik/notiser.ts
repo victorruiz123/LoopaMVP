@@ -26,6 +26,7 @@
 import { adminEmails } from "../admin.js";
 import { getJob } from "../jobStore.js";
 import { sendLetter } from "../efterlysning/notify.js";
+import { sendSms } from "../notify/sms.js";
 import type { Order, OrderSlot } from "./orders.js";
 import type { ButikRecord } from "./store.js";
 
@@ -233,8 +234,37 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
 }
 
 /** Frakten är bokad. EN tid gäller, och det är den enda som nämns. */
+/**
+ * SMS:et när frakten är bokad. Kort, en del om det går: dag, tid och att vi bär in.
+ * "måndag 30 nov kl 08–12" — veckodagen först, det är den man minns.
+ */
+export function fraktBokadSms(input: { namn: string | null; titel: string; datum: string; tid: string | null }): string {
+  const d = new Date(`${input.datum}T12:00:00`);
+  const dag = d.toLocaleDateString("sv-SE", { weekday: "long", day: "numeric", month: "short" }).replace(".", "");
+  const forn = input.namn?.trim().split(/\s+/)[0];
+  const titel = input.titel.length > 34 ? `${input.titel.slice(0, 31).trimEnd()}...` : input.titel;
+  // "–" finns inte i GSM-alfabetet och gör hela SMS:et till UCS-2 (70 tecken per del). Bindestreck.
+  const tid = (input.tid ?? "").replace(/[–—]/g, "-");
+  return `${forn ? `Hej ${forn}! ` : "Hej! "}Leveransen av ${titel} är bokad: ${dag}${tid ? ` kl ${tid}` : ""}. Vi bär in den till dörren. /Loopa`;
+}
+
 export async function notifyDeliveryBooked(order: Order, record: ButikRecord | null, title: string): Promise<void> {
   const when = order.deliveryDate ? slotText({ date: order.deliveryDate, window: order.deliveryWindow ?? "" }) : "tid saknas";
+  // SMS till köparen när vi har numret — i dag Tradera-köparna. Utfallet i historiken, som fraktlänken.
+  if (order.kopare?.telefon && order.deliveryDate) {
+    const r = await sendSms({
+      to: order.kopare.telefon,
+      text: fraktBokadSms({ namn: order.kopare.namn, titel: title, datum: order.deliveryDate, tid: order.deliveryWindow }),
+      kind: "frakt-bokad",
+    });
+    const { recordOrderEvent } = await import("./orders.js");
+    await recordOrderEvent(order.id, {
+      status: null,
+      note: r.sent ? "Bekräftelse-SMS skickat till köparen." : `Bekräftelse-SMS gick inte iväg: ${r.error ?? "okänt fel"}`,
+      actor: "system",
+      publik: false,
+    });
+  }
   if (order.email) {
     await sendLetter({
       to: order.email,

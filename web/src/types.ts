@@ -1374,7 +1374,7 @@ export interface TraderaPostStatus {
   lastError: string | null;
   ohanterade: number;
   /** Hur fraktlänken når Tradera-köparen. Saknas mot äldre servrar. */
-  sms?: { provider: "46elks" | "file" | "none"; dryrun: boolean };
+  sms?: { provider: "46elks" | "file" | "none"; dryrun: boolean; saldoKr?: number | null; saldoGrans?: number };
   email?: string;
 }
 
@@ -1568,6 +1568,8 @@ export interface AdminOrderRad {
   tradera?: AdminTraderaOrder | null;
   /** Fraktlänken köparen fick i SMS:et. */
   fraktLank?: string | null;
+  /** Fritextadress som köparen bett oss granska på fraktsidan. */
+  adressGranskning?: { text: string; status: "vantar" | "godkand" | "avvisad"; at: string; hanteradAt?: string | null } | null;
 }
 
 export interface AdminOrderPart {
@@ -1646,7 +1648,10 @@ export interface EfterlysningKandidat {
 
 /** Vad panelen kan göra med en order. Se server/src/adminOrdrar.ts. */
 export interface OrderAtgard {
-  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank";
+  gor: "boka" | "levererad" | "anteckna" | "skicka-fraktlank" | "godkann-adress" | "avvisa-adress";
+  adress?: string;
+  postnummer?: string;
+  ort?: string;
   datum?: string;
   tid?: string;
   text?: string;

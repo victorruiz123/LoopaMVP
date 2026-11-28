@@ -3545,6 +3545,10 @@ startButikSweeper();
 // och adminadressen. Av av sig själv tills GMAIL_USER/GMAIL_APP_PASSWORD finns i server/.env.
 startTraderaMailWatch();
 
+// SMS-saldot hos 46elks: läses vid start och var sjätte timme, mejl till FRAKT_NOTIFY_TO när det
+// närmar sig noll. Av när 46elks-nycklarna saknas. Se notify/smsSaldo.ts.
+void import("./notify/smsSaldo.js").then((m) => m.startaSaldoBevakning());
+
 // Blocket-vakten: kontrollerar var tolfte timme att sessionen fortfarande gäller, skriver beskedet
 // där panelen läser det, och mejlar adminadresserna när den gått ut — innan en säljare upptäcker
 // det. Av av sig själv när ingen session finns i server/.env.

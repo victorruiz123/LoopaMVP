@@ -119,8 +119,21 @@ export interface Order {
   kopare?: OrderPart | null;
   /** Traderas sida av köpet. Null på butikens ordrar. */
   tradera?: TraderaOrderInfo | null;
+  /**
+   * Köparens adress som inte gick att leverera till automatiskt — fritext från "Hittar du inte din
+   * adress?" på fraktsidan. `vantar` tills en admin godkänt (adressen sätts då och tiderna öppnas)
+   * eller avvisat den. Se butik/fraktAdress.ts.
+   */
+  adressGranskning?: AdressGranskning | null;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface AdressGranskning {
+  text: string;
+  status: "vantar" | "godkand" | "avvisad";
+  at: string;
+  hanteradAt?: string | null;
 }
 
 /** En part i ett köp: namn, adress och hur vi når dem. Samma form för köpare och säljare. */

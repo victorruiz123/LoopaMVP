@@ -6,6 +6,7 @@
  * och svarar med true när den tagit hand om anropet.
  */
 
+import { andraFraktAdress, begarAdressGranskning, fraktZon, FraktAdressFel } from "./fraktAdress.js";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { deliveryQuote, slotsFor, zoneFor } from "./delivery.js";
 import { abandonCheckout, checkoutConfigured, CheckoutError, fulfilPaidOrder, parseWebhook, reconcileOrder, requestSlots, startCheckout } from "./checkout.js";
@@ -596,6 +597,15 @@ function forBuyer(order: Order): Order {
  *   GET  /api/butik/frakt/:token           ordern, möbeln och tiderna att välja bland
  *   POST /api/butik/frakt/:token/leverans  köparens upp till tre tider — samma steg som butikens köpare
  */
+/** Tiderna köparen kan välja, och om adressen ligger utanför det vi kör till. */
+function fraktTider(order: Order): { slots: ReturnType<typeof slotsFor>; utanforZon: boolean } {
+  const zon = fraktZon(order);
+  return {
+    slots: order.status === "paid" && zon && order.adressGranskning?.status !== "vantar" ? slotsFor(zon, new Date(order.createdAt)) : [],
+    utanforZon: !!order.postalCode && !zon,
+  };
+}
+
 export async function handleButikFrakt(segments: string[], req: IncomingMessage, res: ServerResponse): Promise<boolean> {
   if (segments[0] !== "frakt" || !segments[1]) return false;
   const order = await orderByFraktToken(segments[1]);
@@ -603,9 +613,34 @@ export async function handleButikFrakt(segments: string[], req: IncomingMessage,
 
   if (segments.length === 2 && req.method === "GET") {
     const product = await productById(order.productId);
-    const zon = order.postalCode ? zoneFor(order.postalCode) : null;
-    const slots = order.status === "paid" && zon ? slotsFor(zon, new Date(order.createdAt)) : [];
-    json(res, 200, { order: forBuyer(order), product, slots, utanforZon: !!order.postalCode && !zon });
+    json(res, 200, { order: forBuyer(order), product, ...fraktTider(order) });
+    return true;
+  }
+
+  // Köparen byter leveransadress. Utanför zonen: 422 med kod "utanfor" och ingenting sparas.
+  if (segments.length === 3 && segments[2] === "adress" && req.method === "POST") {
+    try {
+      const body = await jsonBody<{ adress?: string; postnummer?: string; ort?: string }>(req);
+      const updated = await andraFraktAdress(order, body);
+      json(res, 200, { order: forBuyer(updated), product: await productById(updated.productId), ...fraktTider(updated) });
+    } catch (err) {
+      if (err instanceof FraktAdressFel) return json(res, err.status, { error: err.message, kod: err.kod }), true;
+      json(res, 500, { error: "Kunde inte spara adressen." });
+    }
+    return true;
+  }
+
+  // "Hittar du inte din adress?" — fritext till oss för granskning.
+  if (segments.length === 3 && segments[2] === "adress-granskning" && req.method === "POST") {
+    try {
+      const body = await jsonBody<{ text?: string }>(req);
+      const product = await productById(order.productId);
+      const updated = await begarAdressGranskning(order, body.text ?? "", product?.title ?? "Möbel");
+      json(res, 200, { order: forBuyer(updated), product, ...fraktTider(updated) });
+    } catch (err) {
+      if (err instanceof FraktAdressFel) return json(res, err.status, { error: err.message, kod: err.kod }), true;
+      json(res, 500, { error: "Kunde inte skicka adressen." });
+    }
     return true;
   }
 

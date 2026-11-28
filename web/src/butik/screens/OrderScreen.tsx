@@ -75,7 +75,15 @@ export default function OrderScreen({ id, fraktToken }: { id?: string; fraktToke
 
   // Tradera-köparen från SMS:et får en egen, avskalad vy med ett enda ärende: välj tid.
   if (fraktToken && order.kanal === "tradera") {
-    return <FraktBokning token={fraktToken} order={order} product={product} slots={slots} utanforZon={utanforZon} onOrder={setOrder} />;
+    return <FraktBokning
+        token={fraktToken}
+        order={order}
+        product={product}
+        slots={slots}
+        utanforZon={utanforZon}
+        onOrder={setOrder}
+        onSvar={(r) => { setOrder(r.order); setProduct(r.product); setSlots(r.slots ?? []); setUtanforZon(!!r.utanforZon); }}
+      />;
   }
 
   /**

@@ -113,6 +113,8 @@ export async function sendSms(msg: SmsMessage): Promise<SmsResult> {
     } catch {
       // Ett 200 utan JSON är fortfarande ett mottaget SMS.
     }
+    // Saldot efter varje riktigt SMS (inte provläget). Väntas inte in — se smsSaldo.ts.
+    if (process.env.SMS_DRYRUN !== "1") void import("./smsSaldo.js").then((m) => m.kollaSmsSaldo()).catch(() => {});
     return { sent: true, provider, id, error: null };
   } catch (err) {
     return { sent: false, provider, id: null, error: err instanceof Error ? err.message : String(err) };

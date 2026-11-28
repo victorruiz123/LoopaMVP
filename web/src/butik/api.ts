@@ -167,6 +167,8 @@ export interface Order {
   /** Tradera-köparens egna uppgifter — adressen vi kör till. */
   kopare?: { namn: string | null; adress: string | null; postnummer: string | null; ort: string | null } | null;
   tradera?: { ordernummer: string } | null;
+  /** Fritextadress som köparen bett oss granska, och beslutet. Se server/src/butik/fraktAdress.ts. */
+  adressGranskning?: { text: string; status: "vantar" | "godkand" | "avvisad"; at: string } | null;
 }
 
 /** Leveransbeskedet är PUBLIKT — man ska kunna se pris och tid innan man loggar in. */
@@ -261,6 +263,34 @@ export async function requestFraktSlots(token: string, tider: OrderSlot[]): Prom
   const body = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((body as { error?: string }).error || `Anropet misslyckades (${res.status})`);
   return body as { order: Order };
+}
+
+/** Fel från fraktsidans adressvägar. `kod` = "utanfor" betyder adress utanför området. */
+export class FraktFel extends Error {
+  constructor(message: string, readonly kod: string | null) {
+    super(message);
+  }
+}
+
+export type FraktSvar = { order: Order; product: Product | null; slots: DeliverySlot[]; utanforZon?: boolean };
+
+async function fraktPost(token: string, del: string, data: unknown): Promise<FraktSvar> {
+  const res = await fetch(`/api/butik/frakt/${encodeURIComponent(token)}/${del}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+  const body = (await res.json().catch(() => ({}))) as { error?: string; kod?: string };
+  if (!res.ok) throw new FraktFel(body.error || `Anropet misslyckades (${res.status})`, body.kod ?? null);
+  return body as unknown as FraktSvar;
+}
+
+export function andraFraktAdress(token: string, adress: { adress: string; postnummer: string; ort: string }): Promise<FraktSvar> {
+  return fraktPost(token, "adress", adress);
+}
+
+export function skickaAdressForGranskning(token: string, text: string): Promise<FraktSvar> {
+  return fraktPost(token, "adress-granskning", { text });
 }
 
 export interface Interpretation {

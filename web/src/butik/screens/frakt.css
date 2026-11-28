@@ -99,3 +99,20 @@
   .fb-dag-namn { flex-direction: column; justify-content: center; gap: 0; }
   .fb-slot { min-height: 68px; }
 }
+
+/* Adressen: ändra, eller skicka den för granskning. */
+.fb-lank-knapp { background: none; border: 0; padding: 6px 4px; font: inherit; font-weight: 700; color: var(--accent-ink); text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }
+.fb-adressform { display: flex; flex-direction: column; gap: 12px; margin-bottom: 22px; }
+.fb-falt { display: flex; flex-direction: column; gap: 4px; font-size: var(--fs-sm); color: var(--muted); font-weight: 600; flex: 1; min-width: 0; }
+.fb-falt input, .fb-adressform textarea { font: inherit; font-size: var(--fs-field); color: var(--ink); padding: 12px 14px; border: 2px solid var(--border); border-radius: 12px; background: var(--surface); width: 100%; box-sizing: border-box; }
+.fb-falt input:focus, .fb-adressform textarea:focus { outline: none; border-color: var(--accent); }
+.fb-falt-rad { display: flex; gap: 10px; }
+.fb-falt-postnr { flex: 0 0 38%; }
+.fb-knapprad { display: flex; gap: 12px; align-items: center; }
+.fb-cta-liten { width: auto; min-height: 48px; padding: 0 22px; font-size: var(--fs-base); }
+.fb-cta-sekundar { background: var(--ink); box-shadow: none; margin-top: 10px; align-self: flex-start; }
+.fb-cta-sekundar:hover:not(:disabled) { background: var(--ink-soft); }
+.fb-hittar-inte { border-top: 1px dashed var(--border); padding-top: 10px; display: flex; flex-direction: column; }
+.fb-hittar-inte .fb-lank-knapp { align-self: flex-start; color: var(--muted); font-weight: 600; }
+.fb-hittar-inte-lyft .fb-lank-knapp { color: var(--accent-ink); font-weight: 800; }
+.fb-vantar-ikon { background: var(--accent-light); font-size: 26px; }

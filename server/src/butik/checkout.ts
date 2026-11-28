@@ -409,7 +409,7 @@ export async function requestSlots(orderId: string, slots: OrderSlot[]): Promise
   if (order.status !== "paid" && order.status !== "booking") {
     throw new CheckoutError("Ordern är inte betald, eller så är frakten redan bokad.", 409);
   }
-  if (order.postalCode && !zoneFor(order.postalCode)) {
+  if (order.postalCode && !zoneFor(order.postalCode) && order.adressGranskning?.status !== "godkand") {
     throw new CheckoutError("Ordern har ingen leveranszon — vi hör av oss om upphämtning.", 409);
   }
   const rensade = slots

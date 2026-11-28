@@ -26,6 +26,7 @@
  * Cloud-projekt för en enda inkorg. Saknas någon av variablerna är bevakaren av, och säger det.
  */
 
+import { senastKandaSaldo } from "../../notify/smsSaldo.js";
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -179,7 +180,7 @@ export interface TraderaMailStatus {
    * Hur fraktlänken når Tradera-köparen. `46elks` = SMS skickas på riktigt; `file` = SMS:en hamnar i
    * /outbox (nycklar saknas); `none` = avstängt. `email` är utskickets leverantör för samma länk.
    */
-  sms: { provider: "46elks" | "file" | "none"; dryrun: boolean };
+  sms: { provider: "46elks" | "file" | "none"; dryrun: boolean; saldoKr: number | null; saldoGrans: number };
   email: string;
 }
 
@@ -194,7 +195,7 @@ export async function traderaMailStatus(): Promise<TraderaMailStatus> {
     lastPollAt: cursor.lastPollAt,
     lastError: cursor.lastError,
     ohanterade: all.filter((p) => !p.handledAt && p.kind !== "ovrigt").length,
-    sms: { provider: smsProvider(), dryrun: process.env.SMS_DRYRUN === "1" },
+    sms: { provider: smsProvider(), dryrun: process.env.SMS_DRYRUN === "1", saldoKr: senastKandaSaldo().saldoKr, saldoGrans: senastKandaSaldo().grans },
     email: (process.env.EMAIL_PROVIDER ?? "file").trim().toLowerCase() || "file",
   };
 }

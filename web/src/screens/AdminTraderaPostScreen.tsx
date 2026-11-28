@@ -81,6 +81,12 @@ export default function AdminTraderaPostScreen({ onOpenAd }: { onOpenAd?: (loopa
             : status.sms.provider === "none"
               ? t("SMS: avstängt (SMS_PROVIDER=none). Köparen får bara mejlet.")
               : t("SMS: ingen leverantör — SMS:en sparas i /outbox. Lägg ELKS_API_USERNAME och ELKS_API_PASSWORD i server/.env.")}
+          {status.sms.provider === "46elks" && typeof status.sms.saldoKr === "number" && (
+            <strong style={{ color: status.sms.saldoKr < (status.sms.saldoGrans ?? 10) ? "var(--accent)" : undefined }}>
+              {" "}{t("Saldo: {kr} kr", { kr: status.sms.saldoKr.toFixed(2).replace(".", ",") })}
+              {status.sms.saldoKr < (status.sms.saldoGrans ?? 10) ? ` — ${t("fyll på hos 46elks")}` : ""}
+            </strong>
+          )}
           {status.email && status.email !== "gmail" && status.email !== "smtp"
             ? ` ${t("Mejl: EMAIL_PROVIDER={p} — mejlen till köparen skickas INTE på riktigt.", { p: status.email })}`
             : ""}

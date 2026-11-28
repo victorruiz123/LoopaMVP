@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
-import { requestFraktSlots, type DeliverySlot, type Order } from "../api";
+import { andraFraktAdress, FraktFel, requestFraktSlots, skickaAdressForGranskning, type DeliverySlot, type FraktSvar, type Order } from "../api";
 import type { Product } from "../types";
+import AdressFalt from "../../components/AdressFalt";
 import "./frakt.css";
 
 /**
@@ -11,7 +12,7 @@ import "./frakt.css";
  * tummen, utan att läsa ett stycke först.
  */
 export default function FraktBokning({
-  token, order, product, slots, utanforZon, onOrder,
+  token, order, product, slots, utanforZon, onOrder, onSvar,
 }: {
   token: string;
   order: Order;
@@ -19,6 +20,8 @@ export default function FraktBokning({
   slots: DeliverySlot[];
   utanforZon: boolean;
   onOrder: (o: Order) => void;
+  /** Ett nytt svar från servern efter en adressändring: ordern, tiderna och zonläget på en gång. */
+  onSvar: (svar: FraktSvar) => void;
 }) {
   /** Ordningen är förstahandsvalet först — se OrderScreen. */
   const [valda, setValda] = useState<DeliverySlot[]>([]);
@@ -54,7 +57,10 @@ export default function FraktBokning({
   const adress = order.kopare
     ? [order.kopare.adress, [order.kopare.postnummer, order.kopare.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ")
     : null;
-  const valjer = order.status === "paid" && slots.length > 0 && !utanforZon;
+  const granskas = order.status === "paid" && order.adressGranskning?.status === "vantar";
+  const valjer = order.status === "paid" && slots.length > 0 && !granskas;
+  /** Betald men ingen tid att välja: adressen ligger utanför och är inte godkänd. Då ska adressen bytas. */
+  const behoverAdress = order.status === "paid" && !granskas && !valjer && (utanforZon || order.adressGranskning?.status === "avvisad");
   const steg = ["paid", "booking", "scheduled", "delivered"] as const;
   // Steget som är KLART. "paid" betyder att betalningen är klar och att tiderna är nästa sak att göra.
   const stegKlart = Math.max(0, steg.indexOf(order.status as (typeof steg)[number]));
@@ -83,7 +89,7 @@ export default function FraktBokning({
             <>
               <h1 className="fb-h1">När kan du ta emot den?</h1>
               <p className="fb-lead">Tryck på de tider du kan vara hemma. <b>Välj gärna 2–3</b>, så hittar vi en bil snabbare.</p>
-              {adress && <Adress adress={adress} />}
+              <AdressRuta token={token} order={order} adress={adress} onSvar={onSvar} />
 
               <div className="fb-dagar">
                 {dagar.map(([datum, pass]) => (
@@ -111,12 +117,26 @@ export default function FraktBokning({
             </>
           )}
 
-          {order.status === "paid" && utanforZon && (
+          {behoverAdress && (
             <>
-              <h1 className="fb-h1">Vi ordnar frakten åt dig</h1>
-              {adress && <Adress adress={adress} />}
+              <h1 className="fb-h1">Var ska vi leverera?</h1>
+              <p className="fb-lead">
+                {order.adressGranskning?.status === "avvisad"
+                  ? "Vi kan tyvärr inte leverera till adressen du skickade. Ange en adress inom Storstockholm med omnejd."
+                  : "Vi kör hem inom Storstockholm med omnejd. Adressen från Tradera ligger utanför området — ange en adress inom området, så kan du välja tid."}
+              </p>
+              <AdressRuta token={token} order={order} adress={adress} onSvar={onSvar} oppen />
+            </>
+          )}
+
+          {granskas && (
+            <>
+              <div className="fb-klar-ikon fb-vantar-ikon">⏳</div>
+              <h1 className="fb-h1">Vi tittar på din adress</h1>
+              <p className="fb-lead">Vi hör av oss med SMS så fort vi har kollat den, oftast samma dag. Sedan väljer du tid här.</p>
               <div className="fb-ruta">
-                <p>Din adress ligger utanför områdena där vi kör själva. Du behöver inte göra något — vi hör av oss inom kort med hur och när möbeln kommer fram.</p>
+                <div className="fb-ruta-rubrik">Adressen du skickade</div>
+                <p>{order.adressGranskning?.text}</p>
               </div>
             </>
           )}
@@ -253,6 +273,121 @@ function Adress({ adress }: { adress: string }) {
       <div>
         <div className="fb-mute fb-liten">Vi kör hem till</div>
         <div className="fb-adress-text">{adress}</div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Adressen, med "Ändra" när den går att ändra. Formuläret har förslag medan man skriver
+ * (AdressFalt), och under det "Hittar du inte din adress?" — fritext som vi granskar för hand.
+ */
+function AdressRuta({ token, order, adress, onSvar, oppen = false }: {
+  token: string;
+  order: Order;
+  adress: string | null;
+  onSvar: (svar: FraktSvar) => void;
+  oppen?: boolean;
+}) {
+  const [redigerar, setRedigerar] = useState(oppen);
+  const [gata, setGata] = useState(order.kopare?.adress ?? "");
+  const [postnr, setPostnr] = useState(order.kopare?.postnummer ?? "");
+  const [ort, setOrt] = useState(order.kopare?.ort ?? "");
+  const [fel, setFel] = useState<{ text: string; utanfor: boolean } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [fritext, setFritext] = useState<string | null>(null);
+
+  const spara = async () => {
+    setBusy(true);
+    setFel(null);
+    try {
+      onSvar(await andraFraktAdress(token, { adress: gata, postnummer: postnr, ort }));
+      setRedigerar(false);
+    } catch (e) {
+      setFel({ text: e instanceof Error ? e.message : "Kunde inte spara adressen.", utanfor: e instanceof FraktFel && e.kod === "utanfor" });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const skickaFritext = async () => {
+    if (!fritext?.trim()) return;
+    setBusy(true);
+    setFel(null);
+    try {
+      onSvar(await skickaAdressForGranskning(token, fritext));
+    } catch (e) {
+      setFel({ text: e instanceof Error ? e.message : "Kunde inte skicka adressen.", utanfor: false });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (!redigerar) {
+    return (
+      <div className="fb-adress">
+        <span className="fb-adress-ikon" aria-hidden>📍</span>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div className="fb-mute fb-liten">Vi kör hem till</div>
+          <div className="fb-adress-text">{adress ?? "Ingen adress angiven"}</div>
+        </div>
+        <button type="button" className="fb-lank-knapp" onClick={() => setRedigerar(true)}>Ändra</button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="fb-ruta fb-adressform">
+      <div className="fb-ruta-rubrik">Leveransadress</div>
+      <label className="fb-falt">
+        <span>Gatuadress</span>
+        <AdressFalt
+          id="fb-gata"
+          value={gata}
+          ort={ort}
+          onChange={setGata}
+          onValj={(t) => {
+            if (t.gatuadress) setGata(t.gatuadress);
+            if (t.postnummer) setPostnr(t.postnummer);
+            if (t.ort) setOrt(t.ort);
+          }}
+        />
+      </label>
+      <div className="fb-falt-rad">
+        <label className="fb-falt fb-falt-postnr">
+          <span>Postnummer</span>
+          <input inputMode="numeric" autoComplete="postal-code" value={postnr} onChange={(e) => setPostnr(e.target.value)} placeholder="123 45" />
+        </label>
+        <label className="fb-falt">
+          <span>Ort</span>
+          <input autoComplete="address-level2" value={ort} onChange={(e) => setOrt(e.target.value)} />
+        </label>
+      </div>
+
+      {fel && <p className="fb-fel">{fel.text}</p>}
+
+      <div className="fb-knapprad">
+        <button type="button" className="fb-cta fb-cta-liten" disabled={busy || !gata.trim() || !postnr.trim() || !ort.trim()} onClick={spara}>
+          {busy ? "Sparar…" : "Spara adressen"}
+        </button>
+        {!oppen && <button type="button" className="fb-lank-knapp" onClick={() => { setRedigerar(false); setFel(null); }}>Avbryt</button>}
+      </div>
+
+      <div className={`fb-hittar-inte${fel?.utanfor ? " fb-hittar-inte-lyft" : ""}`}>
+        {fritext === null ? (
+          <button type="button" className="fb-lank-knapp" onClick={() => setFritext([gata, [postnr, ort].filter(Boolean).join(" ")].filter(Boolean).join(", "))}>
+            Hittar du inte din adress?
+          </button>
+        ) : (
+          <>
+            <div className="fb-ruta-rubrik">Skicka adressen till oss</div>
+            <p className="fb-mute fb-liten" style={{ margin: "0 0 8px" }}>Skriv adressen som den ser ut, gärna med postnummer och ort. Vi kollar den för hand och hör av oss med SMS.</p>
+            <textarea rows={3} value={fritext} onChange={(e) => setFritext(e.target.value)} placeholder="Gata och nummer, postnummer, ort" />
+            <button type="button" className="fb-cta fb-cta-liten fb-cta-sekundar" disabled={busy || fritext.trim().length < 5} onClick={skickaFritext}>
+              {busy ? "Skickar…" : "Skicka för granskning"}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );

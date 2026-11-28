@@ -4,7 +4,7 @@ import { formatOre } from "../components/Affiliate";
 import { TruckIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import { useT } from "../lib/i18n";
-import type { AdminAffiliateRad, AdminOrderDetalj, AdminOrderRad, AdminOrdrar, UtbetalningsRad } from "../types";
+import type { AdminAffiliateRad, AdminOrderDetalj, AdminOrderRad, AdminOrdrar, OrderAtgard, UtbetalningsRad } from "../types";
 
 /**
  * Orderfliken: alla köp, och framför allt det som väntar på oss.
@@ -304,6 +304,8 @@ function OrderDetalj({
 
       {fel && <p className="public-card-error">{fel}</p>}
 
+      {order.adressGranskning && <AdressGranskningRuta order={order} busy={busy} gor={gor} />}
+
       {order.kanal === "tradera" && order.tradera && (
         <section className="admin-note">
           <strong>{t("Tradera-köp")} {order.tradera.ordernummer}</strong>
@@ -584,5 +586,60 @@ function AffiliateUtbetalningar() {
         </ul>
       )}
     </>
+  );
+}
+
+/**
+ * Köparens fritextadress från fraktsidan ("Hittar du inte din adress?").
+ *
+ * Godkänn = adressen som står i fälten blir leveransadressen, köparen får ett SMS och kan välja
+ * tider. Avvisa = köparen får ett SMS och ombeds ange en annan adress. Se butik/fraktAdress.ts.
+ */
+function AdressGranskningRuta({
+  order,
+  busy,
+  gor,
+}: {
+  order: AdminOrderDetalj;
+  busy: boolean;
+  gor: (atgard: OrderAtgard) => Promise<void>;
+}) {
+  const t = useT();
+  const g = order.adressGranskning!;
+  const [adress, setAdress] = useState(order.kopare?.adress ?? "");
+  const [postnummer, setPostnummer] = useState(order.kopare?.postnummer ?? "");
+  const [ort, setOrt] = useState(order.kopare?.ort ?? "");
+  const [skal, setSkal] = useState("");
+  const vantar = g.status === "vantar";
+  return (
+    <section className="admin-note" style={vantar ? { borderColor: "var(--accent)", background: "var(--accent-light)" } : undefined}>
+      <strong>
+        {vantar ? t("Adress att granska") : g.status === "godkand" ? t("Adress godkänd") : t("Adress avvisad")}
+      </strong>
+      <p style={{ margin: "6px 0" }}>
+        {t("Köparen skrev")}: <strong>{g.text}</strong>
+      </p>
+      {vantar && (
+        <>
+          <p className="card-row-meta" style={{ margin: "0 0 8px" }}>
+            {t("Skriv adressen som den ska stå på ordern och godkänn — köparen får ett SMS och kan välja tider. Avvisar du ombeds köparen ange en annan adress.")}
+          </p>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+            <input className="input" style={{ flex: "2 1 200px" }} placeholder={t("Gatuadress")} value={adress} onChange={(e) => setAdress(e.target.value)} />
+            <input className="input" style={{ flex: "0 1 110px" }} placeholder={t("Postnummer")} value={postnummer} onChange={(e) => setPostnummer(e.target.value)} />
+            <input className="input" style={{ flex: "1 1 140px" }} placeholder={t("Ort")} value={ort} onChange={(e) => setOrt(e.target.value)} />
+          </div>
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+            <button type="button" className="btn btn-small" disabled={busy || !adress.trim() || !postnummer.trim() || !ort.trim()} onClick={() => void gor({ gor: "godkann-adress", adress, postnummer, ort })}>
+              {t("Godkänn adressen")}
+            </button>
+            <input className="input" style={{ flex: "1 1 180px" }} placeholder={t("Skäl (valfritt, internt)")} value={skal} onChange={(e) => setSkal(e.target.value)} />
+            <button type="button" className="btn btn-small btn-outline" disabled={busy} onClick={() => void gor({ gor: "avvisa-adress", text: skal })}>
+              {t("Avvisa")}
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }

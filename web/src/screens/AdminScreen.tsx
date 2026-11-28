@@ -124,7 +124,7 @@ export default function AdminScreen({
   const [attBoka, setAttBoka] = useState(0);
   useEffect(() => {
     let live = true;
-    const las = () => listaOrdrar().then((r) => live && setAttBoka(r.rader.filter((o) => o.status === "booking").length)).catch(() => {});
+    const las = () => listaOrdrar().then((r) => live && setAttBoka(r.rader.filter((o) => o.status === "booking" || (o.status === "paid" && o.adressGranskning?.status === "vantar")).length)).catch(() => {});
     las();
     const id = setInterval(las, 60_000);
     return () => { live = false; clearInterval(id); };
@@ -208,7 +208,7 @@ export default function AdminScreen({
                 >
                   <f.ikon size={16} /> {f.id === "facebook" ? f.namn : t(f.namn)}
                   {f.id === "ordrar" && attBoka > 0 && (
-                    <span className="admin-flik-notis" title={t("Köpare har valt tider — frakt ska bokas")}>{attBoka}</span>
+                    <span className="admin-flik-notis" title={t("Frakt att boka eller adress att granska")}>{attBoka}</span>
                   )}
                 </button>
               ))}
