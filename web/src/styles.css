@@ -7364,3 +7364,6 @@ button.resa-kt-rad:hover { background: var(--surface-pressed); }
 /* Den flytande "Fråga"-knappen ligger annars över Hoppa över / Ladda upp / slutaren. Bildguidens skärmar
    har egna knappar nere till höger, och guiden hinner inte hjälpa på ett kamerasteg ändå. */
 body:has(.pg-intro, .pg-camera, .pg-review) .guide-knapp { display: none; }
+
+/* Siffran på Ordrar-fliken: köpare som valt tider och väntar på att vi bokar bilen. */
+.admin-flik-notis { margin-left: 6px; min-width: 20px; height: 20px; padding: 0 6px; border-radius: 999px; background: var(--accent); color: #fff; font-size: 12px; font-weight: 800; display: inline-grid; place-items: center; line-height: 1; }

@@ -174,16 +174,29 @@ function orderSida(order: Order): string {
   return order.kanal === "tradera" && order.fraktToken ? `/butik/frakt/${order.fraktToken}` : `/butik/order/${order.id}`;
 }
 
+/**
+ * Den som alltid ska veta att en köpare bokat frakt, oavsett vilka som står som admin.
+ * FRAKT_NOTIFY_TO byter mottagare (kommaseparerat); förvalet är Isac, som bokar budfirman.
+ */
+export function fraktNotisMottagare(): string[] {
+  const satt = (process.env.FRAKT_NOTIFY_TO ?? "isacekelund07@gmail.com").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+  return [...new Set([...satt, ...opsAddresses().map((e) => e.toLowerCase())])];
+}
+
 export async function notifySlotsRequested(order: Order, title: string): Promise<boolean> {
-  const tider = order.requestedSlots.map((s) => `  • ${slotText(s)}`).join("\n");
+  const tider = order.requestedSlots.map((s, i) => `  ${i + 1}. ${slotText(s)}${i === 0 ? "  (förstahandsval)" : ""}`).join("\n");
+  const antal = order.requestedSlots.length;
   let framme = false;
-  for (const to of opsAddresses()) {
+  for (const to of fraktNotisMottagare()) {
     const ok = await sendLetter({
       to,
-      subject: `BOKA FRAKT: ${title} (${order.reference})`,
+      subject: `Fraktbokning gjord: ${title} — ${antal} ${antal === 1 ? "tid" : "tider"} (${order.reference})`,
       kind: "ops-frakt",
       body: rader(
-        `Köparen har lämnat sina tider. Frakten ska bokas.`,
+        `En bokning av frakt har gjorts${order.kanal === "tradera" ? " (Tradera-köp)" : ""}. Köparen har valt sina tider — nu ska budfirman bokas.`,
+        "",
+        "Angivna tider, i köparens ordning:",
+        tider || "  (inga tider angivna)",
         "",
         `Möbel: ${title}`,
         `Order: ${order.reference}`,
@@ -193,9 +206,6 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
         order.kopare ? `Adress: ${[order.kopare.adress, [order.kopare.postnummer, order.kopare.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}` : null,
         order.kopare ? `Telefon: ${order.kopare.telefon ?? "saknas"}` : null,
         order.tradera ? `Tradera-order: ${order.tradera.ordernummer} (objekt ${order.tradera.itemId ?? "?"})` : null,
-        "",
-        "Önskade tider, i den ordning köparen angav dem:",
-        tider || "  (inga tider angivna)",
         "",
         link("/?admin=1") ? `Bekräfta i panelen: ${link("/?admin=1")}` : null,
       ),

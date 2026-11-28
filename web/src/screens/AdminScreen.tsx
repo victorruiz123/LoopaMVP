@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { listUsers } from "../api";
+import { listUsers, listaOrdrar } from "../api";
 import { ArrowLeftIcon, CardIcon, ChatIcon, ChevronRight, GlobeIcon, MailIcon, ShieldIcon, VideoIcon, SearchIcon, SparkIcon, TruckIcon, UserIcon, UsersIcon, CheckCircleIcon, SlidersIcon, CopyIcon } from "../components/icons";
 import { formatSek } from "../lib/price";
 import type { AdminAnnonsRad, AdminUser, AdminDirectory, UtskickForval } from "../types";
@@ -117,6 +117,18 @@ export default function AdminScreen({
   flik?: AdminFlik;
 }) {
   const [flik, setFlik] = useState<AdminFlik>(initialFlik);
+  /**
+   * Köpare som valt sina tider och väntar på att vi bokar bilen. Syns som en siffra på Ordrar-fliken
+   * var man än står i panelen, och läses om varje minut.
+   */
+  const [attBoka, setAttBoka] = useState(0);
+  useEffect(() => {
+    let live = true;
+    const las = () => listaOrdrar().then((r) => live && setAttBoka(r.rader.filter((o) => o.status === "booking").length)).catch(() => {});
+    las();
+    const id = setInterval(las, 60_000);
+    return () => { live = false; clearInterval(id); };
+  }, [flik]);
   /** En grupp som datafliken skickat hit för ett utskick. Töms när den använts eller återställts. */
   const [utskickForval, setUtskickForval] = useState<UtskickForval | null>(null);
   const [users, setUsers] = useState<AdminUser[] | null>(null);
@@ -195,6 +207,9 @@ export default function AdminScreen({
                   }}
                 >
                   <f.ikon size={16} /> {f.id === "facebook" ? f.namn : t(f.namn)}
+                  {f.id === "ordrar" && attBoka > 0 && (
+                    <span className="admin-flik-notis" title={t("Köpare har valt tider — frakt ska bokas")}>{attBoka}</span>
+                  )}
                 </button>
               ))}
             </div>
