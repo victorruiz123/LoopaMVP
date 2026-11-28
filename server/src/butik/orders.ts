@@ -8,7 +8,7 @@
  * förstas historia.
  */
 
-import { randomUUID } from "node:crypto";
+import { randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DATA_DIR } from "../jobStore.js";
@@ -102,8 +102,64 @@ export interface Order {
   stripeSessionId: string | null;
   /** Reservationens token — knyter ordern till just den hållningen av möbeln. */
   reservationToken: string | null;
+  /**
+   * Var köpet skedde. Saknas på ordrar från före fältet — de är alla butikens egna.
+   *
+   * `tradera`-ordern har ingen ägare hos oss (`userId` null): köparen har inget Loopa-konto, och
+   * betalningen tog Tradera. Den nås därför inte via de inloggade ordervägarna utan via
+   * `fraktToken` — länken i SMS:et.
+   */
+  kanal?: "butik" | "tradera";
+  /**
+   * Hemligheten i fraktlänken (/butik/frakt/<token>). 32 slumpbytes, inte order-id:t: id:t står i
+   * panelen och i loggar, och den som har länken kan se köparens adress. Null på butikens ordrar.
+   */
+  fraktToken?: string | null;
+  /** Köparen som den står i Traderas orderspecifikation. Null på butikens ordrar. */
+  kopare?: OrderPart | null;
+  /** Traderas sida av köpet. Null på butikens ordrar. */
+  tradera?: TraderaOrderInfo | null;
   createdAt: string;
   updatedAt: string;
+}
+
+/** En part i ett köp: namn, adress och hur vi når dem. Samma form för köpare och säljare. */
+export interface OrderPart {
+  alias: string | null;
+  namn: string | null;
+  adress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+  email: string | null;
+  /** E.164, "+46701234567". */
+  telefon: string | null;
+}
+
+/**
+ * Köpet som Tradera ser det, och kopplingen till annonsen hos oss.
+ *
+ * SÄLJAREN HÄR ÄR TRADERA-KONTOT som annonsen låg på — den som står under "Säljare" i
+ * orderspecifikationen. Möbelns ägare hos Loopa är `jobOwnerId`; de två är olika personer så fort
+ * annonsen ligger på Loopas konto åt någon annan, och båda behövs för att veta vem som ska ha
+ * pengarna och var möbeln hämtas.
+ */
+export interface TraderaOrderInfo {
+  ordernummer: string;
+  itemId: number | null;
+  /** Traderas köp-id, ur "Boka frakt"-länken i mejlet. */
+  purchaseOrderId: string | null;
+  /** Jobbet (annonsen) hos oss. Samma som "Egen referens" i Traderas order. */
+  jobId: string | null;
+  /** Möbelns ägare hos Loopa — kontot som filmade och lade ut den. */
+  jobOwnerId: string | null;
+  saljare: OrderPart;
+  /** Det köparen betalade hos Tradera, frakt inräknad. */
+  totaltSek: number | null;
+  betalmetod: string | null;
+  /** När Tradera skrev att ordern var betald (mejlets datum). */
+  betaldAt: string;
+  /** Message-ID:t på "Betalt objekt"-mejlet. Samma mejl blir aldrig två ordrar. */
+  messageId: string;
 }
 
 const ORDERS_FILE = () =>
@@ -176,6 +232,78 @@ export async function createOrder(input: {
     await flush();
     return order;
   });
+}
+
+/**
+ * En order för ett köp som redan är betalt hos Tradera.
+ *
+ * Den börjar i `paid` och inte i `pending`: det finns ingen kassa hos oss att vänta på. Nästa steg
+ * är detsamma som för butikens köpare — köparen väljer tider via fraktlänken, och ordern går till
+ * `booking`. IDEMPOTENT på Traderas ordernummer: kommer samma köp in två gånger (en omläsning av
+ * inkorgen, ett vidarebefordrat mejl) returneras den order som redan finns, och `created` är falskt.
+ */
+export async function createTraderaOrder(input: {
+  productId: string;
+  priceSek: number;
+  deliveryFeeSek: number;
+  kopare: OrderPart;
+  tradera: TraderaOrderInfo;
+  zone: string | null;
+}): Promise<{ order: Order; created: boolean }> {
+  return serialize(async () => {
+    const map = await load();
+    for (const o of map.values()) {
+      if (o.tradera?.ordernummer === input.tradera.ordernummer) return { order: o, created: false };
+    }
+    const now = new Date().toISOString();
+    const order: Order = {
+      id: randomUUID(),
+      productId: input.productId,
+      reference: makeReference(),
+      userId: null,
+      email: input.kopare.email,
+      priceSek: input.priceSek,
+      deliveryFeeSek: input.deliveryFeeSek,
+      postalCode: input.kopare.postnummer,
+      deliveryZone: input.zone,
+      deliveryDate: null,
+      deliveryWindow: null,
+      requestedSlots: [],
+      status: "paid",
+      events: [
+        {
+          at: now,
+          status: "paid",
+          note: `Betald på Tradera (order ${input.tradera.ordernummer}${input.tradera.betalmetod ? `, ${input.tradera.betalmetod}` : ""}). Nästa steg är att välja tider för leveransen.`,
+          actor: "system",
+          publik: true,
+        },
+      ],
+      stripeSessionId: null,
+      reservationToken: null,
+      kanal: "tradera",
+      fraktToken: randomBytes(24).toString("base64url"),
+      kopare: input.kopare,
+      tradera: input.tradera,
+      createdAt: now,
+      updatedAt: now,
+    };
+    map.set(order.id, order);
+    await flush();
+    return { order, created: true };
+  });
+}
+
+/** Ordern bakom en fraktlänk. Jämförelsen är exakt; en tom eller kort token matchar ingenting. */
+export async function orderByFraktToken(token: string): Promise<Order | null> {
+  if (!token || token.length < 20) return null;
+  for (const o of (await load()).values()) if (o.fraktToken && o.fraktToken === token) return o;
+  return null;
+}
+
+export async function orderByTraderaOrdernummer(ordernummer: string): Promise<Order | null> {
+  for (const o of (await load()).values()) if (o.tradera?.ordernummer === ordernummer) return o;
+  return null;
 }
 
 export async function getOrder(id: string): Promise<Order | null> {
@@ -300,7 +428,8 @@ export async function avidentifieraKopare(userId: string, email: string | null):
     for (const o of map.values()) {
       const egen = o.userId === userId || (!!epost && o.email?.trim().toLowerCase() === epost);
       if (!egen) continue;
-      map.set(o.id, { ...o, userId: null, email: null, postalCode: null, requestedSlots: [], updatedAt: at });
+      // Tradera-köparens namn, adress och telefon är lika mycket en person som e-postadressen.
+      map.set(o.id, { ...o, userId: null, email: null, postalCode: null, requestedSlots: [], kopare: o.kopare ? null : o.kopare, updatedAt: at });
       n += 1;
     }
     if (n) await flush();

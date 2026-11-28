@@ -81,7 +81,7 @@ async function sellerEmail(record: ButikRecord | null): Promise<string | null> {
  */
 export async function notifyPurchase(order: Order, record: ButikRecord | null, title: string): Promise<void> {
   const total = order.priceSek + order.deliveryFeeSek;
-  const orderLink = link(`/butik/order/${order.id}`);
+  const orderLink = link(orderSida(order));
 
   if (order.email) {
     await sendLetter({
@@ -166,6 +166,14 @@ export async function notifyPurchase(order: Order, record: ButikRecord | null, t
  * Falskt betyder också "det fanns ingen att skicka till": en tom `opsAddresses()` är samma sak som
  * ett fallet brev för den som väntar på leveransen.
  */
+/**
+ * Köparens sida för ordern. Tradera-köparen har inget konto och når ordern bara via fraktlänken;
+ * en länk till /butik/order/<id> hade mött dem med en inloggning de inte kan göra.
+ */
+function orderSida(order: Order): string {
+  return order.kanal === "tradera" && order.fraktToken ? `/butik/frakt/${order.fraktToken}` : `/butik/order/${order.id}`;
+}
+
 export async function notifySlotsRequested(order: Order, title: string): Promise<boolean> {
   const tider = order.requestedSlots.map((s) => `  • ${slotText(s)}`).join("\n");
   let framme = false;
@@ -181,6 +189,10 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
         `Order: ${order.reference}`,
         `Till: ${order.postalCode ?? "—"} (${order.deliveryZone ?? "zon okänd"})`,
         `Köpare: ${order.email ?? "adress saknas"}`,
+        order.kopare ? `Namn: ${order.kopare.namn ?? "—"}` : null,
+        order.kopare ? `Adress: ${[order.kopare.adress, [order.kopare.postnummer, order.kopare.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}` : null,
+        order.kopare ? `Telefon: ${order.kopare.telefon ?? "saknas"}` : null,
+        order.tradera ? `Tradera-order: ${order.tradera.ordernummer} (objekt ${order.tradera.itemId ?? "?"})` : null,
         "",
         "Önskade tider, i den ordning köparen angav dem:",
         tider || "  (inga tider angivna)",
@@ -203,7 +215,7 @@ export async function notifySlotsRequested(order: Order, title: string): Promise
         "",
         "Så snart budfirman bekräftat hör vi av oss med den tid som gäller. Du behöver inte göra",
         "något mer så länge.",
-        link(`/butik/order/${order.id}`) ? `Din order: ${link(`/butik/order/${order.id}`)}` : null,
+        link(orderSida(order)) ? `Din order: ${link(orderSida(order))}` : null,
       ),
     });
   }
@@ -227,7 +239,7 @@ export async function notifyDeliveryBooked(order: Order, record: ButikRecord | n
         "",
         "Vi bär in möbeln till dörren. Se till att vägen in är framkomlig, och hör av dig om något",
         "ändras.",
-        link(`/butik/order/${order.id}`) ? `Din order: ${link(`/butik/order/${order.id}`)}` : null,
+        link(orderSida(order)) ? `Din order: ${link(orderSida(order))}` : null,
       ),
     });
   }
@@ -260,7 +272,7 @@ export async function notifyDelivered(order: Order, record: ButikRecord | null, 
         `Order: ${order.reference}`,
         "",
         "Är något inte som du väntade dig, hör av dig så löser vi det.",
-        link(`/butik/order/${order.id}`) ? `Din order: ${link(`/butik/order/${order.id}`)}` : null,
+        link(orderSida(order)) ? `Din order: ${link(orderSida(order))}` : null,
       ),
     });
   }

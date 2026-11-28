@@ -944,6 +944,29 @@ export interface SaleTerms {
   decidedAt: string;
 }
 
+/** En betald Tradera-order kopplad till annonsen. Se `ConditionJob.traderaOrdrar`. */
+export interface TraderaOrderKoppling {
+  /** Orderns id hos oss (butik/orders.ts). */
+  orderId: string;
+  /** Vårt ordernummer, "LO-XXXXXX". */
+  reference: string;
+  /** Traderas ordernummer. */
+  ordernummer: string;
+  itemId: number | null;
+  betaldAt: string;
+  kopare: { alias: string | null; namn: string | null; ort: string | null };
+  /** Tradera-kontot som sålde: "Säljare" i orderspecifikationen. */
+  saljare: {
+    alias: string | null;
+    namn: string | null;
+    adress: string | null;
+    postnummer: string | null;
+    ort: string | null;
+    email: string | null;
+    telefon: string | null;
+  };
+}
+
 export interface ConditionJob {
   id: string;
   createdAt: string;
@@ -966,6 +989,14 @@ export interface ConditionJob {
    * adress i Supabase ska nås på den nya.
    */
   ownerEmail?: string | null;
+  /**
+   * Köpen på Tradera som gäller den här annonsen, ett per betald order (oftast ett).
+   *
+   * Pekar på ordern (butik/orders.ts), där köparens fulla uppgifter står. Här bara det som behövs för
+   * att se vem som köpte möbeln utan att öppna ordern — och Tradera-kontots säljaruppgifter, som är
+   * de uppgifter Tradera själv har om säljaren i köpet.
+   */
+  traderaOrdrar?: TraderaOrderKoppling[];
   /**
    * Säljarens postnummer, sparat på jobbet när säljaren trycker "Sälj med Loopa".
    *

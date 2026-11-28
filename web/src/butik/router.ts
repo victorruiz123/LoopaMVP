@@ -23,6 +23,11 @@ export type ButikRoute =
   | { name: "search"; q: string }
   | { name: "order"; id: string }
   /**
+   * Fraktlänken till en Tradera-köpare: /butik/frakt/<token>. Samma orderskärm, öppnad utan konto —
+   * hemligheten i adressen är behörigheten. Se OrderScreen och server/src/butik/routes.ts.
+   */
+  | { name: "frakt"; token: string }
+  /**
    * Säljarens egen annons: /butik/annons/<jobId>.
    *
    * Skild från `product`, som är KÖPARENS sida om möbeln. Den här öppnas ur profilen, av den som äger
@@ -74,6 +79,7 @@ export function parseButikPath(pathname: string, search: string): ButikRoute {
   if (head === "marke" && tail) return { name: "brand", slug: decodeURIComponent(tail) };
   if (head === "objekt" && tail) return { name: "product", id: decodeURIComponent(tail) };
   if (head === "order" && tail) return { name: "order", id: decodeURIComponent(tail) };
+  if (head === "frakt" && tail) return { name: "frakt", token: decodeURIComponent(tail) };
   if (head === "sok") return { name: "search", q: params.get("q") ?? "" };
   if (head === "annons" && tail) return { name: "annons", id: decodeURIComponent(tail) };
   if (head === "info" && tail) return { name: "info", id: decodeURIComponent(tail) };
@@ -90,6 +96,7 @@ export function butikHref(route: ButikRoute): string {
     case "brand": return `${BUTIK_ROOT}/marke/${encodeURIComponent(route.slug)}`;
     case "product": return `${BUTIK_ROOT}/objekt/${encodeURIComponent(route.id)}`;
     case "order": return `${BUTIK_ROOT}/order/${encodeURIComponent(route.id)}`;
+    case "frakt": return `${BUTIK_ROOT}/frakt/${encodeURIComponent(route.token)}`;
     case "search": return `${BUTIK_ROOT}/sok?q=${encodeURIComponent(route.q)}`;
     case "annons": return `${BUTIK_ROOT}/annons/${encodeURIComponent(route.id)}`;
     case "info": return `${BUTIK_ROOT}/info/${encodeURIComponent(route.id)}`;

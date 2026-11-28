@@ -2398,6 +2398,12 @@ const server = http.createServer(async (req, res) => {
         if (segments[2] === "webhook") {
           if (await handleButikWrite(segments.slice(2), req, res, null)) return;
         }
+        // Fraktlänken i SMS:et till Tradera-köparen. Hemligheten i adressen är behörigheten — se
+        // handleButikFrakt i butik/routes.ts.
+        if (segments[2] === "frakt") {
+          const { handleButikFrakt } = await import("./butik/routes.js");
+          if (await handleButikFrakt(segments.slice(2), req, res)) return;
+        }
         // AI-tolkningen av en sökning: publik av samma skäl som rutnätet — att söka efter en soffa
         // ska inte kräva ett konto.
         if (segments[2] === "tolka") {

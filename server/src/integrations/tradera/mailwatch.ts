@@ -30,13 +30,14 @@ import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { ImapFlow } from "imapflow";
-import { simpleParser } from "mailparser";
+import { simpleParser, type ParsedMail } from "mailparser";
 import { DATA_DIR, listJobs } from "../../jobStore.js";
 import { loopaIdFor } from "../../loopaId.js";
 import { claimForSale, store as butikStore } from "../../butik/store.js";
 import { invalidate } from "../../butik/inventory.js";
 import { sender } from "../../notify/outbox.js";
 import { isFromTradera, parseTraderaMail, type TraderaMail, type TraderaMailKind } from "./mail.js";
+import { parseBetaltMejl, parseOrderspecifikation, pdfTextItems } from "./orderspec.js";
 import type { ConditionJob } from "../../types.js";
 
 // ---------------------------------------------------------------------------
@@ -76,8 +77,21 @@ export interface TraderaPost extends TraderaMail {
   /** Loopa-id:t på möbeln mejlet gällde, när vi kunde koppla det. */
   loopaId: string | null;
   /** Vad vi gjorde. Läses i panelen; "redan-sald" och "okand-annons" är lika viktiga som "sald". */
-  outcome: "sald" | "redan-sald" | "okand-annons" | "noterad";
+  outcome: "sald" | "redan-sald" | "okand-annons" | "noterad" | "betald" | "betald-fel";
   outcomeNote: string | null;
+  /**
+   * Ordern ett "Betalt objekt"-mejl blev, och hur köparen nåddes. Bara på `betald`.
+   * Köparens kontaktuppgifter står här för att adminbrevet och panelen ska kunna visa dem; hela
+   * uppgifterna (adress, säljare) ligger på ordern.
+   */
+  order?: {
+    id: string;
+    reference: string;
+    kopare: { namn: string | null; telefon: string | null; email: string | null; adress: string | null };
+    sms: string;
+    mejl: string;
+    fraktLank: string;
+  } | null;
   /** När en människa kryssade av posten i panelen. */
   handledAt: string | null;
   seenAt: string;
@@ -211,6 +225,108 @@ function titleOf(job: ConditionJob): string | null {
 // Handlingen per mejl
 // ---------------------------------------------------------------------------
 
+/**
+ * "Betalt objekt": läs orderspecifikationen, se till att möbeln är såld, skapa ordern och skicka
+ * fraktlänken till köparen. Se betald.ts för kedjan och orderspec.ts för tolkningen.
+ *
+ * JOBBET HITTAS PÅ "EGEN REFERENS" FÖRST — det är vårt jobb-id, satt av oss när annonsen
+ * publicerades, och det enda id:t i mejlet som inte kan peka på fel möbel. Objektnumret är reserven.
+ *
+ * OBJEKTNUMREN MÅSTE STÄMMA. Säger PDF:en ett annat objekt än mejlet skickas ingenting: hellre en
+ * köpare som får vänta på ett samtal än ett SMS om fel soffa.
+ */
+async function actOnBetald(
+  mail: TraderaMail,
+  parsed: Pick<ParsedMail, "subject" | "text" | "html" | "attachments">,
+  jobs: ConditionJob[],
+): Promise<Omit<TraderaPost, "id" | "seenAt" | "handledAt">> {
+  const meta = parseBetaltMejl(parsed.subject ?? "", parsed.text ?? null, typeof parsed.html === "string" ? parsed.html : null);
+  const itemId = meta.itemId ?? mail.itemId;
+  const base = { ...mail, itemId, alias: meta.alias ?? mail.alias, title: meta.titel ?? mail.title };
+  const job =
+    (meta.egenReferens ? jobs.find((j) => j.id.toLowerCase() === meta.egenReferens) : undefined) ??
+    matchJob({ itemId, title: base.title }, jobs);
+  if (!job) {
+    return { ...base, loopaId: null, outcome: "okand-annons", outcomeNote: "Betald, men annonsen finns inte bland våra jobb. Ingen order skapad." };
+  }
+  const loopaId = loopaIdFor(job.id);
+
+  // Såld först. Har "Sålt objekt" redan gjort det blir det här "redan-sald", och det är väntat.
+  const salj = await actOn({ ...base, kind: "sald" }, [job]);
+  if (salj.outcome === "okand-annons") {
+    return { ...base, loopaId, outcome: "betald-fel", outcomeNote: `${salj.outcomeNote ?? "Möbeln finns inte i butikslagret."} Ingen order skapad.` };
+  }
+
+  const pdf = (parsed.attachments ?? []).find(
+    (a) => /\.pdf$/i.test(a.filename ?? "") || a.contentType === "application/pdf" || /orderspec/i.test(a.filename ?? ""),
+  );
+  if (!pdf) {
+    return { ...base, loopaId, outcome: "betald-fel", outcomeNote: "Orderspecifikationen (PDF) saknades i mejlet — köparens uppgifter finns på Tradera under Mina sålda." };
+  }
+  let spec;
+  try {
+    spec = parseOrderspecifikation(await pdfTextItems(new Uint8Array(pdf.content)));
+  } catch (err) {
+    return { ...base, loopaId, outcome: "betald-fel", outcomeNote: `Orderspecifikationen gick inte att läsa: ${err instanceof Error ? err.message : String(err)}` };
+  }
+  if (itemId && spec.objektnr.length && !spec.objektnr.includes(itemId)) {
+    return {
+      ...base,
+      loopaId,
+      outcome: "betald-fel",
+      outcomeNote: `Orderspecifikationen gäller objekt ${spec.objektnr.join(", ")}, mejlet ${itemId}. Ingenting skickat — kontrollera för hand.`,
+    };
+  }
+
+  const { hanteraBetaltKop, fraktLank } = await import("./betald.js");
+  // Kategorin sätter fraktavgiften i zonen (soffor kostar mer). Faller uppslaget blir det grundpriset.
+  const produkt = await import("../../butik/inventory.js").then((m) => m.productById(loopaId)).catch(() => null);
+  const utfall = await hanteraBetaltKop({
+    meta,
+    spec,
+    messageId: mail.messageId,
+    receivedAt: mail.receivedAt,
+    job,
+    loopaId,
+    titel: titleOf(job) ?? base.title,
+    categorySlug: produkt?.categorySlug ?? null,
+  });
+  const k = utfall.order.kopare;
+  const smsBesked = !utfall.created
+    ? "redan skickat tidigare"
+    : utfall.sms
+      ? utfall.sms.sent
+        ? `skickat till ${k?.telefon}`
+        : `INTE skickat (${utfall.sms.error ?? "okänt fel"})`
+      : "inget nummer i orderspecifikationen";
+  const mejlBesked = !utfall.created
+    ? "redan skickat tidigare"
+    : utfall.mejl === "skickat"
+      ? `skickat till ${k?.email}`
+      : utfall.mejl === "ingen-adress"
+        ? "ingen adress"
+        : "misslyckades";
+  return {
+    ...base,
+    loopaId,
+    outcome: "betald",
+    outcomeNote: utfall.created ? null : `Ordern fanns redan (${utfall.order.reference}). Ingenting skickat igen.`,
+    order: {
+      id: utfall.order.id,
+      reference: utfall.order.reference,
+      kopare: {
+        namn: k?.namn ?? null,
+        telefon: k?.telefon ?? null,
+        email: k?.email ?? null,
+        adress: k ? [k.adress, [k.postnummer, k.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || null : null,
+      },
+      sms: smsBesked,
+      mejl: mejlBesked,
+      fraktLank: fraktLank(utfall.order),
+    },
+  };
+}
+
 async function actOn(mail: TraderaMail, jobs: ConditionJob[]): Promise<Omit<TraderaPost, "id" | "seenAt" | "handledAt">> {
   const job = matchJob(mail, jobs);
   const loopaId = job ? loopaIdFor(job.id) : null;
@@ -270,6 +386,7 @@ function adminLink(loopaId: string | null): string | null {
 
 const KIND_LABEL: Record<TraderaMailKind, string> = {
   sald: "Såld på Tradera",
+  betald: "Betald på Tradera",
   fraga: "Fråga på Tradera",
   bud: "Nytt bud på Tradera",
   ovrigt: "Tradera",
@@ -283,7 +400,23 @@ async function notify(post: TraderaPost): Promise<void> {
   const lines = [
     `${KIND_LABEL[post.kind]} — ${what}`,
     "",
-    post.kind === "sald"
+    post.kind === "betald"
+      ? post.order
+        ? [
+            `Order ${post.order.reference} skapad för ${post.loopaId}.`,
+            "",
+            `Köpare: ${post.order.kopare.namn ?? post.alias ?? "okänd"}`,
+            post.order.kopare.adress ? `Adress: ${post.order.kopare.adress}` : "Adress: saknas",
+            `Telefon: ${post.order.kopare.telefon ?? "saknas"}`,
+            `E-post: ${post.order.kopare.email ?? "saknas"}`,
+            "",
+            `SMS med fraktlänken: ${post.order.sms}`,
+            `Mejl med fraktlänken: ${post.order.mejl}`,
+            `Fraktlänken: ${post.order.fraktLank}`,
+            post.outcomeNote ?? "",
+          ].join("\n")
+        : `Loopa gjorde INGET: ${post.outcomeNote ?? post.outcome}.`
+      : post.kind === "sald"
       ? post.outcome === "sald"
         ? `Möbeln ${post.loopaId} är nu markerad som såld i Loopa.`
         : `Loopa gjorde INGET: ${post.outcomeNote ?? post.outcome}.`
@@ -313,6 +446,8 @@ export interface PollResult {
   fetched: number;
   nya: number;
   salda: number;
+  /** "Betalt objekt" — köp som blev ordrar med fraktlänk. */
+  betalda: number;
   fragor: number;
   error: string | null;
 }
@@ -329,7 +464,7 @@ export function pollTraderaMail(): Promise<PollResult> {
 }
 
 async function runPoll(): Promise<PollResult> {
-  const result: PollResult = { fetched: 0, nya: 0, salda: 0, fragor: 0, error: null };
+  const result: PollResult = { fetched: 0, nya: 0, salda: 0, betalda: 0, fragor: 0, error: null };
   if (!traderaMailConfigured()) {
     result.error = `Gmail är inte konfigurerat. Saknar ${missingGmailEnv().join(", ") || "TRADERA_MAIL_WATCH"}.`;
     return result;
@@ -382,7 +517,7 @@ async function runPoll(): Promise<PollResult> {
           html: typeof parsed.html === "string" ? parsed.html : null,
           date: (parsed.date ?? new Date()).toISOString(),
         });
-        const acted = await actOn(mail, jobs);
+        const acted = mail.kind === "betald" ? await actOnBetald(mail, parsed, jobs) : await actOn(mail, jobs);
         const post: TraderaPost = { ...acted, id: randomUUID(), seenAt: new Date().toISOString(), handledAt: null };
         await serialize(async () => {
           (await loadPosts()).push(post);
@@ -391,6 +526,7 @@ async function runPoll(): Promise<PollResult> {
         known.add(messageId);
         result.nya++;
         if (post.kind === "sald") result.salda++;
+        if (post.kind === "betald") result.betalda++;
         if (post.kind === "fraga") result.fragor++;
         if (post.kind !== "ovrigt") await notify(post);
       }
@@ -437,7 +573,7 @@ export function startTraderaMailWatch(): () => void {
   console.info(`[tradera-post] läser ${process.env.GMAIL_USER} var ${pollMinutes()}:e minut.`);
   const tick = () =>
     void pollTraderaMail().then((r) => {
-      if (r.nya) console.info(`[tradera-post] ${r.nya} nya mejl: ${r.salda} sålda, ${r.fragor} frågor.`);
+      if (r.nya) console.info(`[tradera-post] ${r.nya} nya mejl: ${r.salda} sålda, ${r.betalda} betalda, ${r.fragor} frågor.`);
     });
   const first = setTimeout(tick, 30_000);
   timer = setInterval(tick, every);

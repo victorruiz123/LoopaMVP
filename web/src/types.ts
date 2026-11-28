@@ -1335,7 +1335,7 @@ export interface AnnonsAndring {
 
 // ---- Tradera-posten (GET /api/admin/tradera-post) ----
 
-export type TraderaPostKind = "sald" | "fraga" | "bud" | "ovrigt";
+export type TraderaPostKind = "sald" | "betald" | "fraga" | "bud" | "ovrigt";
 
 /** Ett Tradera-mejl som bevakaren läst, och vad den gjorde. Se server/src/integrations/tradera/mailwatch.ts. */
 export interface TraderaPost {
@@ -1350,10 +1350,19 @@ export interface TraderaPost {
   excerpt: string;
   url: string | null;
   loopaId: string | null;
-  outcome: "sald" | "redan-sald" | "okand-annons" | "noterad";
+  outcome: "sald" | "redan-sald" | "okand-annons" | "noterad" | "betald" | "betald-fel";
   outcomeNote: string | null;
   handledAt: string | null;
   seenAt: string;
+  /** Ordern ett "Betalt objekt"-mejl blev. */
+  order?: {
+    id: string;
+    reference: string;
+    kopare: { namn: string | null; telefon: string | null; email: string | null; adress: string | null };
+    sms: string;
+    mejl: string;
+    fraktLank: string;
+  } | null;
 }
 
 export interface TraderaPostStatus {
@@ -1549,6 +1558,35 @@ export interface AdminOrderRad {
   createdAt: string;
   updatedAt: string;
   vantatTimmar: number | null;
+  /** Var köpet skedde. Se server/src/adminOrdrar.ts. */
+  kanal?: "butik" | "tradera";
+  /** Tradera-köparen ur orderspecifikationen. */
+  kopare?: AdminOrderPart | null;
+  tradera?: AdminTraderaOrder | null;
+  /** Fraktlänken köparen fick i SMS:et. */
+  fraktLank?: string | null;
+}
+
+export interface AdminOrderPart {
+  alias: string | null;
+  namn: string | null;
+  adress: string | null;
+  postnummer: string | null;
+  ort: string | null;
+  email: string | null;
+  telefon: string | null;
+}
+
+export interface AdminTraderaOrder {
+  ordernummer: string;
+  itemId: number | null;
+  purchaseOrderId: string | null;
+  jobId: string | null;
+  jobOwnerId: string | null;
+  saljare: AdminOrderPart;
+  totaltSek: number | null;
+  betalmetod: string | null;
+  betaldAt: string;
 }
 
 export interface AdminOrderDetalj extends AdminOrderRad {

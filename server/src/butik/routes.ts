@@ -9,7 +9,7 @@
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { deliveryQuote, slotsFor, zoneFor } from "./delivery.js";
 import { abandonCheckout, checkoutConfigured, CheckoutError, fulfilPaidOrder, parseWebhook, reconcileOrder, requestSlots, startCheckout } from "./checkout.js";
-import { getOrder, orderByReference, ordersForUser, publikHistorik, updateOrder, type Order } from "./orders.js";
+import { getOrder, orderByFraktToken, orderByReference, ordersForUser, publikHistorik, updateOrder, type Order } from "./orders.js";
 import { createBevakning, deleteBevakning, listBevakningar } from "./bevakningar.js";
 import { aiSearchAvailable, interpretQuery, rateLimited } from "./aiSearch.js";
 import { allProducts, applyFilter, brandFacets, brandFacetsMerged, categoryFacetsOf, productById, typeFacetsMerged } from "./inventory.js";
@@ -367,7 +367,7 @@ export async function handleButikWrite(
     try {
       const order = await getOrder(segments[1]);
       // 404 och inte 403: ett annat svar hade avslöjat att ordern finns.
-      if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
+      if (!order || order.kanal === "tradera" || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
       const body = await jsonBody<{ datum?: string; tid?: string; tider?: Array<{ datum?: string; tid?: string }> }>(req);
       const onskade = (body.tider ?? (body.datum && body.tid ? [{ datum: body.datum, tid: body.tid }] : []))
         .filter((t): t is { datum: string; tid: string } => !!t.datum && !!t.tid)
@@ -454,7 +454,7 @@ export async function handleButikWrite(
   if (segments[0] === "order" && segments.length === 3 && segments[2] === "angra" && req.method === "POST") {
     if (!identity) return json(res, 401, { error: "Logga in." }), true;
     const order = await getOrder(segments[1]);
-    if (!order || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
+    if (!order || order.kanal === "tradera" || (order.userId && order.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
     if (order.status !== "paid" && order.status !== "booking" && order.status !== "scheduled") {
       return json(res, 409, { error: "Köpet går inte att ångra i sitt nuvarande läge." }), true;
     }
@@ -534,7 +534,11 @@ export async function handleButikOrderRead(
   if (segments[0] === "order" && segments.length === 2 && req.method === "GET") {
     if (!identity) return json(res, 401, { error: "Logga in." }), true;
     const funnen = (await getOrder(segments[1])) ?? (await orderByReference(segments[1]));
-    if (!funnen || (funnen.userId && funnen.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
+    /**
+     * Tradera-ordrar har ingen ägare (`userId` null) och skulle annars gå att läsa för vem som helst
+     * som är inloggad och har id:t — med köparens adress och telefon. De nås bara via fraktlänken.
+     */
+    if (!funnen || funnen.kanal === "tradera" || (funnen.userId && funnen.userId !== identity.userId)) return json(res, 404, { error: "Ordern finns inte." }), true;
     /**
      * Står ordern kvar i `pending` frågar vi Stripe innan vi svarar.
      *
@@ -572,5 +576,53 @@ export async function handleButikOrderRead(
  * nätverksfliken. Den enda säkra platsen att sila på är den här.
  */
 function forBuyer(order: Order): Order {
-  return { ...order, events: publikHistorik(order) };
+  // Säljarens uppgifter och fraktlänkens hemlighet är inte köparens att läsa, oavsett väg ut.
+  const { fraktToken: _token, tradera, ...rest } = order;
+  return {
+    ...rest,
+    tradera: tradera ? { ...tradera, saljare: { alias: tradera.saljare.alias, namn: null, adress: null, postnummer: null, ort: null, email: null, telefon: null }, jobOwnerId: null, messageId: "" } : tradera,
+    events: publikHistorik(order),
+  };
+}
+
+/**
+ * Fraktlänken: /api/butik/frakt/:token — UTANFÖR inloggningen, med flit.
+ *
+ * Köparen på Tradera har inget Loopa-konto, och att kräva ett för att välja en leveranstid hade
+ * gjort SMS:et till en registreringsuppmaning. Länken bär i stället en hemlighet (orders.ts
+ * `fraktToken`, 192 bitar) och är det enda som ger åtkomst: samma 404 för fel token som för en order
+ * som inte finns.
+ *
+ *   GET  /api/butik/frakt/:token           ordern, möbeln och tiderna att välja bland
+ *   POST /api/butik/frakt/:token/leverans  köparens upp till tre tider — samma steg som butikens köpare
+ */
+export async function handleButikFrakt(segments: string[], req: IncomingMessage, res: ServerResponse): Promise<boolean> {
+  if (segments[0] !== "frakt" || !segments[1]) return false;
+  const order = await orderByFraktToken(segments[1]);
+  if (!order) return json(res, 404, { error: "Länken gäller inte längre. Hör av dig till oss så hjälper vi dig." }), true;
+
+  if (segments.length === 2 && req.method === "GET") {
+    const product = await productById(order.productId);
+    const zon = order.postalCode ? zoneFor(order.postalCode) : null;
+    const slots = order.status === "paid" && zon ? slotsFor(zon, new Date(order.createdAt)) : [];
+    json(res, 200, { order: forBuyer(order), product, slots, utanforZon: !!order.postalCode && !zon });
+    return true;
+  }
+
+  if (segments.length === 3 && segments[2] === "leverans" && req.method === "POST") {
+    try {
+      const body = await jsonBody<{ tider?: Array<{ datum?: string; tid?: string }> }>(req);
+      const onskade = (body.tider ?? [])
+        .filter((t): t is { datum: string; tid: string } => !!t.datum && !!t.tid)
+        .map((t) => ({ date: t.datum, window: t.tid }));
+      if (onskade.length === 0) return json(res, 400, { error: "Ange minst en tid som passar." }), true;
+      const updated = await requestSlots(order.id, onskade);
+      json(res, 200, { order: updated ? forBuyer(updated) : null });
+    } catch (err) {
+      const status = err instanceof CheckoutError ? err.status : 500;
+      json(res, status, { error: err instanceof Error ? err.message : "Kunde inte spara tiderna." });
+    }
+    return true;
+  }
+  return false;
 }

@@ -17,7 +17,7 @@
  */
 
 import { confirmDelivery, markOrderDelivered } from "./butik/checkout.js";
-import { allOrders, getOrder, publikHistorik, recordOrderEvent, type Order, type OrderEvent, type OrderSlot } from "./butik/orders.js";
+import { allOrders, getOrder, publikHistorik, recordOrderEvent, type Order, type OrderEvent, type OrderPart, type OrderSlot, type TraderaOrderInfo } from "./butik/orders.js";
 import { store as butikStore } from "./butik/store.js";
 import { markDelivered } from "./butik/store.js";
 import { getJob } from "./jobStore.js";
@@ -51,6 +51,14 @@ export interface AdminOrderRad {
   updatedAt: string;
   /** Hur länge ordern väntat på oss, i timmar. Null när den inte väntar. */
   vantatTimmar: number | null;
+  /** Var köpet skedde. Butikens äldre ordrar saknar fältet och är `butik`. */
+  kanal: "butik" | "tradera";
+  /** Tradera-köparen: namn, adress, telefon. Null på butikens ordrar. */
+  kopare: OrderPart | null;
+  /** Traderas ordernummer, säljarkontot och kopplingen till annonsen. Null på butikens ordrar. */
+  tradera: TraderaOrderInfo | null;
+  /** Länken köparen fick i SMS:et. Panelen kan skicka den igen för hand. */
+  fraktLank: string | null;
 }
 
 export interface AdminOrderDetalj extends AdminOrderRad {
@@ -130,6 +138,12 @@ async function radAv(order: Order): Promise<AdminOrderRad> {
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
     vantatTimmar: attGora ? Math.round((Date.now() - new Date(order.updatedAt).getTime()) / 3_600_000) : null,
+    kanal: order.kanal ?? "butik",
+    kopare: order.kopare ?? null,
+    tradera: order.tradera ?? null,
+    fraktLank: order.fraktToken
+      ? `${(process.env.LOOPA_PUBLIC_URL?.trim() || "https://app.loopa.nu").replace(/\/+$/, "")}/butik/frakt/${order.fraktToken}`
+      : null,
   };
 }
 

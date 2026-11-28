@@ -22,7 +22,11 @@
  * `ovrigt` i panelen i stället för att försvinna — det är så vi upptäcker en formulering vi missat.
  */
 
-export type TraderaMailKind = "sald" | "fraga" | "bud" | "ovrigt";
+/**
+ * `betald` är "Betalt objekt"-mejlet: köparen har betalat, och det bär orderspecifikationen med
+ * köparens namn, adress och telefon (orderspec.ts). Det är det mejlet som blir en order hos oss.
+ */
+export type TraderaMailKind = "sald" | "betald" | "fraga" | "bud" | "ovrigt";
 
 export interface RawMail {
   messageId: string;
@@ -98,6 +102,8 @@ export function classify(subject: string, body: string): TraderaMailKind {
   const bidWords = /\b(?:bud|budet|högsta bud|överbjuden|budgivning)\b/;
   const notSold = /\b(?:utan bud|inga bud|avslutades utan|osåld|inte såld|gick inte|ingen köpare)\b/;
 
+  // "Betalt objekt" först: kroppen säger "Köparen X har betalat", och det är ett annat besked än "såld".
+  if (/^\s*betalt objekt\b/.test(s) || /\bordern är betald\b/.test(b)) return "betald";
   // "Utan bud" innehåller ordet bud. Det som INTE hände avgörs före det som hände.
   if (notSold.test(s)) return "ovrigt";
   if (soldWords.test(s)) return "sald";
@@ -173,7 +179,7 @@ export function parseTraderaMail(mail: RawMail): TraderaMail {
     receivedAt: mail.date,
     itemId,
     title: findTitle(mail.subject, body),
-    amountSek: kind === "sald" || kind === "bud" ? findAmount(body) : null,
+    amountSek: kind === "sald" || kind === "bud" || kind === "betald" ? findAmount(body) : null,
     alias: findAlias(body),
     excerpt: findExcerpt(kind, body),
     url,

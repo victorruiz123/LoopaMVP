@@ -148,11 +148,11 @@ export default function AdminTraderaPostScreen({ onOpenAd }: { onOpenAd?: (loopa
 }
 
 function etikett(kind: TraderaPostKind): string {
-  return kind === "sald" ? "Såld" : kind === "fraga" ? "Fråga" : kind === "bud" ? "Bud" : "Övrigt";
+  return kind === "sald" ? "Såld" : kind === "betald" ? "Betald" : kind === "fraga" ? "Fråga" : kind === "bud" ? "Bud" : "Övrigt";
 }
 
 function farg(kind: TraderaPostKind): string | undefined {
-  return kind === "sald" ? "var(--accent)" : kind === "fraga" ? "#b45309" : kind === "bud" ? "#1d4ed8" : "var(--muted-soft)";
+  return kind === "sald" || kind === "betald" ? "var(--accent)" : kind === "fraga" ? "#b45309" : kind === "bud" ? "#1d4ed8" : "var(--muted-soft)";
 }
 
 function utfall(p: TraderaPost): string {
@@ -163,6 +163,12 @@ function utfall(p: TraderaPost): string {
       return p.outcomeNote ?? "Var redan såld";
     case "okand-annons":
       return p.outcomeNote ?? "Ingen annons hos oss";
+    case "betald":
+      return p.order
+        ? `Order ${p.order.reference} · ${p.order.kopare.namn ?? "köpare"} · ${p.order.kopare.telefon ?? "inget nummer"} · SMS: ${p.order.sms} · Mejl: ${p.order.mejl}`
+        : (p.outcomeNote ?? "Betald");
+    case "betald-fel":
+      return p.outcomeNote ?? "Betald, men ingen order skapad";
     default:
       return p.loopaId ? `Gäller ${p.loopaId}` : (p.outcomeNote ?? "Noterad");
   }

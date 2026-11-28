@@ -36,6 +36,7 @@ export default function ButikApp() {
         {route.name === "info" && <ProductScreen id={route.id} utanKop />}
         {route.name === "search" && <SearchScreen q={route.q} />}
         {route.name === "order" && <OrderScreen id={route.id} />}
+        {route.name === "frakt" && <OrderScreen fraktToken={route.token} />}
         {route.name === "annons" && <MinAnnons jobId={route.id} />}
         {route.name === "profile" && <ButikProfile />}
     </ButikChrome>
@@ -54,6 +55,7 @@ function titleFor(route: ReturnType<typeof useButikRoute>["route"]): string {
     case "info": return "Möbeln i annonsen – Loopa";
     case "search": return route.q ? `${route.q} – Loopa Butik` : "Alla möbler – Loopa Butik";
     case "order": return "Din order – Loopa";
+    case "frakt": return "Välj leveranstid – Loopa";
     case "annons": return "Din annons – Loopa";
     case "profile": return "Din profil – Loopa";
     default: return "Loopa Butik – köp begagnat, handla som nytt";

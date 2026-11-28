@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { angraKopet, fetchOrder, requestSlots, type DeliverySlot, type Order } from "../api";
+import { angraKopet, fetchFrakt, fetchOrder, requestFraktSlots, requestSlots, type DeliverySlot, type Order } from "../api";
 import type { Product } from "../types";
 import { Link, SellCta, track } from "../components/Bits";
 
@@ -14,7 +14,12 @@ import { Link, SellCta, track } from "../components/Bits";
  * på en signaturverifierad webhook från Stripe. Kommer köparen tillbaka innan webhooken hunnit fram
  * står det att betalningen behandlas, inte att den misslyckades.
  */
-export default function OrderScreen({ id }: { id: string }) {
+/**
+ * Två ingångar till samma skärm: `id` för butikens inloggade köpare, `fraktToken` för Tradera-
+ * köparen som kommer från SMS:et utan konto. Det som skiljer är var ordern hämtas och att Tradera-
+ * köpet inte ångras här — det köpet gjordes på Tradera och ångras där.
+ */
+export default function OrderScreen({ id, fraktToken }: { id?: string; fraktToken?: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [product, setProduct] = useState<Product | null>(null);
   const [slots, setSlots] = useState<DeliverySlot[]>([]);
@@ -28,11 +33,14 @@ export default function OrderScreen({ id }: { id: string }) {
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [tries, setTries] = useState(0);
+  const [utanforZon, setUtanforZon] = useState(false);
+  const viaLank = !!fraktToken;
 
   useEffect(() => {
     let live = true;
-    fetchOrder(id)
+    (fraktToken ? fetchFrakt(fraktToken) : fetchOrder(id ?? ""))
       .then((r) => {
+        if (live && "utanforZon" in r) setUtanforZon(!!r.utanforZon);
         if (!live) return;
         setOrder(r.order);
         setProduct(r.product);
@@ -46,10 +54,11 @@ export default function OrderScreen({ id }: { id: string }) {
       })
       .catch((e: unknown) => live && setError(e instanceof Error ? e.message : "Kunde inte hämta ordern."));
     return () => { live = false; };
-  }, [id, tries]);
+  }, [id, fraktToken, tries]);
 
   useEffect(() => {
-    if (order?.status === "paid") track("purchase", { transaction_id: order.reference, value: order.priceSek + order.deliveryFeeSek, currency: "SEK" });
+    // Ett Tradera-köp är inte ett köp i butiken och ska inte räknas som ett.
+    if (order?.status === "paid" && !viaLank) track("purchase", { transaction_id: order.reference, value: order.priceSek + order.deliveryFeeSek, currency: "SEK" });
   }, [order?.status]);
 
   if (error) {
@@ -107,7 +116,8 @@ export default function OrderScreen({ id }: { id: string }) {
     if (valda.length === 0) return;
     setBusy(true);
     try {
-      const r = await requestSlots(order.id, valda.map((v) => ({ date: v.date, window: v.window })));
+      const tider = valda.map((v) => ({ date: v.date, window: v.window }));
+      const r = fraktToken ? await requestFraktSlots(fraktToken, tider) : await requestSlots(order.id, tider);
       setOrder(r.order);
       setValda([]);
     } catch (e) {
@@ -140,7 +150,19 @@ export default function OrderScreen({ id }: { id: string }) {
         </h1>
         {vantarPaTider && (
           <p style={{ marginTop: 6 }}>
-            Möbeln är din. Det enda som återstår är att säga när vi får komma — välj nedan, så bokar vi frakten.
+            {order.kanal === "tradera"
+              ? "Du köpte möbeln på Tradera, och vi kör hem den. Det enda som återstår är att säga när vi får komma — välj nedan, så bokar vi frakten."
+              : "Möbeln är din. Det enda som återstår är att säga när vi får komma — välj nedan, så bokar vi frakten."}
+          </p>
+        )}
+        {order.kanal === "tradera" && order.kopare && (order.kopare.adress || order.kopare.ort) && (
+          <p style={{ marginTop: 6 }}>
+            Vi levererar till <strong>{[order.kopare.adress, [order.kopare.postnummer, order.kopare.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ")}</strong>.
+          </p>
+        )}
+        {utanforZon && order.status === "paid" && (
+          <p style={{ marginTop: 6 }}>
+            Adressen ligger utanför de områden vi kör till själva. Vi hör av oss inom kort om hur möbeln kommer fram till dig.
           </p>
         )}
         {order.status === "pending" && <p>Det tar oftast några sekunder. Sidan uppdaterar sig själv.</p>}
@@ -273,6 +295,15 @@ export default function OrderScreen({ id }: { id: string }) {
             Efter leverans står här ingen knapp utan en väg till en människa. Det som händer sedan är
             en förhandling om en möbel någon har hemma, och den kan ingen knapp avgöra.
           */}
+          {order.kanal === "tradera" ? (
+            <section className="butik-explainer" style={{ padding: 18 }}>
+              <h2 style={{ fontSize: 18 }}>Frågor om köpet?</h2>
+              <p style={{ margin: 0 }}>
+                Köpet gjordes på Tradera{order.tradera?.ordernummer ? ` (order ${order.tradera.ordernummer})` : ""}. Har du
+                frågor om leveransen, svara på mejlet du fick från oss eller skriv till oss med ordernumret {order.reference}.
+              </p>
+            </section>
+          ) : (
           <section className="butik-explainer" style={{ padding: 18 }}>
             <h2 style={{ fontSize: 18 }}>Ångra köpet</h2>
             {order.status === "cancel_requested" ? (
@@ -317,6 +348,7 @@ export default function OrderScreen({ id }: { id: string }) {
               </p>
             )}
           </section>
+          )}
 
         </>
       )}

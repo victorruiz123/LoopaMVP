@@ -162,6 +162,11 @@ export interface Order {
   /** Historiken, nyast sist. Tom på gamla ordrar från före tidslinjen. */
   events?: OrderEvent[];
   createdAt: string;
+  /** "tradera" när köpet gjordes på Tradera och ordern öppnats via fraktlänken. */
+  kanal?: "butik" | "tradera";
+  /** Tradera-köparens egna uppgifter — adressen vi kör till. */
+  kopare?: { namn: string | null; adress: string | null; postnummer: string | null; ort: string | null } | null;
+  tradera?: { ordernummer: string } | null;
 }
 
 /** Leveransbeskedet är PUBLIKT — man ska kunna se pris och tid innan man loggar in. */
@@ -232,6 +237,30 @@ export function requestSlots(orderId: string, tider: OrderSlot[]): Promise<{ ord
  */
 export function angraKopet(orderId: string): Promise<{ order: Order }> {
   return authJson(`/api/butik/order/${encodeURIComponent(orderId)}/angra`, { method: "POST" });
+}
+
+/**
+ * Fraktlänken i SMS:et till Tradera-köparen: /butik/frakt/<token>.
+ *
+ * UTAN INLOGGNING. Köparen har inget Loopa-konto; hemligheten i adressen är behörigheten (se
+ * handleButikFrakt i server/src/butik/routes.ts). Därför vanlig fetch och inte authJson.
+ */
+export async function fetchFrakt(token: string): Promise<{ order: Order; product: Product | null; slots: DeliverySlot[]; utanforZon?: boolean }> {
+  const res = await fetch(`/api/butik/frakt/${encodeURIComponent(token)}`);
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body as { error?: string }).error || `Anropet misslyckades (${res.status})`);
+  return body as { order: Order; product: Product | null; slots: DeliverySlot[]; utanforZon?: boolean };
+}
+
+export async function requestFraktSlots(token: string, tider: OrderSlot[]): Promise<{ order: Order }> {
+  const res = await fetch(`/api/butik/frakt/${encodeURIComponent(token)}/leverans`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ tider: tider.map((t) => ({ datum: t.date, tid: t.window })) }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error((body as { error?: string }).error || `Anropet misslyckades (${res.status})`);
+  return body as { order: Order };
 }
 
 export interface Interpretation {

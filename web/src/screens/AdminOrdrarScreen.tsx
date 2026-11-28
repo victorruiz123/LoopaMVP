@@ -304,6 +304,44 @@ function OrderDetalj({
 
       {fel && <p className="public-card-error">{fel}</p>}
 
+      {order.kanal === "tradera" && order.tradera && (
+        <section className="admin-note">
+          <strong>{t("Tradera-köp")} {order.tradera.ordernummer}</strong>
+          <div>
+            <strong>{t("Köpare")}:</strong> {order.kopare?.namn ?? "—"}
+            {order.kopare?.alias ? ` (${order.kopare.alias})` : ""}
+          </div>
+          <div>
+            <strong>{t("Adress")}:</strong>{" "}
+            {[order.kopare?.adress, [order.kopare?.postnummer, order.kopare?.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}
+          </div>
+          <div>
+            <strong>{t("Telefon")}:</strong>{" "}
+            {order.kopare?.telefon ? <a href={`tel:${order.kopare.telefon}`}>{order.kopare.telefon}</a> : t("saknas")}
+          </div>
+          <div>
+            <strong>{t("E-post")}:</strong> {order.kopare?.email ?? t("saknas")}
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <strong>{t("Säljare på Tradera")}:</strong>{" "}
+            {[order.tradera.saljare.namn, order.tradera.saljare.alias ? `(${order.tradera.saljare.alias})` : null].filter(Boolean).join(" ") || "—"}
+            {" · "}
+            {[order.tradera.saljare.adress, [order.tradera.saljare.postnummer, order.tradera.saljare.ort].filter(Boolean).join(" ")].filter(Boolean).join(", ") || "—"}
+            {order.tradera.saljare.telefon ? ` · ${order.tradera.saljare.telefon}` : ""}
+            {order.tradera.saljare.email ? ` · ${order.tradera.saljare.email}` : ""}
+          </div>
+          <div>
+            <strong>{t("Betalt")}:</strong> {order.tradera.totaltSek !== null ? formatSek(order.tradera.totaltSek) : "—"}
+            {order.tradera.betalmetod ? ` (${order.tradera.betalmetod})` : ""}
+          </div>
+          {order.fraktLank && (
+            <div style={{ wordBreak: "break-all" }}>
+              <strong>{t("Fraktlänk")}:</strong> <a href={order.fraktLank} target="_blank" rel="noreferrer">{order.fraktLank}</a>
+            </div>
+          )}
+        </section>
+      )}
+
       <section className="admin-note">
         <div><strong>{t("Köpare")}:</strong> {order.buyerEmail ?? t("adress saknas")}</div>
         <div><strong>{t("Levereras till")}:</strong> {order.postalCode ?? "—"} ({order.deliveryZone ?? t("zon okänd")})</div>
