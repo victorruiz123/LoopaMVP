@@ -1,0 +1,101 @@
+/* Fraktsidan för Tradera-köparen. Se FraktBokning.tsx. */
+.fb { --fb-r: 18px; padding: 8px 0 120px; color: var(--ink); }
+
+/* Framsteg: fyra prickar på en linje. */
+.fb-progress { list-style: none; display: flex; padding: 0; margin: 4px 0 22px; gap: 0; }
+.fb-progress li { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 6px; position: relative; font-size: var(--fs-xs); color: var(--muted-soft); }
+.fb-progress li + li::before { content: ""; position: absolute; top: 13px; right: 50%; width: 100%; height: 2px; background: var(--border); z-index: 0; }
+.fb-progress li.klar + li::before, .fb-progress li.klar + li.nu::before { background: var(--green); }
+.fb-prick { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--surface); border: 2px solid var(--border); font-weight: 700; font-size: 12px; position: relative; z-index: 1; }
+.fb-progress li.klar .fb-prick { background: var(--green); border-color: var(--green); color: #fff; }
+.fb-progress li.nu .fb-prick { border-color: var(--accent); color: var(--accent); box-shadow: 0 0 0 4px var(--accent-light); }
+.fb-progress li.nu, .fb-progress li.klar { color: var(--ink-soft); font-weight: 600; }
+
+.fb-grid { display: grid; gap: 28px; }
+.fb-sida { display: none; }
+
+/* Möbeln, högst upp på mobilen. */
+.fb-mobel { display: flex; gap: 14px; align-items: center; padding: 12px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--fb-r); margin-bottom: 22px; }
+.fb-bild { width: 68px; height: 68px; border-radius: 12px; overflow: hidden; background: var(--surface-sunk); flex: none; display: grid; place-items: center; font-size: 28px; }
+.fb-bild img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.fb-mobel-titel { font-weight: 700; font-size: var(--fs-base); line-height: 1.25; }
+.fb-mobel-meta { font-size: var(--fs-sm); color: var(--muted); margin-top: 4px; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.fb-betald { background: var(--green-light); color: var(--green-dark); font-weight: 700; padding: 2px 8px; border-radius: 999px; font-size: 12px; }
+
+.fb-h1 { font-size: clamp(28px, 7vw, 40px); line-height: 1.08; letter-spacing: -0.02em; margin: 0 0 10px; font-weight: 800; }
+.fb-lead { font-size: var(--fs-lg); color: var(--ink-soft); margin: 0 0 18px; line-height: 1.45; }
+.fb-lead b { color: var(--ink); }
+
+.fb-adress { display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--accent-light); margin-bottom: 22px; }
+.fb-adress-ikon { font-size: 20px; }
+.fb-adress-text { font-weight: 700; color: var(--accent-ink); }
+.fb-liten { font-size: var(--fs-xs); }
+
+/* Dagarna: en rad per dag, två stora knappar. */
+.fb-dagar { display: flex; flex-direction: column; gap: 10px; }
+.fb-dag { display: grid; gap: 6px; }
+.fb-dag + .fb-dag { margin-top: 6px; }
+.fb-dag-namn { display: flex; gap: 8px; align-items: baseline; line-height: 1.2; }
+.fb-dag-namn b { font-size: var(--fs-base); }
+.fb-dag-namn span { color: var(--muted); font-size: var(--fs-sm); }
+.fb-pass { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.fb-slot { position: relative; min-height: 62px; padding-right: 40px !important; border-radius: 14px; border: 2px solid var(--border); background: var(--surface); cursor: pointer; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; padding: 8px 12px; text-align: left; font: inherit; color: var(--ink); transition: transform .08s, border-color .12s, background .12s; }
+.fb-slot:hover { border-color: var(--muted-soft); }
+.fb-slot:active { transform: scale(.97); }
+.fb-slot[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-light); }
+.fb-slot-namn { font-weight: 700; font-size: var(--fs-md); }
+.fb-slot-tid { color: var(--muted); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+.fb-slot[aria-pressed="true"] .fb-slot-tid { color: var(--accent-ink); }
+.fb-nr { position: absolute; top: 8px; right: 8px; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: #fff; font-weight: 800; font-size: 13px; display: grid; place-items: center; }
+.fb-nr-statisk { position: static; flex: none; }
+.fb-not { color: var(--muted); font-size: var(--fs-sm); margin: 12px 0 0; }
+
+.fb-ruta { background: var(--surface); border: 1px solid var(--border); border-radius: var(--fb-r); padding: 16px; margin-bottom: 18px; }
+.fb-ruta p { margin: 0; line-height: 1.5; }
+.fb-ruta-rubrik { font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: .08em; color: var(--muted); font-weight: 700; margin-bottom: 10px; }
+.fb-valda-lista { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+.fb-valda-lista li { display: flex; gap: 10px; align-items: center; }
+.fb-valda-lista li .fb-mute { margin-left: auto; }
+.fb-mute { color: var(--muted); }
+
+.fb-klar-ikon { width: 56px; height: 56px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: 28px; font-weight: 800; margin-bottom: 14px; animation: fb-pop .35s cubic-bezier(.2,1.4,.4,1); }
+@keyframes fb-pop { from { transform: scale(.4); opacity: 0; } }
+.fb-datum-stor { display: inline-flex; flex-direction: column; padding: 16px 22px; border-radius: var(--fb-r); background: var(--ink); color: #fff; margin: 4px 0 16px; }
+.fb-datum-stor b { font-size: 34px; line-height: 1.1; }
+.fb-datum-stor span { opacity: .75; }
+
+.fb-fel { color: var(--accent-ink); background: var(--accent-light); padding: 10px 14px; border-radius: 12px; }
+
+.fb-detaljer { margin-top: 34px; border-top: 1px solid var(--border); padding-top: 14px; font-size: var(--fs-md); color: var(--ink-soft); }
+.fb-detaljer summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+.fb-detaljer dl { margin: 14px 0; }
+.fb-detaljer dl div { display: flex; justify-content: space-between; padding: 3px 0; }
+.fb-detaljer dd { margin: 0; }
+.fb-summa { border-top: 1px solid var(--border); margin-top: 6px; padding-top: 8px !important; font-weight: 700; }
+.fb-historik { list-style: none; padding: 0; margin: 12px 0 0; display: flex; flex-direction: column; gap: 6px; }
+.fb-historik span { color: var(--muted-soft); margin-right: 10px; font-size: var(--fs-xs); }
+
+/* Knappen. */
+.fb-cta { width: 100%; min-height: 56px; border: 0; border-radius: 16px; background: var(--accent); color: #fff; font: inherit; font-size: var(--fs-lg); font-weight: 800; cursor: pointer; box-shadow: 0 6px 18px rgba(228, 87, 46, .32); transition: background .15s, transform .08s; }
+.fb-cta:hover:not(:disabled) { background: var(--accent-dark); }
+.fb-cta:active:not(:disabled) { transform: scale(.98); }
+.fb-cta:disabled { background: var(--surface-sunk); color: var(--muted); box-shadow: none; cursor: default; }
+
+.fb-bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 70%, transparent); z-index: 20; }
+
+/* Datorn: två kolumner, valen ligger kvar till höger. */
+@media (min-width: 900px) {
+  .fb { padding-bottom: 60px; }
+  .fb-grid { grid-template-columns: minmax(0, 1fr) 320px; gap: 40px; align-items: start; }
+  .fb-bara-mobil, .fb-bar { display: none; }
+  .fb-sida { display: block; position: sticky; top: 90px; }
+  .fb-kort { background: var(--surface); border: 1px solid var(--border); border-radius: 22px; padding: 16px; box-shadow: 0 10px 30px rgba(20, 17, 13, .06); }
+  .fb-bild-stor { width: 100%; height: 200px; margin-bottom: 14px; }
+  .fb-kort hr { border: 0; border-top: 1px solid var(--border); margin: 16px 0; }
+  .fb-kort .fb-cta { margin-top: 16px; }
+  .fb-progress { max-width: 560px; }
+  .fb-dag { grid-template-columns: 120px 1fr; gap: 10px; align-items: stretch; }
+  .fb-dag + .fb-dag { margin-top: 0; }
+  .fb-dag-namn { flex-direction: column; justify-content: center; gap: 0; }
+  .fb-slot { min-height: 68px; }
+}

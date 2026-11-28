@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { angraKopet, fetchFrakt, fetchOrder, requestFraktSlots, requestSlots, type DeliverySlot, type Order } from "../api";
 import type { Product } from "../types";
 import { Link, SellCta, track } from "../components/Bits";
+import FraktBokning from "./FraktBokning";
 
 /**
  * Orderskärmen: bekräftad → planerad leverans → levererad.
@@ -71,6 +72,11 @@ export default function OrderScreen({ id, fraktToken }: { id?: string; fraktToke
     );
   }
   if (!order) return <div className="butik-skeleton" style={{ height: 220, margin: "30px 0" }} />;
+
+  // Tradera-köparen från SMS:et får en egen, avskalad vy med ett enda ärende: välj tid.
+  if (fraktToken && order.kanal === "tradera") {
+    return <FraktBokning token={fraktToken} order={order} product={product} slots={slots} utanforZon={utanforZon} onOrder={setOrder} />;
+  }
 
   /**
    * Fyra steg, inte tre.
