@@ -81,7 +81,7 @@ export default function AdminTraderaPostScreen({ onOpenAd }: { onOpenAd?: (loopa
             : status.sms.provider === "none"
               ? t("SMS: avstängt (SMS_PROVIDER=none). Köparen får bara mejlet.")
               : t("SMS: ingen leverantör — SMS:en sparas i /outbox. Lägg ELKS_API_USERNAME och ELKS_API_PASSWORD i server/.env.")}
-          {status.email && status.email !== "gmail"
+          {status.email && status.email !== "gmail" && status.email !== "smtp"
             ? ` ${t("Mejl: EMAIL_PROVIDER={p} — mejlen till köparen skickas INTE på riktigt.", { p: status.email })}`
             : ""}
         </p>

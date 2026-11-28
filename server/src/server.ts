@@ -3607,15 +3607,15 @@ server.listen(PORT, BIND_HOST, () => {
    * textfil på en server. Kombinationen kan bara uppstå i drift, och den syns inte i något
    * gränssnitt — därför sägs den vid start, där den som rullar ut faktiskt tittar.
    */
-  void import("./notify/outbox.js").then(async ({ sender }) => {
+  void import("./notify/outbox.js").then(async ({ sender, RIKTIGA_LEVERANTORER }) => {
     const { checkoutConfigured } = await import("./butik/checkout.js");
     const kanal = sender().name;
     const kassa = checkoutConfigured();
     console.log(`[condition-grading-server] e-post: ${kanal} · kassa: ${kassa ? "konfigurerad" : "avstängd"}`);
-    if (kassa && kanal !== "gmail") {
+    if (kassa && !RIKTIGA_LEVERANTORER.includes(kanal)) {
       console.warn(
         `[condition-grading-server] VARNING: kassan tar emot köp men breven går till "${kanal}". ` +
-          "Köparens kvitto och arbetsordern BOKA FRAKT når då ingen. Sätt EMAIL_PROVIDER=gmail i server/.env.",
+          "Köparens kvitto och arbetsordern BOKA FRAKT når då ingen. Sätt EMAIL_PROVIDER=smtp (eller gmail) i server/.env.",
       );
     }
   });

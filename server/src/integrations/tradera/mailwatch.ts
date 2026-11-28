@@ -15,7 +15,7 @@
  *      reservation hos oss — möbeln är faktiskt borta. Ett null tillbaka betyder att den redan var
  *      såld, och det är inte ett fel.
  *   3. Ett brev går till adminadressen (TRADERA_MAIL_NOTIFY_TO, förval: Gmail-kontot självt) via
- *      utskicket. Med EMAIL_PROVIDER=gmail är det ett riktigt mejl; annars hamnar det i /outbox.
+ *      utskicket. Med EMAIL_PROVIDER=smtp eller gmail är det ett riktigt mejl; annars hamnar det i /outbox.
  *
  * MEJLEN RÖRS INTE. Ingen olästmarkering, ingen etikett, ingen flytt: inkorgen är ägarens. Markören
  * är IMAP-UID:t för det senast lästa mejlet, sparad tillsammans med brevlådans UIDVALIDITY — byter

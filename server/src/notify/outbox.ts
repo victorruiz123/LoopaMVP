@@ -100,11 +100,42 @@ const gmailSender: Sender = {
   },
 };
 
+/**
+ * smtp   skickar från Loopas egen adress, info@loopa.nu, genom webbhotellets SMTP (one.com:
+ *        SMTP_HOST=send.one.com, SMTP_PORT=465). Avsändaren är SMTP_USER, eller EMAIL_FROM när den är
+ *        satt. Servern har haft EMAIL_PROVIDER=smtp sedan 2026-10-08, men stödet låg kvar på en
+ *        sidogren — så ALLA brev, kvitton och arbetsordrar med, hamnade i /outbox fram till 2026-11-28.
+ */
+const smtpSender: Sender = {
+  name: "smtp",
+  async send(letter) {
+    const host = process.env.SMTP_HOST?.trim();
+    const user = process.env.SMTP_USER?.trim();
+    const pass = process.env.SMTP_PASS?.trim();
+    if (!host || !user || !pass) throw new Error("EMAIL_PROVIDER=smtp kräver SMTP_HOST, SMTP_USER och SMTP_PASS.");
+    const port = Number(process.env.SMTP_PORT ?? 465);
+    const { createTransport } = await import("nodemailer");
+    // 465 är TLS från första byten; 587 börjar okrypterat och uppgraderas med STARTTLS.
+    const transport = createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+    await transport.sendMail({
+      from: process.env.EMAIL_FROM?.trim() || `Loopa <${user}>`,
+      to: letter.to,
+      subject: letter.subject,
+      text: letter.body,
+      headers: { "X-Loopa-Kind": letter.kind },
+    });
+  },
+};
+
+/** Leverantörerna som faktiskt når en mottagare. Startvarningen och Tradera-posten läser den. */
+export const RIKTIGA_LEVERANTORER: readonly string[] = ["gmail", "smtp"];
+
 export function sender(): Sender {
   const choice = (process.env.EMAIL_PROVIDER ?? "file").trim().toLowerCase();
   if (choice === "none") return noneSender;
   if (choice === "file") return fileSender;
   if (choice === "gmail") return gmailSender;
+  if (choice === "smtp") return smtpSender;
   /**
    * En okänd leverantör faller till `file` och SÄGER det.
    *
