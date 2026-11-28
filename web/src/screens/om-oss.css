@@ -70,7 +70,9 @@
 /* ---- dekor: cirklar och ringar som i personbeskrivningen ---- */
 .oo-blob { position: absolute; pointer-events: none; border-radius: 999px; background: var(--accent); opacity: 0.9; }
 .oo-ring { position: absolute; pointer-events: none; border-radius: 999px; border-style: solid; }
-.oo-blob-hero { top: -160px; right: -160px; width: 420px; height: 420px; }
+/* På mobil slutar cirkeln ovanför rubriken: den låg förr bakom "det enkla valet.", orange på
+   orange (kontrast 1,1:1). Samma mått som .af .oo-blob-hero på affiliatesidan. */
+.oo-blob-hero { top: -250px; right: -170px; width: 380px; height: 380px; }
 @media (min-width: 768px) {
   .oo-blob-hero { top: -208px; right: -96px; width: 560px; height: 560px; }
 }
